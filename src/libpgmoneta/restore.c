@@ -28,6 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <backup.h>
+#include <extension.h>
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
@@ -36,6 +38,8 @@
 #include <restore.h>
 #include <security.h>
 #include <utils.h>
+#include <verify.h>
+#include <wal.h>
 #include <workers.h>
 #include <workflow.h>
 
@@ -49,14 +53,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NAME                  "restore"
-#define RESTORE_OK            0
-#define RESTORE_MISSING_LABEL 1
-#define RESTORE_NO_DISK_SPACE 2
-#define RESTORE_TYPE_UNKNOWN  3
-#define RESTORE_ERROR         4
-#define MAX_PATH_CONCAT       (MAX_PATH * 2)
-#define TMP_SUFFIX            ".tmp"
+#define NAME            "restore"
+#define MAX_PATH_CONCAT (MAX_PATH * 2)
+#define TMP_SUFFIX      ".tmp"
 
 struct build_backup_file_input
 {
@@ -82,6 +81,9 @@ static int restore_backup_incremental(struct art* nodes);
 static int carry_out_workflow(struct workflow* workflow, struct art* nodes);
 
 static void clear_manifest_incremental_entries(struct json* manifest);
+
+static void parse_position_parameters(char* position, struct art* nodes);
+
 /**
  * Combine the provided backups or each of the user defined table-spaces
  * The function will be called for two rounds, the first round would construct the data directory
@@ -355,26 +357,30 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-   if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
-   {
-      ec = MANAGEMENT_ERROR_RESTORE_ACTIVE;
-      pgmoneta_log_info("Restore: Server %s is active", config->common.servers[server].name);
-      pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
-                         config->common.servers[server].active_backup ? "Yes" : "No",
-                         config->common.servers[server].active_restore ? "Yes" : "No",
-                         config->common.servers[server].active_archive ? "Yes" : "No",
-                         config->common.servers[server].active_delete ? "Yes" : "No",
-                         config->common.servers[server].active_retention ? "Yes" : "No");
-      goto error;
-   }
-
-   config->common.servers[server].active_restore = true;
-   locked = true;
-
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
+   bool plan_only = (bool)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_PLAN);
+
+   if (!plan_only)
+   {
+      if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
+      {
+         ec = MANAGEMENT_ERROR_RESTORE_ACTIVE;
+         pgmoneta_log_info("Restore: Server %s is active", config->common.servers[server].name);
+         pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
+                            config->common.servers[server].active_backup ? "Yes" : "No",
+                            config->common.servers[server].active_restore ? "Yes" : "No",
+                            config->common.servers[server].active_archive ? "Yes" : "No",
+                            config->common.servers[server].active_delete ? "Yes" : "No",
+                            config->common.servers[server].active_retention ? "Yes" : "No");
+         goto error;
+      }
+
+      config->common.servers[server].active_restore = true;
+      locked = true;
+   }
 
    if (identifier == NULL || strlen(identifier) == 0)
    {
@@ -401,6 +407,117 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    if (pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)directory, ValueString))
    {
       goto error;
+   }
+
+   if (plan_only)
+   {
+      struct deque* labels = NULL;
+
+      pgmoneta_log_info("Restore plan mode: Validating restore for %s/%s",
+                        config->common.servers[server].name, backup->label);
+
+      // Parse position string to set NODE_COPY_WAL and NODE_PRIMARY flags
+      parse_position_parameters(position, nodes);
+
+      // Build backup labels for incremental chain validation
+      if (backup->type == TYPE_INCREMENTAL)
+      {
+         if (construct_backup_label_chain(server, identifier, NULL, false, &labels))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+            goto error;
+         }
+      }
+
+      ret = pgmoneta_validate_restore(server, backup, labels, nodes);
+
+      if (labels != NULL)
+      {
+         pgmoneta_deque_destroy(labels);
+      }
+
+      if (pgmoneta_management_create_response(payload, server, &response))
+      {
+         ec = MANAGEMENT_ERROR_ALLOCATION;
+         goto error;
+      }
+
+      backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backup->backup_size, ValueUInt64);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backup->restore_size, ValueUInt64);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)backup->compression, ValueInt32);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)backup->encryption, ValueInt32);
+
+      if (ret == RESTORE_OK)
+      {
+         pgmoneta_json_put(response, "ValidationStatus", (uintptr_t)"READY", ValueString);
+         pgmoneta_json_put(response, "ValidationMessage", (uintptr_t)"All preflight checks passed", ValueString);
+
+#ifdef HAVE_FREEBSD
+         clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+         clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+         if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NETWORK;
+            pgmoneta_log_error("Restore plan: Error sending response for %s", config->common.servers[server].name);
+            goto error;
+         }
+
+         elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
+         pgmoneta_log_info("Restore plan: %s/%s validation passed (Elapsed: %s)",
+                           config->common.servers[server].name, backup->label, elapsed);
+      }
+      else
+      {
+         char* error_msg = NULL;
+         char error_code_str[16];
+         snprintf(error_code_str, sizeof(error_code_str), "%d", ret);
+
+         switch (ret)
+         {
+            case RESTORE_CHAIN_INVALID:
+               error_msg = "Backup chain integrity validation failed";
+               break;
+            case RESTORE_WAL_INCOMPLETE:
+               error_msg = "WAL continuity validation failed";
+               break;
+            case RESTORE_TIMELINE_MISMATCH:
+               error_msg = "Timeline consistency validation failed";
+               break;
+            case RESTORE_VERSION_INCOMPATIBLE:
+               error_msg = "PostgreSQL version compatibility validation failed";
+               break;
+            case RESTORE_FILE_INACCESSIBLE:
+               error_msg = "Backup file accessibility validation failed";
+               break;
+            default:
+               error_msg = "Restore validation failed";
+               break;
+         }
+
+         pgmoneta_json_put(response, "ValidationStatus", (uintptr_t)"FAILED", ValueString);
+         pgmoneta_json_put(response, "ValidationMessage", (uintptr_t)error_msg, ValueString);
+         pgmoneta_json_put(response, "ValidationErrorCode", (uintptr_t)error_code_str, ValueString);
+
+         ec = MANAGEMENT_ERROR_RESTORE_VALIDATION;
+         pgmoneta_log_warn("Restore plan: %s/%s validation failed (error code %d)",
+                           config->common.servers[server].name, backup->label, ret);
+         goto error;
+      }
+
+      pgmoneta_json_destroy(payload);
+      pgmoneta_disconnect(client_fd);
+      pgmoneta_stop_logging();
+      free(backup);
+      free(elapsed);
+      free(output);
+      exit(0);
    }
 
    ret = pgmoneta_restore_backup(nodes);
@@ -519,74 +636,7 @@ pgmoneta_restore_backup(struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   if (position != NULL && strlen(position) > 0)
-   {
-      char tokens[512];
-      bool primary = true;
-      bool copy_wal = false;
-      char* ptr = NULL;
-
-      memset(&tokens[0], 0, sizeof(tokens));
-      memcpy(&tokens[0], position, strlen(position));
-
-      ptr = strtok(&tokens[0], ",");
-
-      while (ptr != NULL)
-      {
-         char key[256];
-         char value[256];
-         char* equal = NULL;
-
-         memset(&key[0], 0, sizeof(key));
-         memset(&value[0], 0, sizeof(value));
-
-         equal = strchr(ptr, '=');
-
-         if (equal == NULL)
-         {
-            memcpy(&key[0], ptr, strlen(ptr));
-         }
-         else
-         {
-            memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
-            memcpy(&value[0], equal + 1, strlen(equal) - 1);
-         }
-
-         if (!strcmp(&key[0], "current") ||
-             !strcmp(&key[0], "immediate") ||
-             !strcmp(&key[0], "name") ||
-             !strcmp(&key[0], "xid") ||
-             !strcmp(&key[0], "lsn") ||
-             !strcmp(&key[0], "time"))
-         {
-            copy_wal = true;
-         }
-         else if (!strcmp(&key[0], "primary"))
-         {
-            primary = true;
-         }
-         else if (!strcmp(&key[0], "replica"))
-         {
-            primary = false;
-         }
-         else if (!strcmp(&key[0], "inclusive") || !strcmp(&key[0], "timeline") || !strcmp(&key[0], "action"))
-         {
-            /* Ok */
-         }
-
-         ptr = strtok(NULL, ",");
-      }
-
-      pgmoneta_art_insert(nodes, NODE_PRIMARY, primary, ValueBool);
-
-      pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, true, ValueBool);
-
-      pgmoneta_art_insert(nodes, NODE_COPY_WAL, copy_wal, ValueBool);
-   }
-   else
-   {
-      pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, false, ValueBool);
-   }
+   parse_position_parameters(position, nodes);
 
    if (backup->type == TYPE_FULL)
    {
@@ -2157,6 +2207,83 @@ clear_manifest_incremental_entries(struct json* manifest)
       }
    }
    pgmoneta_json_iterator_destroy(iter);
+}
+
+/**
+ * Parse position parameters for restore configuration
+ * 
+ * @param position The position string
+ * @param nodes The ART structure to populate with parsed values
+ */
+static void
+parse_position_parameters(char* position, struct art* nodes)
+{
+   if (position != NULL && strlen(position) > 0)
+   {
+      char tokens[512];
+      bool primary = true;
+      bool copy_wal = false;
+      char* ptr = NULL;
+
+      memset(&tokens[0], 0, sizeof(tokens));
+      memcpy(&tokens[0], position, strlen(position));
+
+      ptr = strtok(&tokens[0], ",");
+
+      while (ptr != NULL)
+      {
+         char key[256];
+         char value[256];
+         char* equal = NULL;
+
+         memset(&key[0], 0, sizeof(key));
+         memset(&value[0], 0, sizeof(value));
+
+         equal = strchr(ptr, '=');
+
+         if (equal == NULL)
+         {
+            memcpy(&key[0], ptr, strlen(ptr));
+         }
+         else
+         {
+            memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
+            memcpy(&value[0], equal + 1, strlen(equal) - 1);
+         }
+
+         if (!strcmp(&key[0], "current") ||
+             !strcmp(&key[0], "immediate") ||
+             !strcmp(&key[0], "name") ||
+             !strcmp(&key[0], "xid") ||
+             !strcmp(&key[0], "lsn") ||
+             !strcmp(&key[0], "time"))
+         {
+            copy_wal = true;
+         }
+         else if (!strcmp(&key[0], "primary"))
+         {
+            primary = true;
+         }
+         else if (!strcmp(&key[0], "replica"))
+         {
+            primary = false;
+         }
+         else if (!strcmp(&key[0], "inclusive") || !strcmp(&key[0], "timeline") || !strcmp(&key[0], "action"))
+         {
+            /* Ok - these parameters are parsed elsewhere */
+         }
+
+         ptr = strtok(NULL, ",");
+      }
+
+      pgmoneta_art_insert(nodes, NODE_PRIMARY, primary, ValueBool);
+      pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, true, ValueBool);
+      pgmoneta_art_insert(nodes, NODE_COPY_WAL, copy_wal, ValueBool);
+   }
+   else
+   {
+      pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, false, ValueBool);
+   }
 }
 
 static int

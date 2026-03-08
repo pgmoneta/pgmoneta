@@ -50,6 +50,18 @@ struct timeline_history
    struct timeline_history* next; /**< the next history entry */
 };
 
+/** @struct wal_segment
+ * Defines parsed WAL segment information from filename
+ */
+struct wal_segment
+{
+   char filename[MISC_LENGTH]; /**< Original filename */
+   uint32_t timeline;          /**< Timeline ID */
+   uint32_t log;               /**< Log file number (high part of segment number) */
+   uint32_t seg;               /**< Segment number (low part) */
+   uint64_t segment_no;        /**< Combined segment number for easy comparison */
+};
+
 /**
  * @brief Enum representing types of PostgreSQL objects
  */
@@ -93,6 +105,29 @@ pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** h
  */
 void
 pgmoneta_free_timeline_history(struct timeline_history* history);
+
+/**
+ * Parse WAL filename to extract timeline and segment information
+ * 
+ * @param filename The WAL filename to parse
+ * @param segment Output structure to hold parsed information
+ * @return 0 on success, 1 on parse failure
+ */
+int
+pgmoneta_parse_wal_filename(char* filename, struct wal_segment* segment);
+
+/**
+ * Compare two WAL segments for sorting
+ * 
+ * Sorts by timeline first, then by segment number.
+ * Compatible with qsort() as a comparator function.
+ * 
+ * @param a First WAL segment
+ * @param b Second WAL segment
+ * @return -1 if a < b, 0 if equal, 1 if a > b
+ */
+int
+pgmoneta_compare_wal_segments(const void* a, const void* b);
 
 /**
  * @brief Read OID mappings from PostgreSQL server
