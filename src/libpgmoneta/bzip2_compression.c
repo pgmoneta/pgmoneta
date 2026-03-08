@@ -740,6 +740,7 @@ bzip2_compress(char* from, int level, char* to)
 {
    FILE* from_ptr = NULL;
    FILE* to_ptr = NULL;
+   char* tmp_to = NULL;
 
    char buf[BUFFER_LENGTH] = {0};
    size_t buf_len = BUFFER_LENGTH;
@@ -752,7 +753,10 @@ bzip2_compress(char* from, int level, char* to)
       goto error;
    }
 
-   to_ptr = fopen(to, "wb");
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   to_ptr = fopen(tmp_to, "wb");
    if (!to_ptr)
    {
       goto error;
@@ -782,10 +786,21 @@ bzip2_compress(char* from, int level, char* to)
    }
 
    BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
+   zip_file = NULL;
 
    fclose(from_ptr);
+   from_ptr = NULL;
    fflush(to_ptr);
    fclose(to_ptr);
+   to_ptr = NULL;
+
+   pgmoneta_permission(tmp_to, 6, 0, 0);
+   if (pgmoneta_move_file(tmp_to, to))
+   {
+      goto error_zip;
+   }
+
+   free(tmp_to);
 
    return 0;
 
@@ -805,8 +820,10 @@ error:
    {
       fflush(to_ptr);
       fclose(to_ptr);
-      pgmoneta_delete_file(to, NULL);
+      pgmoneta_delete_file(tmp_to, NULL);
    }
+
+   free(tmp_to);
 
    return 1;
 }
@@ -816,6 +833,7 @@ bzip2_decompress(char* from, char* to)
 {
    FILE* from_ptr = NULL;
    FILE* to_ptr = NULL;
+   char* tmp_to = NULL;
 
    char buf[BUFFER_LENGTH] = {0};
    size_t buf_len = BUFFER_LENGTH;
@@ -829,7 +847,10 @@ bzip2_decompress(char* from, char* to)
       goto error;
    }
 
-   to_ptr = fopen(to, "wb");
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   to_ptr = fopen(tmp_to, "wb");
    if (!to_ptr)
    {
       goto error;
@@ -860,10 +881,21 @@ bzip2_decompress(char* from, char* to)
    while (bzip2_err != BZ_STREAM_END);
 
    BZ2_bzReadClose(&bzip2_err, zip_file);
+   zip_file = NULL;
 
    fclose(from_ptr);
+   from_ptr = NULL;
    fflush(to_ptr);
    fclose(to_ptr);
+   to_ptr = NULL;
+
+   pgmoneta_permission(tmp_to, 6, 0, 0);
+   if (pgmoneta_move_file(tmp_to, to))
+   {
+      goto error_unzip;
+   }
+
+   free(tmp_to);
 
    return 0;
 
@@ -878,13 +910,15 @@ error:
    {
       fflush(to_ptr);
       fclose(to_ptr);
-      pgmoneta_delete_file(to, NULL);
+      pgmoneta_delete_file(tmp_to, NULL);
    }
 
    if (from_ptr)
    {
       fclose(from_ptr);
    }
+
+   free(tmp_to);
 
    return 1;
 }

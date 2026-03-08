@@ -714,6 +714,7 @@ lz4_compress(char* from, char* to)
    char buffIn[2][BLOCK_BYTES];
    int buffInIndex = 0;
    char buffOut[LZ4_COMPRESSBOUND(BLOCK_BYTES)];
+   char* tmp_to = NULL;
 
    lz4Stream = LZ4_createStream();
    if (lz4Stream == NULL)
@@ -728,7 +729,10 @@ lz4_compress(char* from, char* to)
       goto error;
    }
 
-   fout = fopen(to, "wb");
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   fout = fopen(tmp_to, "wb");
    if (fout == NULL)
    {
       goto error;
@@ -767,8 +771,18 @@ lz4_compress(char* from, char* to)
 
    fflush(fout);
    fclose(fout);
+   fout = NULL;
    fclose(fin);
+   fin = NULL;
    LZ4_freeStream(lz4Stream);
+   lz4Stream = NULL;
+
+   pgmoneta_permission(tmp_to, 6, 0, 0);
+   if (pgmoneta_move_file(tmp_to, to))
+   {
+      goto error;
+   }
+   free(tmp_to);
 
    return 0;
 
@@ -783,13 +797,15 @@ error:
    {
       fflush(fout);
       fclose(fout);
-      pgmoneta_delete_file(to, NULL);
+      pgmoneta_delete_file(tmp_to, NULL);
    }
 
    if (lz4Stream != NULL)
    {
       LZ4_freeStream(lz4Stream);
    }
+
+   free(tmp_to);
 
    return 1;
 }
@@ -805,6 +821,7 @@ lz4_decompress(char* from, char* to)
    int buffInIndex = 0;
    char buffOut[LZ4_COMPRESSBOUND(BLOCK_BYTES)];
    size_t read = 0;
+   char* tmp_to = NULL;
 
    lz4StreamDecode = &lz4StreamDecodeBody;
    fin = fopen(from, "rb");
@@ -814,7 +831,10 @@ lz4_decompress(char* from, char* to)
       goto error;
    }
 
-   fout = fopen(to, "wb");
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   fout = fopen(tmp_to, "wb");
 
    if (fout == NULL)
    {
@@ -872,7 +892,16 @@ lz4_decompress(char* from, char* to)
 
    fflush(fout);
    fclose(fout);
+   fout = NULL;
    fclose(fin);
+   fin = NULL;
+
+   pgmoneta_permission(tmp_to, 6, 0, 0);
+   if (pgmoneta_move_file(tmp_to, to))
+   {
+      goto error;
+   }
+   free(tmp_to);
 
    return 0;
 
@@ -886,8 +915,10 @@ error:
    {
       fflush(fout);
       fclose(fout);
-      pgmoneta_delete_file(to, NULL);
+      pgmoneta_delete_file(tmp_to, NULL);
    }
+
+   free(tmp_to);
 
    return 1;
 }

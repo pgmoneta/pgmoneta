@@ -1128,6 +1128,7 @@ encrypt_file(char* from, char* to, int enc)
    int outl = 0;
    int f_len = 0;
    int ret = 1;
+   char* tmp_to = NULL;
 
    config = (struct main_configuration*)shmem;
    cipher_fp = get_cipher(config->encryption);
@@ -1205,10 +1206,13 @@ encrypt_file(char* from, char* to, int enc)
       goto error;
    }
 
-   out = fopen(to, "w");
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   out = fopen(tmp_to, "w");
    if (out == NULL)
    {
-      pgmoneta_log_error("fopen: Could not open %s", to);
+      pgmoneta_log_error("fopen: Could not open %s", tmp_to);
       goto error;
    }
 
@@ -1291,6 +1295,21 @@ cleanup:
       fflush(out);
       fclose(out);
    }
+
+   if (ret == 0)
+   {
+      pgmoneta_permission(tmp_to, 6, 0, 0);
+      if (pgmoneta_move_file(tmp_to, to))
+      {
+         ret = 1;
+      }
+   }
+   else
+   {
+      pgmoneta_delete_file(tmp_to, NULL);
+   }
+
+   free(tmp_to);
 
    return ret;
 
@@ -1687,6 +1706,7 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
    }
 
    return 0;
+
 error:
 
    if (master_key != NULL)
