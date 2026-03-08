@@ -1135,6 +1135,7 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
    FILE* fin = NULL;
    FILE* fout = NULL;
    size_t toRead;
+   char* tmp_to = NULL;
 
    fin = fopen(from, "rb");
 
@@ -1144,7 +1145,10 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
       goto error;
    }
 
-   fout = fopen(to, "wb");
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   fout = fopen(tmp_to, "wb");
 
    if (fout == NULL)
    {
@@ -1195,7 +1199,17 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
 
    fflush(fout);
    fclose(fout);
+   fout = NULL;
    fclose(fin);
+   fin = NULL;
+
+   pgmoneta_permission(tmp_to, 6, 0, 0);
+   if (pgmoneta_move_file(tmp_to, to))
+   {
+      goto error;
+   }
+
+   free(tmp_to);
 
    return 0;
 
@@ -1205,13 +1219,15 @@ error:
    {
       fflush(fout);
       fclose(fout);
-      pgmoneta_delete_file(to, NULL);
+      pgmoneta_delete_file(tmp_to, NULL);
    }
 
    if (fin != NULL)
    {
       fclose(fin);
    }
+
+   free(tmp_to);
 
    return 1;
 }
@@ -1224,6 +1240,7 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
    size_t toRead;
    size_t read;
    size_t lastRet = 0;
+   char* tmp_to = NULL;
 
    fin = fopen(from, "rb");
 
@@ -1233,7 +1250,10 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
       goto error;
    }
 
-   fout = fopen(to, "wb");
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   fout = fopen(tmp_to, "wb");
 
    if (fout == NULL)
    {
@@ -1280,8 +1300,18 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
    }
 
    fclose(fin);
+   fin = NULL;
    fflush(fout);
    fclose(fout);
+   fout = NULL;
+
+   pgmoneta_permission(tmp_to, 6, 0, 0);
+   if (pgmoneta_move_file(tmp_to, to))
+   {
+      goto error;
+   }
+
+   free(tmp_to);
 
    return 0;
 
@@ -1296,8 +1326,10 @@ error:
    {
       fflush(fout);
       fclose(fout);
-      pgmoneta_delete_file(to, NULL);
+      pgmoneta_delete_file(tmp_to, NULL);
    }
+
+   free(tmp_to);
 
    return 1;
 }

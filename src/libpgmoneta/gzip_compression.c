@@ -928,6 +928,7 @@ gz_compress(char* from, int level, char* to)
    char mode[4];
    gzFile out = NULL;
    size_t length;
+   char* tmp_to = NULL;
 
    in = fopen(from, "rb");
    if (in == NULL)
@@ -940,7 +941,10 @@ gz_compress(char* from, int level, char* to)
    mode[1] = 'b';
    mode[2] = '0' + level;
 
-   out = gzopen(to, mode);
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   out = gzopen(tmp_to, mode);
    if (out == NULL)
    {
       goto error;
@@ -973,6 +977,14 @@ gz_compress(char* from, int level, char* to)
       out = NULL;
       goto error;
    }
+   out = NULL;
+
+   pgmoneta_permission(tmp_to, 6, 0, 0);
+   if (pgmoneta_move_file(tmp_to, to))
+   {
+      goto error;
+   }
+   free(tmp_to);
 
    return 0;
 
@@ -987,7 +999,9 @@ error:
    {
       gzclose(out);
    }
-   pgmoneta_delete_file(to, NULL);
+   pgmoneta_delete_file(tmp_to, NULL);
+
+   free(tmp_to);
 
    return 1;
 }
@@ -999,6 +1013,7 @@ gz_decompress(char* from, char* to)
    FILE* out = NULL;
    char mode[3];
    gzFile in = NULL;
+   char* tmp_to = NULL;
 
    memset(&mode[0], 0, sizeof(mode));
    mode[0] = 'r';
@@ -1010,7 +1025,10 @@ gz_decompress(char* from, char* to)
       goto error;
    }
 
-   out = fopen(to, "wb");
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   out = fopen(tmp_to, "wb");
    if (out == NULL)
    {
       goto error;
@@ -1044,9 +1062,18 @@ gz_decompress(char* from, char* to)
       in = NULL;
       goto error;
    }
+   in = NULL;
 
    fflush(out);
    fclose(out);
+   out = NULL;
+
+   pgmoneta_permission(tmp_to, 6, 0, 0);
+   if (pgmoneta_move_file(tmp_to, to))
+   {
+      goto error;
+   }
+   free(tmp_to);
 
    return 0;
 
@@ -1062,7 +1089,9 @@ error:
       fflush(out);
       fclose(out);
    }
-   pgmoneta_delete_file(to, NULL);
+   pgmoneta_delete_file(tmp_to, NULL);
+
+   free(tmp_to);
 
    return 1;
 }
