@@ -1140,6 +1140,11 @@ error:
       fclose(out);
    }
 
+   if (ret == 0)
+   {
+      pgmoneta_permission(to, 6, 0, 0);
+   }
+
    return ret;
 }
 
