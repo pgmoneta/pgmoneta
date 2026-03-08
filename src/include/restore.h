@@ -43,6 +43,18 @@ extern "C" {
 #include <stdbool.h>
 #include <stdlib.h>
 
+/* Restore validation return codes */
+#define RESTORE_OK                   0
+#define RESTORE_MISSING_LABEL        1
+#define RESTORE_NO_DISK_SPACE        2
+#define RESTORE_TYPE_UNKNOWN         3
+#define RESTORE_ERROR                4
+#define RESTORE_CHAIN_INVALID        5
+#define RESTORE_WAL_INCOMPLETE       6
+#define RESTORE_TIMELINE_MISMATCH    7
+#define RESTORE_VERSION_INCOMPATIBLE 8
+#define RESTORE_FILE_INACCESSIBLE    9
+
 /**
  * Fill the passed arugment with the last files names to restore
  * @param output The string array that will be filled with the last files names to restore

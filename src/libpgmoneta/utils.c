@@ -3721,6 +3721,57 @@ pgmoneta_wal_file_name(uint32_t tli, size_t segno, int segsize)
    return f;
 }
 
+char*
+pgmoneta_get_backup_file_path(char* base_path, int compression, int encryption)
+{
+   char* full_path = NULL;
+   char* suffix = NULL;
+   char* candidate_path = NULL;
+
+   if (base_path == NULL)
+   {
+      return NULL;
+   }
+
+   if (pgmoneta_exists(base_path))
+   {
+      return strdup(base_path);
+   }
+
+   if (pgmoneta_extraction_get_suffix(compression, encryption, &suffix))
+   {
+      goto error;
+   }
+
+   candidate_path = pgmoneta_append(candidate_path, base_path);
+   if (candidate_path == NULL)
+   {
+      goto error;
+   }
+
+   if (suffix != NULL)
+   {
+      char* appended = pgmoneta_append(candidate_path, suffix);
+      if (appended == NULL)
+      {
+         goto error;
+      }
+
+      candidate_path = appended;
+   }
+
+   if (pgmoneta_exists(candidate_path))
+   {
+      full_path = candidate_path;
+      candidate_path = NULL;
+   }
+
+error:
+   free(suffix);
+   free(candidate_path);
+   return full_path;
+}
+
 int
 pgmoneta_read_wal(char* directory, char** wal)
 {
