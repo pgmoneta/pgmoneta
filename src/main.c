@@ -1063,6 +1063,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    config = (struct main_configuration*)shmem;
    ai = (struct accept_io*)watcher;
 
+   memset(&client_addr, 0, sizeof(client_addr));
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
    if (client_fd == -1)
@@ -2091,6 +2092,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
    config = (struct main_configuration*)shmem;
 
+   memset(&client_addr, 0, sizeof(client_addr));
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
    if (client_fd == -1)
@@ -2184,6 +2186,7 @@ accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
    config = (struct main_configuration*)shmem;
 
+   memset(&client_addr, 0, sizeof(client_addr));
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
    if (client_fd == -1)
@@ -2256,6 +2259,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
    config = (struct main_configuration*)shmem;
 
+   memset(&client_addr, 0, sizeof(client_addr));
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
    if (client_fd == -1)
