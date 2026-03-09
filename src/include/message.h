@@ -44,8 +44,6 @@ extern "C" {
 #define MESSAGE_STATUS_OK    1
 #define MESSAGE_STATUS_ERROR 2
 
-extern struct token_bucket bucket;
-
 /** @struct message
  * Defines a message
  */

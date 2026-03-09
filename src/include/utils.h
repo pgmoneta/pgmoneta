@@ -149,18 +149,6 @@ struct pgmoneta_parsed_command
    char* args[MISC_LENGTH];      /**< The arguments */
 };
 
-/** @struct token_bucket
- * Defines token bucket structure
- */
-struct token_bucket
-{
-   unsigned long burst;     /**< Default value is 0, no limit */
-   atomic_ulong cur_tokens; /**< The current tokens */
-   long max_rate;           /**< The maximum rate */
-   int every;               /**< The every rate */
-   atomic_ulong last_time;  /**< The last time updated */
-};
-
 /**
  * Utility function to parse the command line
  * and search for a command.
@@ -1316,48 +1304,6 @@ pgmoneta_normalize_file_type(uint32_t type);
  */
 int
 pgmoneta_get_type_suffix(uint32_t type, char** suffix);
-
-/**
- * Init a token bucket
- * @param tb The token bucket
- * @param max_rate The number of bytes of tokens added every one second
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_token_bucket_init(struct token_bucket* tb, long max_rate);
-
-/**
- * Free the memory of the token bucket
- * @param tb The token bucket
- */
-void
-pgmoneta_token_bucket_destroy(struct token_bucket* tb);
-
-/**
- * Add new token into the bucket
- * @param tb The token bucket
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_token_bucket_add(struct token_bucket* tb);
-
-/**
- * Get tokens from token bucket wrapper
- * @param tb The token bucket
- * @param tokens Needed tokens
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_token_bucket_consume(struct token_bucket* tb, unsigned long tokens);
-
-/**
- * Get tokens from token bucket once
- * @param tb The token bucket
- * @param tokens Needed tokens
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens);
 
 /**
  * Format a string and append it to the original string

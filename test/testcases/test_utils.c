@@ -854,38 +854,6 @@ cleanup:
    MCTF_FINISH();
 }
 
-MCTF_TEST(test_utils_token_bucket)
-{
-   struct token_bucket* tb = NULL;
-
-   tb = (struct token_bucket*)malloc(sizeof(struct token_bucket));
-   MCTF_ASSERT_PTR_NONNULL(tb, cleanup, "malloc token_bucket failed");
-
-   // Test initialization
-
-   MCTF_ASSERT_INT_EQ(pgmoneta_token_bucket_init(tb, 100), 0, cleanup, "token_bucket_init failed");
-
-   // Test consume
-
-   MCTF_ASSERT_INT_EQ(pgmoneta_token_bucket_consume(tb, 50), 0, cleanup, "token_bucket_consume failed");
-
-   // Test once
-
-   MCTF_ASSERT_INT_EQ(pgmoneta_token_bucket_once(tb, 10), 0, cleanup, "token_bucket_once failed");
-
-   // Test add (force update)
-
-   MCTF_ASSERT_INT_EQ(pgmoneta_token_bucket_add(tb), 0, cleanup, "token_bucket_add failed");
-
-cleanup:
-   if (tb != NULL)
-   {
-      pgmoneta_token_bucket_destroy(tb);
-      tb = NULL;
-   }
-   MCTF_FINISH();
-}
-
 MCTF_TEST(test_utils_file_dir)
 {
    char base[MAX_PATH];
