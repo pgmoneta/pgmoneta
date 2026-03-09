@@ -42,6 +42,27 @@
 #include <workflow.h>
 
 #define NAME "s3"
+
+static bool
+s3_is_safe_prefix(char* prefix)
+{
+   if (pgmoneta_contains(prefix, "/") || pgmoneta_contains(prefix, ".") || pgmoneta_contains(prefix, ".."))
+   {
+      return false;
+   }
+   if (prefix[0] == '/')
+   {
+      return false;
+   }
+
+   if (strstr(prefix, "..") != NULL)
+   {
+      return false;
+   }
+
+   return true;
+}
+
 void
 pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
@@ -169,6 +190,118 @@ error:
 
    pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                       ec != -1 ? ec : MANAGEMENT_ERROR_LIST_S3_ERROR, en != NULL ? en : NAME,
+                                      compression, encryption, payload);
+
+   pgmoneta_json_destroy(payload);
+   pgmoneta_art_destroy(nodes);
+   pgmoneta_workflow_destroy(workflow);
+   free(elapsed);
+
+   pgmoneta_disconnect(client_fd);
+   pgmoneta_stop_logging();
+   exit(1);
+}
+
+void
+pgmoneta_delete_s3_objects(int client_fd, int server, char* prefix, uint8_t compression, uint8_t encryption, struct json* payload)
+{
+   char* elapsed = NULL;
+   char* en = NULL;
+   int ec = -1;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
+   struct json* response = NULL;
+   struct art* nodes = NULL;
+   struct workflow* workflow = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
+   if (!s3_is_safe_prefix(prefix))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_INVALID_PREFIX;
+      pgmoneta_log_error("S3 delete: invalid prefix for %s", config->common.servers[server].name);
+      goto error;
+   }
+
+   if (pgmoneta_art_create(&nodes))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_WORKFLOW;
+      goto error;
+   }
+
+   if (pgmoneta_art_insert(nodes, NODE_SERVER_ID, (uintptr_t)server, ValueInt32))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_WORKFLOW;
+      goto error;
+   }
+
+   if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)prefix, ValueString))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_WORKFLOW;
+      goto error;
+   }
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_S3_DELETE, NULL);
+
+   if (workflow == NULL)
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_WORKFLOW;
+      pgmoneta_log_error("S3 delete: S3 storage engine is not configured for %s", config->common.servers[server].name);
+      goto error;
+   }
+
+   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
+   {
+      pgmoneta_log_error("S3 delete: workflow failed for %s", config->common.servers[server].name);
+      goto error;
+   }
+
+   if (pgmoneta_management_create_response(payload, server, &response))
+   {
+      ec = MANAGEMENT_ERROR_ALLOCATION;
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_S3_PREFIX, (uintptr_t)prefix, ValueString);
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_NETWORK;
+      pgmoneta_log_error("S3 delete: error sending response for %s", config->common.servers[server].name);
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
+   pgmoneta_log_info("S3 delete: %s/%s (Elapsed: %s)", config->common.servers[server].name, prefix, elapsed);
+
+   pgmoneta_json_destroy(payload);
+   pgmoneta_art_destroy(nodes);
+   pgmoneta_workflow_destroy(workflow);
+   free(elapsed);
+
+   pgmoneta_disconnect(client_fd);
+   pgmoneta_stop_logging();
+   exit(0);
+
+error:
+
+   pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_DELETE_S3_ERROR, en != NULL ? en : NAME,
                                       compression, encryption, payload);
 
    pgmoneta_json_destroy(payload);

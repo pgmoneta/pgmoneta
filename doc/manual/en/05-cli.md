@@ -517,17 +517,19 @@ Manage the s3 storage
 Command
 
 ```sh
-pgmoneta-cli s3 [ls] <server>
+pgmoneta-cli s3 <action> <arguments>
 ```
 
 Subcommand
 
 - `ls` : List all the files in s3
+- `delete` : Delete all files under a remote prefix in s3
 
 Example
 
 ```sh
 pgmoneta-cli s3 ls primary
+pgmoneta-cli s3 delete primary 20260302163357
 ```
 
 ### s3 ls
@@ -541,6 +543,19 @@ Examples
 ```sh
 pgmoneta-cli s3 ls primary
 pgmoneta-cli s3 ls
+```
+
+### s3 delete
+
+Delete all server files/objects in remote storage s3 under a given prefix.
+
+- prefix is relative to `<s3_base_dir>/<server>/backup/`
+
+Examples
+
+```sh
+pgmoneta-cli s3 delete primary 20260302163357/
+pgmoneta-cli s3 delete primary wal/
 ```
 
 
