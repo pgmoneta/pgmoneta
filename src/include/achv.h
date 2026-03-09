@@ -62,12 +62,10 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
  * @param buffer The stream buffer
  * @param basedir The base directory for the backup data
  * @param tablespaces The user level tablespaces
- * @param bucket The rate limit bucket
- * @param network_bucket The network rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
+pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces);
 
 /**
  * Receive backup tar files from the copy stream and write to disk
@@ -78,12 +76,10 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
  * @param buffer The stream buffer
  * @param basedir The base directory for the backup data
  * @param tablespaces The user level tablespaces
- * @param bucket The rate limit bucket
- * @param network_bucket The network rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
+pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces);
 
 /**
  * Extract from a tar file to a given directory

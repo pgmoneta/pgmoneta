@@ -358,6 +358,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
  * @param incremental If the backup is incremental
  * @param label The label of the backup
  * @param include_wal The indication of whether to also include WAL
+ * @param max_rate The max backup rate in bytes per second
  * @param compression The compression type
  * @param compression_level The compression level
  * @param msg The resulting message
@@ -365,6 +366,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
  */
 int
 pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal,
+                                    int max_rate,
                                     int compression, int compression_level, bool progress,
                                     struct message** msg);
 
@@ -498,11 +500,10 @@ pgmoneta_consume_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer
  * @param socket The socket
  * @param buffer The stream buffer
  * @param message The message buffer
- * @param network_bucket The network rate limit bucket
  * @return 1 upon success, 0 if no data to consume, otherwise 2
  */
 int
-pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message, struct token_bucket* network_bucket);
+pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message);
 
 /**
  * Finish consuming the buffer, prepare for the next message to be consumed
@@ -531,12 +532,10 @@ pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_
  * @param socket The socket
  * @param buffer The stream buffer
  * @param basedir The base directory for the manifest
- * @param bucket The rate limit bucket
- * @param network_bucket The network rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket, struct token_bucket* network_bucket);
+pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir);
 
 /**
  * Receive extra file from the server side

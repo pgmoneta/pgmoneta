@@ -337,8 +337,7 @@ struct server
    char tls_key_file[MAX_PATH];                                   /**< TLS key path */
    char tls_ca_file[MAX_PATH];                                    /**< TLS CA certificate path */
    int workers;                                                   /**< The number of workers */
-   int backup_max_rate;                                           /**< Number of tokens added to the bucket with each replenishment for backup. */
-   int network_max_rate;                                          /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
+   int max_rate;                                                  /**< Maximum backup rate in bytes per second. */
    int number_of_extra;                                           /**< The number of source directory*/
    int progress;                                                  /**< The Backup progress status */
    char extra[MAX_EXTRA][MAX_EXTRA_PATH];                         /**< Source directory*/
@@ -499,8 +498,7 @@ struct main_configuration
    unsigned char hugepage;  /**< Huge page support */
    unsigned char direct_io; /**< Direct I/O support (off, auto, on) */
 
-   int backup_max_rate;  /**< Number of tokens added to the bucket with each replenishment for backup. */
-   int network_max_rate; /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
+   int max_rate; /**< Maximum backup rate in bytes per second. */
 
    pgmoneta_time_t verification; /**< The sha512 verification interval */
 

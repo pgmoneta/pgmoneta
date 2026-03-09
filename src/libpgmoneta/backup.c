@@ -752,18 +752,18 @@ error:
 }
 
 int
-pgmoneta_get_backup_max_rate(int server)
+pgmoneta_get_max_rate(int server)
 {
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
 
-   if (config->common.servers[server].backup_max_rate != -1)
+   if (config->common.servers[server].max_rate != -1)
    {
-      return config->common.servers[server].backup_max_rate;
+      return config->common.servers[server].max_rate;
    }
 
-   return config->backup_max_rate;
+   return config->max_rate;
 }
 
 bool

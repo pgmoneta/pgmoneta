@@ -199,11 +199,8 @@ blocking_timeout
   'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks.
   Default is 30
 
-backup_max_rate
-  The number of bytes of tokens added every one second to limit the backup rate. Use 0 to disable. Default is 0
-
-network_max_rate
-  The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable. Default is 0
+max_rate
+  The maximum backup transfer rate in bytes per second. Use 0 to disable. Default is 0
 
 progress
   Enable backup progress tracking. Default is off
@@ -313,11 +310,8 @@ workers
   Use 0 to disable, -1 means use the global settting.  Maximum is CPU count.
   Default is -1
 
-backup_max_rate
-  The number of bytes of tokens added every one second to limit the backup rate. Use 0 to disable, -1 means use the global settting. Default is -1
-
-network_max_rate
-  The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable, -1 means use the global settting. Default is -1
+max_rate
+  The maximum backup transfer rate in bytes per second. Use 0 to disable, -1 means use the global setting. Default is -1
 
 progress
   Enable backup progress tracking. Use on to enable, off to disable, -1 means use the global setting. Default is -1
