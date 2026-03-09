@@ -60,7 +60,7 @@ get_wal_level_string(int wal_level)
    }
 
    return wal_level_str;
-};
+}
 
 struct xl_end_of_recovery*
 create_xl_end_of_recovery(void)

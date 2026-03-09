@@ -742,7 +742,6 @@ parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
       if (parsed->xinfo & XACT_XINFO_HAS_GID)
       {
          snprintf(parsed->twophase_gid, sizeof(parsed->twophase_gid), "%s", data);
-         ;
          data += strlen(data) + 1;
       }
    }
@@ -873,7 +872,6 @@ parse_commit_record_v14(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
       if (parsed->xinfo & XACT_XINFO_HAS_GID)
       {
          snprintf(parsed->twophase_gid, sizeof(parsed->twophase_gid), "%s", data);
-         ;
          data += strlen(data) + 1;
       }
    }
@@ -970,7 +968,6 @@ parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
       if (parsed->xinfo & XACT_XINFO_HAS_GID)
       {
          snprintf(parsed->twophase_gid, sizeof(parsed->twophase_gid), "%s", data);
-         ;
          data += strlen(data) + 1;
       }
    }
@@ -1121,7 +1118,6 @@ parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
       if (parsed->xinfo & XACT_XINFO_HAS_GID)
       {
          snprintf(parsed->twophase_gid, sizeof(parsed->twophase_gid), "%s", data);
-         ;
          data += strlen(data) + 1;
       }
    }
