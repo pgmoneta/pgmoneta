@@ -184,7 +184,7 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
    backup->compression_lz4_elapsed_time = compression_lz4_elapsed_time;
-   snprintf(backup->label, sizeof(backup->label), "%s", label);
+   pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
    if (pgmoneta_save_info(server_backup, backup))
    {
       goto error;

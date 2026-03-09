@@ -1433,21 +1433,21 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
 
       // Calculate record length width
       get_record_length(record, &rec_len, &fpi_len);
-      temp_width = snprintf(NULL, 0, "%d", rec_len);
+      temp_width = pgmoneta_snprintf(NULL, 0, "%d", rec_len);
       if (temp_width > widths->rec_width)
       {
          widths->rec_width = temp_width;
       }
 
       // Calculate total length width
-      temp_width = snprintf(NULL, 0, "%d", record->header.xl_tot_len);
+      temp_width = pgmoneta_snprintf(NULL, 0, "%d", record->header.xl_tot_len);
       if (temp_width > widths->tot_width)
       {
          widths->tot_width = temp_width;
       }
 
       // Calculate XID width
-      temp_width = snprintf(NULL, 0, "%u", record->header.xl_xid);
+      temp_width = pgmoneta_snprintf(NULL, 0, "%u", record->header.xl_xid);
       if (temp_width > widths->xid_width)
       {
          widths->xid_width = temp_width;

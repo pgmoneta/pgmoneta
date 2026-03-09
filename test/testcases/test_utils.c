@@ -651,10 +651,10 @@ MCTF_TEST(test_utils_snprintf)
    char buf[100];
 
    pgmoneta_snprintf(buf, 100, "Hello %s", "World");
-   MCTF_ASSERT_STR_EQ(buf, "Hello World", cleanup, "snprintf result 1 mismatch");
+   MCTF_ASSERT_STR_EQ(buf, "Hello World", cleanup, "pgmoneta_snprintf result 1 mismatch");
 
    pgmoneta_snprintf(buf, 5, "0123456789");
-   MCTF_ASSERT_STR_EQ(buf, "0123", cleanup, "snprintf truncation failed");
+   MCTF_ASSERT_STR_EQ(buf, "0123", cleanup, "pgmoneta_snprintf truncation failed");
 
 cleanup:
    MCTF_FINISH();

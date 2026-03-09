@@ -321,7 +321,7 @@ pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, c
       goto error;
    }
 
-   snprintf(temp_backup->comments, sizeof(temp_backup->comments), "%s", new_comments);
+   pgmoneta_snprintf(temp_backup->comments, sizeof(temp_backup->comments), "%s", new_comments);
    if (pgmoneta_save_info(dir, temp_backup))
    {
       pgmoneta_log_error("Unable to save backup info for directory %s", dir);
@@ -1421,7 +1421,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    write_info(sfile, "%s=%s\n", INFO_COMMENTS, backup->comments);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%.1024s\n", INFO_EXTRA, backup->extra);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%.1024s\n", INFO_EXTRA, backup->extra);
    fputs(&buffer[0], sfile);
 
    pgmoneta_permission(bck_info_file, 6, 0, 0);
@@ -1464,11 +1464,11 @@ pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_fi
    memset(base_relative_path, 0, MAX_PATH);
    if (pgmoneta_ends_with(relative_dir, "/"))
    {
-      snprintf(base_relative_path, MAX_PATH, "%s%s", relative_dir, base_file_name);
+      pgmoneta_snprintf(base_relative_path, MAX_PATH, "%s%s", relative_dir, base_file_name);
    }
    else
    {
-      snprintf(base_relative_path, MAX_PATH, "%s/%s", relative_dir, base_file_name);
+      pgmoneta_snprintf(base_relative_path, MAX_PATH, "%s/%s", relative_dir, base_file_name);
    }
 
    /* try both base and final relative path */
@@ -1885,37 +1885,37 @@ create_info(char* directory, char* label, int status)
    }
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_STATUS, status);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_STATUS, status);
    fputs(&buffer[0], sfile);
    pgmoneta_log_trace("%s=%d", INFO_STATUS, status);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_LABEL, label);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_LABEL, label);
    fputs(&buffer[0], sfile);
    pgmoneta_log_trace("%s=%s", INFO_LABEL, label);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=0\n", INFO_TABLESPACES);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=0\n", INFO_TABLESPACES);
    fputs(&buffer[0], sfile);
    pgmoneta_log_trace("%s=0", INFO_TABLESPACES);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
    fputs(&buffer[0], sfile);
    pgmoneta_log_trace("%s=%s", INFO_PGMONETA_VERSION, VERSION);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=\n", INFO_COMMENTS);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=\n", INFO_COMMENTS);
    fputs(&buffer[0], sfile);
    pgmoneta_log_trace("%s=", INFO_COMMENTS);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->compression_type);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->compression_type);
    fputs(&buffer[0], sfile);
    pgmoneta_log_trace("%s=%d", INFO_COMPRESSION, config->compression_type);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->encryption);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->encryption);
    fputs(&buffer[0], sfile);
    pgmoneta_log_trace("%s=%d", INFO_ENCRYPTION, config->encryption);
 

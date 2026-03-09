@@ -407,8 +407,8 @@ pgmoneta_wal_timestamptz_to_str(timestamp_tz dt)
    strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", ltime);
    strftime(zone, sizeof(zone), "%Z", ltime);
 
-   size_t written = snprintf(buf, sizeof(buf), "%s.%06d %s",
-                             ts, (int)(dt % USECS_PER_SEC), zone);
+   size_t written = pgmoneta_snprintf(buf, sizeof(buf), "%s.%06d %s",
+                                      ts, (int)(dt % USECS_PER_SEC), zone);
 
    if (written == 0 || written >= sizeof(buf))
    {

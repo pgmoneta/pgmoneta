@@ -113,21 +113,21 @@ MCTF_TEST(test_backup_identifier_lsn)
    create_mock_backup("20250101010000", "0/2000", 1, 1);
 
    // Test 1: Target LSN between backups (0/1500) -> Should pick Backup 1 (0/1000)
-   snprintf(identifier, sizeof(identifier), "target-lsn:0/1500");
+   pgmoneta_snprintf(identifier, sizeof(identifier), "target-lsn:0/1500");
    memset(label, 0, MAX_PATH);
    ret = pgmoneta_get_backup_identifier(PRIMARY_SERVER, identifier, nodes, label);
    MCTF_ASSERT_INT_EQ(ret, 0, cleanup, "ret mismatch 1");
    MCTF_ASSERT_STR_EQ(label, "20250101000000", cleanup, "label mismatch 1");
 
    // Test 2: Target LSN after Backup 2 (0/3000) -> Should pick Backup 2 (0/2000)
-   snprintf(identifier, sizeof(identifier), "target-lsn:0/3000");
+   pgmoneta_snprintf(identifier, sizeof(identifier), "target-lsn:0/3000");
    memset(label, 0, MAX_PATH);
    ret = pgmoneta_get_backup_identifier(PRIMARY_SERVER, identifier, nodes, label);
    MCTF_ASSERT_INT_EQ(ret, 0, cleanup, "ret mismatch 2");
    MCTF_ASSERT_STR_EQ(label, "20250101010000", cleanup, "label mismatch 2");
 
    // Test 3: Target LSN before Backup 1 (0/500) -> Should fail
-   snprintf(identifier, sizeof(identifier), "target-lsn:0/500");
+   pgmoneta_snprintf(identifier, sizeof(identifier), "target-lsn:0/500");
    memset(label, 0, MAX_PATH);
    ret = pgmoneta_get_backup_identifier(PRIMARY_SERVER, identifier, nodes, label);
    MCTF_ASSERT(ret != 0, cleanup, "ret should adhere to logic");
@@ -155,7 +155,7 @@ MCTF_TEST(test_backup_identifier_time)
    create_mock_backup("20230101020000", "0/2000", 1, 1);
 
    // Target Time: 2023-01-01 01:00:00 -> Should pick Backup 1
-   snprintf(identifier, sizeof(identifier), "target-time:2023-01-01 01:00:00");
+   pgmoneta_snprintf(identifier, sizeof(identifier), "target-time:2023-01-01 01:00:00");
    memset(label, 0, MAX_PATH);
    ret = pgmoneta_get_backup_identifier(PRIMARY_SERVER, identifier, nodes, label);
    MCTF_ASSERT_INT_EQ(ret, 0, cleanup, "ret mismatch");
@@ -184,7 +184,7 @@ MCTF_TEST(test_backup_identifier_tli)
    create_mock_backup("20230101010000", "0/2000", 2, 1);
 
    // Target TLI: 1
-   snprintf(identifier, sizeof(identifier), "target-tli:1");
+   pgmoneta_snprintf(identifier, sizeof(identifier), "target-tli:1");
    memset(label, 0, MAX_PATH);
    ret = pgmoneta_get_backup_identifier(PRIMARY_SERVER, identifier, nodes, label);
    MCTF_ASSERT_INT_EQ(ret, 0, cleanup, "ret mismatch");

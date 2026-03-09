@@ -336,7 +336,7 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
    }
 
    memset(query, 0, sizeof(query));
-   snprintf(query, sizeof(query), "SELECT pg_read_binary_file('%s', %d, %d, false);", relative_file_path, offset, length);
+   pgmoneta_snprintf(query, sizeof(query), "SELECT pg_read_binary_file('%s', %d, %d, false);", relative_file_path, offset, length);
 
    if (query_execute(ssl, socket, query, &response))
    {
@@ -352,7 +352,7 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
    memset(bytea_data_buffer, 0, DEFAULT_BURST);
 
    /* Note: we get data in hex format */
-   snprintf(bytea_data_buffer, DEFAULT_BURST, "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(bytea_data_buffer, DEFAULT_BURST, "%s", response->tuples->data[0]);
 
    /* Transform it to binary */
    if (transform_hex_bytea_to_binary(bytea_data_buffer, &b_out, &b_len))
@@ -419,7 +419,7 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint3
 
    /* Force checkpoint in the server */
    memset(query, 0, sizeof(query));
-   snprintf(query, sizeof(query), "CHECKPOINT;");
+   pgmoneta_snprintf(query, sizeof(query), "CHECKPOINT;");
 
    if (query_execute(ssl, socket, query, &response))
    {
@@ -443,7 +443,7 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint3
 
    /* Query to get the latest checkpoint LSN */
    memset(query, 0, sizeof(query));
-   snprintf(query, sizeof(query), "SELECT checkpoint_lsn, timeline_id FROM pg_control_checkpoint();");
+   pgmoneta_snprintf(query, sizeof(query), "SELECT checkpoint_lsn, timeline_id FROM pg_control_checkpoint();");
 
    if (query_execute(ssl, socket, query, &response))
    {
@@ -502,7 +502,7 @@ pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_pat
    }
 
    memset(query, 0, sizeof(query));
-   snprintf(query, sizeof(query), "SELECT * FROM pg_stat_file('%s', false);", relative_file_path);
+   pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM pg_stat_file('%s', false);", relative_file_path);
 
    if (query_execute(ssl, socket, query, &response))
    {
@@ -582,7 +582,7 @@ pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** 
          goto error;
       }
       memset(query, 0, sizeof(query));
-      snprintf(query, sizeof(query), "SELECT * FROM  pg_backup_start('%s', false);", label);
+      pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM  pg_backup_start('%s', false);", label);
    }
    else
    {
@@ -597,7 +597,7 @@ pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** 
          goto error;
       }
       memset(query, 0, sizeof(query));
-      snprintf(query, sizeof(query), "SELECT * FROM  pg_start_backup('%s', false, false);", label);
+      pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM  pg_start_backup('%s', false, false);", label);
    }
 
    if (query_execute(ssl, socket, query, &response))
@@ -662,7 +662,7 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char* backup_data, ch
          goto error;
       }
       memset(query, 0, sizeof(query));
-      snprintf(query, sizeof(query), "SELECT * FROM  pg_backup_stop(false);");
+      pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM  pg_backup_stop(false);");
    }
    else
    {
@@ -677,7 +677,7 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char* backup_data, ch
          goto error;
       }
       memset(query, 0, sizeof(query));
-      snprintf(query, sizeof(query), "SELECT * FROM  pg_stop_backup(false, false);");
+      pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM  pg_stop_backup(false, false);");
    }
 
    if (query_execute(ssl, socket, query, &response))
@@ -778,7 +778,7 @@ q:
 
    memset(&wal_size[0], 0, sizeof(wal_size));
 
-   snprintf(&wal_size[0], sizeof(wal_size), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&wal_size[0], sizeof(wal_size), "%s", response->tuples->data[0]);
 
    if (pgmoneta_ends_with(&wal_size[0], "MB"))
    {
@@ -919,7 +919,7 @@ q:
 
    memset(&wal_level[0], 0, sizeof(wal_level));
 
-   snprintf(&wal_level[0], sizeof(wal_level), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&wal_level[0], sizeof(wal_level), "%s", response->tuples->data[0]);
 
    if (!strcmp("replica", wal_level) || !strcmp("logical", wal_level))
    {
@@ -982,7 +982,7 @@ q:
 
    memset(&data_checksums[0], 0, sizeof(data_checksums));
 
-   snprintf(&data_checksums[0], sizeof(data_checksums), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&data_checksums[0], sizeof(data_checksums), "%s", response->tuples->data[0]);
 
    if (!strcmp("on", data_checksums))
    {
@@ -1044,7 +1044,7 @@ q:
 
    memset(&seg_size[0], 0, sizeof(seg_size));
 
-   snprintf(&seg_size[0], sizeof(seg_size), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&seg_size[0], sizeof(seg_size), "%s", response->tuples->data[0]);
 
    if (pgmoneta_ends_with(&seg_size[0], "MB"))
    {
@@ -1122,7 +1122,7 @@ q:
 
    memset(&block_size[0], 0, sizeof(block_size));
 
-   snprintf(&block_size[0], sizeof(block_size), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&block_size[0], sizeof(block_size), "%s", response->tuples->data[0]);
 
    *blocksz = pgmoneta_atoi(block_size);
 
@@ -1182,7 +1182,7 @@ q:
 
    memset(&summarize_wal[0], 0, sizeof(summarize_wal));
 
-   snprintf(&summarize_wal[0], sizeof(summarize_wal), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&summarize_wal[0], sizeof(summarize_wal), "%s", response->tuples->data[0]);
 
    if (!strcmp("on", summarize_wal))
    {
@@ -1248,7 +1248,7 @@ has_predefined_role(SSL* ssl, int socket, char* usr, char* role, bool* has_role)
    char query[MISC_LENGTH];
 
    memset(query, 0, sizeof(query));
-   snprintf(query, sizeof(query), "SELECT pg_has_role('%s', '%s', 'member');", usr, role);
+   pgmoneta_snprintf(query, sizeof(query), "SELECT pg_has_role('%s', '%s', 'member');", usr, role);
 
    ret = pgmoneta_create_query_message(query, &query_msg);
    if (ret != MESSAGE_STATUS_OK)
@@ -1279,7 +1279,7 @@ q:
    }
 
    memset(&res[0], 0, sizeof(res));
-   snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
 
    if (response->number_of_columns != 1)
    {
@@ -1315,7 +1315,7 @@ has_superuser_role(SSL* ssl, int socket, char* usr, bool* is_superuser)
    char query[MISC_LENGTH];
 
    memset(query, 0, sizeof(query));
-   snprintf(query, sizeof(query), "SELECT rolsuper FROM pg_roles WHERE rolname = '%s';", usr);
+   pgmoneta_snprintf(query, sizeof(query), "SELECT rolsuper FROM pg_roles WHERE rolname = '%s';", usr);
 
    ret = pgmoneta_create_query_message(query, &query_msg);
    if (ret != MESSAGE_STATUS_OK)
@@ -1346,7 +1346,7 @@ q:
    }
 
    memset(&res[0], 0, sizeof(res));
-   snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
 
    if (response->number_of_columns != 1)
    {
@@ -1382,7 +1382,7 @@ has_execute_privilege(SSL* ssl, int socket, char* usr, char* func_name, bool* ha
    char query[MISC_LENGTH];
 
    memset(query, 0, sizeof(query));
-   snprintf(query, sizeof(query), "SELECT has_function_privilege('%s', '%s', 'EXECUTE');", usr, func_name);
+   pgmoneta_snprintf(query, sizeof(query), "SELECT has_function_privilege('%s', '%s', 'EXECUTE');", usr, func_name);
 
    ret = pgmoneta_create_query_message(query, &query_msg);
    if (ret != MESSAGE_STATUS_OK)
@@ -1413,7 +1413,7 @@ q:
    }
 
    memset(&res[0], 0, sizeof(res));
-   snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
+   pgmoneta_snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
 
    if (response->number_of_columns != 1)
    {

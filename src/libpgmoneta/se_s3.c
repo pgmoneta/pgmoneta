@@ -459,11 +459,11 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server
 
          if (strlen(relative_path) > 0)
          {
-            snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
+            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
          }
          else
          {
-            snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
+            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
          }
 
          s3_upload_files(local_root, s3_root, relative_dir, server);
@@ -1218,7 +1218,7 @@ s3_url_encode(char* str)
       }
       else
       {
-         snprintf(hex, sizeof(hex), "%%%02X", c);
+         pgmoneta_snprintf(hex, sizeof(hex), "%%%02X", c);
          encoded = pgmoneta_append(encoded, hex);
       }
    }
@@ -1245,8 +1245,8 @@ xml_extract_tag(char* xml, char* tag, struct deque** values)
       }
    }
 
-   snprintf(open_tag, sizeof(open_tag), "<%s>", tag);
-   snprintf(close_tag, sizeof(close_tag), "</%s>", tag);
+   pgmoneta_snprintf(open_tag, sizeof(open_tag), "<%s>", tag);
+   pgmoneta_snprintf(close_tag, sizeof(close_tag), "</%s>", tag);
 
    while ((ptr = strstr(ptr, open_tag)) != NULL)
    {

@@ -348,13 +348,13 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    config = (struct common_configuration*)shmem;
 
    memset(&key_file, 0, sizeof(key_file));
-   snprintf(&key_file[0], sizeof(key_file), "%s/.pgmoneta/pgmoneta.key", config->home_dir);
+   pgmoneta_snprintf(&key_file[0], sizeof(key_file), "%s/.pgmoneta/pgmoneta.key", config->home_dir);
 
    memset(&cert_file, 0, sizeof(cert_file));
-   snprintf(&cert_file[0], sizeof(cert_file), "%s/.pgmoneta/pgmoneta.crt", config->home_dir);
+   pgmoneta_snprintf(&cert_file[0], sizeof(cert_file), "%s/.pgmoneta/pgmoneta.crt", config->home_dir);
 
    memset(&root_file, 0, sizeof(root_file));
-   snprintf(&root_file[0], sizeof(root_file), "%s/.pgmoneta/root.crt", config->home_dir);
+   pgmoneta_snprintf(&root_file[0], sizeof(root_file), "%s/.pgmoneta/root.crt", config->home_dir);
 
    if (stat(&key_file[0], &st) == 0)
    {
@@ -514,7 +514,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    iteration = atoi(iteration_string);
 
    memset(&wo_proof[0], 0, sizeof(wo_proof));
-   snprintf(&wo_proof[0], sizeof(wo_proof), "c=biws,r=%s", combined_nounce);
+   pgmoneta_snprintf(&wo_proof[0], sizeof(wo_proof), "c=biws,r=%s", combined_nounce);
 
    /* n=,r=... */
    client_first_message_bare = sasl_response->data + 26;
@@ -806,7 +806,7 @@ generate_md5(char* str, int length, char** md5)
 
    for (n = 0; n < 16; ++n)
    {
-      snprintf(&(out[n * 2]), 32, "%02x", (unsigned int)digest[n]);
+      pgmoneta_snprintf(&(out[n * 2]), 33 - (n * 2), "%02x", (unsigned int)digest[n]);
    }
 
    *md5 = out;
@@ -911,7 +911,7 @@ retry:
    }
 
    memset(server_first_message, 0, 89);
-   snprintf(server_first_message, 89, "r=%s%s,s=%s,i=4096", client_nounce, server_nounce, base64_salt);
+   pgmoneta_snprintf(server_first_message, 89, "r=%s%s,s=%s,i=4096", client_nounce, server_nounce, base64_salt);
 
    status = pgmoneta_create_auth_scram256_continue(client_nounce, server_nounce, base64_salt, &msg);
    if (status != MESSAGE_STATUS_OK)
@@ -1082,7 +1082,7 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
       char pgsql[MISC_LENGTH];
 
       memset(&pgsql, 0, sizeof(pgsql));
-      snprintf(&pgsql[0], sizeof(pgsql), ".s.PGSQL.%d", config->common.servers[server].port);
+      pgmoneta_snprintf(&pgsql[0], sizeof(pgsql), ".s.PGSQL.%d", config->common.servers[server].port);
       ret = pgmoneta_connect_unix_socket(config->common.servers[server].host, &pgsql[0], &server_fd);
    }
    else
@@ -1386,7 +1386,7 @@ server_md5(char* username, char* password, SSL* ssl, int server_fd)
    pwdusr = malloc(size);
    memset(pwdusr, 0, size);
 
-   snprintf(pwdusr, size, "%s%s", password, username);
+   pgmoneta_snprintf(pwdusr, size, "%s%s", password, username);
 
    if (generate_md5(pwdusr, strlen(pwdusr), &shadow))
    {
@@ -1404,7 +1404,7 @@ server_md5(char* username, char* password, SSL* ssl, int server_fd)
    }
 
    memset(&md5str, 0, sizeof(md5str));
-   snprintf(&md5str[0], 36, "md5%s", md5);
+   pgmoneta_snprintf(&md5str[0], 36, "md5%s", md5);
 
    status = pgmoneta_create_auth_md5_response(md5str, &md5_msg);
    if (status != MESSAGE_STATUS_OK)
@@ -1580,7 +1580,7 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    iteration = atoi(iteration_string);
 
    memset(&wo_proof[0], 0, sizeof(wo_proof));
-   snprintf(&wo_proof[0], sizeof(wo_proof), "c=biws,r=%s", combined_nounce);
+   pgmoneta_snprintf(&wo_proof[0], sizeof(wo_proof), "c=biws,r=%s", combined_nounce);
 
    /* n=,r=... */
    client_first_message_bare = security_messages[1] + 26;
@@ -1769,7 +1769,7 @@ pgmoneta_get_master_key(char** masterkey)
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", home_dir);
+   pgmoneta_snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", home_dir);
 
    if (stat(&buf[0], &st) == -1)
    {
@@ -1790,7 +1790,7 @@ pgmoneta_get_master_key(char** masterkey)
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", home_dir);
+   pgmoneta_snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", home_dir);
 
    if (stat(&buf[0], &st) == -1)
    {

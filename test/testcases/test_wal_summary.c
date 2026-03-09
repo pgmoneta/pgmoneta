@@ -164,7 +164,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
 
    char hex[128] = {0};
 
-   snprintf(hex, sizeof(hex), "%08X%08X%08X%08X", (uint32_t)(s_lsn >> 32), (uint32_t)s_lsn, (uint32_t)(e_lsn >> 32), (uint32_t)e_lsn);
+   pgmoneta_snprintf(hex, sizeof(hex), "%08X%08X%08X%08X", (uint32_t)(s_lsn >> 32), (uint32_t)s_lsn, (uint32_t)(e_lsn >> 32), (uint32_t)e_lsn);
    summary_file_path = pgmoneta_append(summary_file_path, summary_dir);
    if (!pgmoneta_ends_with(summary_dir, "/"))
    {

@@ -74,7 +74,7 @@ html_report_build_path(char* path, size_t size)
 
    *slash = '\0';
 
-   n = snprintf(path, size, "%s/log/pgmoneta-test-report.html", base);
+   n = pgmoneta_snprintf(path, size, "%s/log/pgmoneta-test-report.html", base);
    if (n <= 0 || (size_t)n >= size)
    {
       return 1;
@@ -257,19 +257,19 @@ html_report_generate(const char* path, mctf_filter_type_t filter_type, const cha
       char time_str[32];
       if (hours > 0)
       {
-         snprintf(time_str, sizeof(time_str), "%02ld:%02ld:%02ld.%03ld", hours, minutes, seconds, milliseconds);
+         pgmoneta_snprintf(time_str, sizeof(time_str), "%02ld:%02ld:%02ld.%03ld", hours, minutes, seconds, milliseconds);
       }
       else if (minutes > 0)
       {
-         snprintf(time_str, sizeof(time_str), "%02ld:%02ld.%03ld", minutes, seconds, milliseconds);
+         pgmoneta_snprintf(time_str, sizeof(time_str), "%02ld:%02ld.%03ld", minutes, seconds, milliseconds);
       }
       else if (seconds > 0)
       {
-         snprintf(time_str, sizeof(time_str), "%ld.%03lds", seconds, milliseconds);
+         pgmoneta_snprintf(time_str, sizeof(time_str), "%ld.%03lds", seconds, milliseconds);
       }
       else
       {
-         snprintf(time_str, sizeof(time_str), "%ldms", milliseconds);
+         pgmoneta_snprintf(time_str, sizeof(time_str), "%ldms", milliseconds);
       }
 
       fprintf(f, "      <tr>\n");

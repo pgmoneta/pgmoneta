@@ -680,7 +680,7 @@ pgmoneta_create_timeline_history_message(int timeline, struct message** msg)
    size_t size;
 
    memset(&tl[0], 0, sizeof(tl));
-   snprintf(&tl[0], sizeof(tl), "%d", timeline);
+   pgmoneta_snprintf(&tl[0], sizeof(tl), "%d", timeline);
 
    size = 1 + 4 + 17 + strlen(tl) + 1 + 1;
 
@@ -735,22 +735,22 @@ pgmoneta_create_start_replication_message(char* xlogpos, int timeline, char* slo
    {
       if (xlogpos != NULL && strlen(xlogpos) > 0)
       {
-         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION SLOT %s PHYSICAL %s TIMELINE %d;", slot, xlogpos, timeline);
+         pgmoneta_snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION SLOT %s PHYSICAL %s TIMELINE %d;", slot, xlogpos, timeline);
       }
       else
       {
-         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION SLOT %s PHYSICAL 0/0 TIMELINE %d;", slot, timeline);
+         pgmoneta_snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION SLOT %s PHYSICAL 0/0 TIMELINE %d;", slot, timeline);
       }
    }
    else
    {
       if (xlogpos != NULL && strlen(xlogpos) > 0)
       {
-         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION PHYSICAL %s TIMELINE %d;", xlogpos, timeline);
+         pgmoneta_snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION PHYSICAL %s TIMELINE %d;", xlogpos, timeline);
       }
       else
       {
-         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION PHYSICAL 0/0 TIMELINE %d;", timeline);
+         pgmoneta_snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION PHYSICAL 0/0 TIMELINE %d;", timeline);
       }
    }
 
@@ -876,7 +876,7 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
 
       options = pgmoneta_append(options, "MANIFEST_CHECKSUMS 'SHA512'");
 
-      snprintf(cmd, sizeof(cmd), "BASE_BACKUP (%s)", options);
+      pgmoneta_snprintf(cmd, sizeof(cmd), "BASE_BACKUP (%s)", options);
    }
    else
    {
@@ -909,7 +909,7 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
 
       options = pgmoneta_append(options, "MANIFEST_CHECKSUMS 'SHA512'");
 
-      snprintf(cmd, sizeof(cmd), "BASE_BACKUP %s;", options);
+      pgmoneta_snprintf(cmd, sizeof(cmd), "BASE_BACKUP %s;", options);
    }
 
    if (options != NULL)
@@ -944,11 +944,11 @@ pgmoneta_create_replication_slot_message(char* create_slot_name, struct message*
 
    if (version >= 15)
    {
-      snprintf(cmd, sizeof(cmd), "CREATE_REPLICATION_SLOT %s PHYSICAL (RESERVE_WAL true);", create_slot_name);
+      pgmoneta_snprintf(cmd, sizeof(cmd), "CREATE_REPLICATION_SLOT %s PHYSICAL (RESERVE_WAL true);", create_slot_name);
    }
    else
    {
-      snprintf(cmd, sizeof(cmd), "CREATE_REPLICATION_SLOT %s PHYSICAL RESERVE_WAL;", create_slot_name);
+      pgmoneta_snprintf(cmd, sizeof(cmd), "CREATE_REPLICATION_SLOT %s PHYSICAL RESERVE_WAL;", create_slot_name);
    }
 
    size = 1 + 4 + strlen(cmd) + 1;
@@ -975,7 +975,7 @@ pgmoneta_create_search_replication_slot_message(char* slot_name, struct message*
 
    memset(&cmd[0], 0, sizeof(cmd));
 
-   snprintf(cmd, sizeof(cmd), "SELECT slot_name, slot_type FROM pg_replication_slots WHERE slot_name = '%s';", slot_name);
+   pgmoneta_snprintf(cmd, sizeof(cmd), "SELECT slot_name, slot_type FROM pg_replication_slots WHERE slot_name = '%s';", slot_name);
 
    size = 1 + 4 + strlen(cmd) + 1;
 
@@ -2321,13 +2321,13 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
    // Name the manifest with .tmp suffix so that we know backup is invalid if replication is interrupted
    if (pgmoneta_ends_with(basedir, "/"))
    {
-      snprintf(tmp_file_path, sizeof(tmp_file_path), "%sdata/%s", basedir, "backup_manifest.tmp");
-      snprintf(file_path, sizeof(file_path), "%sdata/%s", basedir, "backup_manifest");
+      pgmoneta_snprintf(tmp_file_path, sizeof(tmp_file_path), "%sdata/%s", basedir, "backup_manifest.tmp");
+      pgmoneta_snprintf(file_path, sizeof(file_path), "%sdata/%s", basedir, "backup_manifest");
    }
    else
    {
-      snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
-      snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "backup_manifest");
+      pgmoneta_snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
+      pgmoneta_snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "backup_manifest");
    }
    file = fopen(tmp_file_path, "wb");
 
@@ -2433,7 +2433,7 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
             if (file_path[0] != '\0')
             {
                dest_dir = (char*)malloc((strlen(target_dir) + strlen(file_path) + 1) * sizeof(char));
-               snprintf(dest_dir, strlen(target_dir) + strlen(file_path) + 1, "%s%s", target_dir, file_path);
+               pgmoneta_snprintf(dest_dir, strlen(target_dir) + strlen(file_path) + 1, "%s%s", target_dir, file_path);
             }
             else
             {
@@ -2445,7 +2445,7 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
             pgmoneta_mkdir(dest_dir);
 
             dest_path = (char*)malloc((strlen(dest_dir) + strlen(file_name) + 1) * sizeof(char));
-            snprintf(dest_path, strlen(dest_dir) + strlen(file_name) + 1, "%s%s", dest_dir, file_name);
+            pgmoneta_snprintf(dest_path, strlen(dest_dir) + strlen(file_name) + 1, "%s%s", dest_dir, file_name);
 
             pgmoneta_ext_get_file(ssl, socket, paths[j], &qr);
             if (qr != NULL && qr->tuples != NULL)

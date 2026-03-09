@@ -51,7 +51,7 @@ MCTF_TEST(test_streamer)
    char retrospect_dir[MAX_PATH] = {0};
    dir = pgmoneta_append(dir, TEST_BASE_DIR);
    dir = pgmoneta_append(dir, "/streamer");
-   snprintf(retrospect_dir, sizeof(retrospect_dir), "%s/%s", TEST_RETROSPECT_DIR, "streamer");
+   pgmoneta_snprintf(retrospect_dir, sizeof(retrospect_dir), "%s/%s", TEST_RETROSPECT_DIR, "streamer");
    pgmoneta_mkdir(retrospect_dir);
    bigfile = pgmoneta_append(bigfile, dir);
    bigfile = pgmoneta_append(bigfile, "/bigfile.txt");
@@ -67,7 +67,7 @@ MCTF_TEST(test_streamer)
    size_t num_read = 0;
 
    // generate a large file for testing
-   snprintf(cmd, sizeof(cmd), "dd bs=102400000 if=/dev/urandom count=1 2>/dev/null | LC_ALL=C tr -dc \"A-Za-z0-9@#*=[]\" | fold -w100 | head -n 100000 > %s", bigfile);
+   pgmoneta_snprintf(cmd, sizeof(cmd), "dd bs=102400000 if=/dev/urandom count=1 2>/dev/null | LC_ALL=C tr -dc \"A-Za-z0-9@#*=[]\" | fold -w100 | head -n 100000 > %s", bigfile);
    pgmoneta_mkdir(dir);
    system(cmd);
 
@@ -80,8 +80,8 @@ MCTF_TEST(test_streamer)
          int encryption = encryption_methods[j];
          memset(backup_dest, 0, sizeof(backup_dest));
          memset(restore_dest, 0, sizeof(restore_dest));
-         snprintf(backup_dest, sizeof(backup_dest), "%s/bigfile_backup_%s_%s", dir, translate_compression(compression), translate_encryption(encryption));
-         snprintf(restore_dest, sizeof(restore_dest), "%s/bigfile_restore_%s_%s", dir, translate_compression(compression), translate_encryption(encryption));
+         pgmoneta_snprintf(backup_dest, sizeof(backup_dest), "%s/bigfile_backup_%s_%s", dir, translate_compression(compression), translate_encryption(encryption));
+         pgmoneta_snprintf(restore_dest, sizeof(restore_dest), "%s/bigfile_restore_%s_%s", dir, translate_compression(compression), translate_encryption(encryption));
          //backup
          MCTF_ASSERT(!pgmoneta_vfile_create_local(bigfile, "r", &reader), cleanup);
          MCTF_ASSERT(!pgmoneta_vfile_create_local(backup_dest, "wb", &writer), cleanup);

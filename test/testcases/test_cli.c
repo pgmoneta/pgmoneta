@@ -184,7 +184,7 @@ MCTF_TEST(test_cli_verify)
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
-   snprintf(path, sizeof(path), "%s/verify_test", TEST_BASE_DIR);
+   pgmoneta_snprintf(path, sizeof(path), "%s/verify_test", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
 
    MCTF_ASSERT(pgmoneta_tsclient_verify("primary", "newest", path, NULL, 0) == 0, cleanup, "Verify newest failed");
@@ -203,7 +203,7 @@ MCTF_TEST(test_cli_archive)
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
-   snprintf(path, sizeof(path), "%s/archive_test", TEST_BASE_DIR);
+   pgmoneta_snprintf(path, sizeof(path), "%s/archive_test", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
 
    MCTF_ASSERT(pgmoneta_tsclient_archive("primary", "newest", NULL, path, 0) == 0, cleanup, "Archive newest failed");
@@ -305,9 +305,9 @@ MCTF_TEST(test_cli_utility_positive)
 
    pgmoneta_test_setup();
 
-   snprintf(path, sizeof(path), "%s/pgmoneta_test_file", TEST_BASE_DIR);
-   snprintf(path_aes, sizeof(path_aes), "%s/pgmoneta_test_file.aes", TEST_BASE_DIR);
-   snprintf(path_zstd, sizeof(path_zstd), "%s/pgmoneta_test_file.zstd", TEST_BASE_DIR);
+   pgmoneta_snprintf(path, sizeof(path), "%s/pgmoneta_test_file", TEST_BASE_DIR);
+   pgmoneta_snprintf(path_aes, sizeof(path_aes), "%s/pgmoneta_test_file.aes", TEST_BASE_DIR);
+   pgmoneta_snprintf(path_zstd, sizeof(path_zstd), "%s/pgmoneta_test_file.zstd", TEST_BASE_DIR);
 
    /* Setup: Create a dummy file */
    fp = fopen(path, "w");
@@ -376,7 +376,7 @@ MCTF_TEST(test_cli_negative)
                "Verify invalid_server should fail with NOSERVER");
 
    /* Archive invalid server */
-   snprintf(path, sizeof(path), "%s/archive_test_neg", TEST_BASE_DIR);
+   pgmoneta_snprintf(path, sizeof(path), "%s/archive_test_neg", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
    MCTF_ASSERT(pgmoneta_tsclient_archive("invalid_server", "newest", NULL, path, MANAGEMENT_ERROR_ARCHIVE_NOSERVER) == 0, cleanup,
                "Archive invalid_server should fail with NOSERVER");

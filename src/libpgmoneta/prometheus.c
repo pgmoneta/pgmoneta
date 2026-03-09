@@ -2235,7 +2235,7 @@ general_information(prometheus_metrics_container_t* container)
       {
          char xlogpos[MISC_LENGTH];
          memset(xlogpos, 0, MISC_LENGTH);
-         snprintf(xlogpos, MISC_LENGTH, "%X/%X", curh->switchpos_hi, curh->switchpos_lo);
+         pgmoneta_snprintf(xlogpos, MISC_LENGTH, "%X/%X", curh->switchpos_hi, curh->switchpos_lo);
 
          data = pgmoneta_append(data, "pgmoneta_server_timeline_switchpos{");
 
@@ -3427,9 +3427,9 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
             data = pgmoneta_append(data, backups[i][j] != NULL ? backups[i][j]->label : "0");
             data = pgmoneta_append(data, "\", ");
 
-            snprintf(walpos, MISC_LENGTH, "%X/%X",
-                     backups[i][j] != NULL ? backups[i][j]->start_lsn_hi32 : 0,
-                     backups[i][j] != NULL ? backups[i][j]->start_lsn_lo32 : 0);
+            pgmoneta_snprintf(walpos, MISC_LENGTH, "%X/%X",
+                              backups[i][j] != NULL ? backups[i][j]->start_lsn_hi32 : 0,
+                              backups[i][j] != NULL ? backups[i][j]->start_lsn_lo32 : 0);
             data = pgmoneta_append(data, "walpos=\"");
             data = pgmoneta_append(data, walpos);
             data = pgmoneta_append(data, "\"} ");
@@ -3471,7 +3471,7 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
             data = pgmoneta_append(data, backups[i][j]->label);
             data = pgmoneta_append(data, "\", ");
 
-            snprintf(walpos, MISC_LENGTH, "%X/%X", backups[i][j]->checkpoint_lsn_hi32, backups[i][j]->checkpoint_lsn_lo32);
+            pgmoneta_snprintf(walpos, MISC_LENGTH, "%X/%X", backups[i][j]->checkpoint_lsn_hi32, backups[i][j]->checkpoint_lsn_lo32);
             data = pgmoneta_append(data, "walpos=\"");
             data = pgmoneta_append(data, walpos);
             data = pgmoneta_append(data, "\"} ");
@@ -3513,9 +3513,9 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
             data = pgmoneta_append(data, backups[i][j] != NULL ? backups[i][j]->label : "0");
             data = pgmoneta_append(data, "\", ");
 
-            snprintf(walpos, MISC_LENGTH, "%X/%X",
-                     backups[i][j] != NULL ? backups[i][j]->end_lsn_hi32 : 0,
-                     backups[i][j] != NULL ? backups[i][j]->end_lsn_lo32 : 0);
+            pgmoneta_snprintf(walpos, MISC_LENGTH, "%X/%X",
+                              backups[i][j] != NULL ? backups[i][j]->end_lsn_hi32 : 0,
+                              backups[i][j] != NULL ? backups[i][j]->end_lsn_lo32 : 0);
             data = pgmoneta_append(data, "walpos=\"");
             data = pgmoneta_append(data, walpos);
             data = pgmoneta_append(data, "\"} ");

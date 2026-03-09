@@ -762,7 +762,7 @@ main(int argc, char** argv)
       if (port == NULL && cli_cfg->port > 0)
       {
          memset(port_buf, 0, sizeof(port_buf));
-         snprintf(port_buf, sizeof(port_buf), "%d", cli_cfg->port);
+         pgmoneta_snprintf(port_buf, sizeof(port_buf), "%d", cli_cfg->port);
          port = &port_buf[0];
       }
 
@@ -2544,7 +2544,7 @@ error:
       config_value = (char*)malloc(6);
       if (config_value)
       {
-         snprintf(config_value, 6, "Error");
+         pgmoneta_snprintf(config_value, 6, "Error");
       }
       *r = (uintptr_t)config_value;
       pgmoneta_json_destroy(filtered_response);
@@ -2900,7 +2900,7 @@ int_to_hex(uint32_t num)
    char buf[MISC_LENGTH];
    char* ret = NULL;
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%X", num);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%X", num);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }

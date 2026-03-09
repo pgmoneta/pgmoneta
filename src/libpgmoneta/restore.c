@@ -847,7 +847,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
    pgmoneta_art_insert(backups, label, (uintptr_t)bck, ValueRef);
 
    memset(manifest_path, 0, MAX_PATH);
-   snprintf(manifest_path, MAX_PATH, "%s/backup_manifest", output_dir);
+   pgmoneta_snprintf(manifest_path, MAX_PATH, "%s/backup_manifest", output_dir);
 
    clear_manifest_incremental_entries(manifest);
    files = (struct json*)pgmoneta_json_get(manifest, MANIFEST_FILES);
@@ -896,20 +896,20 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
       memset(otblspc_dir, 0, MAX_PATH);
       memset(itblspc_dir, 0, MAX_PATH);
 
-      snprintf(otblspc_dir, MAX_PATH, "%s/%s/%u", output_dir, "pg_tblspc", tsoid);
-      snprintf(itblspc_dir, MAX_PATH, "%s/%s/%u", input_dir, "pg_tblspc", tsoid);
-      snprintf(relative_tablespace_prefix, MAX_PATH, "%s/%u/", "pg_tblspc", tsoid);
+      pgmoneta_snprintf(otblspc_dir, MAX_PATH, "%s/%s/%u", output_dir, "pg_tblspc", tsoid);
+      pgmoneta_snprintf(itblspc_dir, MAX_PATH, "%s/%s/%u", input_dir, "pg_tblspc", tsoid);
+      pgmoneta_snprintf(relative_tablespace_prefix, MAX_PATH, "%s/%u/", "pg_tblspc", tsoid);
 
       if (!combine_as_is)
       {
-         snprintf(relative_tablespace_path, MAX_PATH, "../../%s-%s-%s",
-                  config->common.servers[server].name, bck->label, bck->tablespaces[i]);
-         snprintf(full_tablespace_path, MAX_PATH, "%s/%s-%s-%s", base, config->common.servers[server].name, bck->label, bck->tablespaces[i]);
+         pgmoneta_snprintf(relative_tablespace_path, MAX_PATH, "../../%s-%s-%s",
+                           config->common.servers[server].name, bck->label, bck->tablespaces[i]);
+         pgmoneta_snprintf(full_tablespace_path, MAX_PATH, "%s/%s-%s-%s", base, config->common.servers[server].name, bck->label, bck->tablespaces[i]);
       }
       else
       {
-         snprintf(relative_tablespace_path, MAX_PATH, "../../%s", bck->tablespaces[i]);
-         snprintf(full_tablespace_path, MAX_PATH, "%s/%s", base, bck->tablespaces[i]);
+         pgmoneta_snprintf(relative_tablespace_path, MAX_PATH, "../../%s", bck->tablespaces[i]);
+         pgmoneta_snprintf(full_tablespace_path, MAX_PATH, "%s/%s", base, bck->tablespaces[i]);
       }
 
       create_workspace_directory(server, label, relative_tablespace_prefix);
@@ -1046,8 +1046,8 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    }
 
    // rebuild backup.info
-   snprintf(backup_info_path, sizeof(backup_info_path), "%s%s", backup_dir, "backup.info");
-   snprintf(tmp_backup_info_path, sizeof(tmp_backup_info_path), "%s/%s", tmp_backup_root, "backup.info");
+   pgmoneta_snprintf(backup_info_path, sizeof(backup_info_path), "%s%s", backup_dir, "backup.info");
+   pgmoneta_snprintf(tmp_backup_info_path, sizeof(tmp_backup_info_path), "%s/%s", tmp_backup_root, "backup.info");
    if (pgmoneta_copy_file(backup_info_path, tmp_backup_info_path, NULL))
    {
       pgmoneta_log_error("Unable to copy %s to %s", backup_info_path, tmp_backup_info_path);
@@ -1065,7 +1065,7 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    }
    else
    {
-      snprintf(tmp_backup->parent_label, sizeof(tmp_backup->parent_label), "%s", oldest_backup->parent_label);
+      pgmoneta_snprintf(tmp_backup->parent_label, sizeof(tmp_backup->parent_label), "%s", oldest_backup->parent_label);
    }
    if (pgmoneta_save_info(tmp_backup_dir, tmp_backup))
    {
@@ -1206,7 +1206,7 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
          {
             goto error;
          }
-         snprintf(temp, strlen(from) + strlen(restore_last_files_names[i]) + 1, "%s%s", from, restore_last_files_names[i]);
+         pgmoneta_snprintf(temp, strlen(from) + strlen(restore_last_files_names[i]) + 1, "%s%s", from, restore_last_files_names[i]);
          free(restore_last_files_names[i]);
 
          restore_last_files_names[i] = temp;
@@ -1434,20 +1434,20 @@ combine_backups_recursive(uint32_t tsoid,
       // we'll need to deal with incremental files within, the former case is invalid
       if (tsoid != 0)
       {
-         snprintf(relative_prefix, MAX_PATH, "%s/%u/", "pg_tblspc", tsoid);
+         pgmoneta_snprintf(relative_prefix, MAX_PATH, "%s/%u/", "pg_tblspc", tsoid);
       }
    }
    else
    {
-      snprintf(ifulldir, MAX_PATH, "%s/%s", input_dir, relative_dir);
-      snprintf(ofulldir, MAX_PATH, "%s/%s", output_dir, relative_dir);
+      pgmoneta_snprintf(ifulldir, MAX_PATH, "%s/%s", input_dir, relative_dir);
+      pgmoneta_snprintf(ofulldir, MAX_PATH, "%s/%s", output_dir, relative_dir);
       if (tsoid == 0)
       {
-         snprintf(relative_prefix, MAX_PATH, "%s/", relative_dir);
+         pgmoneta_snprintf(relative_prefix, MAX_PATH, "%s/", relative_dir);
       }
       else
       {
-         snprintf(relative_prefix, MAX_PATH, "%s/%u/%s/", "pg_tblspc", tsoid, relative_dir);
+         pgmoneta_snprintf(relative_prefix, MAX_PATH, "%s/%u/%s/", "pg_tblspc", tsoid, relative_dir);
       }
    }
 
@@ -1494,10 +1494,10 @@ combine_backups_recursive(uint32_t tsoid,
          }
          else
          {
-            snprintf(new_relative_dir, MAX_PATH, "%s/%s", relative_dir, entry->d_name);
+            pgmoneta_snprintf(new_relative_dir, MAX_PATH, "%s/%s", relative_dir, entry->d_name);
          }
 
-         snprintf(new_relative_prefix, MAX_PATH_CONCAT, "%s%s/", relative_prefix, entry->d_name);
+         pgmoneta_snprintf(new_relative_prefix, MAX_PATH_CONCAT, "%s%s/", relative_prefix, entry->d_name);
          create_workspace_directory(server, label, new_relative_prefix);
          create_workspace_directories(server, prior_labels, new_relative_prefix);
 
@@ -1666,7 +1666,7 @@ reconstruct_backup_file(int server,
    // Note that we are working directly on backup archive, so bare file name could include compression/encryption suffix
    // and bare file name is alway stripped from the INCREMENTAL. prefix
    memset(incr_file_name, 0, MAX_PATH);
-   snprintf(incr_file_name, MAX_PATH, "%s%s", INCREMENTAL_PREFIX, base_file_name);
+   pgmoneta_snprintf(incr_file_name, MAX_PATH, "%s%s", INCREMENTAL_PREFIX, base_file_name);
    // handle the latest file specially, it is the only file that can only be incremental
    bck = (struct backup*)pgmoneta_art_search(backups, label);
    if (pgmoneta_incremental_rfile_initialize(server, label, relative_dir, incr_file_name, bck->encryption, bck->compression, &latest_source))
@@ -1792,13 +1792,13 @@ reconstruct_backup_file(int server,
 
    if (full_file_found)
    {
-      snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s", output_dir, base_file_name);
-      snprintf(manifest_path, MAX_PATH_CONCAT, "%s%s", relative_dir, base_file_name);
+      pgmoneta_snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s", output_dir, base_file_name);
+      pgmoneta_snprintf(manifest_path, MAX_PATH_CONCAT, "%s%s", relative_dir, base_file_name);
    }
    else
    {
-      snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s%s", output_dir, INCREMENTAL_PREFIX, base_file_name);
-      snprintf(manifest_path, MAX_PATH_CONCAT, "%s%s%s", relative_dir, INCREMENTAL_PREFIX, base_file_name);
+      pgmoneta_snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s%s", output_dir, INCREMENTAL_PREFIX, base_file_name);
+      pgmoneta_snprintf(manifest_path, MAX_PATH_CONCAT, "%s%s%s", relative_dir, INCREMENTAL_PREFIX, base_file_name);
    }
 
    if (copy_source != NULL)
@@ -1881,7 +1881,7 @@ copy_backup_file(int server,
    memset(manifest_path, 0, MAX_PATH_CONCAT);
    // copy the full file from input dir to output dir
    // extract before copy
-   snprintf(manifest_path, MAX_PATH_CONCAT, "%s%s", relative_dir, file_name);
+   pgmoneta_snprintf(manifest_path, MAX_PATH_CONCAT, "%s%s", relative_dir, file_name);
    if (pgmoneta_extract_backup_file(server, label, manifest_path, NULL, &extracted_file_path))
    {
       goto error;
@@ -1900,11 +1900,11 @@ copy_backup_file(int server,
 
    if (excluded && exclude)
    {
-      snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s%s", output_dir, base_file_name, TMP_SUFFIX);
+      pgmoneta_snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s%s", output_dir, base_file_name, TMP_SUFFIX);
    }
    else
    {
-      snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s", output_dir, base_file_name);
+      pgmoneta_snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s", output_dir, base_file_name);
    }
 
    pgmoneta_copy_file(extracted_file_path, ofullpath, NULL);
@@ -2165,8 +2165,8 @@ write_backup_label(char* from_dir, char* to_dir, char* lsn_entry, char* tli_entr
    memset(to_path, 0, MAX_PATH);
    memset(row, 0, MISC_LENGTH);
 
-   snprintf(from_path, MAX_PATH, "%s/backup_label", from_dir);
-   snprintf(to_path, MAX_PATH, "%s/backup_label", to_dir);
+   pgmoneta_snprintf(from_path, MAX_PATH, "%s/backup_label", from_dir);
+   pgmoneta_snprintf(to_path, MAX_PATH, "%s/backup_label", to_dir);
 
    from = fopen(from_path, "r");
    to = fopen(to_path, "w");
@@ -2505,14 +2505,14 @@ restore_backup_incremental(struct art* nodes)
       goto error;
    }
 
-   snprintf(target_root_combine, MAX_PATH, "%s", directory);
+   pgmoneta_snprintf(target_root_combine, MAX_PATH, "%s", directory);
    if (!combine_as_is)
    {
-      snprintf(target_base_combine, MAX_PATH_CONCAT, "%s/%s-%s", directory, config->common.servers[server].name, backup->label);
+      pgmoneta_snprintf(target_base_combine, MAX_PATH_CONCAT, "%s/%s-%s", directory, config->common.servers[server].name, backup->label);
    }
    else
    {
-      snprintf(target_base_combine, MAX_PATH_CONCAT, "%s/data", directory);
+      pgmoneta_snprintf(target_base_combine, MAX_PATH_CONCAT, "%s/data", directory);
    }
 
    manifest_path = pgmoneta_get_server_backup_identifier_data(server, backup->label);
@@ -2593,8 +2593,8 @@ restore_backup_incremental(struct art* nodes)
       {
          memset(excluded_file_path, 0, MAX_PATH_CONCAT);
          memset(tmp_excluded_file_path, 0, MAX_PATH_CONCAT);
-         snprintf(tmp_excluded_file_path, sizeof(tmp_excluded_file_path), "%s%s%s", target_base_combine, restore_last_files_names[i], TMP_SUFFIX);
-         snprintf(excluded_file_path, MAX_PATH_CONCAT, "%s%s", target_base_combine, restore_last_files_names[i]);
+         pgmoneta_snprintf(tmp_excluded_file_path, sizeof(tmp_excluded_file_path), "%s%s%s", target_base_combine, restore_last_files_names[i], TMP_SUFFIX);
+         pgmoneta_snprintf(excluded_file_path, MAX_PATH_CONCAT, "%s%s", target_base_combine, restore_last_files_names[i]);
 
          if (rename(tmp_excluded_file_path, excluded_file_path) != 0)
          {
@@ -2628,13 +2628,13 @@ error:
       memset(tblspc, 0, MAX_PATH);
       if (combine_as_is)
       {
-         snprintf(tblspc, MAX_PATH, "%s/%s", directory, backup->tablespaces[i]);
+         pgmoneta_snprintf(tblspc, MAX_PATH, "%s/%s", directory, backup->tablespaces[i]);
       }
       else
       {
-         snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", directory,
-                  config->common.servers[server].name, backup->label,
-                  backup->tablespaces[i]);
+         pgmoneta_snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", directory,
+                           config->common.servers[server].name, backup->label,
+                           backup->tablespaces[i]);
       }
       if (pgmoneta_exists(tblspc))
       {

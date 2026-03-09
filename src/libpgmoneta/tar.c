@@ -243,8 +243,8 @@ write_tar_file(struct archive* a, char* src, char* dst)
          continue;
       }
 
-      snprintf(real_path, sizeof(real_path), "%s/%s", src, entry_name);
-      snprintf(save_path, sizeof(save_path), "%s/%s", dst, entry_name);
+      pgmoneta_snprintf(real_path, sizeof(real_path), "%s/%s", src, entry_name);
+      pgmoneta_snprintf(save_path, sizeof(save_path), "%s/%s", dst, entry_name);
 
       entry = archive_entry_new();
       if (entry == NULL)

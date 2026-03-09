@@ -243,11 +243,11 @@ azure_upload_files(char* local_root, char* azure_root, char* relative_path)
 
          if (strlen(relative_path) > 0)
          {
-            snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
+            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
          }
          else
          {
-            snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
+            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
          }
 
          azure_upload_files(local_root, azure_root, relative_dir);
@@ -409,7 +409,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    else
    {
       string_to_sign = pgmoneta_append(string_to_sign, "PUT\n\n\n");
-      snprintf(size_str, sizeof(size_str), "%ld", (long)file_info.st_size);
+      pgmoneta_snprintf(size_str, sizeof(size_str), "%ld", (long)file_info.st_size);
       string_to_sign = pgmoneta_append(string_to_sign, size_str);
       string_to_sign = pgmoneta_append(string_to_sign, "\n\napplication/octet-stream\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:");
    }
@@ -444,7 +444,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
-   snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s", config->azure_container, azure_path);
+   pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s", config->azure_container, azure_path);
 
    if (pgmoneta_http_request_create(PGMONETA_HTTP_PUT, azure_put_path, &request))
    {

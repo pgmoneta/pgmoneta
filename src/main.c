@@ -3125,15 +3125,15 @@ create_pidfile(void)
       // no pidfile set, use a default one
       if (!pgmoneta_ends_with(config->common.unix_socket_dir, "/"))
       {
-         snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
-                  config->common.unix_socket_dir,
-                  !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
+         pgmoneta_snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
+                           config->common.unix_socket_dir,
+                           !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
       }
       else
       {
-         snprintf(config->pidfile, sizeof(config->pidfile), "%spgmoneta.%s.pid",
-                  config->common.unix_socket_dir,
-                  !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
+         pgmoneta_snprintf(config->pidfile, sizeof(config->pidfile), "%spgmoneta.%s.pid",
+                           config->common.unix_socket_dir,
+                           !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
       }
       pgmoneta_log_debug("PID file automatically set to: [%s]", config->pidfile);
    }
@@ -3156,7 +3156,7 @@ create_pidfile(void)
          goto error;
       }
 
-      snprintf(&buffer[0], sizeof(buffer), "%u\n", (unsigned)pid);
+      pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%u\n", (unsigned)pid);
 
       pgmoneta_permission(config->pidfile, 6, 4, 0);
 

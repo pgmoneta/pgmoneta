@@ -335,7 +335,7 @@ build_mctf_log_path(char* path, size_t size)
 
    *slash = '\0';
 
-   n = snprintf(path, size, "%s/log/pgmoneta-test.log", base);
+   n = pgmoneta_snprintf(path, size, "%s/log/pgmoneta-test.log", base);
    if (n <= 0 || (size_t)n >= size)
    {
       return 1;

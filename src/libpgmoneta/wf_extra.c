@@ -188,7 +188,7 @@ extra_execute(char* name __attribute__((unused)), struct art* nodes)
    }
    else
    {
-      snprintf(backup->extra, sizeof(backup->extra), "%s", info_extra);
+      pgmoneta_snprintf(backup->extra, sizeof(backup->extra), "%s", info_extra);
    }
    pgmoneta_log_debug("backup->label: %s", backup->label);
    if (pgmoneta_save_info(info_root, backup))
