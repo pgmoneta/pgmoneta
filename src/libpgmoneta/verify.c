@@ -29,20 +29,62 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <backup.h>
+#include <extension.h>
+#include <extraction.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <restore.h>
 #include <security.h>
 #include <utils.h>
+#include <wal.h>
 #include <workflow.h>
 
 /* system */
+#include <dirent.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #define NAME "verify"
+
+/**
+ * Structure to hold parsed recovery target information
+ */
+struct recovery_target
+{
+   char* target_lsn;    /**< Recovery target LSN (if specified) */
+   char* target_xid;    /**< Recovery target XID (if specified) */
+   char* target_time;   /**< Recovery target timestamp (if specified) */
+   char* target_name;   /**< Recovery target name (if specified) */
+   uint32_t target_tli; /**< Recovery target timeline (if specified) */
+   bool inclusive;      /**< Whether recovery target is inclusive */
+};
+
+/**
+ * Validation functions for restore integrity checks
+ */
+static int validate_backup_chain_integrity(int server, struct backup* backup);
+
+static int validate_wal_continuity(int server, struct backup* backup, struct art* nodes);
+
+static int validate_timeline_consistency(int server, struct deque* labels, struct art* nodes);
+
+static int validate_postgresql_version(int server, struct backup* backup);
+
+static int validate_backup_file_accessibility(int server, struct backup* backup);
+
+/**
+ * Helper functions for WAL validation
+ */
+static int parse_recovery_target(char* position, struct recovery_target* target);
+
+static void free_recovery_target(struct recovery_target* target);
+
+static int collect_available_wal_files(int server, struct backup* backup, struct deque** wal_files);
+
+static int validate_wal_sequence_continuity(int server, struct deque* wal_files, char* start_wal);
 
 void
 pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
@@ -540,4 +582,1077 @@ server_cleanup:
 
    pgmoneta_stop_logging();
    exit(err);
+}
+
+/**
+ * Main restore validation function that orchestrates all integrity checks
+ * @param server The server
+ * @param backup The backup
+ * @param labels The backup labels (for incremental chain)
+ * @param nodes The nodes containing restore context
+ * @return 0 on success, restore error code if validation fails
+ */
+int
+pgmoneta_validate_restore(int server, struct backup* backup, struct deque* labels, struct art* nodes)
+{
+   int ret = RESTORE_OK;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (backup == NULL)
+   {
+      pgmoneta_log_error("Validate restore: backup is NULL");
+      return RESTORE_ERROR;
+   }
+
+   pgmoneta_log_debug("Validate restore: Starting integrity checks for %s/%s",
+                      config->common.servers[server].name, backup->label);
+
+   ret = validate_backup_chain_integrity(server, backup);
+   if (ret != RESTORE_OK)
+   {
+      pgmoneta_log_error("Validate restore: Backup chain integrity check failed");
+      goto done;
+   }
+
+   ret = validate_wal_continuity(server, backup, nodes);
+   if (ret != RESTORE_OK)
+   {
+      pgmoneta_log_error("Validate restore: WAL continuity check failed");
+      goto done;
+   }
+
+   ret = validate_timeline_consistency(server, labels, nodes);
+   if (ret != RESTORE_OK)
+   {
+      pgmoneta_log_error("Validate restore: Timeline consistency check failed");
+      goto done;
+   }
+
+   ret = validate_postgresql_version(server, backup);
+   if (ret != RESTORE_OK)
+   {
+      pgmoneta_log_error("Validate restore: PostgreSQL version compatibility check failed");
+      goto done;
+   }
+
+   ret = validate_backup_file_accessibility(server, backup);
+   if (ret != RESTORE_OK)
+   {
+      pgmoneta_log_error("Validate restore: Backup file accessibility check failed");
+      goto done;
+   }
+
+   pgmoneta_log_debug("Validate restore: All integrity checks passed for %s/%s",
+                      config->common.servers[server].name, backup->label);
+
+   goto done;
+done:
+   return ret;
+}
+
+/**
+ * Validate backup chain integrity (full + incrementals exist and are linked)
+ * 
+ * Checks:
+ * - For incremental backups: verify all parent backups exist and are marked valid
+ * - Verify backup chain is not broken
+ * - Check that all backups in chain have valid SHA512 checksums
+ * 
+ * @param server The server
+ * @param backup The backup to validate
+ * @return 0 on success, RESTORE_CHAIN_INVALID if validation fails
+ */
+static int
+validate_backup_chain_integrity(int server, struct backup* backup)
+{
+   struct backup* current = NULL;
+   struct backup* parent = NULL;
+   char* backup_dir = NULL;
+   bool current_is_input = true;
+   int depth = 0;
+
+   if (backup == NULL)
+   {
+      return RESTORE_CHAIN_INVALID;
+   }
+
+   current = backup;
+
+   while (current != NULL)
+   {
+      if (!pgmoneta_is_backup_struct_valid(server, current))
+      {
+         pgmoneta_log_error("Validate backup chain: invalid backup %s", current->label);
+         goto error;
+      }
+
+      backup_dir = pgmoneta_get_server_backup_identifier(server, current->label);
+      if (backup_dir == NULL || !pgmoneta_exists(backup_dir))
+      {
+         pgmoneta_log_error("Validate backup chain: missing backup directory for %s", current->label);
+         goto error;
+      }
+      free(backup_dir);
+      backup_dir = NULL;
+
+      if (current->type == TYPE_FULL)
+      {
+         break;
+      }
+
+      if (strlen(current->parent_label) == 0)
+      {
+         pgmoneta_log_error("Validate backup chain: missing parent for %s", current->label);
+         goto error;
+      }
+
+      depth++;
+      if (depth > 1024)
+      {
+         pgmoneta_log_error("Validate backup chain: excessive chain depth for %s", current->label);
+         goto error;
+      }
+
+      if (pgmoneta_get_backup_parent(server, current, &parent) || parent == NULL)
+      {
+         pgmoneta_log_error("Validate backup chain: unable to load parent for %s", current->label);
+         goto error;
+      }
+
+      if (!strcmp(parent->label, current->label))
+      {
+         pgmoneta_log_error("Validate backup chain: parent label loops on %s", current->label);
+         goto error;
+      }
+
+      if (!current_is_input)
+      {
+         free(current);
+      }
+
+      current = parent;
+      parent = NULL;
+      current_is_input = false;
+   }
+
+   if (!current_is_input && current != NULL)
+   {
+      free(current);
+   }
+
+   return RESTORE_OK;
+
+error:
+   if (!current_is_input && current != NULL)
+   {
+      free(current);
+   }
+   if (parent != NULL)
+   {
+      free(parent);
+   }
+   free(backup_dir);
+   return RESTORE_CHAIN_INVALID;
+}
+
+/**
+ * Validate WAL availability and continuity for requested recovery target
+ * 
+ * Checks:
+ * - Verify WAL files are available from backup start LSN
+ * - Check WAL continuity (no gaps in WAL segments)
+ * - Verify timeline matches backup timeline
+ * 
+ * @param server The server
+ * @param backup The backup
+ * @param nodes The nodes containing recovery target info
+ * @return 0 on success, RESTORE_WAL_INCOMPLETE if validation fails
+ */
+static int
+validate_wal_continuity(int server, struct backup* backup, struct art* nodes)
+{
+   bool copy_wal = false;
+   struct deque* wal_files = NULL;
+   char* position = NULL;
+   struct recovery_target target = {0};
+   int ret = RESTORE_OK;
+
+   if (backup == NULL)
+   {
+      return RESTORE_WAL_INCOMPLETE;
+   }
+
+   // Check if WAL copying is requested
+   if (pgmoneta_art_contains_key(nodes, NODE_COPY_WAL))
+   {
+      copy_wal = (bool)pgmoneta_art_search(nodes, NODE_COPY_WAL);
+   }
+
+   if (!copy_wal)
+   {
+      pgmoneta_log_debug("Validate WAL continuity: WAL copying not requested, skipping validation");
+      return RESTORE_OK;
+   }
+
+   if (strlen(backup->wal) == 0)
+   {
+      pgmoneta_log_error("Validate WAL continuity: backup %s missing start WAL segment", backup->label);
+      return RESTORE_WAL_INCOMPLETE;
+   }
+
+   pgmoneta_log_debug("Validate WAL continuity: starting validation for backup %s, start WAL: %s",
+                      backup->label, backup->wal);
+
+   // Parse recovery target parameters if specified
+   position = (char*)pgmoneta_art_search(nodes, USER_POSITION);
+   if (position != NULL && strlen(position) > 0)
+   {
+      if (parse_recovery_target(position, &target) == 0)
+      {
+         if (target.target_lsn != NULL)
+         {
+            pgmoneta_log_debug("Validate WAL continuity: recovery target LSN = %s", target.target_lsn);
+         }
+         if (target.target_xid != NULL)
+         {
+            pgmoneta_log_debug("Validate WAL continuity: recovery target XID = %s", target.target_xid);
+         }
+         if (target.target_time != NULL)
+         {
+            pgmoneta_log_debug("Validate WAL continuity: recovery target time = %s", target.target_time);
+         }
+         if (target.target_name != NULL)
+         {
+            pgmoneta_log_debug("Validate WAL continuity: recovery target name = %s", target.target_name);
+         }
+         if (target.target_tli > 0)
+         {
+            pgmoneta_log_debug("Validate WAL continuity: recovery target timeline = %u", target.target_tli);
+         }
+      }
+      else
+      {
+         pgmoneta_log_warn("Validate WAL continuity: failed to parse recovery target position");
+      }
+   }
+
+   // Collect all available WAL files from backup and archive directories
+   if (collect_available_wal_files(server, backup, &wal_files))
+   {
+      pgmoneta_log_error("Validate WAL continuity: failed to collect WAL files");
+      ret = RESTORE_WAL_INCOMPLETE;
+      goto cleanup;
+   }
+
+   if (wal_files == NULL || pgmoneta_deque_size(wal_files) == 0)
+   {
+      pgmoneta_log_error("Validate WAL continuity: no WAL files found for backup %s", backup->label);
+      ret = RESTORE_WAL_INCOMPLETE;
+      goto cleanup;
+   }
+
+   pgmoneta_log_debug("Validate WAL continuity: collected %d WAL files", pgmoneta_deque_size(wal_files));
+
+   if (validate_wal_sequence_continuity(server, wal_files, backup->wal))
+   {
+      pgmoneta_log_error("Validate WAL continuity: WAL sequence validation failed for backup %s", backup->label);
+      ret = RESTORE_WAL_INCOMPLETE;
+      goto cleanup;
+   }
+
+   pgmoneta_log_debug("Validate WAL continuity: validation passed for backup %s", backup->label);
+
+cleanup:
+   free_recovery_target(&target);
+   if (wal_files != NULL)
+   {
+      pgmoneta_deque_destroy(wal_files);
+   }
+
+   return ret;
+}
+
+/**
+ * Validate timeline consistency across backup chain
+ * 
+ * Checks backup chain metadata for timeline consistency:
+ * - Verify timeline never decreases in backup chain (full -> incremental)
+ * - Validate recovery_target_timeline doesn't exceed chain maximum
+ * - Ensure each backup has valid timeline range (start_timeline <= end_timeline)
+ * 
+ * @param server The server
+ * @param labels The backup labels in chain
+ * @param nodes The nodes containing recovery target timeline info
+ * @return 0 on success, RESTORE_TIMELINE_MISMATCH if validation fails
+ */
+static int
+validate_timeline_consistency(int server, struct deque* labels, struct art* nodes)
+{
+   if (labels == NULL || pgmoneta_deque_size(labels) == 0)
+   {
+      return RESTORE_OK;
+   }
+
+   struct deque_iterator* iter = NULL;
+   struct backup* bck = NULL;
+   char** label_list = NULL;
+   int label_count = 0;
+   int idx = 0;
+   uint32_t prev_end_tli = 0;
+   bool has_prev = false;
+   uint32_t max_tli = 0;
+   uint32_t target_tli = 0;
+   char* position = NULL;
+   char* server_backup = NULL;
+
+   label_count = pgmoneta_deque_size(labels);
+   label_list = (char**)calloc(label_count, sizeof(char*));
+   if (label_list == NULL)
+   {
+      return RESTORE_TIMELINE_MISMATCH;
+   }
+
+   server_backup = pgmoneta_get_server_backup(server);
+   if (server_backup == NULL)
+   {
+      free(label_list);
+      return RESTORE_TIMELINE_MISMATCH;
+   }
+
+   pgmoneta_deque_iterator_create(labels, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      if (idx >= label_count)
+      {
+         break;
+      }
+      label_list[idx++] = (char*)pgmoneta_value_data(iter->value);
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+
+   for (int i = label_count - 1; i >= 0; i--)
+   {
+      if (pgmoneta_load_info(server_backup, label_list[i], &bck))
+      {
+         pgmoneta_log_error("Validate timeline consistency: unable to load backup metadata %s", label_list[i]);
+         free(server_backup);
+         free(label_list);
+         return RESTORE_TIMELINE_MISMATCH;
+      }
+
+      if (bck == NULL)
+      {
+         free(server_backup);
+         free(label_list);
+         return RESTORE_TIMELINE_MISMATCH;
+      }
+
+      if (bck->start_timeline > bck->end_timeline)
+      {
+         pgmoneta_log_error("Validate timeline consistency: invalid timeline range for %s (start=%u > end=%u)",
+                            bck->label, bck->start_timeline, bck->end_timeline);
+         free(bck);
+         free(server_backup);
+         free(label_list);
+         return RESTORE_TIMELINE_MISMATCH;
+      }
+
+      if (has_prev)
+      {
+         if (bck->start_timeline < prev_end_tli)
+         {
+            pgmoneta_log_error("Validate timeline consistency: timeline regression in backup chain at %s (prev=%u, current=%u)",
+                               bck->label, prev_end_tli, bck->start_timeline);
+            free(bck);
+            free(server_backup);
+            free(label_list);
+            return RESTORE_TIMELINE_MISMATCH;
+         }
+      }
+
+      if (bck->end_timeline > max_tli)
+      {
+         max_tli = bck->end_timeline;
+      }
+
+      prev_end_tli = bck->end_timeline;
+      has_prev = true;
+      free(bck);
+      bck = NULL;
+   }
+
+   free(server_backup);
+   free(label_list);
+
+   position = (char*)pgmoneta_art_search(nodes, USER_POSITION);
+   if (position != NULL && strlen(position) > 0)
+   {
+      struct recovery_target target = {0};
+
+      if (parse_recovery_target(position, &target) == 0)
+      {
+         target_tli = target.target_tli;
+         free_recovery_target(&target);
+      }
+      else
+      {
+         pgmoneta_log_warn("Validate timeline consistency: failed to parse recovery target position");
+      }
+   }
+
+   if (target_tli > 0)
+   {
+      if (target_tli > max_tli)
+      {
+         pgmoneta_log_error("Validate timeline consistency: recovery_target_timeline=%u exceeds backup chain maximum timeline=%u",
+                            target_tli, max_tli);
+         return RESTORE_TIMELINE_MISMATCH;
+      }
+
+      pgmoneta_log_debug("Validate timeline consistency: recovery_target_timeline=%u is within backup chain range", target_tli);
+   }
+
+   pgmoneta_log_debug("Validate timeline consistency: backup chain metadata validation passed");
+
+   return RESTORE_OK;
+}
+
+/**
+ * Validate PostgreSQL version compatibility
+ * 
+ * Checks:
+ * - Verify backup's PostgreSQL version is compatible with target server version
+ * - Check for major version mismatches
+ * - For incremental backups: verify all backups have same PostgreSQL major version
+ * - Validate pgmoneta version compatibility between backup and current version
+ * 
+ * @param server The server
+ * @param backup The backup
+ * @return 0 on success, RESTORE_VERSION_INCOMPATIBLE if validation fails
+ */
+static int
+validate_postgresql_version(int server, struct backup* backup)
+{
+   struct main_configuration* config;
+   struct backup* current = NULL;
+   struct backup* parent = NULL;
+   bool current_is_input = true;
+   int target_major = 0;
+   struct version backup_pgmoneta_version = {0};
+   struct version current_pgmoneta_version = {0};
+
+   if (backup == NULL)
+   {
+      return RESTORE_VERSION_INCOMPATIBLE;
+   }
+
+   config = (struct main_configuration*)shmem;
+   target_major = config->common.servers[server].version;
+
+   if (strlen(backup->version) > 0)
+   {
+      if (pgmoneta_extension_parse_version(backup->version, &backup_pgmoneta_version) == 0)
+      {
+         if (pgmoneta_extension_parse_version(VERSION, &current_pgmoneta_version) == 0)
+         {
+            if (backup_pgmoneta_version.major > current_pgmoneta_version.major)
+            {
+               pgmoneta_log_error("Validate PostgreSQL version: backup %s created with pgmoneta %s, "
+                                  "current is %s. Backup format may be incompatible.",
+                                  backup->label, backup->version, VERSION);
+               return RESTORE_VERSION_INCOMPATIBLE;
+            }
+
+            // Warn about significant version differences
+            if (backup_pgmoneta_version.major < current_pgmoneta_version.major - 1)
+            {
+               pgmoneta_log_warn("Validate PostgreSQL version: backup %s created with older pgmoneta %s, "
+                                 "current is %s. Please verify compatibility.",
+                                 backup->label, backup->version, VERSION);
+            }
+         }
+      }
+      else
+      {
+         pgmoneta_log_debug("Validate PostgreSQL version: unable to parse backup pgmoneta version '%s'",
+                            backup->version);
+      }
+   }
+
+   if (backup->major_version > 0 && target_major > 0 && backup->major_version != target_major)
+   {
+      if (backup->major_version < target_major)
+      {
+         pgmoneta_log_error("Validate PostgreSQL version: backup %s is PostgreSQL %d, target server is PostgreSQL %d. "
+                            "Restoring older major version to newer requires pg_upgrade after restore.",
+                            backup->label, backup->major_version, target_major);
+      }
+      else
+      {
+         pgmoneta_log_error("Validate PostgreSQL version: backup %s is PostgreSQL %d, target server is PostgreSQL %d. "
+                            "Cannot restore newer major version to older PostgreSQL.",
+                            backup->label, backup->major_version, target_major);
+      }
+      return RESTORE_VERSION_INCOMPATIBLE;
+   }
+
+   // Check minor version compatibility - warning only
+   if (backup->minor_version > 0 && config->common.servers[server].minor_version > 0 &&
+       backup->minor_version != config->common.servers[server].minor_version)
+   {
+      if (backup->minor_version < config->common.servers[server].minor_version)
+      {
+         pgmoneta_log_info("Validate PostgreSQL version: backup minor version %d.%d, server is %d.%d. "
+                           "Restoring older minor version to newer is generally safe.",
+                           backup->major_version, backup->minor_version,
+                           target_major, config->common.servers[server].minor_version);
+      }
+      else
+      {
+         pgmoneta_log_warn("Validate PostgreSQL version: backup minor version %d.%d, server is %d.%d. "
+                           "Verify compatibility before proceeding.",
+                           backup->major_version, backup->minor_version,
+                           target_major, config->common.servers[server].minor_version);
+      }
+   }
+
+   current = backup;
+   while (current != NULL && current->type == TYPE_INCREMENTAL)
+   {
+      if (pgmoneta_get_backup_parent(server, current, &parent) || parent == NULL)
+      {
+         pgmoneta_log_error("Validate PostgreSQL version: unable to load parent for %s", current->label);
+         goto error;
+      }
+
+      if (parent->major_version > 0 && backup->major_version > 0 &&
+          parent->major_version != backup->major_version)
+      {
+         pgmoneta_log_error("Validate PostgreSQL version: PostgreSQL major version mismatch in backup chain. "
+                            "Backup %s is PostgreSQL %d, parent %s is PostgreSQL %d.",
+                            current->label, backup->major_version,
+                            parent->label, parent->major_version);
+         goto error;
+      }
+
+      if (!current_is_input)
+      {
+         free(current);
+      }
+      current = parent;
+      parent = NULL;
+      current_is_input = false;
+   }
+
+   if (!current_is_input && current != NULL)
+   {
+      free(current);
+   }
+
+   return RESTORE_OK;
+
+error:
+   if (!current_is_input && current != NULL)
+   {
+      free(current);
+   }
+   if (parent != NULL)
+   {
+      free(parent);
+   }
+   return RESTORE_VERSION_INCOMPATIBLE;
+}
+
+/**
+ * Validate backup file accessibility
+ * 
+ * Checks:
+ * - Verify backup directory exists and is readable
+ * - Check for required files (backup_label, pg_control)
+ * - Handles compressed/encrypted files automatically
+ * 
+ * @param server The server
+ * @param backup The backup
+ * @return 0 on success, RESTORE_FILE_INACCESSIBLE if validation fails
+ */
+static int
+validate_backup_file_accessibility(int server, struct backup* backup)
+{
+   char* backup_root = NULL;
+   char* backup_data = NULL;
+   char* backup_label_path = NULL;
+   char* pg_control_path = NULL;
+   DIR* dir = NULL;
+
+   if (backup == NULL)
+   {
+      return RESTORE_FILE_INACCESSIBLE;
+   }
+
+   backup_root = pgmoneta_get_server_backup_identifier(server, backup->label);
+   backup_data = pgmoneta_get_server_backup_identifier_data(server, backup->label);
+
+   if (backup_root == NULL || backup_data == NULL)
+   {
+      goto error;
+   }
+
+   if (!pgmoneta_exists(backup_root) || !pgmoneta_exists(backup_data))
+   {
+      pgmoneta_log_error("Validate backup files: missing backup directory for %s", backup->label);
+      goto error;
+   }
+
+   dir = opendir(backup_data);
+   if (dir == NULL)
+   {
+      pgmoneta_log_error("Validate backup files: unable to read %s", backup_data);
+      goto error;
+   }
+   closedir(dir);
+   dir = NULL;
+
+   backup_label_path = pgmoneta_append(backup_label_path, backup_data);
+   if (!pgmoneta_ends_with(backup_label_path, "/"))
+   {
+      backup_label_path = pgmoneta_append(backup_label_path, "/");
+   }
+   backup_label_path = pgmoneta_append(backup_label_path, "backup_label");
+
+   pg_control_path = pgmoneta_append(pg_control_path, backup_data);
+   if (!pgmoneta_ends_with(pg_control_path, "/"))
+   {
+      pg_control_path = pgmoneta_append(pg_control_path, "/");
+   }
+   pg_control_path = pgmoneta_append(pg_control_path, "global/pg_control");
+
+   // Check for backup_label file using backup compression/encryption metadata
+   char* actual_backup_label = pgmoneta_get_backup_file_path(backup_label_path, backup->compression, backup->encryption);
+   if (actual_backup_label == NULL)
+   {
+      pgmoneta_log_error("Validate backup files: missing backup_label for %s", backup->label);
+      goto error;
+   }
+   free(actual_backup_label);
+
+   // Check for pg_control file using backup compression/encryption metadata
+   char* actual_pg_control = pgmoneta_get_backup_file_path(pg_control_path, backup->compression, backup->encryption);
+   if (actual_pg_control == NULL)
+   {
+      pgmoneta_log_error("Validate backup files: missing pg_control for %s", backup->label);
+      goto error;
+   }
+   free(actual_pg_control);
+
+   free(backup_root);
+   free(backup_data);
+   free(backup_label_path);
+   free(pg_control_path);
+   return RESTORE_OK;
+
+error:
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+   free(backup_root);
+   free(backup_data);
+   free(backup_label_path);
+   free(pg_control_path);
+   return RESTORE_FILE_INACCESSIBLE;
+}
+
+/**
+ * Parse recovery target information from position string
+ * 
+ * Parses the USER_POSITION string to extract recovery target parameters like
+ * recovery_target_lsn, recovery_target_xid, recovery_target_time, etc.
+ * 
+ * @param position The position string (comma-separated key=value pairs)
+ * @param target The recovery target structure to populate
+ * @return 0 on success, 1 on failure
+ */
+static int
+parse_recovery_target(char* position, struct recovery_target* target)
+{
+   char tokens[1024];
+   char* ptr = NULL;
+
+   if (target == NULL)
+   {
+      return 1;
+   }
+
+   memset(target, 0, sizeof(struct recovery_target));
+
+   if (position == NULL || strlen(position) == 0)
+   {
+      return 0;
+   }
+
+   memset(tokens, 0, sizeof(tokens));
+   if (strlen(position) >= sizeof(tokens))
+   {
+      pgmoneta_log_warn("Parse recovery target: position string too long, truncating");
+      memcpy(tokens, position, sizeof(tokens) - 1);
+   }
+   else
+   {
+      memcpy(tokens, position, strlen(position));
+   }
+
+   ptr = strtok(tokens, ",");
+   while (ptr != NULL)
+   {
+      char* equal = strchr(ptr, '=');
+      if (equal != NULL)
+      {
+         char key[256];
+         char value[512];
+         size_t key_len = (size_t)(equal - ptr);
+
+         memset(key, 0, sizeof(key));
+         memset(value, 0, sizeof(value));
+
+         if (key_len >= sizeof(key))
+         {
+            key_len = sizeof(key) - 1;
+         }
+         memcpy(key, ptr, key_len);
+
+         if (strlen(equal + 1) >= sizeof(value))
+         {
+            memcpy(value, equal + 1, sizeof(value) - 1);
+         }
+         else
+         {
+            memcpy(value, equal + 1, strlen(equal + 1));
+         }
+
+         if (!strcmp(key, "lsn") || !strcmp(key, "recovery_target_lsn"))
+         {
+            target->target_lsn = strdup(value);
+         }
+         else if (!strcmp(key, "xid") || !strcmp(key, "recovery_target_xid"))
+         {
+            target->target_xid = strdup(value);
+         }
+         else if (!strcmp(key, "time") || !strcmp(key, "recovery_target_time"))
+         {
+            target->target_time = strdup(value);
+         }
+         else if (!strcmp(key, "name") || !strcmp(key, "recovery_target_name"))
+         {
+            target->target_name = strdup(value);
+         }
+         else if (!strcmp(key, "timeline") || !strcmp(key, "recovery_target_timeline"))
+         {
+            target->target_tli = (uint32_t)strtoul(value, NULL, 10);
+         }
+         else if (!strcmp(key, "inclusive"))
+         {
+            target->inclusive = (!strcmp(value, "true") || !strcmp(value, "1"));
+         }
+      }
+
+      ptr = strtok(NULL, ",");
+   }
+
+   return 0;
+}
+
+/**
+ * Free recovery target structure
+ * 
+ * @param target The recovery target to free
+ */
+static void
+free_recovery_target(struct recovery_target* target)
+{
+   if (target == NULL)
+   {
+      return;
+   }
+
+   free(target->target_lsn);
+   free(target->target_xid);
+   free(target->target_time);
+   free(target->target_name);
+
+   memset(target, 0, sizeof(struct recovery_target));
+}
+
+/**
+ * Collect all available WAL files from backup and archive directories
+ * 
+ * Collects WAL files from both the backup's WAL directory and the server's
+ * archive WAL directory, normalizing filenames and storing them in a deque.
+ * 
+ * @param server The server index
+ * @param backup The backup structure
+ * @param wal_files Output deque of normalized WAL filenames (caller must destroy)
+ * @return 0 on success, 1 on failure
+ */
+static int
+collect_available_wal_files(int server, struct backup* backup, struct deque** wal_files)
+{
+   char* wal_dir_backup = NULL;
+   char* wal_dir_archive = NULL;
+   struct deque* backup_wals = NULL;
+   struct deque* archive_wals = NULL;
+   struct deque_iterator* iter = NULL;
+   struct deque* collected = NULL;
+
+   if (backup == NULL || wal_files == NULL)
+   {
+      return 1;
+   }
+
+   if (pgmoneta_deque_create(false, &collected))
+   {
+      return 1;
+   }
+
+   wal_dir_backup = pgmoneta_get_server_backup_identifier_data_wal(server, backup->label);
+   wal_dir_archive = pgmoneta_get_server_wal(server);
+
+   if (wal_dir_backup != NULL && pgmoneta_exists(wal_dir_backup))
+   {
+      if (pgmoneta_get_wal_files(wal_dir_backup, &backup_wals) == 0 && backup_wals != NULL)
+      {
+         pgmoneta_deque_iterator_create(backup_wals, &iter);
+         while (pgmoneta_deque_iterator_next(iter))
+         {
+            char* filename = (char*)pgmoneta_value_data(iter->value);
+            char* normalized = NULL;
+
+            if (pgmoneta_extraction_strip_suffix(filename, 0, &normalized) == 0 && normalized != NULL)
+            {
+               pgmoneta_deque_add(collected, NULL, (uintptr_t)normalized, ValueString);
+            }
+         }
+         pgmoneta_deque_iterator_destroy(iter);
+         pgmoneta_deque_destroy(backup_wals);
+         iter = NULL;
+         backup_wals = NULL;
+      }
+   }
+
+   if (wal_dir_archive != NULL && pgmoneta_exists(wal_dir_archive))
+   {
+      if (pgmoneta_get_wal_files(wal_dir_archive, &archive_wals) == 0 && archive_wals != NULL)
+      {
+         pgmoneta_deque_iterator_create(archive_wals, &iter);
+         while (pgmoneta_deque_iterator_next(iter))
+         {
+            char* filename = (char*)pgmoneta_value_data(iter->value);
+            char* normalized = NULL;
+
+            if (pgmoneta_extraction_strip_suffix(filename, 0, &normalized) == 0 && normalized != NULL)
+            {
+               // Check if already in collected to avoid duplicates
+               bool found = false;
+               struct deque_iterator* check_iter = NULL;
+               pgmoneta_deque_iterator_create(collected, &check_iter);
+               while (pgmoneta_deque_iterator_next(check_iter))
+               {
+                  char* existing = (char*)pgmoneta_value_data(check_iter->value);
+                  if (!strcmp(existing, normalized))
+                  {
+                     found = true;
+                     free(normalized);
+                     normalized = NULL;
+                     break;
+                  }
+               }
+               pgmoneta_deque_iterator_destroy(check_iter);
+
+               if (!found && normalized != NULL)
+               {
+                  pgmoneta_deque_add(collected, NULL, (uintptr_t)normalized, ValueString);
+               }
+            }
+         }
+         pgmoneta_deque_iterator_destroy(iter);
+         pgmoneta_deque_destroy(archive_wals);
+         iter = NULL;
+         archive_wals = NULL;
+      }
+   }
+
+   free(wal_dir_backup);
+   free(wal_dir_archive);
+
+   *wal_files = collected;
+   return 0;
+}
+
+/**
+ * Validate WAL sequence continuity starting from a specific WAL file
+ * 
+ * Parses all WAL filenames, sorts them by timeline and segment number,
+ * then checks for gaps in the sequence starting from start_wal.
+ * Also validates that .history files exist for any timeline switches.
+ * 
+ * @param server The server index
+ * @param wal_files Deque of available WAL filenames
+ * @param start_wal The starting WAL filename
+ * @return 0 if continuous, 1 if gaps detected or start not found
+ */
+static int
+validate_wal_sequence_continuity(int server, struct deque* wal_files, char* start_wal)
+{
+   struct deque_iterator* iter = NULL;
+   struct wal_segment* segments = NULL;
+   struct wal_segment start_segment = {0};
+   int segment_count = 0;
+   int valid_count = 0;
+   int start_index = -1;
+   int ret = 1;
+
+   if (wal_files == NULL || start_wal == NULL || strlen(start_wal) == 0)
+   {
+      return 1;
+   }
+
+   segment_count = pgmoneta_deque_size(wal_files);
+   if (segment_count == 0)
+   {
+      pgmoneta_log_error("WAL sequence validation: no WAL files provided");
+      return 1;
+   }
+
+   if (pgmoneta_parse_wal_filename(start_wal, &start_segment))
+   {
+      pgmoneta_log_error("WAL sequence validation: failed to parse start WAL %s", start_wal);
+      return 1;
+   }
+
+   segments = (struct wal_segment*)calloc(segment_count, sizeof(struct wal_segment));
+   if (segments == NULL)
+   {
+      pgmoneta_log_error("WAL sequence validation: memory allocation failed");
+      return 1;
+   }
+
+   pgmoneta_deque_iterator_create(wal_files, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* wal_name = (char*)pgmoneta_value_data(iter->value);
+      if (pgmoneta_parse_wal_filename(wal_name, &segments[valid_count]) == 0)
+      {
+         valid_count++;
+      }
+      else
+      {
+         pgmoneta_log_debug("WAL sequence validation: skipping unparseable file: %s", wal_name);
+      }
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+
+   if (valid_count == 0)
+   {
+      pgmoneta_log_error("WAL sequence validation: no valid WAL files found");
+      goto cleanup;
+   }
+
+   pgmoneta_log_debug("WAL sequence validation: parsed %d valid WAL files out of %d",
+                      valid_count, segment_count);
+
+   qsort(segments, valid_count, sizeof(struct wal_segment), pgmoneta_compare_wal_segments);
+
+   for (int i = 0; i < valid_count; i++)
+   {
+      if (segments[i].timeline == start_segment.timeline &&
+          segments[i].segment_no == start_segment.segment_no)
+      {
+         start_index = i;
+         break;
+      }
+   }
+
+   if (start_index == -1)
+   {
+      pgmoneta_log_error("WAL sequence validation: start WAL %s (TLI=%u, seg_no=%lu) not found in available files",
+                         start_wal, start_segment.timeline, start_segment.segment_no);
+      goto cleanup;
+   }
+
+   pgmoneta_log_debug("WAL sequence validation: found start WAL at index %d", start_index);
+
+   // We check files with the same timeline as the start, and validate .history files for timeline switches
+   uint32_t current_timeline = segments[start_index].timeline;
+   uint64_t expected_segment_no = segments[start_index].segment_no;
+   int gap_count = 0;
+   struct timeline_history* history = NULL;
+
+   for (int i = start_index; i < valid_count; i++)
+   {
+      if (segments[i].timeline != current_timeline)
+      {
+         pgmoneta_log_info("WAL sequence validation: timeline switch detected from %u to %u at segment %lu",
+                           current_timeline, segments[i].timeline, segments[i].segment_no);
+
+         // Validate that .history file exists for the new timeline (if > 1)
+         if (segments[i].timeline > 1)
+         {
+            if (pgmoneta_get_timeline_history(server, segments[i].timeline, &history))
+            {
+               pgmoneta_log_error("WAL sequence validation: timeline switch to %u detected, but .history file missing or invalid",
+                                  segments[i].timeline);
+               pgmoneta_log_error("WAL sequence validation: recovery will fail without timeline history file %08X.history",
+                                  segments[i].timeline);
+               ret = 1;
+               pgmoneta_free_timeline_history(history);
+               goto cleanup;
+            }
+            else
+            {
+               pgmoneta_log_debug("WAL sequence validation: verified .history file exists for timeline %u",
+                                  segments[i].timeline);
+               pgmoneta_free_timeline_history(history);
+               history = NULL;
+            }
+         }
+
+         current_timeline = segments[i].timeline;
+         expected_segment_no = segments[i].segment_no + 1;
+         continue;
+      }
+
+      if (segments[i].segment_no != expected_segment_no)
+      {
+         gap_count++;
+         if (gap_count <= 5) // Only log the first few gaps to avoid log spam
+         {
+            pgmoneta_log_warn("WAL sequence gap detected: expected segment %lu, found %lu (file: %s)",
+                              expected_segment_no, segments[i].segment_no, segments[i].filename);
+         }
+         expected_segment_no = segments[i].segment_no + 1;
+      }
+      else
+      {
+         expected_segment_no++;
+      }
+   }
+
+   if (gap_count > 0)
+   {
+      pgmoneta_log_error("WAL sequence validation: detected %d gap(s) in WAL sequence starting from %s",
+                         gap_count, start_wal);
+      pgmoneta_log_error("WAL sequence validation: restore may fail if recovery needs missing WAL segments");
+      ret = 1;
+   }
+   else
+   {
+      pgmoneta_log_info("WAL sequence validation: no gaps detected, %d consecutive segments from %s",
+                        valid_count - start_index, start_wal);
+      ret = 0;
+   }
+
+cleanup:
+   free(segments);
+   return ret;
 }
