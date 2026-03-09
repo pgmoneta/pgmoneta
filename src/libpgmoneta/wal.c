@@ -440,7 +440,7 @@ pgmoneta_wal(int srv, char** argv)
          goto error;
       }
 
-      snprintf(cmd, sizeof(cmd), "%X/%X", high32, low32);
+      pgmoneta_snprintf(cmd, sizeof(cmd), "%X/%X", high32, low32);
 
       pgmoneta_create_start_replication_message(cmd, timeline, config->common.servers[srv].wal_slot,
                                                 &start_replication_msg);
@@ -456,7 +456,7 @@ pgmoneta_wal(int srv, char** argv)
 
       // assign xlogpos at the beginning of the streaming to LSN
       memset(config->common.servers[srv].current_wal_lsn, 0, MISC_LENGTH);
-      snprintf(config->common.servers[srv].current_wal_lsn, MISC_LENGTH, "%s", cmd);
+      pgmoneta_snprintf(config->common.servers[srv].current_wal_lsn, MISC_LENGTH, "%s", cmd);
 
       struct wal_checkpoint_scanner scanner = {0};
       if (xlogptr % XLOG_BLCKSZ == 0)
@@ -553,7 +553,7 @@ pgmoneta_wal(int srv, char** argv)
                         goto error;
                      }
                      memset(config->common.servers[srv].current_wal_filename, 0, MISC_LENGTH);
-                     snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
+                     pgmoneta_snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
                      if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
                      {
                         if (wal_shipping != NULL)
@@ -657,7 +657,7 @@ pgmoneta_wal(int srv, char** argv)
                               goto error;
                            }
                            memset(config->common.servers[srv].current_wal_filename, 0, MISC_LENGTH);
-                           snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
+                           pgmoneta_snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
                            if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
                            {
                               if (wal_shipping != NULL)
@@ -939,7 +939,7 @@ update_wal_lsn(int srv, size_t xlogptr)
    uint32_t low32 = xlogptr & 0xffffffff;
    uint32_t high32 = xlogptr >> 32 & 0xffffffff;
    memset(config->common.servers[srv].current_wal_lsn, 0, MISC_LENGTH);
-   snprintf(config->common.servers[srv].current_wal_lsn, MISC_LENGTH, "%X/%X", high32, low32);
+   pgmoneta_snprintf(config->common.servers[srv].current_wal_lsn, MISC_LENGTH, "%X/%X", high32, low32);
 }
 
 int
@@ -959,7 +959,7 @@ pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** h
       return 0;
    }
 
-   snprintf(filename, sizeof(filename), "%08X.history", tli);
+   pgmoneta_snprintf(filename, sizeof(filename), "%08X.history", tli);
    path = pgmoneta_get_server_wal(srv);
    path = pgmoneta_append(path, filename);
    file = fopen(path, "r");
@@ -1058,7 +1058,7 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
    memset(path, 0, sizeof(path));
    if (pgmoneta_ends_with(basedir, "/"))
    {
-      snprintf(path, sizeof(path), "%s%08x.history", basedir, timeline);
+      pgmoneta_snprintf(path, sizeof(path), "%s%08x.history", basedir, timeline);
    }
 
    // do nothing if the corresponding .history already exists, or current timeline is 1
@@ -1199,13 +1199,13 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
 
    if (pgmoneta_ends_with(root, "/"))
    {
-      snprintf(tmp_file_path, sizeof(tmp_file_path), "%s%s.partial", root, filename);
-      snprintf(file_path, sizeof(file_path), "%s%s", root, filename);
+      pgmoneta_snprintf(tmp_file_path, sizeof(tmp_file_path), "%s%s.partial", root, filename);
+      pgmoneta_snprintf(file_path, sizeof(file_path), "%s%s", root, filename);
    }
    else
    {
-      snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/%s.partial", root, filename);
-      snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
+      pgmoneta_snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/%s.partial", root, filename);
+      pgmoneta_snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
    }
 
    fflush(file);
@@ -1633,7 +1633,7 @@ pgmoneta_get_database_name(int oid, char** name)
 
    if (temp_name == NULL)
    {
-      max_digits = snprintf(NULL, 0, "%d", oid) + 1;
+      max_digits = pgmoneta_snprintf(NULL, 0, "%d", oid) + 1;
       temp_name = malloc(max_digits);
 
       if (temp_name == NULL)
@@ -1641,7 +1641,7 @@ pgmoneta_get_database_name(int oid, char** name)
          goto error;
       }
 
-      snprintf(temp_name, max_digits, "%d", oid);
+      pgmoneta_snprintf(temp_name, max_digits, "%d", oid);
    }
 
    *name = temp_name;
@@ -1679,14 +1679,14 @@ pgmoneta_get_tablespace_name(int oid, char** name)
 
    if (temp_name == NULL)
    {
-      max_digits = snprintf(NULL, 0, "%d", oid) + 1;
+      max_digits = pgmoneta_snprintf(NULL, 0, "%d", oid) + 1;
       temp_name = malloc(max_digits);
       if (temp_name == NULL)
       {
          goto error;
       }
 
-      snprintf(temp_name, max_digits, "%d", oid);
+      pgmoneta_snprintf(temp_name, max_digits, "%d", oid);
    }
 
    *name = temp_name;
@@ -1724,14 +1724,14 @@ pgmoneta_get_relation_name(int oid, char** name)
 
    if (temp_name == NULL)
    {
-      max_digits = snprintf(NULL, 0, "%d", oid) + 1;
+      max_digits = pgmoneta_snprintf(NULL, 0, "%d", oid) + 1;
       temp_name = malloc(max_digits);
       if (temp_name == NULL)
       {
          goto error;
       }
 
-      snprintf(temp_name, max_digits, "%d", oid);
+      pgmoneta_snprintf(temp_name, max_digits, "%d", oid);
    }
 
    *name = temp_name;
@@ -1757,13 +1757,13 @@ pgmoneta_get_tablespace_oid(char* name, char** oid)
       {
          if (oidMappings[i].type == OBJ_TABLESPACE && !strcmp(oidMappings[i].name, name))
          {
-            max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+            max_digits = pgmoneta_snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
             temp_oid = malloc(max_digits);
             if (temp_oid == NULL)
             {
                goto error;
             }
-            snprintf(temp_oid, max_digits, "%d", oidMappings[i].oid);
+            pgmoneta_snprintf(temp_oid, max_digits, "%d", oidMappings[i].oid);
             break;
          }
       }
@@ -1801,13 +1801,13 @@ pgmoneta_get_database_oid(char* name, char** oid)
       {
          if (oidMappings[i].type == OBJ_DATABASE && !strcmp(oidMappings[i].name, name))
          {
-            max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+            max_digits = pgmoneta_snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
             temp_oid = malloc(max_digits);
             if (temp_oid == NULL)
             {
                goto error;
             }
-            snprintf(temp_oid, max_digits, "%d", oidMappings[i].oid);
+            pgmoneta_snprintf(temp_oid, max_digits, "%d", oidMappings[i].oid);
             break;
          }
       }
@@ -1845,13 +1845,13 @@ pgmoneta_get_relation_oid(char* name, char** oid)
       {
          if (oidMappings[i].type == OBJ_RELATION && !strcmp(oidMappings[i].name, name))
          {
-            max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+            max_digits = pgmoneta_snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
             temp_oid = malloc(max_digits);
             if (temp_oid == NULL)
             {
                goto error;
             }
-            snprintf(temp_oid, max_digits, "%d", oidMappings[i].oid);
+            pgmoneta_snprintf(temp_oid, max_digits, "%d", oidMappings[i].oid);
             break;
          }
       }

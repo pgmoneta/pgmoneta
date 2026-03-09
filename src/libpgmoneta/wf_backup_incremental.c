@@ -280,9 +280,9 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       }
    }
    memset(version, 0, sizeof(version));
-   snprintf(version, sizeof(version), "%d", config->common.servers[server].version);
+   pgmoneta_snprintf(version, sizeof(version), "%d", config->common.servers[server].version);
    memset(minor_version, 0, sizeof(minor_version));
-   snprintf(minor_version, sizeof(minor_version), "%d", config->common.servers[server].minor_version);
+   pgmoneta_snprintf(minor_version, sizeof(minor_version), "%d", config->common.servers[server].minor_version);
 
    block_size = config->common.servers[server].block_size;
    segment_size = config->common.servers[server].segment_size;
@@ -565,11 +565,11 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    pgmoneta_read_wal(backup_data, &wal);
 
    backup->valid = VALID_TRUE;
-   snprintf(backup->label, sizeof(backup->label), "%s", label);
+   pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
    backup->number_of_tablespaces = 0;
    backup->compression = config->compression_type;
    backup->encryption = config->encryption;
-   snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
+   pgmoneta_snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
    backup->restore_size = size;
    backup->biggest_file_size = biggest_file_size;
    backup->major_version = atoi(version);
@@ -582,7 +582,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    backup->end_timeline = stop_tli;
    backup->basebackup_elapsed_time = incr_backup_elapsed_time;
    backup->type = TYPE_INCREMENTAL;
-   snprintf(backup->parent_label, sizeof(backup->parent_label), "%s", incremental_label);
+   pgmoneta_snprintf(backup->parent_label, sizeof(backup->parent_label), "%s", incremental_label);
    sscanf(lf.checkpoint_lsn, "%X/%X", &backup->checkpoint_lsn_hi32, &backup->checkpoint_lsn_lo32);
 
    if (pgmoneta_save_info(server_backup, backup))
@@ -782,9 +782,9 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
       }
    }
    memset(version, 0, sizeof(version));
-   snprintf(version, sizeof(version), "%d", config->common.servers[server].version);
+   pgmoneta_snprintf(version, sizeof(version), "%d", config->common.servers[server].version);
    memset(minor_version, 0, sizeof(minor_version));
-   snprintf(minor_version, sizeof(minor_version), "%d", config->common.servers[server].minor_version);
+   pgmoneta_snprintf(minor_version, sizeof(minor_version), "%d", config->common.servers[server].minor_version);
 
    pgmoneta_create_query_message("SELECT spcname, pg_tablespace_location(oid) FROM pg_tablespace;", &tablespace_msg);
    if (pgmoneta_query_execute(ssl, socket, tablespace_msg, &response) || response == NULL)
@@ -882,7 +882,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
       pgmoneta_log_error("Incremental backup: Could not backup %s", config->common.servers[server].name);
 
       backup->valid = VALID_FALSE;
-      snprintf(backup->label, sizeof(backup->label), "%s", label);
+      pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
       if (pgmoneta_save_info(server_backup, backup))
       {
          pgmoneta_log_error("Incremental backup: Could not save backup %s", label);
@@ -907,11 +907,11 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    memset(old_label_path, 0, MAX_PATH);
    if (pgmoneta_ends_with(backup_base, "/"))
    {
-      snprintf(old_label_path, MAX_PATH, "%sdata/%s", backup_base, "backup_label.old");
+      pgmoneta_snprintf(old_label_path, MAX_PATH, "%sdata/%s", backup_base, "backup_label.old");
    }
    else
    {
-      snprintf(old_label_path, MAX_PATH, "%s/data/%s", backup_base, "backup_label.old");
+      pgmoneta_snprintf(old_label_path, MAX_PATH, "%s/data/%s", backup_base, "backup_label.old");
    }
 
    if (pgmoneta_exists(old_label_path))
@@ -954,11 +954,11 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    pgmoneta_read_checkpoint_info(backup_data, &chkptpos);
 
    backup->valid = VALID_TRUE;
-   snprintf(backup->label, sizeof(backup->label), "%s", label);
+   pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
    backup->number_of_tablespaces = 0;
    backup->compression = config->compression_type;
    backup->encryption = config->encryption;
-   snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
+   pgmoneta_snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
    backup->restore_size = size;
    backup->biggest_file_size = biggest_file_size;
    backup->major_version = atoi(version);
@@ -971,7 +971,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    backup->basebackup_elapsed_time = basebackup_elapsed_time;
 
    backup->type = TYPE_INCREMENTAL;
-   snprintf(backup->parent_label, sizeof(backup->parent_label), "%s", incremental_label);
+   pgmoneta_snprintf(backup->parent_label, sizeof(backup->parent_label), "%s", incremental_label);
 
    // in case of parsing error
    if (chkptpos != NULL)
@@ -986,9 +986,9 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    {
       int i = backup->number_of_tablespaces;
 
-      snprintf(backup->tablespaces[i], sizeof(backup->tablespaces[i]), "tblspc_%s", current_tablespace->name);
-      snprintf(backup->tablespaces_oids[i], sizeof(backup->tablespaces_oids[i]), "%u", current_tablespace->oid);
-      snprintf(backup->tablespaces_paths[i], sizeof(backup->tablespaces_paths[i]), "%s", current_tablespace->path);
+      pgmoneta_snprintf(backup->tablespaces[i], sizeof(backup->tablespaces[i]), "tblspc_%s", current_tablespace->name);
+      pgmoneta_snprintf(backup->tablespaces_oids[i], sizeof(backup->tablespaces_oids[i]), "%u", current_tablespace->oid);
+      pgmoneta_snprintf(backup->tablespaces_paths[i], sizeof(backup->tablespaces_paths[i]), "%s", current_tablespace->path);
 
       backup->number_of_tablespaces++;
       current_tablespace = current_tablespace->next;
@@ -1179,7 +1179,7 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
    FILE* prev_label_file = NULL;
 
    memset(label, 0, MAX_PATH);
-   snprintf(label, MAX_PATH, "%s/backup_label", prev_data);
+   pgmoneta_snprintf(label, MAX_PATH, "%s/backup_label", prev_data);
 
    label_file = fopen(label_file_path, "a");
    if (label_file == NULL)

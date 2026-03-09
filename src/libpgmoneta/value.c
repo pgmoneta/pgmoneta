@@ -422,7 +422,7 @@ int8_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char* 
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%" PRId8, (int8_t)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%" PRId8, (int8_t)data);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -434,7 +434,7 @@ uint8_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char*
    char buf[MISC_LENGTH];
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%" PRIu8, (uint8_t)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%" PRIu8, (uint8_t)data);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -447,7 +447,7 @@ int16_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char*
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%" PRId16, (int16_t)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%" PRId16, (int16_t)data);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -460,7 +460,7 @@ uint16_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%" PRIu16, (uint16_t)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%" PRIu16, (uint16_t)data);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -473,7 +473,7 @@ int32_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char*
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%" PRId32, (int32_t)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%" PRId32, (int32_t)data);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -486,7 +486,7 @@ uint32_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%" PRIu32, (uint32_t)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%" PRIu32, (uint32_t)data);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -499,7 +499,7 @@ int64_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char*
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%" PRId64, (int64_t)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%" PRId64, (int64_t)data);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -512,7 +512,7 @@ uint64_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%" PRIu64, (uint64_t)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%" PRIu64, (uint64_t)data);
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -525,7 +525,7 @@ float_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char*
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%f", pgmoneta_value_to_float(data));
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%f", pgmoneta_value_to_float(data));
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -538,7 +538,7 @@ double_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%f", pgmoneta_value_to_double(data));
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%f", pgmoneta_value_to_double(data));
    ret = pgmoneta_append(ret, buf);
 
    return ret;
@@ -558,18 +558,18 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    {
       if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
-         snprintf(buf, MISC_LENGTH, "null");
+         pgmoneta_snprintf(buf, MISC_LENGTH, "null");
       }
    }
    else if (strlen(str) == 0)
    {
       if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
-         snprintf(buf, MISC_LENGTH, "\"%s\"", str);
+         pgmoneta_snprintf(buf, MISC_LENGTH, "\"%s\"", str);
       }
       else if (format == FORMAT_TEXT)
       {
-         snprintf(buf, MISC_LENGTH, "''");
+         pgmoneta_snprintf(buf, MISC_LENGTH, "''");
       }
    }
    else
@@ -577,12 +577,12 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
       if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
          translated_string = pgmoneta_escape_string(str);
-         snprintf(buf, MISC_LENGTH, "\"%s\"", translated_string);
+         pgmoneta_snprintf(buf, MISC_LENGTH, "\"%s\"", translated_string);
          free(translated_string);
       }
       else if (format == FORMAT_TEXT)
       {
-         snprintf(buf, MISC_LENGTH, "%s", str);
+         pgmoneta_snprintf(buf, MISC_LENGTH, "%s", str);
       }
    }
    ret = pgmoneta_append(ret, buf);
@@ -607,7 +607,7 @@ char_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char* 
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "'%c'", (char)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "'%c'", (char)data);
    ret = pgmoneta_append(ret, buf);
 
    return ret;
@@ -639,7 +639,7 @@ mem_to_string_cb(uintptr_t data, int32_t format __attribute__((unused)), char* t
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%p", (void*)data);
+   pgmoneta_snprintf(buf, MISC_LENGTH, "%p", (void*)data);
    ret = pgmoneta_append(ret, buf);
 
    return ret;

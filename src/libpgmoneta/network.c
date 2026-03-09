@@ -168,7 +168,7 @@ pgmoneta_bind_unix_socket(char* directory, char* file, int* fd)
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s", directory);
+   pgmoneta_snprintf(&buf[0], sizeof(buf), "%s", directory);
 
    if (stat(&buf[0], &st) == -1)
    {
@@ -182,7 +182,7 @@ pgmoneta_bind_unix_socket(char* directory, char* file, int* fd)
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/%s", directory, file);
+   pgmoneta_snprintf(&buf[0], sizeof(buf), "%s/%s", directory, file);
 
    strncpy(addr.sun_path, &buf[0], sizeof(addr.sun_path) - 1);
    unlink(&buf[0]);
@@ -217,7 +217,7 @@ pgmoneta_remove_unix_socket(char* directory, char* file)
    char buf[MISC_LENGTH];
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/%s", directory, file);
+   pgmoneta_snprintf(&buf[0], sizeof(buf), "%s/%s", directory, file);
 
    unlink(&buf[0]);
 
@@ -370,7 +370,7 @@ pgmoneta_connect_unix_socket(char* directory, char* file, int* fd)
    addr.sun_family = AF_UNIX;
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/%s", directory, file);
+   pgmoneta_snprintf(&buf[0], sizeof(buf), "%s/%s", directory, file);
 
    strncpy(addr.sun_path, &buf[0], sizeof(addr.sun_path) - 1);
 

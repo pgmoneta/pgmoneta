@@ -555,9 +555,9 @@ int
 pgmoneta_mkdir(char* dir);
 
 /**
- * snprintf-like formatter that builds the result using pgexporter_append
+ * snprintf-like formatter that builds the result using pgmoneta_append
  * helpers. The output is clamped to the smaller of
- * (PGEXPORTER_SNPRINTF_MAX_LENGTH) and (n-1). Returns the number of characters
+ * (PGMONETA_SNPRINTF_MAX_LENGTH) and (n-1). Returns the number of characters
  * that would have been written (excluding the NUL byte), similar to snprintf.
  * If buf is not NULL and n > 0, the output is NUL-terminated.
  *

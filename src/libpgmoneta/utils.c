@@ -994,10 +994,10 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
    }
 
    // compose the new title
-   snprintf(title, sizeof(title) - 1, "pgmoneta: %s%s%s",
-            s1 != NULL ? s1 : "",
-            s1 != NULL && s2 != NULL ? "/" : "",
-            s2 != NULL ? s2 : "");
+   pgmoneta_snprintf(title, sizeof(title) - 1, "pgmoneta: %s%s%s",
+                     s1 != NULL ? s1 : "",
+                     s1 != NULL && s2 != NULL ? "/" : "",
+                     s2 != NULL ? s2 : "");
 
    // nuke the command line info
    memset(*argv, 0, max_process_title_size);
@@ -1021,10 +1021,10 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
    max_process_title_size = size;
 #elif defined(HAVE_OSX)
    // compose the new title
-   snprintf(title, sizeof(title), "pgmoneta: %s%s%s",
-            s1 != NULL ? s1 : "",
-            s1 != NULL && s2 != NULL ? "/" : "",
-            s2 != NULL ? s2 : "");
+   pgmoneta_snprintf(title, sizeof(title), "pgmoneta: %s%s%s",
+                     s1 != NULL ? s1 : "",
+                     s1 != NULL && s2 != NULL ? "/" : "",
+                     s2 != NULL ? s2 : "");
 
    // set the program name using setprogname (macOS API)
    setprogname(title);
@@ -1504,7 +1504,7 @@ pgmoneta_append_char(char* orig, char c)
    char str[2];
 
    memset(&str[0], 0, sizeof(str));
-   snprintf(&str[0], 2, "%c", c);
+   pgmoneta_snprintf(&str[0], 2, "%c", c);
    orig = pgmoneta_append(orig, str);
 
    return orig;
@@ -1516,7 +1516,7 @@ pgmoneta_append_int(char* orig, int i)
    char number[12];
 
    memset(&number[0], 0, sizeof(number));
-   snprintf(&number[0], 11, "%d", i);
+   pgmoneta_snprintf(&number[0], 11, "%d", i);
    orig = pgmoneta_append(orig, number);
 
    return orig;
@@ -1528,7 +1528,7 @@ pgmoneta_append_ulong(char* orig, unsigned long l)
    char number[21];
 
    memset(&number[0], 0, sizeof(number));
-   snprintf(&number[0], 20, "%lu", l);
+   pgmoneta_snprintf(&number[0], 20, "%lu", l);
    orig = pgmoneta_append(orig, number);
 
    return orig;
@@ -1540,7 +1540,7 @@ pgmoneta_append_double(char* orig, double d)
    char number[21];
 
    memset(&number[0], 0, sizeof(number));
-   snprintf(&number[0], 20, "%lf", d);
+   pgmoneta_snprintf(&number[0], 20, "%lf", d);
    orig = pgmoneta_append(orig, number);
 
    return orig;
@@ -1558,7 +1558,7 @@ pgmoneta_append_double_precision(char* orig, double d, int precision)
    format = pgmoneta_append_char(format, 'f');
 
    memset(&number[0], 0, sizeof(number));
-   snprintf(&number[0], 20, format, d);
+   pgmoneta_snprintf(&number[0], 20, format, d);
    orig = pgmoneta_append(orig, number);
 
    free(format);
@@ -1706,7 +1706,7 @@ pgmoneta_directory_size(char* directory)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
          total_size += pgmoneta_directory_size(path);
       }
@@ -1942,7 +1942,7 @@ pgmoneta_delete_directory(char* path)
          {
             struct stat statbuf;
 
-            snprintf(buf, len, "%s/%s", path, entry->d_name);
+            pgmoneta_snprintf(buf, len, "%s/%s", path, entry->d_name);
             if (!lstat(buf, &statbuf))
             {
                if (S_ISDIR(statbuf.st_mode))
@@ -3032,7 +3032,7 @@ pgmoneta_biggest_file(char* directory)
          }
 
          memset(&path[0], 0, sizeof(path));
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
          size = pgmoneta_biggest_file(path);
 
@@ -3348,7 +3348,7 @@ pgmoneta_wal_file_name(uint32_t tli, size_t segno, int segsize)
    int seg_id = segno / segments_per_id;
    int seg_offset = segno % segments_per_id;
 
-   snprintf(&hex[0], sizeof(hex), "%08X%08X%08X", tli, seg_id, seg_offset);
+   pgmoneta_snprintf(&hex[0], sizeof(hex), "%08X%08X%08X", tli, seg_id, seg_offset);
    f = pgmoneta_append(f, hex);
    return f;
 }
@@ -3427,7 +3427,7 @@ pgmoneta_read_checkpoint_info(char* directory, char** chkptpos)
    memset(chkpt, 0, MISC_LENGTH);
    memset(buffer, 0, sizeof(buffer));
    memset(label, 0, MAX_PATH);
-   snprintf(label, MAX_PATH, "%s/backup_label", directory);
+   pgmoneta_snprintf(label, MAX_PATH, "%s/backup_label", directory);
 
    file = fopen(label, "r");
    if (file == NULL)
@@ -4544,7 +4544,7 @@ pgmoneta_lsn_to_string(uint64_t lsn)
       return NULL;
    }
    memset(result, 0, 64);
-   snprintf(result, 64, "%X/%X", (uint32_t)(lsn >> 32), (uint32_t)lsn);
+   pgmoneta_snprintf(result, 64, "%X/%X", (uint32_t)(lsn >> 32), (uint32_t)lsn);
    return result;
 }
 
@@ -5057,7 +5057,7 @@ pgmoneta_backtrace_string(char** s)
          close(p[1]);
 
          memset(&addr_hex[0], 0, sizeof(addr_hex));
-         snprintf(&addr_hex[0], sizeof(addr_hex), "0x%lx", offset);
+         pgmoneta_snprintf(&addr_hex[0], sizeof(addr_hex), "0x%lx", offset);
 
          char* args[] = {"addr2line", "-e", filepath, "-fC", &addr_hex[0], NULL};
          execvp("addr2line", args);
@@ -5093,7 +5093,7 @@ pgmoneta_backtrace_string(char** s)
          {
             found_main = true;
          }
-         snprintf(log_buffer, sizeof(log_buffer), "#%zu  0x%lx in ", i - 1, addr);
+         pgmoneta_snprintf(log_buffer, sizeof(log_buffer), "#%zu  0x%lx in ", i - 1, addr);
          log_str = pgmoneta_append(log_str, log_buffer);
          log_str = pgmoneta_append(log_str, buffer);
          log_str = pgmoneta_append(log_str, "\n");

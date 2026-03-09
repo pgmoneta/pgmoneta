@@ -156,13 +156,13 @@ pgmoneta_wal_summary_save(int srv, uint64_t s_lsn, uint64_t e_lsn, block_ref_tab
 
    if (pgmoneta_ends_with(summary_dir, "/"))
    {
-      snprintf(tmp_file, sizeof(tmp_file), "%s%s.partial", summary_dir, summary_filename);
-      snprintf(file, sizeof(file), "%s%s", summary_dir, summary_filename);
+      pgmoneta_snprintf(tmp_file, sizeof(tmp_file), "%s%s.partial", summary_dir, summary_filename);
+      pgmoneta_snprintf(file, sizeof(file), "%s%s", summary_dir, summary_filename);
    }
    else
    {
-      snprintf(tmp_file, sizeof(tmp_file), "%s/%s.partial", summary_dir, summary_filename);
-      snprintf(file, sizeof(file), "%s/%s", summary_dir, summary_filename);
+      pgmoneta_snprintf(tmp_file, sizeof(tmp_file), "%s/%s.partial", summary_dir, summary_filename);
+      pgmoneta_snprintf(file, sizeof(file), "%s/%s", summary_dir, summary_filename);
    }
 
    if (pgmoneta_brt_write(brt, tmp_file))
@@ -193,7 +193,7 @@ summary_file_name(uint64_t s_lsn, uint64_t e_lsn)
    char hex[128];
    char* f = NULL;
    memset(&hex[0], 0, sizeof(hex));
-   snprintf(&hex[0], sizeof(hex), "%08X%08X%08X%08X", (uint32_t)(s_lsn >> 32), (uint32_t)s_lsn, (uint32_t)(e_lsn >> 32), (uint32_t)e_lsn);
+   pgmoneta_snprintf(&hex[0], sizeof(hex), "%08X%08X%08X%08X", (uint32_t)(s_lsn >> 32), (uint32_t)s_lsn, (uint32_t)(e_lsn >> 32), (uint32_t)e_lsn);
    f = pgmoneta_append(f, hex);
    return f;
 }

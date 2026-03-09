@@ -3612,7 +3612,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    memset(old_value, 0, MISC_LENGTH);
    if (write_config_value(old_value, config_key, MISC_LENGTH))
    {
-      snprintf(old_value, MISC_LENGTH, "<unknown>");
+      pgmoneta_snprintf(old_value, MISC_LENGTH, "<unknown>");
    }
 
    // Apply configuration change
@@ -3635,7 +3635,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    memset(new_value, 0, MISC_LENGTH);
    if (write_config_value(new_value, config_key, MISC_LENGTH))
    {
-      snprintf(new_value, MISC_LENGTH, "<unknown>");
+      pgmoneta_snprintf(new_value, MISC_LENGTH, "<unknown>");
    }
 
    if (*restart_required)
@@ -4196,60 +4196,60 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
       case 0: // Main configuration
          if (!strcmp(key_info.key, "host"))
          {
-            snprintf(buffer, buffer_size, "%s", config->host);
+            pgmoneta_snprintf(buffer, buffer_size, "%s", config->host);
          }
          else if (!strcmp(key_info.key, "metrics"))
          {
-            snprintf(buffer, buffer_size, "%d", config->metrics);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->metrics);
          }
          else if (!strcmp(key_info.key, "management"))
          {
-            snprintf(buffer, buffer_size, "%d", config->management);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->management);
          }
          else if (!strcmp(key_info.key, "workers"))
          {
-            snprintf(buffer, buffer_size, "%d", config->workers);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->workers);
          }
          else if (!strcmp(key_info.key, "log_level"))
          {
-            snprintf(buffer, buffer_size, "%d", config->common.log_level);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->common.log_level);
          }
          else if (!strcmp(key_info.key, "log_type"))
          {
-            snprintf(buffer, buffer_size, "%d", config->common.log_type);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->common.log_type);
          }
          else if (!strcmp(key_info.key, "log_path"))
          {
-            snprintf(buffer, buffer_size, "%s", config->common.log_path);
+            pgmoneta_snprintf(buffer, buffer_size, "%s", config->common.log_path);
          }
          else if (!strcmp(key_info.key, "compression"))
          {
-            snprintf(buffer, buffer_size, "%d", config->compression_type);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->compression_type);
          }
          else if (!strcmp(key_info.key, "compression_level"))
          {
-            snprintf(buffer, buffer_size, "%d", config->compression_level);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->compression_level);
          }
          else if (!strcmp(key_info.key, "storage_engine"))
          {
-            snprintf(buffer, buffer_size, "%d", config->storage_engine);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->storage_engine);
          }
          else if (!strcmp(key_info.key, "backup_max_rate"))
          {
-            snprintf(buffer, buffer_size, "%d", config->backup_max_rate);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->backup_max_rate);
          }
          else if (!strcmp(key_info.key, "network_max_rate"))
          {
-            snprintf(buffer, buffer_size, "%d", config->network_max_rate);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->network_max_rate);
          }
          else if (!strcmp(key_info.key, "verification"))
          {
-            snprintf(buffer, buffer_size, "%d", config->verification);
+            pgmoneta_snprintf(buffer, buffer_size, "%d", config->verification);
          }
          else if (!strcmp(key_info.key, "retention"))
          {
             char* ret = get_retention_string(config->retention_days, config->retention_weeks, config->retention_months, config->retention_years);
-            snprintf(buffer, buffer_size, "%s", ret ? ret : "");
+            pgmoneta_snprintf(buffer, buffer_size, "%s", ret ? ret : "");
             free(ret);
          }
          else
@@ -4271,81 +4271,81 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
 
                if (!strcmp(key_info.key, "host"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->host);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->host);
                }
                else if (!strcmp(key_info.key, "port"))
                {
-                  snprintf(buffer, buffer_size, "%d", srv->port);
+                  pgmoneta_snprintf(buffer, buffer_size, "%d", srv->port);
                }
                else if (!strcmp(key_info.key, "user"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->username);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->username);
                }
                else if (!strcmp(key_info.key, "wal_slot"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->wal_slot);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->wal_slot);
                }
                else if (!strcmp(key_info.key, "create_slot"))
                {
-                  snprintf(buffer, buffer_size, "%d", srv->create_slot);
+                  pgmoneta_snprintf(buffer, buffer_size, "%d", srv->create_slot);
                }
                else if (!strcmp(key_info.key, "follow"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->follow);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->follow);
                }
                else if (!strcmp(key_info.key, "workers"))
                {
-                  snprintf(buffer, buffer_size, "%d", srv->workers);
+                  pgmoneta_snprintf(buffer, buffer_size, "%d", srv->workers);
                }
                else if (!strcmp(key_info.key, "backup_max_rate"))
                {
-                  snprintf(buffer, buffer_size, "%d", srv->backup_max_rate);
+                  pgmoneta_snprintf(buffer, buffer_size, "%d", srv->backup_max_rate);
                }
                else if (!strcmp(key_info.key, "network_max_rate"))
                {
-                  snprintf(buffer, buffer_size, "%d", srv->network_max_rate);
+                  pgmoneta_snprintf(buffer, buffer_size, "%d", srv->network_max_rate);
                }
                else if (!strcmp(key_info.key, "retention"))
                {
                   char* ret = get_retention_string(srv->retention_days, srv->retention_weeks, srv->retention_months, srv->retention_years);
-                  snprintf(buffer, buffer_size, "%s", ret ? ret : "");
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", ret ? ret : "");
                   free(ret);
                }
                else if (!strcmp(key_info.key, "s3_use_tls"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->s3.use_tls ? "true" : "false");
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.use_tls ? "true" : "false");
                }
                else if (!strcmp(key_info.key, "s3_storage_class"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->s3.storage_class);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.storage_class);
                }
                else if (!strcmp(key_info.key, "s3_endpoint"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->s3.endpoint);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.endpoint);
                }
                else if (!strcmp(key_info.key, "s3_port"))
                {
-                  snprintf(buffer, buffer_size, "%d", srv->s3.port);
+                  pgmoneta_snprintf(buffer, buffer_size, "%d", srv->s3.port);
                }
                else if (!strcmp(key_info.key, "s3_region"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->s3.region);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.region);
                }
                else if (!strcmp(key_info.key, "s3_access_key_id"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->s3.access_key_id);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.access_key_id);
                }
                else if (!strcmp(key_info.key, "s3_secret_access_key"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->s3.secret_access_key);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.secret_access_key);
                }
                else if (!strcmp(key_info.key, "s3_bucket"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->s3.bucket);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.bucket);
                }
                else if (!strcmp(key_info.key, "s3_base_dir"))
                {
-                  snprintf(buffer, buffer_size, "%s", srv->s3.base_dir);
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.base_dir);
                }
                else
                {

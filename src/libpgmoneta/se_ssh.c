@@ -642,7 +642,7 @@ sftp_copy_directory(char* local_root, char* remote_root, char* relative_path)
             continue;
          }
 
-         snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
+         pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
 
          sftp_copy_directory(local_root, remote_root, relative_dir);
       }
@@ -1031,13 +1031,13 @@ pgmoneta_sftp_wal_close(int server, char* filename, bool partial, sftp_file* fil
 
    if (pgmoneta_ends_with(root, "/"))
    {
-      snprintf(tmp_file_path, sizeof(tmp_file_path), "%s%s.partial", root, filename);
-      snprintf(file_path, sizeof(file_path), "%s%s", root, filename);
+      pgmoneta_snprintf(tmp_file_path, sizeof(tmp_file_path), "%s%s.partial", root, filename);
+      pgmoneta_snprintf(file_path, sizeof(file_path), "%s%s", root, filename);
    }
    else
    {
-      snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/%s.partial", root, filename);
-      snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
+      pgmoneta_snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/%s.partial", root, filename);
+      pgmoneta_snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
    }
    if (sftp_rename(sftp, tmp_file_path, file_path) != 0)
    {

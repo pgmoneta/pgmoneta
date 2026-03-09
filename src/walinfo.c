@@ -471,11 +471,11 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
       const char* rmgr_name = pgmoneta_rmgr_get_name(record->header.xl_rmid);
       if (rmgr_name != NULL)
       {
-         snprintf(rec_ui->rmgr, sizeof(rec_ui->rmgr), "%s", rmgr_name);
+         pgmoneta_snprintf(rec_ui->rmgr, sizeof(rec_ui->rmgr), "%s", rmgr_name);
       }
       else
       {
-         snprintf(rec_ui->rmgr, sizeof(rec_ui->rmgr), "UNKNOWN");
+         pgmoneta_snprintf(rec_ui->rmgr, sizeof(rec_ui->rmgr), "UNKNOWN");
       }
 
       /* LSN values */
@@ -510,8 +510,8 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
       }
       else
       {
-         snprintf(rec_ui->description, sizeof(rec_ui->description),
-                  "XID: %u", rec_ui->xid);
+         pgmoneta_snprintf(rec_ui->description, sizeof(rec_ui->description),
+                           "XID: %u", rec_ui->xid);
       }
 
       /* Generate hex dump for binary mode */
@@ -528,10 +528,10 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
               j < max_bytes && (size_t)hex_pos < hex_data_size - 3;
               j++)
          {
-            hex_pos += snprintf(rec_ui->hex_data + hex_pos,
-                                hex_data_size - (size_t)hex_pos,
-                                "%02X ",
-                                (uint8_t)record->main_data[j]);
+            hex_pos += pgmoneta_snprintf(rec_ui->hex_data + hex_pos,
+                                         hex_data_size - (size_t)hex_pos,
+                                         "%02X ",
+                                         (uint8_t)record->main_data[j]);
          }
       }
 
@@ -1457,28 +1457,28 @@ print_wal_statistics(FILE* out, enum value_type type)
          char comb_size_str[COL_WIDTH_COMBINED_SIZE + 1], comb_pct_str[COL_WIDTH_COMBINED_PCT + 1];
          char temp_str[64];
 
-         snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].count);
+         pgmoneta_snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].count);
          right_align(count_str, sizeof(count_str), temp_str, COL_WIDTH_COUNT);
 
-         snprintf(temp_str, sizeof(temp_str), "%.2f%%", count_pct);
+         pgmoneta_snprintf(temp_str, sizeof(temp_str), "%.2f%%", count_pct);
          right_align(count_pct_str, sizeof(count_pct_str), temp_str, COL_WIDTH_COUNT_PCT);
 
-         snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].record_size);
+         pgmoneta_snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].record_size);
          right_align(rec_size_str, sizeof(rec_size_str), temp_str, COL_WIDTH_RECORD_SIZE);
 
-         snprintf(temp_str, sizeof(temp_str), "%.2f%%", rec_size_pct);
+         pgmoneta_snprintf(temp_str, sizeof(temp_str), "%.2f%%", rec_size_pct);
          right_align(rec_pct_str, sizeof(rec_pct_str), temp_str, COL_WIDTH_RECORD_PCT);
 
-         snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].fpi_size);
+         pgmoneta_snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].fpi_size);
          right_align(fpi_size_str, sizeof(fpi_size_str), temp_str, COL_WIDTH_FPI_SIZE);
 
-         snprintf(temp_str, sizeof(temp_str), "%.2f%%", fpi_size_pct);
+         pgmoneta_snprintf(temp_str, sizeof(temp_str), "%.2f%%", fpi_size_pct);
          right_align(fpi_pct_str, sizeof(fpi_pct_str), temp_str, COL_WIDTH_FPI_PCT);
 
-         snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].combined_size);
+         pgmoneta_snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].combined_size);
          right_align(comb_size_str, sizeof(comb_size_str), temp_str, COL_WIDTH_COMBINED_SIZE);
 
-         snprintf(temp_str, sizeof(temp_str), "%.2f%%", combined_size_pct);
+         pgmoneta_snprintf(temp_str, sizeof(temp_str), "%.2f%%", combined_size_pct);
          right_align(comb_pct_str, sizeof(comb_pct_str), temp_str, COL_WIDTH_COMBINED_PCT);
 
          fprintf(out, "%-*s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
@@ -1499,28 +1499,28 @@ print_wal_statistics(FILE* out, enum value_type type)
       char comb_size_str[COL_WIDTH_COMBINED_SIZE + 1], comb_pct_str[COL_WIDTH_COMBINED_PCT + 1];
       char temp_str[64];
 
-      snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_count);
+      pgmoneta_snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_count);
       right_align(count_str, sizeof(count_str), temp_str, COL_WIDTH_COUNT);
 
-      snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
+      pgmoneta_snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
       right_align(count_pct_str, sizeof(count_pct_str), temp_str, COL_WIDTH_COUNT_PCT);
 
-      snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_record_size);
+      pgmoneta_snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_record_size);
       right_align(rec_size_str, sizeof(rec_size_str), temp_str, COL_WIDTH_RECORD_SIZE);
 
-      snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
+      pgmoneta_snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
       right_align(rec_pct_str, sizeof(rec_pct_str), temp_str, COL_WIDTH_RECORD_PCT);
 
-      snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_fpi_size);
+      pgmoneta_snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_fpi_size);
       right_align(fpi_size_str, sizeof(fpi_size_str), temp_str, COL_WIDTH_FPI_SIZE);
 
-      snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
+      pgmoneta_snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
       right_align(fpi_pct_str, sizeof(fpi_pct_str), temp_str, COL_WIDTH_FPI_PCT);
 
-      snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_combined_size);
+      pgmoneta_snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_combined_size);
       right_align(comb_size_str, sizeof(comb_size_str), temp_str, COL_WIDTH_COMBINED_SIZE);
 
-      snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
+      pgmoneta_snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
       right_align(comb_pct_str, sizeof(comb_pct_str), temp_str, COL_WIDTH_COMBINED_PCT);
 
       fprintf(out, "%-*s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
@@ -2471,7 +2471,7 @@ describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* outpu
       pgmoneta_deque_iterator_create(files, &file_iterator);
       while (pgmoneta_deque_iterator_next(file_iterator))
       {
-         snprintf(file_path, MAX_PATH, "%s/%s", dir_path, (char*)file_iterator->value->data);
+         pgmoneta_snprintf(file_path, MAX_PATH, "%s/%s", dir_path, (char*)file_iterator->value->data);
 
          if (!pgmoneta_is_file(file_path))
          {
@@ -2522,7 +2522,7 @@ describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* outpu
    pgmoneta_deque_iterator_create(files, &file_iterator);
    while (pgmoneta_deque_iterator_next(file_iterator))
    {
-      snprintf(file_path, MAX_PATH, "%s/%s", dir_path, (char*)file_iterator->value->data);
+      pgmoneta_snprintf(file_path, MAX_PATH, "%s/%s", dir_path, (char*)file_iterator->value->data);
 
       struct column_widths* widths_to_use = (type == ValueString && !summary) ? &widths : NULL;
       if (describe_walfile_internal(file_path, type, output, quiet, color,

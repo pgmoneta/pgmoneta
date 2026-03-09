@@ -201,9 +201,9 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
       }
    }
    memset(version, 0, sizeof(version));
-   snprintf(version, sizeof(version), "%d", config->common.servers[server].version);
+   pgmoneta_snprintf(version, sizeof(version), "%d", config->common.servers[server].version);
    memset(minor_version, 0, sizeof(minor_version));
-   snprintf(minor_version, sizeof(minor_version), "%d", config->common.servers[server].minor_version);
+   pgmoneta_snprintf(minor_version, sizeof(minor_version), "%d", config->common.servers[server].minor_version);
 
    pgmoneta_create_query_message("SELECT spcname, pg_tablespace_location(oid) FROM pg_tablespace;", &tablespace_msg);
    if (pgmoneta_query_execute(ssl, socket, tablespace_msg, &response) || response == NULL)
@@ -282,7 +282,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_error("Backup: Could not backup %s", config->common.servers[server].name);
 
          backup->valid = VALID_FALSE;
-         snprintf(backup->label, sizeof(backup->label), "%s", label);
+         pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
          if (pgmoneta_save_info(server_backup, backup))
          {
             pgmoneta_log_error("Backup: Could not save backup %s", label);
@@ -299,7 +299,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_error("Backup: Could not backup %s", config->common.servers[server].name);
 
          backup->valid = VALID_FALSE;
-         snprintf(backup->label, sizeof(backup->label), "%s", label);
+         pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
          if (pgmoneta_save_info(server_backup, backup))
          {
             pgmoneta_log_error("Backup: Could not save backup %s", label);
@@ -325,11 +325,11 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    memset(old_label_path, 0, MAX_PATH);
    if (pgmoneta_ends_with(backup_base, "/"))
    {
-      snprintf(old_label_path, MAX_PATH, "%sdata/%s", backup_base, "backup_label.old");
+      pgmoneta_snprintf(old_label_path, MAX_PATH, "%sdata/%s", backup_base, "backup_label.old");
    }
    else
    {
-      snprintf(old_label_path, MAX_PATH, "%s/data/%s", backup_base, "backup_label.old");
+      pgmoneta_snprintf(old_label_path, MAX_PATH, "%s/data/%s", backup_base, "backup_label.old");
    }
 
    if (pgmoneta_exists(old_label_path))
@@ -371,11 +371,11 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_read_checkpoint_info(backup_data, &chkptpos);
 
    backup->valid = VALID_TRUE;
-   snprintf(backup->label, sizeof(backup->label), "%s", label);
+   pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
    backup->number_of_tablespaces = 0;
    backup->compression = config->compression_type;
    backup->encryption = config->encryption;
-   snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
+   pgmoneta_snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
    backup->restore_size = size;
    backup->biggest_file_size = biggest_file_size;
    backup->major_version = atoi(version);
@@ -401,9 +401,9 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    {
       int i = backup->number_of_tablespaces;
 
-      snprintf(backup->tablespaces[i], sizeof(backup->tablespaces[i]), "tblspc_%s", current_tablespace->name);
-      snprintf(backup->tablespaces_oids[i], sizeof(backup->tablespaces_oids[i]), "%u", current_tablespace->oid);
-      snprintf(backup->tablespaces_paths[i], sizeof(backup->tablespaces_paths[i]), "%s", current_tablespace->path);
+      pgmoneta_snprintf(backup->tablespaces[i], sizeof(backup->tablespaces[i]), "tblspc_%s", current_tablespace->name);
+      pgmoneta_snprintf(backup->tablespaces_oids[i], sizeof(backup->tablespaces_oids[i]), "%u", current_tablespace->oid);
+      pgmoneta_snprintf(backup->tablespaces_paths[i], sizeof(backup->tablespaces_paths[i]), "%s", current_tablespace->path);
 
       backup->number_of_tablespaces++;
       current_tablespace = current_tablespace->next;
@@ -515,7 +515,7 @@ directory_size_excludes(char* directory, char** excludes)
 
          if (!excluded)
          {
-            snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+            pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
             total_size += directory_size_excludes(path, excludes);
          }

@@ -201,7 +201,7 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
          backup_base = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
          backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
          backup->linking_elapsed_time = linking_elapsed_time;
-         snprintf(backup->label, sizeof(backup->label), "%s", label);
+         pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
          if (pgmoneta_save_info(backup_base, backup))
          {
             goto error;

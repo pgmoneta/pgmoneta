@@ -176,7 +176,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    while (pgmoneta_json_next_array_item(reader, &entry))
    {
       memset(file_path, 0, MAX_PATH);
-      snprintf(file_path, MAX_PATH, "%s", (char*)pgmoneta_json_get(entry, "Path"));
+      pgmoneta_snprintf(file_path, MAX_PATH, "%s", (char*)pgmoneta_json_get(entry, "Path"));
       info[MANIFEST_PATH_INDEX] = file_path;
       info[MANIFEST_CHECKSUM_INDEX] = (char*)pgmoneta_json_get(entry, "Checksum");
       pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);

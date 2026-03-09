@@ -207,7 +207,7 @@ write_backup_sha512(char* root, char* relative_path)
             continue;
          }
 
-         snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
+         pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
 
          write_backup_sha512(root, relative_dir);
       }

@@ -393,11 +393,11 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server
 
          if (strlen(relative_path) > 0)
          {
-            snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
+            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
          }
          else
          {
-            snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
+            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
          }
 
          s3_upload_files(local_root, s3_root, relative_dir, server);

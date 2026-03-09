@@ -71,11 +71,11 @@ pgmoneta_manifest_checksum_verify(char* root)
    memset(manifest_path, 0, MAX_PATH);
    if (pgmoneta_ends_with(root, "/"))
    {
-      snprintf(manifest_path, MAX_PATH, "%s%s", root, "backup_manifest");
+      pgmoneta_snprintf(manifest_path, MAX_PATH, "%s%s", root, "backup_manifest");
    }
    else
    {
-      snprintf(manifest_path, MAX_PATH, "%s/%s", root, "backup_manifest");
+      pgmoneta_snprintf(manifest_path, MAX_PATH, "%s/%s", root, "backup_manifest");
    }
    if (pgmoneta_json_reader_init(manifest_path, &reader))
    {
@@ -97,11 +97,11 @@ pgmoneta_manifest_checksum_verify(char* root)
       memset(file_path, 0, MAX_PATH);
       if (pgmoneta_ends_with(root, "/"))
       {
-         snprintf(file_path, MAX_PATH, "%s%s", root, (char*)pgmoneta_json_get(file, "Path"));
+         pgmoneta_snprintf(file_path, MAX_PATH, "%s%s", root, (char*)pgmoneta_json_get(file, "Path"));
       }
       else
       {
-         snprintf(file_path, MAX_PATH, "%s/%s", root, (char*)pgmoneta_json_get(file, "Path"));
+         pgmoneta_snprintf(file_path, MAX_PATH, "%s/%s", root, (char*)pgmoneta_json_get(file, "Path"));
       }
 
       file_size = pgmoneta_get_file_size(file_path);
@@ -559,7 +559,7 @@ pgmoneta_generate_files_manifest(char* source_dir, struct json* files)
       }
 
       memset(real_path, 0, sizeof(real_path));
-      snprintf(real_path, sizeof(real_path), "%s/%s", source_dir, entry_name);
+      pgmoneta_snprintf(real_path, sizeof(real_path), "%s/%s", source_dir, entry_name);
 
       lstat(real_path, &s);
       if (S_ISDIR(s.st_mode))

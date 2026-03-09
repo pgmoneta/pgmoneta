@@ -33,6 +33,7 @@
 #include <message.h>
 #include <network.h>
 #include <security.h>
+#include <utils.h>
 
 /* system */
 #include <stdlib.h>
@@ -68,7 +69,7 @@ int
 pgmoneta_ext_get_file(SSL* ssl, int socket, char* file_path, struct query_response** qr)
 {
    char query[MAX_QUERY_LENGTH];
-   snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_get_file('%s');", file_path);
+   pgmoneta_snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_get_file('%s');", file_path);
    return query_execute(ssl, socket, query, qr);
 }
 
@@ -76,7 +77,7 @@ int
 pgmoneta_ext_get_files(SSL* ssl, int socket, char* file_path, struct query_response** qr)
 {
    char query[MAX_QUERY_LENGTH];
-   snprintf(query, MAX_QUERY_LENGTH, "SELECT * FROM pgmoneta_ext_get_files('%s');", file_path);
+   pgmoneta_snprintf(query, MAX_QUERY_LENGTH, "SELECT * FROM pgmoneta_ext_get_files('%s');", file_path);
    return query_execute(ssl, socket, query, qr);
 }
 
@@ -84,7 +85,7 @@ int
 pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, char* dest_path, char* base64_data, struct query_response** qr)
 {
    char query[MAX_QUERY_LENGTH];
-   snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_receive_file_chunk('%s', '%s');", base64_data, dest_path);
+   pgmoneta_snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_receive_file_chunk('%s', '%s');", base64_data, dest_path);
    return query_execute(ssl, socket, query, qr);
 }
 
@@ -420,20 +421,20 @@ pgmoneta_version_to_string(struct version* version, char* buffer, size_t buffer_
 
    if (version->patch != -1)
    {
-      result = snprintf(buffer, buffer_size, "%d.%d.%d", major, minor, patch);
+      result = pgmoneta_snprintf(buffer, buffer_size, "%d.%d.%d", major, minor, patch);
    }
    else if (version->minor != -1)
    {
-      result = snprintf(buffer, buffer_size, "%d.%d", major, minor);
+      result = pgmoneta_snprintf(buffer, buffer_size, "%d.%d", major, minor);
    }
    else
    {
-      result = snprintf(buffer, buffer_size, "%d", major);
+      result = pgmoneta_snprintf(buffer, buffer_size, "%d", major);
    }
 
    if (result < 0)
    {
-      pgmoneta_log_error("snprintf failed for version string");
+      pgmoneta_log_error("pgmoneta_snprintf failed for version string");
       goto error;
    }
 

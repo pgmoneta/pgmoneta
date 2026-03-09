@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 The pgexporter community
+ * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -689,7 +689,7 @@ main(int argc, char* argv[])
    while (pgmoneta_deque_iterator_next(file_iter))
    {
       file_path = malloc(MAX_PATH);
-      snprintf(file_path, MAX_PATH, "%s/%s", wal_files_path, (char*)file_iter->value->data);
+      pgmoneta_snprintf(file_path, MAX_PATH, "%s/%s", wal_files_path, (char*)file_iter->value->data);
 
       if (!pgmoneta_is_file(file_path))
       {
@@ -705,7 +705,7 @@ main(int argc, char* argv[])
       {
          if (!secure_temp_dir_created)
          {
-            snprintf(secure_temp_dir, sizeof(secure_temp_dir), "/tmp/pgmoneta-walfilter-XXXXXX");
+            pgmoneta_snprintf(secure_temp_dir, sizeof(secure_temp_dir), "/tmp/pgmoneta-walfilter-XXXXXX");
             if (mkdtemp(secure_temp_dir) == NULL)
             {
                pgmoneta_log_fatal("Failed to create secure temporary directory: %s", strerror(errno));

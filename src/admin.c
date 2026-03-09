@@ -376,7 +376,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", home_dir);
+   pgmoneta_snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", home_dir);
 
    if (stat(&buf[0], &st) == -1)
    {
@@ -396,7 +396,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", home_dir);
+   pgmoneta_snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", home_dir);
 
    if (pgmoneta_exists(&buf[0]))
    {
@@ -959,7 +959,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
       goto error;
    }
 
-   snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
+   pgmoneta_snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
    users_file_tmp = fopen(tmpfilename, "w+");
    if (users_file_tmp == NULL)
    {
@@ -1282,7 +1282,7 @@ remove_user(char* users_path, char* username, int32_t output_format)
    }
 
    memset(&tmpfilename, 0, sizeof(tmpfilename));
-   snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
+   pgmoneta_snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
    users_file_tmp = fopen(tmpfilename, "w+");
    if (users_file_tmp == NULL)
    {
