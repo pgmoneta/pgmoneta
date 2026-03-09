@@ -102,6 +102,7 @@ static void help_restore(void);
 static void help_verify(void);
 static void help_archive(void);
 static void help_delete(void);
+static void help_s3(void);
 static void help_retain(void);
 static void help_expunge(void);
 static void help_decrypt(void);
@@ -122,6 +123,7 @@ static void display_helper(char* command);
 static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
 static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int list_s3_objects(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -235,6 +237,9 @@ usage(void)
    printf("  restore                  Restore a backup from a server\n");
    printf("  retain                   Retain a backup from a server\n");
    printf("  shutdown                 Shutdown pgmoneta\n");
+   printf("  s3 <action>              Manage s3 data, with:\n");
+   printf("                           - 'ls' to list remote objects\n");
+   printf("                           - 'delete' to delete remote objects under a prefix\n");
    printf("  status [details]         Status of pgmoneta, with optional details\n");
    printf("  verify                   Verify a backup from a server\n");
    printf("\n");
@@ -265,6 +270,12 @@ struct pgmoneta_command command_table[] = {
     .action = MANAGEMENT_S3_LS,
     .deprecated = false,
     .log_message = "<s3 ls>"},
+   {.command = "s3",
+    .subcommand = "delete",
+    .accepted_argument_count = {2},
+    .action = MANAGEMENT_S3_DELETE,
+    .deprecated = false,
+    .log_message = "<s3 delete>"},
    {
       .command = "restore",
       .subcommand = "",
@@ -916,6 +927,10 @@ execute:
    {
       exit_code = list_s3_objects(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_S3_DELETE)
+   {
+      exit_code = delete_s3_objects(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+   }
    else if (parsed.cmd->action == MANAGEMENT_RESTORE)
    {
       if (parsed.args[3])
@@ -1122,7 +1137,8 @@ static void
 help_s3(void)
 {
    printf("Manage the s3\n");
-   printf("  pgmoneta-cli s3 [ls] <server>\n");
+   printf("  pgmoneta-cli s3 ls <server>\n");
+   printf("  pgmoneta-cli s3 delete <server> <prefix>\n");
 }
 
 static void
@@ -1409,6 +1425,25 @@ list_s3_objects(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t
       goto error;
    }
    return 0;
+error:
+   return 1;
+}
+
+static int
+delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_delete_s3_objects(ssl, socket, server, prefix, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
 error:
    return 1;
 }
@@ -2584,6 +2619,11 @@ translate_command(int32_t cmd_code)
          command_output = pgmoneta_append_char(command_output, ' ');
          command_output = pgmoneta_append(command_output, "ls");
          break;
+      case MANAGEMENT_S3_DELETE:
+         command_output = pgmoneta_append(command_output, COMMAND_S3);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "delete");
+         break;
       case MANAGEMENT_RESTORE:
          command_output = pgmoneta_append(command_output, COMMAND_RESTORE);
          break;
@@ -3267,6 +3307,8 @@ translate_json_object(struct json* j)
                   translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
                }
                pgmoneta_json_iterator_destroy(server_it);
+               break;
+            case MANAGEMENT_S3_DELETE:
                break;
             case MANAGEMENT_STATUS_DETAILS:
                translate_response_argument(response);

@@ -38,6 +38,7 @@
 /* system */
 #include <assert.h>
 #include <dirent.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,15 +48,21 @@ static int s3_storage_setup(char*, struct art*);
 static int s3_storage_execute(char*, struct art*);
 static int s3_storage_list(char*, struct art*);
 static int s3_storage_teardown(char*, struct art*);
+static int s3_storage_cleanup(char*, struct art*);
 static int s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int server);
 static int s3_list_objects(char* relative_path, char* s3_list, int server, struct deque** objects);
+static int s3_delete_all_objects(char* relative_path, char* s3_list, int server, struct art*) __attribute__((unused));
 static int s3_send_list_request(char* relative_path, char* s3_list, int server, char* continuationToken, struct http_response** response);
+static int s3_send_delete_request(char* relative_path, char* s3_list, int server, char* xml_body, struct http_response** response);
 static int s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class);
 
 static char* s3_get_host(int server);
 static char* s3_get_basepath(int server, char* identifier);
 static char* s3_url_encode(char* str);
+static int xml_parse_s3_delete_result(char* xml, bool* has_fatal_error);
+static int xml_s3_build_delete_key(char** xml, char* key);
+static int xml_s3_build_delete_list(char** xml, struct deque* keys, size_t max_keys);
 static int xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuationToken);
 static int xml_parse_s3_list(char* xml, struct deque** keys);
 
@@ -77,7 +84,10 @@ pgmoneta_storage_create_s3(int workflow_type)
       case WORKFLOW_TYPE_S3_LIST:
          wf->execute = &s3_storage_list;
          break;
-
+      case WORKFLOW_TYPE_DELETE_BACKUP:
+      case WORKFLOW_TYPE_S3_DELETE:
+         wf->execute = &s3_storage_cleanup;
+         break;
       default:
          break;
    }
@@ -429,6 +439,48 @@ s3_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 
    return 0;
 }
+static int
+s3_storage_cleanup(char* name __attribute__((unused)), struct art* nodes)
+{
+   int server = -1;
+   char* label = NULL;
+   char* s3_root = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+#ifdef DEBUG
+   pgmoneta_dump_art(nodes);
+
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("S3 storage engine (cleanup): %s/%s",
+                      config->common.servers[server].name, label);
+   pgmoneta_log_debug("S3 effective config: bucket=%s, region=%s, endpoint=%s",
+                      s3_get_effective_bucket(server),
+                      s3_get_effective_region(server),
+                      s3_get_effective_endpoint(server));
+
+   s3_root = s3_get_basepath(server, label);
+
+   if (s3_delete_all_objects("", s3_root, server, nodes))
+   {
+      goto error;
+   }
+
+   free(s3_root);
+
+   return 0;
+
+error:
+   free(s3_root);
+   return 1;
+}
 
 static int
 s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server)
@@ -539,6 +591,80 @@ error:
    return 1;
 }
 
+static int
+s3_delete_all_objects(char* relative_path, char* s3_root, int server, struct art* nodes)
+{
+   struct http_response* list_response = NULL;
+   struct http_response* delete_response = NULL;
+   struct deque* objects = NULL;
+   char* continuation_token = NULL;
+   char* delete_xml = NULL;
+   bool is_truncated = true;
+
+   (void)nodes;
+
+   while (is_truncated)
+   {
+      if (s3_send_list_request(relative_path, s3_root, server, continuation_token, &list_response))
+      {
+         goto error;
+      }
+
+      free(continuation_token);
+      continuation_token = NULL;
+
+      if (xml_parse_s3_list_truncated(list_response->payload.data, &is_truncated, &continuation_token))
+      {
+         goto error;
+      }
+
+      if (xml_parse_s3_list(list_response->payload.data, &objects))
+      {
+         goto error;
+      }
+
+      pgmoneta_http_response_destroy(list_response);
+      list_response = NULL;
+
+      if (objects != NULL && pgmoneta_deque_size(objects) > 0)
+      {
+         size_t sample_size = pgmoneta_deque_size(objects);
+         if (xml_s3_build_delete_list(&delete_xml, objects, sample_size))
+         {
+            goto error;
+         }
+
+         pgmoneta_deque_destroy(objects);
+         objects = NULL;
+
+         if (s3_send_delete_request(relative_path, s3_root, server, delete_xml, &delete_response))
+         {
+            goto error;
+         }
+         pgmoneta_http_response_destroy(delete_response);
+         delete_response = NULL;
+
+         free(delete_xml);
+         delete_xml = NULL;
+      }
+      else
+      {
+         pgmoneta_deque_destroy(objects);
+         objects = NULL;
+      }
+   }
+
+   free(continuation_token);
+   return 0;
+
+error:
+   pgmoneta_http_response_destroy(list_response);
+   pgmoneta_http_response_destroy(delete_response);
+   pgmoneta_deque_destroy(objects);
+   free(delete_xml);
+   free(continuation_token);
+   return 1;
+}
 static int
 s3_send_list_request(char* relative_path, char* s3_root, int server, char* continuationToken, struct http_response** response)
 {
@@ -796,6 +922,278 @@ error:
    return 1;
 }
 
+static int
+s3_send_delete_request(char* relative_path, char* s3_root, int server, char* xml_body, struct http_response** response)
+{
+   char short_date[SHORT_TIME_LENGTH];
+   char long_date[LONG_TIME_LENGTH];
+   char* canonical_request = NULL;
+   char* auth_value = NULL;
+   char* string_to_sign = NULL;
+   char* s3_host = NULL;
+   char* s3_path = NULL;
+   char* request_path = NULL;
+   char* canonical_request_sha256 = NULL;
+   char* key = NULL;
+   char* query_string = NULL;
+   char* body_hash = NULL;
+   unsigned char* date_key_hmac = NULL;
+   unsigned char* date_region_key_hmac = NULL;
+   unsigned char* date_region_service_key_hmac = NULL;
+   unsigned char* signing_key_hmac = NULL;
+   unsigned char* signature_hmac = NULL;
+   unsigned char* signature_hex = NULL;
+   int hmac_length = 0;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+
+   char* effective_endpoint = s3_get_effective_endpoint(server);
+   char* effective_region = s3_get_effective_region(server);
+   char* effective_access_key_id = s3_get_effective_access_key_id(server);
+   char* effective_secret_access_key = s3_get_effective_secret_access_key(server);
+   char* effective_bucket = s3_get_effective_bucket(server);
+   int effective_port = s3_get_effective_port(server);
+   bool effective_use_tls = s3_get_effective_use_tls(server);
+   bool path_style = (strlen(effective_endpoint) > 0);
+
+   s3_path = pgmoneta_append(s3_path, s3_root);
+   if (strlen(relative_path) > 0)
+   {
+      if (!pgmoneta_ends_with(s3_root, "/"))
+      {
+         s3_path = pgmoneta_append(s3_path, "/");
+      }
+      s3_path = pgmoneta_append(s3_path, relative_path);
+   }
+
+   memset(&short_date[0], 0, sizeof(short_date));
+   memset(&long_date[0], 0, sizeof(long_date));
+
+   if (pgmoneta_get_timestamp_ISO8601_format(short_date, long_date))
+   {
+      goto error;
+   }
+
+   if (xml_body == NULL || strlen(xml_body) == 0)
+   {
+      pgmoneta_log_error("S3 delete request requires a non-empty XML body");
+      goto error;
+   }
+
+   query_string = pgmoneta_append(query_string, "delete=");
+
+   if (pgmoneta_generate_string_sha256_hash(xml_body, &body_hash))
+   {
+      goto error;
+   }
+
+   s3_host = s3_get_host(server);
+
+   canonical_request = pgmoneta_append(canonical_request, "POST\n/");
+   if (path_style)
+   {
+      canonical_request = pgmoneta_append(canonical_request, effective_bucket);
+   }
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, query_string);
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, "host:");
+   canonical_request = pgmoneta_append(canonical_request, s3_host);
+   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-content-sha256:");
+   canonical_request = pgmoneta_append(canonical_request, body_hash);
+   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-date:");
+   canonical_request = pgmoneta_append(canonical_request, long_date);
+   canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date\n");
+   canonical_request = pgmoneta_append(canonical_request, body_hash);
+
+   pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
+
+   string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
+   string_to_sign = pgmoneta_append(string_to_sign, long_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "\n");
+   string_to_sign = pgmoneta_append(string_to_sign, short_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, effective_region);
+   string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
+   string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
+
+   key = pgmoneta_append(key, "AWS4");
+   key = pgmoneta_append(key, effective_secret_access_key);
+
+   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, effective_region, strlen(effective_region), &date_region_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length, "s3", strlen("s3"), &date_region_service_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length, "aws4_request", strlen("aws4_request"), &signing_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
+
+   // Build authorization header with matching signed headers
+   auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
+   auth_value = pgmoneta_append(auth_value, effective_access_key_id);
+   auth_value = pgmoneta_append(auth_value, "/");
+   auth_value = pgmoneta_append(auth_value, short_date);
+   auth_value = pgmoneta_append(auth_value, "/");
+   auth_value = pgmoneta_append(auth_value, effective_region);
+   auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=");
+   auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
+
+   int s3_port;
+
+   if (effective_port != 0)
+   {
+      s3_port = effective_port;
+   }
+   else
+   {
+      s3_port = effective_use_tls ? 443 : 80;
+   }
+
+   bool use_tls = effective_use_tls;
+   if (s3_port == 443)
+   {
+      use_tls = true;
+   }
+
+   if (pgmoneta_http_create(s3_host, s3_port, use_tls, &connection))
+   {
+      goto error;
+   }
+
+   if (path_style)
+   {
+      request_path = pgmoneta_append(request_path, "/");
+      request_path = pgmoneta_append(request_path, effective_bucket);
+      request_path = pgmoneta_append(request_path, "?");
+   }
+   else
+   {
+      request_path = pgmoneta_append(request_path, "/?");
+   }
+   request_path = pgmoneta_append(request_path, query_string);
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_POST, request_path, &request))
+   {
+      goto error;
+   }
+
+   if (s3_add_request_headers(request, auth_value, body_hash, long_date, ""))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_request_add_header(request, "Content-Type", "application/xml"))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_set_data(request, xml_body, strlen(xml_body)))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, response))
+   {
+      goto error;
+   }
+
+   if ((*response)->status_code >= 200 && (*response)->status_code < 300)
+   {
+      bool has_fatal_error = false;
+
+      if (xml_parse_s3_delete_result((*response)->payload.data, &has_fatal_error))
+      {
+         goto error;
+      }
+
+      if (has_fatal_error)
+      {
+         pgmoneta_log_error("S3 delete response contains object-level errors for path: %s", s3_path);
+         goto error;
+      }
+
+      pgmoneta_log_info("Successfully deleted files from URL: https://%s/%s", s3_host, s3_path);
+   }
+   else
+   {
+      pgmoneta_log_error("S3 delete failed with status code: %d. Failed to delete files from S3 path: %s",
+                         (*response)->status_code, s3_path);
+      goto error;
+   }
+
+   free(s3_host);
+   free(request_path);
+   free(signature_hex);
+   free(signature_hmac);
+   free(signing_key_hmac);
+   free(date_region_service_key_hmac);
+   free(date_region_key_hmac);
+   free(date_key_hmac);
+   free(key);
+   free(s3_path);
+   free(body_hash);
+   free(canonical_request_sha256);
+   free(canonical_request);
+   free(string_to_sign);
+   free(auth_value);
+   free(query_string);
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_destroy(connection);
+
+   return 0;
+
+error:
+
+   free(s3_host);
+   free(request_path);
+   free(signature_hex);
+   free(signature_hmac);
+
+   free(signing_key_hmac);
+   free(date_region_service_key_hmac);
+   free(date_region_key_hmac);
+   free(date_key_hmac);
+   free(key);
+   free(s3_path);
+   free(body_hash);
+   free(canonical_request_sha256);
+   free(canonical_request);
+   free(string_to_sign);
+   free(auth_value);
+   free(query_string);
+
+   if (connection != NULL)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+
+   if (request != NULL)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+
+   return 1;
+}
 static int
 s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int server)
 {
@@ -1323,4 +1721,142 @@ xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuation_t
    }
 
    return 0;
+}
+
+static int
+xml_parse_s3_delete_result(char* xml, bool* has_fatal_error)
+{
+   char* cursor = NULL;
+
+   if (xml == NULL || has_fatal_error == NULL)
+   {
+      return 1;
+   }
+
+   *has_fatal_error = false;
+   cursor = xml;
+
+   while ((cursor = strstr(cursor, "<Error>")) != NULL)
+   {
+      char* end = strstr(cursor, "</Error>");
+      char* error_block = NULL;
+      struct deque* key_values = NULL;
+      struct deque* code_values = NULL;
+      struct deque* message_values = NULL;
+      char* key = NULL;
+      char* code = NULL;
+      char* message = NULL;
+      size_t block_len = 0;
+
+      if (end == NULL)
+      {
+         return 1;
+      }
+
+      end += strlen("</Error>");
+      block_len = (size_t)(end - cursor);
+
+      error_block = (char*)malloc(block_len + 1);
+      if (error_block == NULL)
+      {
+         return 1;
+      }
+      memcpy(error_block, cursor, block_len);
+      error_block[block_len] = '\0';
+
+      if (xml_extract_tag(error_block, "Key", &key_values))
+      {
+         free(error_block);
+         return 1;
+      }
+      if (xml_extract_tag(error_block, "Code", &code_values))
+      {
+         pgmoneta_deque_destroy(key_values);
+         free(error_block);
+         return 1;
+      }
+      if (xml_extract_tag(error_block, "Message", &message_values))
+      {
+         pgmoneta_deque_destroy(key_values);
+         pgmoneta_deque_destroy(code_values);
+         free(error_block);
+         return 1;
+      }
+
+      key = key_values != NULL && pgmoneta_deque_size(key_values) > 0 ? (char*)pgmoneta_deque_peek(key_values, NULL) : "unknown";
+      code = code_values != NULL && pgmoneta_deque_size(code_values) > 0 ? (char*)pgmoneta_deque_peek(code_values, NULL) : "unknown";
+      message = message_values != NULL && pgmoneta_deque_size(message_values) > 0 ? (char*)pgmoneta_deque_peek(message_values, NULL) : "unknown";
+
+      pgmoneta_log_warn("S3 delete object error: key=%s code=%s message=%s", key, code, message);
+
+      if (strcmp(code, "NoSuchKey"))
+      {
+         *has_fatal_error = true;
+      }
+
+      pgmoneta_deque_destroy(key_values);
+      pgmoneta_deque_destroy(code_values);
+      pgmoneta_deque_destroy(message_values);
+      free(error_block);
+
+      cursor = end;
+   }
+
+   return 0;
+}
+
+static int
+xml_s3_build_delete_key(char** xml, char* key)
+{
+   const char* open_tag = "<Object><Key>";
+   const char* close_tag = "</Key></Object>";
+
+   if (xml == NULL || key == NULL)
+   {
+      return 1;
+   }
+
+   *xml = pgmoneta_append(*xml, open_tag);
+   *xml = pgmoneta_append(*xml, key);
+   *xml = pgmoneta_append(*xml, close_tag);
+
+   return 0;
+}
+
+static int
+xml_s3_build_delete_list(char** xml, struct deque* keys, size_t max_keys)
+{
+   if (xml == NULL || keys == NULL || max_keys == 0)
+   {
+      goto error;
+   }
+
+   const char* quiet_tag = "<Quiet>true</Quiet>";
+   const char* header_tag = "<Delete xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">";
+   *xml = pgmoneta_append(*xml, header_tag);
+   *xml = pgmoneta_append(*xml, quiet_tag);
+
+   while (max_keys > 0 && pgmoneta_deque_size(keys) > 0)
+   {
+      char* key = (char*)pgmoneta_deque_poll(keys, NULL);
+      if (key == NULL)
+      {
+         goto error;
+      }
+
+      if (xml_s3_build_delete_key(xml, key))
+      {
+         free(key);
+         goto error;
+      }
+
+      free(key);
+      max_keys--;
+   }
+
+   *xml = pgmoneta_append(*xml, "</Delete>");
+   return 0;
+
+error:
+   return 1;
 }

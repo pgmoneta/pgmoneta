@@ -47,6 +47,18 @@ extern "C" {
  */
 void
 pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
+
+/**
+ * Delete S3 objects for a server under a prefix
+ * @param client_fd The client
+ * @param server The server
+ * @param prefix The prefix under server backup path
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param payload The payload
+ */
+void
+pgmoneta_delete_s3_objects(int client_fd, int server, char* prefix, uint8_t compression, uint8_t encryption, struct json* payload);
 #ifdef __cplusplus
 }
 #endif

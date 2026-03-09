@@ -95,6 +95,7 @@ extern "C" {
 #define MANAGEMENT_LIST_USERS     104
 
 #define MANAGEMENT_S3_LS          200
+#define MANAGEMENT_S3_DELETE      201
 
 /**
  * Management categories
@@ -171,6 +172,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_RETENTION_YEARS       "RetentionYears"
 #define MANAGEMENT_ARGUMENT_S3_KEY                "S3Key"
 #define MANAGEMENT_ARGUMENT_S3_OBJECTS            "S3Objects"
+#define MANAGEMENT_ARGUMENT_S3_PREFIX             "S3Prefix"
 #define MANAGEMENT_ARGUMENT_SERVER                "Server"
 #define MANAGEMENT_ARGUMENT_SERVERS               "Servers"
 #define MANAGEMENT_ARGUMENT_SERVER_SIZE           "ServerSize"
@@ -391,6 +393,13 @@ extern "C" {
 #define MANAGEMENT_ERROR_PROGRESS_NETWORK                   3002
 #define MANAGEMENT_ERROR_PROGRESS_ERROR                     3003
 
+#define MANAGEMENT_ERROR_DELETE_S3_NOSERVER                 3100
+#define MANAGEMENT_ERROR_DELETE_S3_NOFORK                   3101
+#define MANAGEMENT_ERROR_DELETE_S3_WORKFLOW                 3102
+#define MANAGEMENT_ERROR_DELETE_S3_NETWORK                  3103
+#define MANAGEMENT_ERROR_DELETE_S3_INVALID_PREFIX           3104
+#define MANAGEMENT_ERROR_DELETE_S3_ERROR                    3105
+
 /**
  * Output formats
  */
@@ -481,6 +490,20 @@ pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char
  */
 int
 pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a delete s3 objects request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param prefix The prefix to delete under the server backup path
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request
