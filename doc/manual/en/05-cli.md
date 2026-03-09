@@ -452,7 +452,7 @@ pgmoneta-cli conf set management 5002
 
 # Performance tuning
 pgmoneta-cli conf set workers 4
-pgmoneta-cli conf set backup_max_rate 1000000
+pgmoneta-cli conf set max_rate 1000000
 pgmoneta-cli conf set compression zstd
 
 # Retention policies

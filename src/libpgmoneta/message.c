@@ -797,14 +797,21 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 
 int
 pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal,
+                                    int max_rate,
                                     int compression, int compression_level, bool progress,
                                     struct message** msg)
 {
    bool use_new_format = server_version >= 15;
+   int max_rate_kb = 0;
    char cmd[1024];
    char* options = NULL;
    struct message* m = NULL;
    size_t size;
+
+   if (max_rate > 0)
+   {
+      max_rate_kb = (max_rate + 1023) / 1024;
+   }
 
    memset(&cmd[0], 0, sizeof(cmd));
    // other options are
@@ -827,6 +834,13 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
       else
       {
          options = pgmoneta_append(options, "WAL false, ");
+      }
+
+      if (max_rate_kb > 0)
+      {
+         options = pgmoneta_append(options, "MAX_RATE ");
+         options = pgmoneta_append_int(options, max_rate_kb);
+         options = pgmoneta_append(options, ", ");
       }
 
       if (compression == COMPRESSION_SERVER_GZIP)
@@ -882,6 +896,13 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
          options = pgmoneta_append(options, "WAL ");
 
          options = pgmoneta_append(options, "NOWAIT ");
+      }
+
+      if (max_rate_kb > 0)
+      {
+         options = pgmoneta_append(options, "MAX_RATE ");
+         options = pgmoneta_append_int(options, max_rate_kb);
+         options = pgmoneta_append(options, " ");
       }
 
       options = pgmoneta_append(options, "MANIFEST 'yes' ");
@@ -2064,7 +2085,7 @@ error:
 }
 
 int
-pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message, struct token_bucket* network_bucket)
+pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message)
 {
    bool keep_read = false;
    int status;
@@ -2102,20 +2123,6 @@ pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_
       }
       length = pgmoneta_read_int32(buffer->buffer + buffer->cursor + 1);
 
-      if (network_bucket)
-      {
-         while (1)
-         {
-            if (!pgmoneta_token_bucket_consume(network_bucket, length))
-            {
-               break;
-            }
-            else
-            {
-               SLEEP(500000000L)
-            }
-         }
-      }
       // receive the whole message even if we are going to skip it
       while (buffer->cursor + 1 + length >= buffer->end)
       {
@@ -2213,7 +2220,7 @@ pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_
    // consume DataRow messages from stream buffer until CommandComplete
    while (config->running && pgmoneta_server_is_online(srv) && (msg == NULL || msg->kind != 'C'))
    {
-      status = pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, NULL);
+      status = pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
       if (status != MESSAGE_STATUS_OK)
       {
          goto error;
@@ -2294,7 +2301,7 @@ error:
 }
 
 int
-pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket, struct token_bucket* network_bucket)
+pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir)
 {
    char tmp_file_path[MAX_PATH];
    char file_path[MAX_PATH];
@@ -2332,7 +2339,7 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
    // get the copy out response
    while (msg == NULL || msg->kind != 'H')
    {
-      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, NULL);
+      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -2344,7 +2351,7 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
 
    while (msg->kind != 'c')
    {
-      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, network_bucket);
+      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -2353,21 +2360,6 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
       }
       if (msg->kind == 'd' && msg->length > 0)
       {
-         if (bucket)
-         {
-            while (1)
-            {
-               if (!pgmoneta_token_bucket_consume(bucket, msg->length))
-               {
-                  break;
-               }
-               else
-               {
-                  SLEEP(500000000L)
-               }
-            }
-         }
-
          // copy data
          if (fwrite(msg->data, msg->length, 1, file) != 1)
          {

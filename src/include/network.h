@@ -165,14 +165,6 @@ int
 pgmoneta_socket_has_error(int fd);
 
 /**
- * Get the network max rate for a server
- * @param server The server
- * @return The network max rate
- */
-int
-pgmoneta_get_network_max_rate(int server);
-
-/**
  * Get the host name for an address
  * @param addr The addr
  * @return The host name

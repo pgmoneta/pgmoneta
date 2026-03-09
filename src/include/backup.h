@@ -74,12 +74,12 @@ void
 pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
- * Get the backup max rate for a server
+ * Get the max rate for a server
  * @param server The server
- * @return The backup max rate
+ * @return The max rate
  */
 int
-pgmoneta_get_backup_max_rate(int server);
+pgmoneta_get_max_rate(int server);
 
 /**
  * Is progress enabled for a server

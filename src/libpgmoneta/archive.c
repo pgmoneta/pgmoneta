@@ -268,7 +268,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
+pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces)
 {
    char directory[MAX_PATH];
    char link_path[MAX_PATH];
@@ -346,7 +346,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       // get the copy out response
       while (msg == NULL || msg->kind != 'H')
       {
-         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, NULL);
+         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
          if (msg->kind == 'E' || msg->kind == 'f')
          {
             pgmoneta_log_copyfail_message(msg);
@@ -359,7 +359,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       }
       while (msg->kind != 'c')
       {
-         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, network_bucket);
+         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
          if (msg->kind == 'E' || msg->kind == 'f')
          {
             pgmoneta_log_copyfail_message(msg);
@@ -371,21 +371,6 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
 
          if (msg->kind == 'd' && msg->length > 0)
          {
-            if (bucket)
-            {
-               while (1)
-               {
-                  if (!pgmoneta_token_bucket_consume(bucket, msg->length))
-                  {
-                     break;
-                  }
-                  else
-                  {
-                     SLEEP(500000000L)
-                  }
-               }
-            }
-
             // copy data
             if (fwrite(msg->data, msg->length, 1, file) != 1)
             {
@@ -421,7 +406,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       tup = tup->next;
    }
 
-   if (pgmoneta_receive_manifest_file(srv, ssl, socket, buffer, basedir, bucket, network_bucket))
+   if (pgmoneta_receive_manifest_file(srv, ssl, socket, buffer, basedir))
    {
       goto error;
    }
@@ -485,7 +470,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
+pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces)
 {
    struct main_configuration* config = (struct main_configuration*)shmem;
    struct query_response* response = NULL;
@@ -544,7 +529,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    }
    while (msg == NULL || msg->kind != 'H')
    {
-      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, NULL);
+      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -556,7 +541,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
 
    while (msg->kind != 'c')
    {
-      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, network_bucket);
+      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -695,21 +680,6 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                if (msg->length <= 1)
                {
                   break;
-               }
-
-               if (bucket)
-               {
-                  while (1)
-                  {
-                     if (!pgmoneta_token_bucket_consume(bucket, msg->length))
-                     {
-                        break;
-                     }
-                     else
-                     {
-                        SLEEP(500000000L)
-                     }
-                  }
                }
 
                if (fwrite(msg->data + 1, msg->length - 1, 1, file) != 1)

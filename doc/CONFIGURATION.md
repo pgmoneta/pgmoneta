@@ -74,8 +74,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | metrics_key_file | | String | No | Private key file for TLS for Prometheus metrics. This file must be owned by either the user running pgmoneta or root. Additionally permissions must be at least `0640` when owned by root or `0600` otherwise. |
 | metrics_ca_file | | String | No | Certificate Authority (CA) file for TLS for Prometheus metrics. This file must be owned by either the user running pgmoneta or root.  |
 | libev | `auto` | String | No | Select the [libev](http://software.schmorp.de/pkg/libev.html) backend to use. Valid options: `auto`, `select`, `poll`, `epoll`, `iouring`, `devpoll` and `port` |
-| backup_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the backup rate|
-| network_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the netowrk backup rate|
+| max_rate | 0 | Int | No | The maximum backup transfer rate in bytes per second. Use 0 to disable |
 | progress | off | Bool | No | Enable backup progress tracking |
 | verification | 0 | String | No | The time between verification of a backup. Setting this parameter to 0 disables verification. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
 | keep_alive | on | Bool | No | Have `SO_KEEPALIVE` on sockets |
@@ -113,8 +112,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | hot_standby_overrides | | String | No | Files to override in the hot standby directory. If multiple hot standbys are specified then this setting is separated by a \| |
 | hot_standby_tablespaces | | String | No | Tablespace mappings for the hot standby. Syntax is [from -> to,?]+. If multiple hot standbys are specified then this setting is separated by a \| |
 | workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting. Maximum is CPU count |
-| backup_max_rate | -1 | Int | No | The number of bytes of tokens added every one second to limit the backup rate. Use 0 to disable, -1 means use the global settting|
-| network_max_rate | -1 | Int | No | The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable, -1 means use the global settting|
+| max_rate | -1 | Int | No | The maximum backup transfer rate in bytes per second. Use 0 to disable, -1 means use the global setting |
 | progress | -1 | Int | No | Enable backup progress tracking. Use 1 to enable, 0 to disable, -1 means use the global setting |
 | tls_cert_file | | String | No | Certificate file for TLS. This file must be owned by either the user running pgmoneta or root. Can interpolate environment variables (e.g., `$HOME`) |
 | tls_key_file | | String | No | Private key file for TLS. This file must be owned by either the user running pgmoneta or root. Additionally permissions must be at least `0640` when owned by root or `0600` otherwise. Can interpolate environment variables (e.g., `$HOME`) |

@@ -691,21 +691,6 @@ error:
    return 1;
 }
 
-int
-pgmoneta_get_network_max_rate(int server)
-{
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   if (config->common.servers[server].network_max_rate != -1)
-   {
-      return config->common.servers[server].network_max_rate;
-   }
-
-   return config->network_max_rate;
-}
-
 char*
 pgmoneta_get_host(struct sockaddr_in6 addr)
 {

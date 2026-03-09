@@ -2,6 +2,31 @@
 
 ## From 0.20.x to 0.21.0
 
+### Backup Rate Limit Configuration
+
+Rate-limit configuration for backups has been consolidated.
+
+This is a **breaking change** for existing configuration files.
+
+`backup_max_rate` and `network_max_rate` are no longer valid keys and
+have been replaced by a single `max_rate` key.
+
+`max_rate` is configured in **bytes per second**.
+
+**Action required:**
+
+1. Update `pgmoneta.conf` and replace old keys:
+   - `backup_max_rate`
+   - `network_max_rate`
+2. Set `max_rate` instead (globally and/or per-server).
+3. Reload or restart pgmoneta.
+
+Example:
+
+```conf
+max_rate = 1000000
+```
+
 ### Vault Encryption
 
 The key derivation for vault file encryption has been upgraded to
