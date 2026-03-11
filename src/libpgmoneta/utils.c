@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <deque.h>
+#include <extraction.h>
 #include <info.h>
 #include <logging.h>
 #include <shmem.h>
@@ -93,8 +94,8 @@ static int get_permissions(char* from, int* permissions);
 
 static void do_copy_file(struct worker_common* wc);
 static void do_delete_file(struct worker_common* wc);
-static bool is_valid_wal_file_suffix(char* f);
-bool pgmoneta_is_number(char* str, int base);
+static bool is_valid_wal_file_prefix(char* f);
+static bool is_valid_wal_file_name(char* f);
 
 int32_t
 pgmoneta_get_request(struct message* msg)
@@ -2102,20 +2103,42 @@ error:
    return 1;
 }
 
+static bool
+is_valid_wal_file_prefix(char* f)
+{
+   if (f != NULL)
+   {
+      if (strlen(f) == 24)
+      {
+         for (size_t i = 0; i < 24; i++)
+         {
+            if (!isxdigit((unsigned char)f[i]))
+            {
+               return false;
+            }
+         }
+
+         return true;
+      }
+   }
+
+   return false;
+}
+
 /**
  * Check if a file has a valid WAL file suffix pattern
- * 
+ *
  * Valid patterns are:
  * - 24-char hex (uncompressed)
  * - 24-char hex + .partial
  * - 24-char hex + compression suffix (.gz, .lz4, .zst, .zstd, .bz2)
  * - 24-char hex + compression suffix + .aes
- * 
+ *
  * @param f The filename to check
- * @return true if the file has a valid WAL suffix pattern, false otherwise
+ * @return true if the file has a valid WAL pattern, false otherwise
  */
 static bool
-is_valid_wal_file_suffix(char* f)
+is_valid_wal_file_name(char* f)
 {
    char* valid_suffixes[] = {
       "",
@@ -2150,7 +2173,7 @@ is_valid_wal_file_suffix(char* f)
 
       if (suffix_len == 0)
       {
-         if (name_len == 24 && pgmoneta_is_wal_file(name))
+         if (is_valid_wal_file_prefix(name))
          {
             return true;
          }
@@ -2167,7 +2190,7 @@ is_valid_wal_file_suffix(char* f)
                memset(prefix, 0, sizeof(prefix));
                memcpy(prefix, name, 24);
 
-               if (pgmoneta_is_wal_file(prefix))
+               if (is_valid_wal_file_prefix(prefix))
                {
                   return true;
                }
@@ -2212,7 +2235,7 @@ pgmoneta_get_wal_files(char* base, struct deque** files)
          continue;
       }
 
-      if (is_valid_wal_file_suffix(entry->d_name))
+      if (is_valid_wal_file_name(entry->d_name))
       {
          if (pgmoneta_deque_add(array, entry->d_name, (uintptr_t)entry->d_name, ValueString))
          {
@@ -3127,7 +3150,10 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
    char* ff = NULL;
    char* tf = NULL;
 
-   pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, from, false, &wal_files);
+   if (pgmoneta_get_wal_files(from, &wal_files))
+   {
+      goto error;
+   }
 
    pgmoneta_deque_iterator_create(wal_files, &it);
    while (pgmoneta_deque_iterator_next(it))
@@ -3228,7 +3254,10 @@ pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
 
    result = 0;
 
-   pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, directory, false, &wal_files);
+   if (pgmoneta_get_wal_files(directory, &wal_files))
+   {
+      goto error;
+   }
 
    pgmoneta_deque_iterator_create(wal_files, &it);
    while (pgmoneta_deque_iterator_next(it))
@@ -3669,43 +3698,32 @@ pgmoneta_wal_file_name(uint32_t tli, size_t segno, int segsize)
 int
 pgmoneta_read_wal(char* directory, char** wal)
 {
-   bool found = false;
    char* result = NULL;
    char* pgwal = NULL;
-
    struct deque* wal_files = NULL;
-   struct deque_iterator* it = NULL;
 
    *wal = NULL;
 
    pgwal = pgmoneta_append(pgwal, directory);
    pgwal = pgmoneta_append(pgwal, "/pg_wal/");
 
-   pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, pgwal, false, &wal_files);
+   if (pgmoneta_get_wal_files(pgwal, &wal_files))
+   {
+      goto error;
+   }
 
    if (pgmoneta_deque_size(wal_files) == 0)
    {
       goto error;
    }
 
-   pgmoneta_deque_iterator_create(wal_files, &it);
-   while (pgmoneta_deque_iterator_next(it) && !found)
+   if (pgmoneta_extraction_strip_suffix((char*)pgmoneta_deque_peek(wal_files, NULL),
+                                        PGMONETA_FILE_TYPE_UNKNOWN, &result))
    {
-      char* wal_file = (char*)it->value->data;
-
-      if (pgmoneta_is_wal_file(wal_file))
-      {
-         result = malloc(strlen(wal_file) + 1);
-         memset(result, 0, strlen(wal_file) + 1);
-         memcpy(result, wal_file, strlen(wal_file));
-
-         *wal = result;
-
-         found = true;
-      }
+      goto error;
    }
-   pgmoneta_deque_iterator_destroy(it);
-   it = NULL;
+
+   *wal = result;
 
    free(pgwal);
    pgmoneta_deque_destroy(wal_files);
@@ -3715,7 +3733,6 @@ pgmoneta_read_wal(char* directory, char** wal)
 error:
 
    free(pgwal);
-   pgmoneta_deque_iterator_destroy(it);
    pgmoneta_deque_destroy(wal_files);
 
    return 1;

@@ -2044,6 +2044,7 @@ MCTF_TEST(test_utils_missing_wal)
    char* dir = NULL;
    char* file1 = NULL;
    char* file2 = NULL;
+   char* invalid_file = NULL;
    char* to_dir = NULL;
    char* check_file = NULL;
    struct deque* files = NULL;
@@ -2063,6 +2064,10 @@ MCTF_TEST(test_utils_missing_wal)
    MCTF_ASSERT_PTR_NONNULL(file2, cleanup, "append file2 base failed");
    file2 = pgmoneta_append(file2, "/000000010000000000000002");
    MCTF_ASSERT_PTR_NONNULL(file2, cleanup, "append file2 failed");
+   invalid_file = pgmoneta_append(NULL, dir);
+   MCTF_ASSERT_PTR_NONNULL(invalid_file, cleanup, "append invalid_file base failed");
+   invalid_file = pgmoneta_append(invalid_file, "/00000001000000000000000G");
+   MCTF_ASSERT_PTR_NONNULL(invalid_file, cleanup, "append invalid_file failed");
 
    f = fopen(file1, "w");
    if (f)
@@ -2078,10 +2083,17 @@ MCTF_TEST(test_utils_missing_wal)
       fclose(f);
       f = NULL;
    }
+   f = fopen(invalid_file, "w");
+   if (f)
+   {
+      fflush(f);
+      fclose(f);
+      f = NULL;
+   }
 
    MCTF_ASSERT_INT_EQ(pgmoneta_get_wal_files(dir, &files), 0, cleanup, "get_wal_files failed");
    MCTF_ASSERT_PTR_NONNULL(files, cleanup, "files deque is null");
-   MCTF_ASSERT_INT_EQ(pgmoneta_deque_size(files), 2, cleanup, "files size should be 2");
+   MCTF_ASSERT_INT_EQ(pgmoneta_deque_size(files), 2, cleanup, "files size should exclude non-hex WAL names");
    pgmoneta_deque_destroy(files);
    files = NULL;
 
@@ -2135,6 +2147,11 @@ cleanup:
    {
       free(file2);
       file2 = NULL;
+   }
+   if (invalid_file != NULL)
+   {
+      free(invalid_file);
+      invalid_file = NULL;
    }
    if (to_dir != NULL)
    {
