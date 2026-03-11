@@ -52,7 +52,6 @@
 
 #define NAME "archive"
 
-static bool is_server_side_compression(void);
 static const char* basebackup_archive_extension(void);
 
 void
@@ -558,7 +557,8 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                // append two blocks of null buffer and extract the tar file
                if (file != NULL)
                {
-                  if ((!is_server_side_compression()) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  struct main_configuration* config = (struct main_configuration*)shmem;
+                  if (!COMPRESSION_IS_SERVER(config->compression_type) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
                      fflush(file);
@@ -644,7 +644,8 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                // start of manifest, finish off previous data archive receiving
                if (file != NULL)
                {
-                  if ((!is_server_side_compression()) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  struct main_configuration* config = (struct main_configuration*)shmem;
+                  if (!COMPRESSION_IS_SERVER(config->compression_type) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
                      fflush(file);
@@ -840,7 +841,7 @@ pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art*
    a = archive_read_new();
    archive_read_support_format_tar(a);
 
-   if (is_server_side_compression())
+   if (COMPRESSION_IS_SERVER(config->compression_type))
    {
       if (pgmoneta_vfile_create_local(file_path, "r", &reader))
       {
@@ -1058,17 +1059,6 @@ error:
    pgmoneta_hasher_destroy(hasher);
    free(entry_path_cpy);
    return 1;
-}
-
-static bool
-is_server_side_compression(void)
-{
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-   return config->compression_type == COMPRESSION_SERVER_GZIP ||
-          config->compression_type == COMPRESSION_SERVER_LZ4 ||
-          config->compression_type == COMPRESSION_SERVER_ZSTD;
 }
 
 static const char*

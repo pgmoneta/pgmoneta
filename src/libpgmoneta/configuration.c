@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
+#include <compression.h>
 #include <configuration.h>
 #include <logging.h>
 #include <management.h>
@@ -1882,50 +1883,7 @@ pgmoneta_validate_main_configuration(void* shm)
       return 1;
    }
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
-   {
-      if (config->compression_level < 1)
-      {
-         config->compression_level = 1;
-      }
-      else if (config->compression_level > 9)
-      {
-         config->compression_level = 9;
-      }
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-   {
-      if (config->compression_level < -131072)
-      {
-         config->compression_level = -131072;
-      }
-      else if (config->compression_level > 22)
-      {
-         config->compression_level = 22;
-      }
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-   {
-      if (config->compression_level < 1)
-      {
-         config->compression_level = 1;
-      }
-      else if (config->compression_level > 12)
-      {
-         config->compression_level = 12;
-      }
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-   {
-      if (config->compression_level < 1)
-      {
-         config->compression_level = 1;
-      }
-      else if (config->compression_level > 9)
-      {
-         config->compression_level = 9;
-      }
-   }
+   pgmoneta_compression_get_level(config->compression_type, &config->compression_level);
 
    if (config->workers < 0)
    {

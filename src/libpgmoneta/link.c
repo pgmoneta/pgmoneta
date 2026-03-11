@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <compression.h>
 #include <link.h>
 #include <logging.h>
 #include <utils.h>
@@ -481,44 +482,28 @@ do_comparefiles(struct worker_common* wc)
 static char*
 trim_suffix(char* str)
 {
-   char* res = NULL;
    struct main_configuration* config;
 
-   config = (struct main_configuration*)shmem;
-   int len = 0;
    if (str == NULL)
    {
       return NULL;
    }
-   len = strlen(str) + 1;
 
-   if (!pgmoneta_compare_string(str, "backup_label") &&
-       !pgmoneta_compare_string(str, "backup_manifest"))
+   config = (struct main_configuration*)shmem;
+
+   /* Special files should not have their suffixes trimmed */
+   if (pgmoneta_compare_string(str, "backup_label") ||
+       pgmoneta_compare_string(str, "backup_manifest"))
    {
-      switch (config->compression_type)
-      {
-         case COMPRESSION_CLIENT_GZIP:
-         case COMPRESSION_SERVER_GZIP:
-            len -= 3;
-            break;
-         case COMPRESSION_CLIENT_ZSTD:
-         case COMPRESSION_SERVER_ZSTD:
-            len -= 5;
-            break;
-         case COMPRESSION_CLIENT_LZ4:
-         case COMPRESSION_SERVER_LZ4:
-         case COMPRESSION_CLIENT_BZIP2:
-            len -= 4;
-            break;
-      }
-      if (config->encryption != ENCRYPTION_NONE)
-      {
-         len -= 4;
-      }
+      return pgmoneta_append(NULL, str);
    }
 
-   res = malloc(len);
-   memset(res, 0, len);
-   memcpy(res, str, len - 1);
+   char* res = NULL;
+
+   if (pgmoneta_compression_trim_suffix(str, config->compression_type, config->encryption, &res))
+   {
+      return NULL;
+   }
+
    return res;
 }

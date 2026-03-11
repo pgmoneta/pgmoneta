@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
+#include <compression.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -156,29 +157,16 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
    }
    else
    {
-      switch (config->compression_type)
+      const char* alg_suffix = NULL;
+
+      pgmoneta_compression_get_suffix(config->compression_type, &alg_suffix);
+      if (alg_suffix != NULL)
       {
-         case COMPRESSION_CLIENT_GZIP:
-         case COMPRESSION_SERVER_GZIP:
-            compress_suffix = ".gz";
-            break;
-         case COMPRESSION_CLIENT_ZSTD:
-         case COMPRESSION_SERVER_ZSTD:
-            compress_suffix = ".zstd";
-            break;
-         case COMPRESSION_CLIENT_LZ4:
-         case COMPRESSION_SERVER_LZ4:
-            compress_suffix = ".lz4";
-            break;
-         case COMPRESSION_CLIENT_BZIP2:
-            compress_suffix = ".bz2";
-            break;
-         case COMPRESSION_NONE:
-            compress_suffix = "";
-            break;
-         default:
-            pgmoneta_log_error("encryption_execute: Unknown compression type");
-            break;
+         compress_suffix = (char*)alg_suffix;
+      }
+      else
+      {
+         compress_suffix = "";
       }
 
       d = pgmoneta_append(d, tarfile);
