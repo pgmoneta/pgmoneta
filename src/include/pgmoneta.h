@@ -45,6 +45,7 @@ extern "C" {
 #include <sys/types.h>
 #include <openssl/ssl.h>
 
+// clang-format off
 #define VERSION                      "0.21.0"
 
 #define PGMONETA_HOMEPAGE            "https://pgmoneta.github.io/"
@@ -106,14 +107,34 @@ extern "C" {
 #define DIRECT_IO_AUTO               1
 #define DIRECT_IO_ON                 2
 
-#define COMPRESSION_NONE             0
-#define COMPRESSION_CLIENT_GZIP      1
-#define COMPRESSION_CLIENT_ZSTD      2
-#define COMPRESSION_CLIENT_LZ4       3
-#define COMPRESSION_CLIENT_BZIP2     4
-#define COMPRESSION_SERVER_GZIP      5
-#define COMPRESSION_SERVER_ZSTD      6
-#define COMPRESSION_SERVER_LZ4       7
+// clang-format on
+/* Compression type bits */
+#define COMPRESSION_TYPE_CLIENT 0x10
+#define COMPRESSION_TYPE_SERVER 0x20
+#define COMPRESSION_TYPE_BOTH   (COMPRESSION_TYPE_CLIENT | COMPRESSION_TYPE_SERVER)
+#define COMPRESSION_TYPE_MASK   0x30
+
+/* Compression algorithm bits (bits 0-3) */
+#define COMPRESSION_ALG_NONE         0x00
+#define COMPRESSION_ALG_GZIP         0x01
+#define COMPRESSION_ALG_ZSTD         0x02
+#define COMPRESSION_ALG_LZ4          0x03
+#define COMPRESSION_ALG_BZIP2        0x04
+
+#define COMPRESSION_NONE             0x00
+
+#define COMPRESSION_CLIENT_GZIP      (COMPRESSION_TYPE_CLIENT | COMPRESSION_ALG_GZIP)
+#define COMPRESSION_CLIENT_ZSTD      (COMPRESSION_TYPE_CLIENT | COMPRESSION_ALG_ZSTD)
+#define COMPRESSION_CLIENT_LZ4       (COMPRESSION_TYPE_CLIENT | COMPRESSION_ALG_LZ4)
+#define COMPRESSION_CLIENT_BZIP2     (COMPRESSION_TYPE_CLIENT | COMPRESSION_ALG_BZIP2)
+
+#define COMPRESSION_SERVER_GZIP      (COMPRESSION_TYPE_SERVER | COMPRESSION_ALG_GZIP)
+#define COMPRESSION_SERVER_ZSTD      (COMPRESSION_TYPE_SERVER | COMPRESSION_ALG_ZSTD)
+#define COMPRESSION_SERVER_LZ4       (COMPRESSION_TYPE_SERVER | COMPRESSION_ALG_LZ4)
+
+#define COMPRESSION_IS_SERVER(t)     (!!((t) & COMPRESSION_TYPE_SERVER))
+#define COMPRESSION_IS_CLIENT(t)     (!!((t) & COMPRESSION_TYPE_CLIENT))
+#define COMPRESSION_ALGORITHM(t)     ((t) & 0x0F)
 
 #define STORAGE_ENGINE_LOCAL         1 << 0
 #define STORAGE_ENGINE_SSH           1 << 1

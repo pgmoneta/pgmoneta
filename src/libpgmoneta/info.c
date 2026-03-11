@@ -77,6 +77,9 @@ split_file_path(char* path, char** relative_path, char** bare_file_name);
 static void
 write_info(FILE* sfile, const char* fmt, ...);
 
+static int
+migrate_compression_value(int compression);
+
 static void
 create_info(char* directory, char* label, int status);
 
@@ -686,7 +689,7 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
          }
          else if (pgmoneta_starts_with(&key[0], INFO_COMPRESSION))
          {
-            bck->compression = atoi(&value[0]);
+            bck->compression = migrate_compression_value(atoi(&value[0]));
          }
          else if (pgmoneta_starts_with(&key[0], INFO_ENCRYPTION))
          {
@@ -1780,6 +1783,7 @@ file_final_name(char* file, int encryption, int compression, char** finalname)
    final = pgmoneta_append(final, file);
    {
       char* suffix = NULL;
+
       if (pgmoneta_extraction_get_suffix(compression, encryption, &suffix))
       {
          goto error;
@@ -1787,8 +1791,8 @@ file_final_name(char* file, int encryption, int compression, char** finalname)
       if (suffix != NULL)
       {
          final = pgmoneta_append(final, suffix);
-         free(suffix);
       }
+      free(suffix);
    }
 
    *finalname = final;
@@ -1843,6 +1847,22 @@ split_file_path(char* path, char** relative_path, char** bare_file_name)
 error:
    free(path_copy);
    return 1;
+}
+
+static int
+migrate_compression_value(int compression)
+{
+   switch (compression)
+   {
+      case 5:
+         return COMPRESSION_SERVER_GZIP;
+      case 6:
+         return COMPRESSION_SERVER_ZSTD;
+      case 7:
+         return COMPRESSION_SERVER_LZ4;
+      default:
+         return compression;
+   }
 }
 
 static void

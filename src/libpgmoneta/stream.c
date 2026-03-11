@@ -30,6 +30,7 @@
 #include <aes.h>
 #include <compression.h>
 #include <deque.h>
+#include <extraction.h>
 #include <logging.h>
 #include <stream.h>
 #include <utils.h>
@@ -354,39 +355,26 @@ static int
 get_backup_file_name_cb(struct streamer* this, char* file_name, char** dest_file_name)
 {
    char* dest = NULL;
+   char* suffix = NULL;
    if (this == NULL || file_name == NULL)
    {
       goto error;
    }
    dest = pgmoneta_append(dest, file_name);
-   switch (this->compression)
+   if (pgmoneta_extraction_get_suffix(this->compression, this->encryption, &suffix))
    {
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
-         dest = pgmoneta_append(dest, ".zstd");
-         break;
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
-         dest = pgmoneta_append(dest, ".gz");
-         break;
-      case COMPRESSION_SERVER_LZ4:
-      case COMPRESSION_CLIENT_LZ4:
-         dest = pgmoneta_append(dest, ".lz4");
-         break;
-      case COMPRESSION_CLIENT_BZIP2:
-         dest = pgmoneta_append(dest, ".bz2");
-         break;
-      default:
-         break;
+      goto error;
    }
-   if (this->encryption != ENCRYPTION_NONE)
+   if (suffix != NULL)
    {
-      dest = pgmoneta_append(dest, ".aes");
+      dest = pgmoneta_append(dest, suffix);
+      free(suffix);
    }
    *dest_file_name = dest;
    return 0;
 error:
    free(dest);
+   free(suffix);
    return 1;
 }
 

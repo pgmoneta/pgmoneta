@@ -92,19 +92,17 @@ int
 pgmoneta_compressor_create(int compression_type, struct compressor** compressor)
 {
    *compressor = NULL;
-   switch (compression_type)
+   switch (COMPRESSION_ALGORITHM(compression_type))
    {
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
+      case COMPRESSION_ALG_ZSTD:
          return pgmoneta_zstd_compressor_create(compressor);
-      case COMPRESSION_CLIENT_LZ4:
-      case COMPRESSION_SERVER_LZ4:
+      case COMPRESSION_ALG_LZ4:
          return pgmoneta_lz4_compressor_create(compressor);
-      case COMPRESSION_CLIENT_BZIP2:
+      case COMPRESSION_ALG_BZIP2:
          return pgmoneta_bzip2_compressor_create(compressor);
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
+      case COMPRESSION_ALG_GZIP:
          return pgmoneta_gzip_compressor_create(compressor);
+      case COMPRESSION_ALG_NONE:
       default:
          return create_noop_compressor(compressor);
    }
@@ -170,6 +168,141 @@ pgmoneta_compressor_destroy(struct compressor* compressor)
    }
    compressor->close(compressor);
    free(compressor);
+}
+
+int
+pgmoneta_compression_get_suffix(int type, const char** suffix)
+{
+   if (suffix == NULL)
+   {
+      return 1;
+   }
+
+   *suffix = NULL;
+
+   switch (COMPRESSION_ALGORITHM(type))
+   {
+      case COMPRESSION_ALG_GZIP:
+         *suffix = ".gz";
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         *suffix = ".zstd";
+         break;
+      case COMPRESSION_ALG_LZ4:
+         *suffix = ".lz4";
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         *suffix = ".bz2";
+         break;
+      case COMPRESSION_ALG_NONE:
+      default:
+         break;
+   }
+
+   return 0;
+}
+
+int
+pgmoneta_compression_get_level(int type, int* level)
+{
+   if (level == NULL)
+   {
+      return 1;
+   }
+
+   switch (COMPRESSION_ALGORITHM(type))
+   {
+      case COMPRESSION_ALG_GZIP:
+         if (*level < 1)
+         {
+            *level = 1;
+         }
+         else if (*level > 9)
+         {
+            *level = 9;
+         }
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         if (*level < -131072)
+         {
+            *level = -131072;
+         }
+         else if (*level > 22)
+         {
+            *level = 22;
+         }
+         break;
+      case COMPRESSION_ALG_LZ4:
+         if (*level < 1)
+         {
+            *level = 1;
+         }
+         else if (*level > 12)
+         {
+            *level = 12;
+         }
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         if (*level < 1)
+         {
+            *level = 1;
+         }
+         else if (*level > 9)
+         {
+            *level = 9;
+         }
+         break;
+      case COMPRESSION_ALG_NONE:
+      default:
+         break;
+   }
+
+   return 0;
+}
+
+int
+pgmoneta_compression_trim_suffix(char* str, int compression_type, int encryption, char** result)
+{
+   char* res = NULL;
+   char* tmp = NULL;
+   const char* alg_suffix = NULL;
+
+   if (str == NULL || result == NULL)
+   {
+      return 1;
+   }
+
+   *result = NULL;
+
+   /* Start with a copy of the original string */
+   res = pgmoneta_append(NULL, str);
+   if (res == NULL)
+   {
+      return 1;
+   }
+
+   /* Strip the compression algorithm suffix, if any */
+   if (!pgmoneta_compression_get_suffix(compression_type, &alg_suffix) && alg_suffix != NULL)
+   {
+      if (pgmoneta_ends_with(res, (char*)alg_suffix))
+      {
+         tmp = pgmoneta_remove_suffix(res, (char*)alg_suffix);
+         free(res);
+         res = tmp;
+      }
+   }
+
+   /* Strip encryption suffix if present */
+   if (encryption != ENCRYPTION_NONE && pgmoneta_ends_with(res, ".aes"))
+   {
+      tmp = pgmoneta_remove_suffix(res, ".aes");
+      free(res);
+      res = tmp;
+   }
+
+   *result = res;
+
+   return 0;
 }
 
 static int
