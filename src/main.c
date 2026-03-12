@@ -112,7 +112,7 @@ static int init_replication_slot(int server);
 static int verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket);
 static int create_pidfile(void);
 static void remove_pidfile(void);
-static void shutdown_ports(void);
+static void shutdown_ports(bool remove);
 
 struct accept_io
 {
@@ -148,7 +148,7 @@ start_mgt(void)
 }
 
 static void
-shutdown_mgt(void)
+shutdown_mgt(bool remove)
 {
    struct main_configuration* config;
 
@@ -157,7 +157,10 @@ shutdown_mgt(void)
    ev_io_stop(main_loop, (struct ev_io*)&io_mgt);
    pgmoneta_disconnect(unix_management_socket);
    errno = 0;
-   pgmoneta_remove_unix_socket(config->common.unix_socket_dir, MAIN_UDS);
+   if (remove)
+   {
+      pgmoneta_remove_unix_socket(config->common.unix_socket_dir, MAIN_UDS);
+   }
    errno = 0;
 }
 
@@ -203,7 +206,7 @@ start_console(void)
 }
 
 static void
-shutdown_console(void)
+shutdown_console(bool remove __attribute__((unused)))
 {
    for (int i = 0; i < console_fds_length; i++)
    {
@@ -229,7 +232,7 @@ start_management(void)
 }
 
 static void
-shutdown_management(void)
+shutdown_management(bool remove __attribute__((unused)))
 {
    for (int i = 0; i < management_fds_length; i++)
    {
@@ -956,10 +959,10 @@ main(int argc, char** argv)
    sd_notify(0, "STOPPING=1");
 #endif
 
-   shutdown_management();
+   shutdown_management(true);
    shutdown_metrics();
-   shutdown_console();
-   shutdown_mgt();
+   shutdown_console(true);
+   shutdown_mgt(true);
 
    for (int i = 0; i < SIGNALS_NUMBER; i++)
    {
@@ -995,7 +998,7 @@ error:
 
    if (mgt_started)
    {
-      shutdown_mgt();
+      shutdown_mgt(true);
    }
 
    if (metrics_started)
@@ -1005,12 +1008,12 @@ error:
 
    if (console_started)
    {
-      shutdown_console();
+      shutdown_console(true);
    }
 
    if (management_started)
    {
-      shutdown_management();
+      shutdown_management(true);
    }
 
    free(metrics_fds);
@@ -1072,7 +1075,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          pgmoneta_log_warn("Restarting management due to: %s (%d)", strerror(errno), watcher->fd);
 
-         shutdown_mgt();
+         shutdown_mgt(false);
 
          if (pgmoneta_bind_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &unix_management_socket))
          {
@@ -1145,7 +1148,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             {
                struct json* pyl = NULL;
 
-               shutdown_ports();
+               shutdown_ports(false);
 
                pgmoneta_json_clone(payload, &pyl);
 
@@ -1194,7 +1197,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1235,7 +1238,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1279,7 +1282,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1321,7 +1324,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1363,7 +1366,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1404,7 +1407,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1445,7 +1448,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1581,7 +1584,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -1604,7 +1607,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -1627,7 +1630,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -1648,7 +1651,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -1682,7 +1685,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1723,7 +1726,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1751,7 +1754,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -1772,7 +1775,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -1793,7 +1796,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -1835,7 +1838,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -1890,7 +1893,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -1931,7 +1934,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             struct json* pyl = NULL;
 
-            shutdown_ports();
+            shutdown_ports(false);
 
             pgmoneta_json_clone(payload, &pyl);
 
@@ -2083,7 +2086,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
+         shutdown_ports(false);
 
          pgmoneta_json_clone(payload, &pyl);
 
@@ -2177,7 +2180,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    if (!fork())
    {
       ev_loop_fork(loop);
-      shutdown_ports();
+      shutdown_ports(false);
       if (strlen(config->metrics_cert_file) > 0 && strlen(config->metrics_key_file) > 0)
       {
          if (pgmoneta_create_ssl_ctx(false, &ctx))
@@ -2235,7 +2238,7 @@ accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          pgmoneta_log_warn("Restarting listening port due to: %s (%d)", strerror(errno), watcher->fd);
 
-         shutdown_console();
+         shutdown_console(false);
 
          free(console_fds);
          console_fds = NULL;
@@ -2271,7 +2274,7 @@ accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    if (!fork())
    {
       ev_loop_fork(loop);
-      shutdown_ports();
+      shutdown_ports(false);
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
       pgmoneta_console(NULL, client_fd);
       exit(0);
@@ -2308,7 +2311,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          pgmoneta_log_warn("Restarting listening port due to: %s (%d)", strerror(errno), watcher->fd);
 
-         shutdown_management();
+         shutdown_management(false);
 
          free(management_fds);
          management_fds = NULL;
@@ -2350,7 +2353,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       addr = pgmoneta_append(addr, address);
 
       ev_loop_fork(loop);
-      shutdown_ports();
+      shutdown_ports(false);
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
       pgmoneta_remote_management(client_fd, addr);
       exit(0);
@@ -2447,7 +2450,7 @@ reload_services_only(void)
       }
    }
 
-   shutdown_management();
+   shutdown_management(true);
 
    free(management_fds);
    management_fds = NULL;
@@ -2476,7 +2479,7 @@ reload_services_only(void)
       }
    }
 
-   shutdown_console();
+   shutdown_console(true);
 
    free(console_fds);
    console_fds = NULL;
@@ -2547,7 +2550,7 @@ retention_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attr
 
    if (!fork())
    {
-      shutdown_ports();
+      shutdown_ports(false);
       pgmoneta_retention(argv_ptr);
    }
 }
@@ -2564,7 +2567,7 @@ verification_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __a
 
    if (!fork())
    {
-      shutdown_ports();
+      shutdown_ports(false);
       pgmoneta_sha512_verification(argv_ptr);
    }
 }
@@ -2585,6 +2588,7 @@ valid_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribut
 
    if (!fork())
    {
+      shutdown_ports(false);
       pgmoneta_start_logging();
       pgmoneta_memory_init();
 
@@ -2720,7 +2724,7 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
             }
             else if (pid == 0)
             {
-               shutdown_ports();
+               shutdown_ports(false);
                pgmoneta_wal(i, argv_ptr);
             }
          }
@@ -2801,7 +2805,7 @@ reload_configuration(bool* restart)
 
    if (old_management != config->management)
    {
-      shutdown_management();
+      shutdown_management(true);
 
       free(management_fds);
       management_fds = NULL;
@@ -2833,7 +2837,7 @@ reload_configuration(bool* restart)
 
    if (old_console != config->console)
    {
-      shutdown_console();
+      shutdown_console(true);
 
       free(console_fds);
       console_fds = NULL;
@@ -2906,7 +2910,7 @@ init_receivewal(int server)
          }
          else if (pid == 0)
          {
-            shutdown_ports();
+            shutdown_ports(false);
             pgmoneta_wal(server, argv_ptr);
          }
       }
@@ -3229,11 +3233,13 @@ remove_pidfile(void)
 }
 
 static void
-shutdown_ports(void)
+shutdown_ports(bool remove)
 {
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
+
+   shutdown_mgt(remove);
 
    if (config->metrics > 0)
    {
@@ -3242,11 +3248,11 @@ shutdown_ports(void)
 
    if (config->management > 0)
    {
-      shutdown_management();
+      shutdown_management(remove);
    }
 
    if (config->console > 0)
    {
-      shutdown_console();
+      shutdown_console(remove);
    }
 }
