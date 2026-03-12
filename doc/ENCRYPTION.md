@@ -41,6 +41,27 @@ Command
 pgmoneta-cli encrypt <file>
 ```
 
+## Technical Implementation
+
+### File Format (Since 0.21.0)
+
+Each encrypted file starts with a 32-byte header:
+
+| Offset | Length | Description |
+|--------|--------|-------------|
+| 0      | 16     | Salt used for PBKDF2 key derivation |
+| 16     | 16     | Initialization Vector (IV) |
+
+The actual encrypted data follows immediately after the header.
+
+### Key Derivation and Caching
+
+The master key is derived from the user-provided password and the per-file salt using `PKCS5_PBKDF2_HMAC` (SHA-256).
+
+For backup performance, pgmoneta generates a global salt on startup. The derived key is cached in volatile memory and reused across all files in a backup stream that share the same salt, eliminating the computational overhead of PBKDF2 for every file. This cache persists for the duration of the backup stream and is securely wiped once processing is complete. A unique random IV is still generated for every file to ensure cryptographic security.
+
+During decryption, pgmoneta reads the salt from the file header. If it matches the cached salt, the cached key is reused; otherwise, a new key is derived and cached.
+
 ## Benchmark
 Check if your CPU have [AES-NI](https://en.wikipedia.org/wiki/AES_instruction_set)
 ```sh

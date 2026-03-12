@@ -185,10 +185,16 @@ pgmoneta_streamer_reset(struct streamer* streamer)
       return;
    }
    pgmoneta_compressor_destroy(streamer->compressor);
-   pgmoneta_encryptor_destroy(streamer->encryptor);
-
    pgmoneta_compressor_create(streamer->compression, &streamer->compressor);
-   pgmoneta_encryptor_create(streamer->encryption, &streamer->encryptor);
+
+   if (streamer->encryptor)
+   {
+      streamer->encryptor->reset(streamer->encryptor);
+   }
+   else
+   {
+      pgmoneta_encryptor_create(streamer->encryption, &streamer->encryptor);
+   }
 
    pgmoneta_deque_clear(streamer->destinations);
    streamer->size = 0;
