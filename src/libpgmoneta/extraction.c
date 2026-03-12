@@ -214,12 +214,6 @@ bitmask_to_compression(uint32_t file_type)
  * Determine the encryption type for a file from its bitmask.
  * The .aes suffix doesn't distinguish AES variants, so we fall back to
  * the config's encryption type when the file is encrypted.
- *
- * NOTE: Known temporary limitation — the streamer's encryptor uses a zero salt
- * (create_aes_encryptor), while pgmoneta_encrypt_file (used by wf_encryption)
- * uses a random per-file salt prepended to the ciphertext. This means files
- * encrypted by pgmoneta_encrypt_file cannot be decrypted by the streamer.
- * This will be resolved when salt support is added to the encryptor.
  */
 static int
 bitmask_to_encryption(uint32_t file_type)

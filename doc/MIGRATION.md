@@ -27,6 +27,25 @@ Example:
 max_rate = 1000000
 ```
 
+### Encryption Format
+
+The AES encryption format has been refined for improved security and performance. 
+Each encrypted file now starts with a 32-byte header:
+* `Salt` (16 bytes)
+* `IV` (16 bytes)
+
+The PBKDF2 Master Key is now cached in volatile memory for the duration of the backup stream, 
+and securely wiped once processing is complete, significantly improving performance for 
+large backup sets.
+
+This is a **breaking change**. Backups created with versions prior to 0.21.0 
+cannot be decrypted by this version.
+
+**Action required:**
+
+1. New backups will automatically use the new format.
+2. If you need to restore old backups, use the version of pgmoneta they were created with.
+
 ### Vault Encryption
 
 The key derivation for vault file encryption has been upgraded to

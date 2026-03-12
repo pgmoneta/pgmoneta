@@ -73,6 +73,12 @@ struct encryptor
     * @param encryptor The encryptor
     */
    void (*close)(struct encryptor* encryptor);
+
+   /**
+    * Reset the encryptor state for the next file in the stream, keeping cached key/salt
+    * @param encryptor The encryptor
+    */
+   void (*reset)(struct encryptor* encryptor);
 };
 
 /**
