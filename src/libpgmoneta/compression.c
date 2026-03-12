@@ -28,12 +28,16 @@
 
 #include <bzip2_compression.h>
 #include <compression.h>
+#include <extraction.h>
 #include <gzip_compression.h>
 #include <logging.h>
 #include <lz4_compression.h>
 #include <utils.h>
 #include <zlib.h>
 #include <zstandard_compression.h>
+
+#include <dirent.h>
+#include <sys/types.h>
 
 static int
 create_noop_compressor(struct compressor** compressor);
@@ -75,7 +79,7 @@ pgmoneta_decompression_file_callback(char* path, compression_func* decompress_cb
 }
 
 int
-pgmoneta_decompress(char* from, char* to)
+pgmoneta_decompress_file(char* from, char* to)
 {
    compression_func decompress_cb = NULL;
    if (pgmoneta_decompression_file_callback(from, &decompress_cb))
@@ -85,6 +89,74 @@ pgmoneta_decompress(char* from, char* to)
    }
    return decompress_cb(from, to);
 error:
+   return 1;
+}
+
+int
+pgmoneta_decompress_directory(char* directory)
+{
+   DIR* dir = NULL;
+   struct dirent* entry = NULL;
+   char full_path[MAX_PATH];
+
+   if (directory == NULL)
+   {
+      goto error;
+   }
+
+   if (!(dir = opendir(directory)))
+   {
+      goto error;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+      {
+         continue;
+      }
+
+      pgmoneta_snprintf(full_path, sizeof(full_path), "%s/%s", directory, entry->d_name);
+
+      if (entry->d_type == DT_DIR)
+      {
+         if (pgmoneta_decompress_directory(full_path))
+         {
+            goto error;
+         }
+      }
+      else if (entry->d_type == DT_REG)
+      {
+         char* to = NULL;
+
+         if (pgmoneta_compression_is_compressed(full_path))
+         {
+            if (pgmoneta_extraction_strip_suffix(full_path, PGMONETA_FILE_TYPE_UNKNOWN, &to))
+            {
+               goto error;
+            }
+
+            if (pgmoneta_decompress_file(full_path, to))
+            {
+               goto error;
+            }
+         }
+
+         free(to);
+      }
+   }
+
+   closedir(dir);
+
+   return 0;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
    return 1;
 }
 
@@ -200,6 +272,20 @@ pgmoneta_compression_get_suffix(int type, const char** suffix)
    }
 
    return 0;
+}
+
+bool
+pgmoneta_compression_is_compressed(char* f)
+{
+   if (pgmoneta_ends_with(f, ".gz") ||
+       pgmoneta_ends_with(f, ".zstd") ||
+       pgmoneta_ends_with(f, ".lz4") ||
+       pgmoneta_ends_with(f, ".bz2"))
+   {
+      return true;
+   }
+
+   return false;
 }
 
 int

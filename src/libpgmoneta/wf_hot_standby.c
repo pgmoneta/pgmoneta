@@ -28,7 +28,9 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
 #include <art.h>
+#include <compression.h>
 #include <logging.h>
 #include <manifest.h>
 #include <restore.h>
@@ -317,6 +319,31 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
          {
             error = true;
             goto cleanup;
+         }
+
+         if (config->encryption != ENCRYPTION_NONE)
+         {
+            if (pgmoneta_decrypt_directory(destination, workers))
+            {
+               error = true;
+               goto cleanup;
+            }
+            pgmoneta_workers_wait(workers);
+            if (workers != NULL && !workers->outcome)
+            {
+               error = true;
+               goto cleanup;
+            }
+         }
+
+         if (COMPRESSION_ALGORITHM(config->compression_type) != COMPRESSION_ALG_NONE)
+         {
+            /* TODO: Workers */
+            if (pgmoneta_decompress_directory(destination))
+            {
+               error = true;
+               goto cleanup;
+            }
          }
 
          if (strlen(config->common.servers[server].hot_standby_overrides[i]) > 0 &&

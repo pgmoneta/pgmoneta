@@ -48,6 +48,7 @@ struct compressor
     * @return 0 upon success, 1 if otherwise
     */
    int (*compress)(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+
    /**
     * The decompress callback
     * @param compressor The compressor
@@ -58,6 +59,7 @@ struct compressor
     * @return 0 upon success, 1 if otherwise
     */
    int (*decompress)(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+
    /**
     * Close the compressor
     * @param compressor The compressor
@@ -110,6 +112,14 @@ int
 pgmoneta_compression_get_suffix(int type, const char** suffix);
 
 /**
+ * Is the file compressed
+ * @param f The file
+ * @return True if compressed, or false
+ */
+bool
+pgmoneta_compression_is_compressed(char* f);
+
+/**
  * Clamp a compression level according to the compression algorithm.
  *
  * Updates *level in-place to fall within the supported range for the
@@ -143,18 +153,20 @@ pgmoneta_compression_trim_suffix(char* str, int compression_type, int encryption
 
 /**
  * Decompress a file using the appropriate decompression method.
- *
- * This function determines the compression type of the input file by calling
- * `pgmoneta_decompression_file_callback`, and then uses the resulting callback to
- * decompress the file from the `from` path to the `to` path.
- * If no appropriate decompression callback is found, an error is logged.
- *
- * @param from   The source file path, expected to be a compressed file.
- * @param to     The destination file path where the decompressed output will be saved.
+ * @param from    The source file path, expected to be a compressed file.
+ * @param to      The destination file path where the decompressed output will be saved.
  *
  * @return 0 if decompression succeeds, 1 if no matching decompression callback is found or decompression fails.
  */
 int
-pgmoneta_decompress(char* from, char* to);
+pgmoneta_decompress_file(char* from, char* to);
+
+/**
+ * Decompress a directory using the appropriate decompression method.
+ * @param directory The directory
+ * @return 0 if decompression succeeds, 1 if no matching decompression callback is found or decompression fails.
+ */
+int
+pgmoneta_decompress_directory(char* directory);
 
 #endif //PGMONETA_COMPRESSION_H
