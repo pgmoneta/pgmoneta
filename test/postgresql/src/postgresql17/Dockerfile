@@ -33,6 +33,9 @@ LABEL summary="PostgreSQL 17" \
 
 ENV PGVERSION="17"
 ENV PGROOT="/usr/pgsql-${PGVERSION}"
+ENV PATH="/usr/pgsql-${PGVERSION}/bin:$PATH"
+ENV EXTENSION_NAME="pgmoneta_ext"
+ENV GITHUB_REPO="https://github.com/pgmoneta/pgmoneta_ext.git"
 
 RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 RUN dnf -y install --nogpgcheck --allowerasing https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
@@ -41,8 +44,24 @@ RUN dnf -y upgrade
 RUN dnf install -y dnf-plugins-core
 RUN dnf config-manager --set-enabled crb
 RUN dnf makecache
+
+# Install dependencies
+RUN dnf -y install git gcc cmake make postgresql17-devel
 RUN dnf -y install procps wget iputils net-tools
 RUN dnf -y install postgresql17 postgresql17-server postgresql17-contrib postgresql17-libs
+
+# Build and Install pgmoneta_ext
+WORKDIR /tmp/pg_extension
+RUN git clone --depth 1 ${GITHUB_REPO}
+WORKDIR /tmp/pg_extension/${EXTENSION_NAME}
+
+RUN mkdir build
+WORKDIR /tmp/pg_extension/${EXTENSION_NAME}/build
+RUN cmake -DDOCS=false ..
+RUN make
+RUN make install
+
+RUN rm -rf /tmp/pg_extension
 RUN dnf --nogpgcheck clean all
 
 WORKDIR /
