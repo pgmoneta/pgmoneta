@@ -602,6 +602,17 @@ char*
 pgmoneta_append(char* orig, const char* s);
 
 /**
+ * Append bytes to a buffer
+ * @param orig The original buffer
+ * @param s The bytes to append
+ * @param s_len The number of bytes to append
+ * @param orig_len The current size of the original buffer
+ * @return The resulting buffer
+ */
+char*
+pgmoneta_append_bytes(char* orig, const char* s, size_t s_len, size_t orig_len);
+
+/**
  * Append a char
  * @param orig The original string
  * @param s The string

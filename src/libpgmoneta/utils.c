@@ -1533,6 +1533,24 @@ pgmoneta_append(char* orig, const char* s)
 }
 
 char*
+pgmoneta_append_bytes(char* orig, const char* s, size_t s_length, size_t orig_length)
+{
+   char* n = NULL;
+   if (s == NULL || s_length == 0)
+   {
+      return orig;
+   }
+   n = (char*)realloc(orig, orig_length + s_length + 1);
+   if (n == NULL)
+   {
+      return orig;
+   }
+   memcpy(n + orig_length, s, s_length);
+   n[orig_length + s_length] = '\0';
+   return n;
+}
+
+char*
 pgmoneta_append_char(char* orig, char c)
 {
    char str[2];

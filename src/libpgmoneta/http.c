@@ -572,8 +572,7 @@ http_read_response_header(SSL* ssl, int socket,
    ssize_t bytes_read;
    size_t total = 0;
    char* end = NULL;
-
-   *header_text = NULL;
+   char* header_str = NULL;
 
    // read to the buffer
    while (!end)
@@ -581,26 +580,33 @@ http_read_response_header(SSL* ssl, int socket,
       bytes_read = http_read_bytes(ssl, socket, buffer, sizeof(buffer) - 1);
       if (bytes_read < 0)
       {
-         free(*header_text);
          goto error;
       }
 
-      buffer[bytes_read] = '\0';
-      *header_text = pgmoneta_append(*header_text, buffer);
-      total += bytes_read;
+      if (bytes_read == 0)
+      {
+         // Unexpected EOF before we received the complete header delimiter.
+         goto error;
+      }
+
+      header_str = pgmoneta_append_bytes(header_str, buffer, (size_t)bytes_read, total);
+      if (header_str == NULL)
+      {
+         goto error;
+      }
+      total += (size_t)bytes_read;
 
       if (total > MAX_HEADER_SIZE)
       {
-         free(*header_text);
          goto error;
       }
 
-      end = strstr(*header_text, "\r\n\r\n");
+      end = strstr(header_str, "\r\n\r\n");
    }
 
    // store the rest as body/data of the http request
    // add 4 bytes for the \r\n\r\n CLRF
-   size_t header_len = (end - *header_text) + 4;
+   size_t header_len = (end - header_str) + 4;
    size_t extra = total - header_len;
 
    if (extra > 0)
@@ -608,18 +614,19 @@ http_read_response_header(SSL* ssl, int socket,
       http_response->payload.data = malloc(extra + 1);
       if (!http_response->payload.data)
       {
-         free(*header_text);
          goto error;
       }
 
-      memcpy(http_response->payload.data, *header_text + header_len, extra);
+      memcpy(http_response->payload.data, header_str + header_len, extra);
       ((char*)http_response->payload.data)[extra] = '\0';
       http_response->payload.data_size = extra;
    }
 
-   (*header_text)[header_len] = '\0';
+   header_str[header_len] = '\0';
+   *header_text = header_str;
    return MESSAGE_STATUS_OK;
 error:
+   free(header_str);
    return MESSAGE_STATUS_ERROR;
 }
 
@@ -720,8 +727,7 @@ http_read_chunked_body(SSL* ssl, int socket, struct http_response* http_response
          if (bytes_read <= 0)
             goto error;
 
-         buffer[bytes_read] = '\0';
-         http_response->payload.data = pgmoneta_append(http_response->payload.data, buffer);
+         http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
          http_response->payload.data_size += bytes_read;
          chunk_read += bytes_read;
       }
@@ -779,8 +785,7 @@ http_read_content_length_body(SSL* ssl, int socket, struct http_response* http_r
       if (bytes_read <= 0)
          goto error;
 
-      buffer[bytes_read] = '\0';
-      http_response->payload.data = pgmoneta_append(http_response->payload.data, buffer);
+      http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
       http_response->payload.data_size += bytes_read;
       remaining -= bytes_read;
    }
@@ -805,8 +810,7 @@ http_read_EOF_body(SSL* ssl, int socket, struct http_response* http_response)
       if (bytes_read == 0)
          break;
 
-      buffer[bytes_read] = '\0';
-      http_response->payload.data = pgmoneta_append(http_response->payload.data, buffer);
+      http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
       http_response->payload.data_size += bytes_read;
    }
 
@@ -909,7 +913,6 @@ http_parse_header(char** header_text, struct http_response* http_response)
       {
          pgmoneta_log_warn("Failed to add header key %s with value %s", key, value);
       }
-
       p = line_end + 2;
    }
 

@@ -47,14 +47,16 @@ struct echo_server
    pthread_t thread;
    bool running;
    char* response;
+   size_t response_len;
 };
 
 static struct echo_server* test_server = NULL;
 
 static void* echo_server_thread(void* arg);
-static int start_echo_server(int port, char* response);
+static int start_echo_server(int port, char* response, size_t response_len);
 static int stop_echo_server(void);
 static void setup_echo_server(char* response);
+static void setup_echo_server_binary(char* response, size_t response_len);
 static void teardown_echo_server(void);
 
 MCTF_TEST(test_pgmoneta_http_get)
@@ -153,6 +155,71 @@ MCTF_TEST(test_pgmoneta_http_get_truncated_chunk)
    MCTF_ASSERT(truncated, cleanup, "Truncated-Chunk is null");
 
 cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_http_get_binary_body)
+{
+   int status;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   char* raw_response = NULL;
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+
+   // binary payload starts with \0, has \0 throughout
+   // mirrors what a real PostgreSQL data file chunk looks like
+   // this is some sort of a real file from a backup
+   unsigned char binary_payload[] = {
+      0x00, 0x01, 0x02, 0x03,
+      0x00, 0xFF, 0x00, 0xAB,
+      0x50, 0x47, 0x00, 0x44,
+      0x00, 0x00, 0x00, 0x00};
+   size_t payload_size = sizeof(binary_payload);
+
+   char header[] =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: application/octet-stream\r\n"
+      "Connection: close\r\n"
+      "Content-Length: 16\r\n"
+      "\r\n";
+
+   size_t header_len = strlen(header);
+   size_t total_len = header_len + payload_size;
+
+   raw_response = malloc(total_len);
+   MCTF_ASSERT_PTR_NONNULL(raw_response, cleanup, "failed to allocate raw response");
+
+   memcpy(raw_response, header, header_len);
+   memcpy(raw_response + header_len, binary_payload, payload_size);
+
+   setup_echo_server_binary(raw_response, total_len);
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection),
+               cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/binary", &request),
+               cleanup, "failed to create request");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup,
+                      "HTTP GET binary request failed");
+
+   // if pgmoneta_append truncated at first \0, data_size will be 0 not 16
+   MCTF_ASSERT_INT_EQ((int)response->payload.data_size, (int)payload_size, cleanup,
+                      "binary body truncated — data_size mismatch, null byte handling broken");
+
+   // memcmp is null-byte safe verifies every byte survived intact
+   MCTF_ASSERT(!memcmp(response->payload.data, binary_payload, payload_size),
+               cleanup, "binary body corrupted — byte content mismatch");
+
+cleanup:
+   free(raw_response);
    pgmoneta_http_request_destroy(request);
    pgmoneta_http_response_destroy(response);
    pgmoneta_http_destroy(connection);
@@ -362,7 +429,7 @@ echo_server_thread(void* arg)
          if (bytes_read > 0)
          {
             buffer[bytes_read] = '\0';
-            send(client_fd, server->response, strlen(server->response), 0);
+            send(client_fd, server->response, server->response_len, 0);
          }
 
          close(client_fd);
@@ -373,7 +440,7 @@ echo_server_thread(void* arg)
 }
 
 static int
-start_echo_server(int port, char* response)
+start_echo_server(int port, char* response, size_t response_len)
 {
    if (test_server != NULL)
    {
@@ -389,12 +456,16 @@ start_echo_server(int port, char* response)
    test_server->port = port;
    test_server->running = false;
    if (response == NULL)
+   {
       response = "HTTP/1.1 200 OK\r\n"
                  "Content-Type: application/json\r\n"
                  "Connection: close\r\n"
                  "\r\n"
                  "{\"status\":\"ok\"}\n";
+      response_len = strlen(response);
+   }
    test_server->response = response;
+   test_server->response_len = response_len;
 
    test_server->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
    if (test_server->socket_fd < 0)
@@ -475,7 +546,14 @@ static void
 setup_echo_server(char* response)
 {
    pgmoneta_test_setup();
-   start_echo_server(9999, response);
+   size_t len = response != NULL ? strlen(response) : 0;
+   start_echo_server(9999, response, len);
+}
+static void
+setup_echo_server_binary(char* response, size_t response_len)
+{
+   pgmoneta_test_setup();
+   start_echo_server(9999, response, response_len);
 }
 
 static void
