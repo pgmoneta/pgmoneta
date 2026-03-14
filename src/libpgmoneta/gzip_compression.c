@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
 #include <gzip_compression.h>
 #include <logging.h>
 #include <management.h>
@@ -113,7 +114,7 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
             continue;
          }
 
-         if (!pgmoneta_is_compressed(entry->d_name) && !pgmoneta_is_encrypted(entry->d_name))
+         if (!pgmoneta_compression_is_compressed(entry->d_name) && !pgmoneta_is_encrypted(entry->d_name))
          {
             from = pgmoneta_append(from, directory);
             from = pgmoneta_append(from, "/");
@@ -265,7 +266,7 @@ pgmoneta_gzip_wal(char* directory)
       }
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_is_compressed(entry->d_name) ||
+         if (pgmoneta_compression_is_compressed(entry->d_name) ||
              pgmoneta_is_encrypted(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
              pgmoneta_ends_with(entry->d_name, ".history"))

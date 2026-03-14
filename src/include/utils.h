@@ -1262,22 +1262,6 @@ size_t
 pgmoneta_get_file_size(char* file_path);
 
 /**
- * Is the file encrypted
- * @param file_path The file path
- * @return True if encrypted, otherwise false
- */
-bool
-pgmoneta_is_encrypted(char* file_path);
-
-/**
- * Is the file compressed
- * @param file_path The file path
- * @return True if compressed, otherwise false
- */
-bool
-pgmoneta_is_compressed(char* file_path);
-
-/**
  * Get the file type bitmask for a given file path
  * The bitmask can include combinations of:
  * - PGMONETA_FILE_TYPE_WAL (24-char hex WAL file)
