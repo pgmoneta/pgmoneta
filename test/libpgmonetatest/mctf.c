@@ -28,13 +28,12 @@
  */
 
 #include <mctf.h>
+#include <mctf_logslice.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
-#include <sys/time.h>
-#include <unistd.h>
 
 extern char** environ;
 
@@ -217,7 +216,7 @@ mctf_cleanup(void)
 }
 
 void
-mctf_register_test(const char* name, const char* module, const char* file, mctf_test_func_t func)
+mctf_register_test_with_flags(const char* name, const char* module, const char* file, mctf_test_func_t func, bool is_negative)
 {
    if (!g_initialized)
    {
@@ -259,9 +258,29 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
    }
 
    test->func = func;
-   test->next = g_runner.tests;
-   g_runner.tests = test;
+   test->is_negative = is_negative;
+   test->next = NULL;
+
+   /* Preserve declaration/registration order to keep test sequencing deterministic.
+    * Use tests_tail for O(1) append instead of traversing the full list. */
+   if (g_runner.tests == NULL)
+   {
+      g_runner.tests = test;
+      g_runner.tests_tail = test;
+   }
+   else
+   {
+      g_runner.tests_tail->next = test;
+      g_runner.tests_tail = test;
+   }
+
    g_runner.test_count++;
+}
+
+void
+mctf_register_test(const char* name, const char* module, const char* file, mctf_test_func_t func)
+{
+   mctf_register_test_with_flags(name, module, file, func, false);
 }
 
 
@@ -547,6 +566,9 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
       }
       /* ---- end module transition ---- */
 
+      off_t log_start = 0;
+      mctf_capture_log_boundary(&log_start);
+
       mctf_result_t* result = &g_runner.results[g_runner.result_count];
       result->test_name = test->name;
       result->file = test->file;
@@ -604,27 +626,79 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
          mctf_errno = 0;
          if (mctf_errmsg) { free(mctf_errmsg); mctf_errmsg = NULL; }
       }
-      else if (ret == 0 && mctf_errno == 0)
-      {
-         result->passed = true;
-         g_runner.passed_count++;
-         mctf_logf("%s (%02ld:%02ld:%02ld,%03ld) [PASS]\n",
-                   test->name, hours, minutes, seconds, milliseconds);
-      }
       else
       {
-         result->passed = false;
-         result->error_code = (ret != 0) ? ret : mctf_errno;
-         result->error_message = mctf_errmsg ? strdup(mctf_errmsg) : NULL;
-         if (mctf_errmsg)
+         off_t log_end = 0;
+         bool has_log_errors = false;
+         char* log_error_summary = NULL;
+
+         mctf_capture_log_boundary(&log_end);
+
+         mctf_analyze_and_write_test_log_slice(test->module, test->name, log_start, log_end,
+                                               &has_log_errors, &log_error_summary);
+
+         bool base_pass = (ret == 0 && mctf_errno == 0);
+
+         if (base_pass)
          {
-            free(mctf_errmsg);
-            mctf_errmsg = NULL;
+            /* Passed by assertions; now enforce log cleanliness for positive tests */
+            if (!test->is_negative && has_log_errors)
+            {
+               result->passed = false;
+               result->error_code = 0;
+
+               if (result->error_message)
+               {
+                  free((void*)result->error_message);
+               }
+               if (log_error_summary != NULL)
+               {
+                  result->error_message = log_error_summary;
+                  log_error_summary = NULL;
+               }
+               else
+               {
+                  result->error_message = strdup("Unexpected ERROR entries in pgmoneta.log for this test");
+               }
+
+               g_runner.failed_count++;
+               /* Runtime output for log-based failures: */
+               mctf_logf("  %s (%02ld:%02ld:%02ld,%03ld) [FAIL]\n",
+                         test->name, hours, minutes, seconds, milliseconds);
+               if (result->error_message)
+               {
+                  mctf_logf("    Log errors:\n%s", result->error_message);
+               }
+            }
+            else
+            {
+               result->passed = true;
+               g_runner.passed_count++;
+               mctf_logf("%s (%02ld:%02ld:%02ld,%03ld) [PASS]\n",
+                         test->name, hours, minutes, seconds, milliseconds);
+            }
          }
-         g_runner.failed_count++;
+         else
+         {
+            /* Test failed by its own assertions */
+            result->passed = false;
+            result->error_code = (ret != 0) ? ret : mctf_errno;
+            result->error_message = mctf_errmsg ? strdup(mctf_errmsg) : NULL;
+            if (mctf_errmsg)
+            {
+               free(mctf_errmsg);
+               mctf_errmsg = NULL;
+            }
+            g_runner.failed_count++;
             mctf_logf("  %s (%02ld:%02ld:%02ld,%03ld) [FAIL] (%s:%d)\n",
                       test->name, hours, minutes, seconds, milliseconds,
                       test->file, result->error_code);
+         }
+
+         if (log_error_summary != NULL)
+         {
+            free(log_error_summary);
+         }
       }
 
       g_runner.result_count++;
@@ -679,22 +753,38 @@ mctf_print_summary(void)
       mctf_logf("\nFailed tests:\n");
       for (size_t i = 0; i < g_runner.result_count; i++)
       {
-         if (!g_runner.results[i].passed && !g_runner.results[i].skipped)
+         mctf_result_t* r = &g_runner.results[i];
+         if (!r->passed && !r->skipped)
          {
-            if (g_runner.results[i].error_message)
+            /* Mirror log summary failures. */
+            if (r->error_code == 0 && r->error_message != NULL &&
+                strstr(r->error_message, "Errors:") != NULL)
+            {
+               long elapsed_ms = r->elapsed_ms;
+               long total_seconds = elapsed_ms / 1000;
+               long hours = total_seconds / 3600;
+               long minutes = (total_seconds % 3600) / 60;
+               long seconds = total_seconds % 60;
+               long milliseconds = elapsed_ms % 1000;
+
+               mctf_logf("  %s (%02ld:%02ld:%02ld,%03ld) [FAIL]\n",
+                         r->test_name, hours, minutes, seconds, milliseconds);
+               mctf_logf("    Log errors:\n%s", r->error_message);
+            }
+            else if (r->error_message)
             {
                mctf_logf("  - %s (%s:%d) - %s\n",
-                         g_runner.results[i].test_name,
-                         g_runner.results[i].file,
-                         g_runner.results[i].error_code,
-                         g_runner.results[i].error_message);
+                         r->test_name,
+                         r->file,
+                         r->error_code,
+                         r->error_message);
             }
             else
             {
                mctf_logf("  - %s (%s:%d)\n",
-                         g_runner.results[i].test_name,
-                         g_runner.results[i].file,
-                         g_runner.results[i].error_code);
+                         r->test_name,
+                         r->file,
+                         r->error_code);
             }
          }
       }

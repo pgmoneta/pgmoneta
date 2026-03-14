@@ -126,7 +126,30 @@ MCTF_TEST(test_backup_identifier_lsn)
    MCTF_ASSERT_INT_EQ(ret, 0, cleanup, "ret mismatch 2");
    MCTF_ASSERT_STR_EQ(label, "20250101010000", cleanup, "label mismatch 2");
 
-   // Test 3: Target LSN before Backup 1 (0/500) -> Should fail
+cleanup:
+   if (nodes != NULL)
+   {
+      pgmoneta_art_destroy(nodes);
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_backup_identifier_lsn_before_first_backup)
+{
+   struct art* nodes = NULL;
+   char label[MAX_PATH];
+   char identifier[MAX_PATH];
+   int ret = 0;
+
+   pgmoneta_art_create(&nodes);
+
+   // Setup: Create 2 backups
+   // Backup 1: 20250101000000, LSN 0/1000
+   create_mock_backup("20250101000000", "0/1000", 1, 1);
+   // Backup 2: 20250101010000, LSN 0/2000
+   create_mock_backup("20250101010000", "0/2000", 1, 1);
+
+   // Target LSN before Backup 1 (0/500) -> Should fail
    pgmoneta_snprintf(identifier, sizeof(identifier), "target-lsn:0/500");
    memset(label, 0, MAX_PATH);
    ret = pgmoneta_get_backup_identifier(PRIMARY_SERVER, identifier, nodes, label);

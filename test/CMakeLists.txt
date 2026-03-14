@@ -115,7 +115,10 @@ if (check)
   set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
 
   add_executable(pgmoneta-test runner.c ${SOURCES})
-  target_include_directories(pgmoneta-test PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/test/include)
+  target_include_directories(pgmoneta-test PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/include
+    ${CMAKE_SOURCE_DIR}/test/include
+    ${CMAKE_SOURCE_DIR}/test/libpgmonetatest)
 
   if(EXISTS "/etc/debian_version")
     target_link_libraries(pgmoneta-test pthread rt m pgmoneta)

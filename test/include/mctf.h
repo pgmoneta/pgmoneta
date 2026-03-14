@@ -64,6 +64,7 @@ typedef struct mctf_test
    const char* module;     /**< Module name */
    const char* file;       /**< Source file name */
    mctf_test_func_t func;  /**< Test function pointer */
+   bool is_negative;       /**< True if this is a negative test */
    struct mctf_test* next; /**< Next test in linked list */
 } mctf_test_t;
 
@@ -113,6 +114,7 @@ typedef struct mctf_result
 typedef struct mctf_runner
 {
    mctf_test_t* tests;                /**< Linked list of registered tests */
+   mctf_test_t* tests_tail;           /**< Tail pointer for O(1) append */
    mctf_result_t* results;            /**< Array of test results */
    mctf_test_hooks_t* test_hooks;     /**< Per-test hook registrations (by module) */
    mctf_module_hooks_t* module_hooks; /**< Per-module hook registrations */
@@ -144,6 +146,17 @@ mctf_cleanup(void);
  */
 void
 mctf_register_test(const char* name, const char* module, const char* file, mctf_test_func_t func);
+
+/**
+ * Register a test function with additional flags.
+ * @param name The test name
+ * @param module The module name
+ * @param file The source file name
+ * @param func The test function
+ * @param is_negative Whether this test is a negative test (expects errors in logs)
+ */
+void
+mctf_register_test_with_flags(const char* name, const char* module, const char* file, mctf_test_func_t func, bool is_negative);
 
 /**
  * Register a per-test setup hook for a module.
@@ -402,6 +415,25 @@ mctf_get_results(size_t* count);
       const char* filename = mctf_extract_filename(file_path);                        \
       mctf_register_test(#name, mctf_extract_module_name(file_path), filename, name); \
    }                                                                                  \
+   static int name(void)
+
+/**
+ * Define and register a negative test function.
+ *
+ * Usage: MCTF_TEST_NEGATIVE(test_function_name) { ... }
+ * The module name is automatically extracted from the source file name.
+ * Negative tests are allowed to produce errors in pgmoneta.log and will be
+ * treated differently by log validation.
+ */
+#define MCTF_TEST_NEGATIVE(name)                                                          \
+   static int name(void);                                                                 \
+   static void __attribute__((constructor)) mctf_register_negative_##name(void)           \
+   {                                                                                      \
+      const char* file_path = __FILE__;                                                   \
+      const char* filename = mctf_extract_filename(file_path);                            \
+      mctf_register_test_with_flags(#name, mctf_extract_module_name(file_path), filename, \
+                                    name, true);                                          \
+   }                                                                                      \
    static int name(void)
 
 /**

@@ -112,7 +112,15 @@ MCTF_TEST(test_cli_conf_set)
 
    MCTF_ASSERT(pgmoneta_tsclient_conf_set("log_level", "info", 0) == 0, cleanup, "Conf set log_level=info failed");
 
-   /* Negative: Set unknown key */
+cleanup:
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_cli_conf_set_invalid_key)
+{
+   pgmoneta_test_setup();
+
    MCTF_ASSERT(pgmoneta_tsclient_conf_set("invalid_key", "value", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
                "Conf set invalid_key should fail with ERROR");
 
@@ -126,6 +134,15 @@ MCTF_TEST(test_cli_mode)
    pgmoneta_test_setup();
 
    MCTF_ASSERT(pgmoneta_tsclient_mode("primary", "online", 0) == 0, cleanup, "Mode online failed");
+
+cleanup:
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_cli_mode_invalid_server)
+{
+   pgmoneta_test_setup();
 
    /* Negative */
    MCTF_ASSERT(pgmoneta_tsclient_mode("invalid_server", "online", MANAGEMENT_ERROR_MODE_NOSERVER) == 0, cleanup,
@@ -338,7 +355,7 @@ cleanup:
 
 /* Negative Tests */
 
-MCTF_TEST(test_cli_negative)
+MCTF_TEST_NEGATIVE(test_cli_negative)
 {
    char path[MAX_PATH];
    pgmoneta_test_setup();

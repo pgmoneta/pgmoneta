@@ -34,6 +34,7 @@ MCTF (Minimal C Test Framework) is pgmoneta's custom test framework designed for
 - **Flexible assertions** - Assert macros with optional printf-style error messages
 - **Test filtering** - Run tests by name pattern (`-t`) or by module (`-m`)
 - **Test skipping** - Skip tests conditionally using `MCTF_SKIP()` when prerequisites aren't met
+- **Per-test pgmoneta log slicing and validation** - Captures each test's log window to `/tmp/pgmoneta-test/log/<module>__<test_name>.pgmoneta.log`; positive tests fail on unexpected `ERROR` lines, while `MCTF_TEST_NEGATIVE` is used for expected-error scenarios
 - **Lifecycle hooks** – Automatic per-test and per-module setup/teardown via `MCTF_TEST_SETUP`, `MCTF_TEST_TEARDOWN`, `MCTF_MODULE_SETUP`, `MCTF_MODULE_TEARDOWN`
 - **Config snapshot/restore** – `pgmoneta_test_config_save()` / `pgmoneta_test_config_restore()` to isolate shared-memory config changes between tests
 - **Cleanup pattern** - Structured cleanup using goto labels for resource management
@@ -51,6 +52,20 @@ MCTF (Minimal C Test Framework) is pgmoneta's custom test framework designed for
 To add an additional testcase, go to [testcases](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases) directory inside the `pgmoneta` project.
 
 Create a `.c` file that contains the test and use the `MCTF_TEST()` macro to define your test. Tests are automatically registered and module names are extracted from file names.
+
+Use `MCTF_TEST_NEGATIVE()` for tests that intentionally exercise error paths and are expected to emit `ERROR` log lines in `pgmoneta.log`.
+
+**Per-test pgmoneta log validation**
+
+MCTF captures a per-test slice of `pgmoneta.log` and writes it to:
+
+`/tmp/pgmoneta-test/log/<module>__<test_name>.pgmoneta.log`
+
+Behavior:
+
+- `MCTF_TEST`: fails if the test itself passes but the log slice contains unexpected `ERROR` lines
+- `MCTF_TEST_NEGATIVE`: skips the log-error failure gate for that test (still must satisfy test assertions)
+- `WARN` lines are included in summaries but do not fail a passing test
 
 **Lifecycle Hooks**
 
@@ -125,6 +140,7 @@ test code you can open the file from there directly.
 After running the tests, you will find:
 
 * **pgmoneta log:** `/tmp/pgmoneta-test/log/`
+  * **per-test pgmoneta log slices:** `/tmp/pgmoneta-test/log/<module>__<test_name>.pgmoneta.log`
 * **postgres log:** `/tmp/pgmoneta-test/pg_log/`, the log level is set to debug5 and has the application name (**pgmoneta**) shown in the log.
 * **code coverage reports:** `/tmp/pgmoneta-test/coverage/`
 

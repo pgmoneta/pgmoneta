@@ -50,6 +50,20 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST_NEGATIVE(test_pgmoneta_delete_retained_backup_rejects_delete)
+{
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
+
+   MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_pgmoneta_delete_retained_backup)
 {
    struct json* response = NULL;
@@ -60,7 +74,6 @@ MCTF_TEST(test_pgmoneta_delete_retained_backup)
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
    num_backups = pgmoneta_tsclient_get_backup_count(response);
@@ -86,6 +99,20 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST_NEGATIVE(test_pgmoneta_delete_force_retained_backup_rejects_regular_delete)
+{
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
+
+   MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_pgmoneta_delete_force_retained_backup)
 {
    struct json* response = NULL;
@@ -96,7 +123,6 @@ MCTF_TEST(test_pgmoneta_delete_force_retained_backup)
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
    num_backups = pgmoneta_tsclient_get_backup_count(response);
