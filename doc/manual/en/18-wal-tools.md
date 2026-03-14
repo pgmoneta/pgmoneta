@@ -1,6 +1,6 @@
 \newpage
 
-# Write-Ahead Log (WAL) Tools
+#Write - Ahead Log(WAL) Tools
 
 pgmoneta provides two powerful command-line utilities for working with PostgreSQL Write-Ahead Log (WAL) files:
 
@@ -25,9 +25,10 @@ pgmoneta-walinfo 0.20.0
   Command line utility to read and display Write-Ahead Log (WAL) files
 
 Usage:
-  pgmoneta-walinfo <file|directory|tar_archive>
+  pgmoneta-walinfo [OPTIONS] <file|directory|tar_archive>
 
 Options:
+  -I,  --interactive Interactive mode with ncurses UI
   -c,  --config      Set the path to the pgmoneta_walinfo.conf file
   -u,  --users       Set the path to the pgmoneta_users.conf file
   -RT, --tablespaces Filter on tablspaces
@@ -53,6 +54,42 @@ Options:
 ```
 
 ### Output Formats
+
+#### Interactive Mode
+
+The `-I` or `--interactive` flag launches an interactive ncurses-based user interface for browsing and analyzing WAL files.
+
+**Features:**
+
+- **File Browser**: Navigate directories to select WAL files
+- **Record Display**: View detailed WAL records in a table format
+- **Search Functionality**: Search records by resource manager, LSN range, XID, or description
+- **Color-Coded Display**: Different colors for different record types and components
+- **Keyboard Navigation**: Use arrow keys to navigate, Enter to select, `?` for help
+- **Bounded WAL Navigation**: Navigate WAL records using Home to jump to the first record, arrow up for the previous record, and arrow down for the next, across all WAL files in the current directory.
+
+**Usage:**
+
+```bash
+#Interactive mode on a directory
+pgmoneta-walinfo -I /path/to/wal_directory/
+
+#Interactive mode on a single WAL file
+pgmoneta-walinfo -I /path/to/000000010000000000000001
+```
+
+**Keyboard Shortcuts:**
+
+- `Arrow Keys`: Navigate records and menus
+- `Enter`: Select file or option
+- `?`: Display help
+- `q`: Quit application
+- `s`: Start search
+- `n`: Next search result
+- `p`: Previous search result
+- `l`: Load different file from the current directory
+- `home`: Go to the first record at the WAL file
+- `end`: Go to the last record at the WAL file
 
 #### Raw Output Format
 
@@ -80,43 +117,55 @@ This format makes it easy to visually distinguish different parts of the WAL fil
 
 ### Examples
 
-1. **View WAL file details in JSON format:**
+1. **Interactive mode on a WAL directory:**
+
+```bash
+pgmoneta-walinfo -I /path/to/wal_directory/
+```
+
+2. **Interactive mode on WAL file:**
+
+```bash
+pgmoneta-walinfo -I /path/to/walfile
+```
+
+3. **View WAL file details in JSON format:**
 
 ```bash
 pgmoneta-walinfo -F json /path/to/walfile
 ```
 
-2. **View WAL file details with OIDs translated to object names using database connection:**
+4. **View WAL file details with OIDs translated to object names using database connection:**
 
 ```bash
 pgmoneta-walinfo -c pgmoneta_walinfo.conf -t -u /path/to/pgmoneta_user.conf /path/to/walfile
 ```
 
-3. **View WAL file details with OIDs translated using a mapping file:**
+5. **View WAL file details with OIDs translated using a mapping file:**
 
 ```bash
 pgmoneta-walinfo -c pgmoneta_walinfo.conf -t -m /path/to/mapping.json /path/to/walfile
 ```
 
-4. **Show summary of WAL record counts by resource manager:**
+6. **Show summary of WAL record counts by resource manager:**
 
 ```bash
 pgmoneta-walinfo -S /path/to/walfile
 ```
 
-5. **Filter records by resource manager and limit output:**
+7. **Filter records by resource manager and limit output:**
 
 ```bash
 pgmoneta-walinfo -r Heap -l 10 /path/to/walfile
 ```
 
-6. **Analyze a directory containing WAL files:**
+8. **Analyze a directory containing WAL files:**
 
 ```bash
 pgmoneta-walinfo /path/to/wal_directory/
 ```
 
-7. **Analyze WAL files from a TAR archive:**
+9. **Analyze WAL files from a TAR archive:**
 
 ```bash
 pgmoneta-walinfo /path/to/wal_backup.tar.gz
