@@ -4,6 +4,7 @@ subtitle: "Backup/Restore for PostgreSQL"
 keywords: [pgmoneta, PostgreSQL]
 lang: "en"
 titlepage: true,
+titlepage-logo: "../images/logo-2048.png"
 titlepage-color: "0064A5"
 titlepage-text-color: "FFFFFF"
 titlepage-rule-color: "360049"

@@ -54,6 +54,7 @@ Trevor Jacob Mathews <trevorjacobmathews@gmail.com>
 Abdelrhman Sersawy <abdelrhmansersawy@gmail.com>
 Zeyad Daowd <zeyaddaowd@yahoo.com>
 Sakshi Aggarwal <sakshiaggarwal2706@gmail.com>
+Chen Shen <scisbeloved23@gmail.com>
 ```
 
 ## Committers

@@ -69,13 +69,7 @@ cmake -DCMAKE_BUILD_TYPE=Release -DDOCS=FALSE ..
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/manual/en/*.md %{buildroot}%{_docdir}/%{name}/manual/en/
 %{__mkdir_p} %{buildroot}%{_docdir}/%{name}/images/
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/grafana_datasource.jpg %{buildroot}%{_docdir}/%{name}/images/grafana_datasource.jpg
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/grafana_dashboard.jpg %{buildroot}%{_docdir}/%{name}/images/grafana_dashboard.jpg
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/console_home_simple.png %{buildroot}%{_docdir}/%{name}/images/console_home_simple.png
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/console_home_advanced.png %{buildroot}%{_docdir}/%{name}/images/console_home_advanced.png
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/console_home_server_filter.png %{buildroot}%{_docdir}/%{name}/images/console_home_server_filter.png
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/prometheus_console.jpg %{buildroot}%{_docdir}/%{name}/images/prometheus_console.jpg
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/prometheus_graph.jpg %{buildroot}%{_docdir}/%{name}/images/prometheus_graph.jpg
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/* %{buildroot}%{_docdir}/%{name}/images/*
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta.conf %{buildroot}%{_sysconfdir}/pgmoneta/pgmoneta.conf
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta_walfilter.conf %{buildroot}%{_sysconfdir}/pgmoneta/pgmoneta_walfilter.conf
@@ -159,13 +153,7 @@ cd %{buildroot}%{_libdir}/
 %{_mandir}/man5/pgmoneta.conf.5*
 %{_mandir}/man5/pgmoneta-cli.conf.5*
 
-%{_docdir}/%{name}/images/grafana_datasource.jpg
-%{_docdir}/%{name}/images/grafana_dashboard.jpg
-%{_docdir}/%{name}/images/console_home_simple.png
-%{_docdir}/%{name}/images/console_home_advanced.png
-%{_docdir}/%{name}/images/console_home_server_filter.png
-%{_docdir}/%{name}/images/prometheus_console.jpg
-%{_docdir}/%{name}/images/prometheus_graph.jpg
+%{_docdir}/%{name}/images/*
 
 %{_mandir}/man1/pgmoneta-walfilter.1*
 %{_mandir}/man1/pgmoneta-walinfo.1*
