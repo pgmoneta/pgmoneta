@@ -150,7 +150,7 @@ error:
 }
 
 int
-pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, int expected_error)
+pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, struct json** response, int expected_error)
 {
    int socket = -1;
 
@@ -165,7 +165,7 @@ pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* f
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, response))
    {
       goto error;
    }
