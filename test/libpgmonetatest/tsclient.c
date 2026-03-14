@@ -52,7 +52,7 @@
 #include <sys/types.h>
 
 
-static int check_output_outcome(int socket, int expected_error, struct json** output);
+static int check_output_outcome(int socket, int expected_error, struct json** output, int* actual_error);
 static int get_connection();
 
 int
@@ -73,7 +73,7 @@ pgmoneta_tsclient_backup(char* server, char* incremental, int expected_error)
    }
 
    // Check the outcome field of the output
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -104,7 +104,7 @@ pgmoneta_tsclient_list_backup(char* server, char* sort_order, struct json** resp
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, response))
+   if (check_output_outcome(socket, expected_error, response, NULL))
    {
       goto error;
    }
@@ -137,7 +137,7 @@ pgmoneta_tsclient_restore(char* server, char* backup_id, char* position, int exp
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -150,7 +150,7 @@ error:
 }
 
 int
-pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, int expected_error)
+pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, struct json** response, int expected_error)
 {
    int socket = -1;
 
@@ -165,7 +165,7 @@ pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* f
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, response, NULL))
    {
       goto error;
    }
@@ -193,7 +193,7 @@ pgmoneta_tsclient_archive(char* server, char* backup_id, char* position, char* d
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -226,7 +226,7 @@ pgmoneta_tsclient_delete(char* server, char* backup_id, int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -259,7 +259,7 @@ pgmoneta_tsclient_force_delete(char* server, char* backup_id, int expected_error
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -287,7 +287,7 @@ pgmoneta_tsclient_retain(char* server, char* backup_id, bool cascade, int expect
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -315,7 +315,7 @@ pgmoneta_tsclient_expunge(char* server, char* backup_id, bool cascade, int expec
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -343,7 +343,7 @@ pgmoneta_tsclient_decrypt(char* path, int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -371,7 +371,7 @@ pgmoneta_tsclient_encrypt(char* path, int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -399,7 +399,7 @@ pgmoneta_tsclient_decompress(char* path, int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -427,7 +427,7 @@ pgmoneta_tsclient_compress(char* path, int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -455,7 +455,7 @@ pgmoneta_tsclient_ping(int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -483,7 +483,7 @@ pgmoneta_tsclient_shutdown(int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -511,7 +511,7 @@ pgmoneta_tsclient_status(int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -539,7 +539,7 @@ pgmoneta_tsclient_status_details(int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -567,7 +567,7 @@ pgmoneta_tsclient_reload(int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -595,7 +595,7 @@ pgmoneta_tsclient_conf_ls(int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -623,7 +623,7 @@ pgmoneta_tsclient_conf_get(char* config_key, int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -651,7 +651,7 @@ pgmoneta_tsclient_conf_set(char* config_key, char* config_value, int expected_er
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -679,7 +679,7 @@ pgmoneta_tsclient_info(char* server, char* backup_id, int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -707,7 +707,7 @@ pgmoneta_tsclient_annotate(char* server, char* backup_id, char* action, char* ke
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
@@ -723,6 +723,9 @@ int
 pgmoneta_tsclient_mode(char* server, char* action, int expected_error)
 {
    int socket = -1;
+   struct json* response = NULL;
+   struct json* response_obj = NULL;
+   bool online = false;
 
    socket = get_connection();
    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
@@ -735,25 +738,55 @@ pgmoneta_tsclient_mode(char* server, char* action, int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, &response, NULL))
    {
       goto error;
    }
 
+   if (expected_error == 0 &&
+       action != NULL &&
+       (!strcmp(action, "online") || !strcmp(action, "offline")))
+   {
+      response_obj = (struct json*)pgmoneta_json_get(response, MANAGEMENT_CATEGORY_RESPONSE);
+      if (response_obj == NULL || !pgmoneta_json_contains_key(response_obj, MANAGEMENT_ARGUMENT_ONLINE))
+      {
+         goto error;
+      }
+
+      online = (bool)pgmoneta_json_get(response_obj, MANAGEMENT_ARGUMENT_ONLINE);
+
+      if ((!strcmp(action, "online") && !online) ||
+          (!strcmp(action, "offline") && online))
+      {
+         pgmoneta_log_error("Mode %s did not reach requested state for %s", action, server);
+         goto error;
+      }
+   }
+
+   pgmoneta_json_destroy(response);
    pgmoneta_disconnect(socket);
    return 0;
 error:
+   if (response != NULL)
+   {
+      pgmoneta_json_destroy(response);
+   }
    pgmoneta_disconnect(socket);
    return 1;
 }
 
 static int
-check_output_outcome(int socket, int expected_error, struct json** output)
+check_output_outcome(int socket, int expected_error, struct json** output, int* actual_error)
 {
    struct json* read = NULL;
    struct json* outcome = NULL;
    bool status = false;
    int error = 0;
+
+   if (actual_error != NULL)
+   {
+      *actual_error = -1;
+   }
 
    if (pgmoneta_management_read_json(NULL, socket, NULL, NULL, &read))
    {
@@ -778,31 +811,29 @@ check_output_outcome(int socket, int expected_error, struct json** output)
 
    status = (bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS);
 
-   if (expected_error == 0)
+   if (status)
    {
-      if (!status)
-      {
-         goto error;
-      }
+      error = 0;
    }
    else
    {
-      if (status)
-      {
-         goto error;
-      }
-
       if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_ERROR))
       {
-          goto error;
+         goto error;
       }
 
       error = (int)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_ERROR);
-      if (error != expected_error)
-      {
-         pgmoneta_log_error("Expected error %d, got %d", expected_error, error);
-         goto error;
-      }
+   }
+
+   if (actual_error != NULL)
+   {
+      *actual_error = error;
+   }
+
+   if (expected_error >= 0 && error != expected_error)
+   {
+      pgmoneta_log_error("Expected error %d, got %d", expected_error, error);
+      goto error;
    }
 
    if (output != NULL)
@@ -814,10 +845,11 @@ check_output_outcome(int socket, int expected_error, struct json** output)
       pgmoneta_json_destroy(read);
    }
    return 0;
+
 error:
-   if (read)
+   if (read != NULL)
    {
-       pgmoneta_json_destroy(read);
+      pgmoneta_json_destroy(read);
    }
    return 1;
 }
@@ -856,7 +888,7 @@ pgmoneta_tsclient_reset(int expected_error)
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, NULL, NULL))
    {
       goto error;
    }
