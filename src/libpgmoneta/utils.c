@@ -28,6 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
+#include <compression.h>
 #include <deque.h>
 #include <extraction.h>
 #include <info.h>
@@ -1837,7 +1839,7 @@ pgmoneta_calculate_wal_size(char* directory, char* start)
          basename = strdup(filename);
       }
 
-      if (pgmoneta_is_compressed(basename))
+      if (pgmoneta_compression_is_compressed(basename))
       {
          char* bn = basename;
          basename = NULL;
@@ -3190,7 +3192,7 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
          basename = pgmoneta_append(basename, wal_file);
       }
 
-      if (pgmoneta_is_compressed(basename))
+      if (pgmoneta_compression_is_compressed(basename))
       {
          char* bn = basename;
          basename = NULL;
@@ -3294,7 +3296,7 @@ pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
          basename = pgmoneta_append(basename, wal_file);
       }
 
-      if (pgmoneta_is_compressed(basename))
+      if (pgmoneta_compression_is_compressed(basename))
       {
          char* bn = basename;
          basename = NULL;
@@ -4425,31 +4427,6 @@ pgmoneta_get_file_size(char* file_path)
    }
 
    return file_stat.st_size;
-}
-
-bool
-pgmoneta_is_encrypted(char* file_path)
-{
-   if (pgmoneta_ends_with(file_path, ".aes"))
-   {
-      return true;
-   }
-
-   return false;
-}
-
-bool
-pgmoneta_is_compressed(char* file_path)
-{
-   if (pgmoneta_ends_with(file_path, ".zstd") ||
-       pgmoneta_ends_with(file_path, ".lz4") ||
-       pgmoneta_ends_with(file_path, ".bz2") ||
-       pgmoneta_ends_with(file_path, ".gz"))
-   {
-      return true;
-   }
-
-   return false;
 }
 
 uint32_t

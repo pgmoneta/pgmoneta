@@ -47,6 +47,7 @@ COVERAGE_DIR="$PGMONETA_ROOT_DIR/coverage"
 LOG_DIR="$PGMONETA_ROOT_DIR/log"
 PG_LOG_DIR="$PGMONETA_ROOT_DIR/pg_log"
 RETROSPECT_DIR="$PGMONETA_ROOT_DIR/retrospect"
+HOT_STANDBY_DIRECTORY="$PGMONETA_ROOT_DIR/standby"
 
 # BASE DIR holds all the run time data
 WORKSPACE_DIRECTORY="$BASE_DIR/pgmoneta-workspace/"
@@ -313,6 +314,9 @@ export_pgmoneta_test_variables() {
 
   echo "export PGMONETA_TEST_RETROSPECT_DIR=$RETROSPECT_DIR"
   export PGMONETA_TEST_RETROSPECT_DIR=$RETROSPECT_DIR
+
+  echo "export PGMONETA_TEST_HOT_STANDBY_DIR=$HOT_STANDBY_DIRECTORY"
+  export PGMONETA_TEST_HOT_STANDBY_DIR=$HOT_STANDBY_DIRECTORY
 }
 
 unset_pgmoneta_test_variables() {
@@ -321,6 +325,7 @@ unset_pgmoneta_test_variables() {
   unset PGMONETA_TEST_USER_CONF
   unset PGMONETA_TEST_CONF_SAMPLE
   unset PGMONETA_TEST_RESTORE_DIR
+  unset PGMONETA_TEST_HOT_STANDBY_DIR
   unset LLVM_PROFILE_FILE
   unset CC
 }

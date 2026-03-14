@@ -843,7 +843,7 @@ main(int argc, char* argv[])
       wal_path = NULL;
       wal_path = pgmoneta_append(wal_path, file_path);
 
-      if (pgmoneta_is_encrypted(wal_path) || pgmoneta_is_compressed(wal_path))
+      if (pgmoneta_is_encrypted(wal_path) || pgmoneta_compression_is_compressed(wal_path))
       {
          free(tmp_wal);
          tmp_wal = NULL;

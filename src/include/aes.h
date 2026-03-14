@@ -235,6 +235,14 @@ pgmoneta_encrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsign
 int
 pgmoneta_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** dec_buffer, size_t* dec_size, int mode);
 
+/**
+ * Check if a file is encrypted
+ * @param f The file name
+ * @return True if encrypted, otherwise false
+ */
+bool
+pgmoneta_is_encrypted(char* f);
+
 #ifdef __cplusplus
 }
 #endif
