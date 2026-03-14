@@ -28,15 +28,28 @@
  */
 
 #include <management.h>
+#include <configuration.h>
+#include <info.h>
 #include <mctf.h>
 #include <tsclient.h>
+#include <tsclient_helpers.h>
 #include <tscommon.h>
 #include <utils.h>
 
+#include <dirent.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
+
+static int count_files_with_suffix(char* path, const char* suffix, int* count);
+static int get_failed_verify_count(struct json* response);
+static int get_test_pg_version(void);
+static int configure_aes_zstd_in_config(const char* path);
+static int enable_aes_zstd_configuration(void);
+static int assert_backup_contains_aes_zstd_artifacts(char* backup_data_dir);
+static int assert_restored_output_is_plaintext(char* restore_path);
 
 /* Basic CLI Tests */
 
@@ -204,7 +217,7 @@ MCTF_TEST(test_cli_verify)
    pgmoneta_snprintf(path, sizeof(path), "%s/verify_test", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
 
-   MCTF_ASSERT(pgmoneta_tsclient_verify("primary", "newest", path, NULL, 0) == 0, cleanup, "Verify newest failed");
+   MCTF_ASSERT(pgmoneta_tsclient_verify("primary", "newest", path, NULL, NULL, 0) == 0, cleanup, "Verify newest failed");
 
    pgmoneta_delete_directory(path);
 
@@ -241,6 +254,274 @@ MCTF_TEST(test_cli_restore)
    MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore newest failed");
 
 cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_cli_backup_verify_restore_aes)
+{
+   char verify_path[MAX_PATH];
+   char restore_path[MAX_PATH];
+   struct json* list_response = NULL;
+   struct json* verify_response = NULL;
+   struct json* backup = NULL;
+   struct backup* backup_info = NULL;
+   char* label = NULL;
+   char* backup_dir = NULL;
+   char* backup_data_dir = NULL;
+
+   memset(verify_path, 0, sizeof(verify_path));
+   memset(restore_path, 0, sizeof(restore_path));
+
+   pgmoneta_test_setup();
+
+   if (get_test_pg_version() < 17)
+   {
+      MCTF_SKIP("AES CLI compression/encryption integration runs on PostgreSQL 17; TEST_PG_VERSION=%s",
+                getenv("TEST_PG_VERSION") != NULL ? getenv("TEST_PG_VERSION") : "(unset)");
+   }
+
+   MCTF_ASSERT(enable_aes_zstd_configuration() == 0, cleanup,
+               "failed to enable zstd + aes configuration for CLI AES test");
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "AES backup primary failed");
+
+   MCTF_ASSERT(pgmoneta_tsclient_list_backup("primary", NULL, &list_response, 0) == 0, cleanup, "List backup primary failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_tsclient_get_backup_count(list_response), 1, cleanup, "backup count mismatch");
+
+   backup = pgmoneta_tsclient_get_backup(list_response, 0);
+   MCTF_ASSERT_PTR_NONNULL(backup, cleanup, "backup 0 null");
+
+   label = pgmoneta_tsclient_get_backup_label(backup);
+   MCTF_ASSERT_PTR_NONNULL(label, cleanup, "backup label null");
+   label = strdup(label);
+   MCTF_ASSERT_PTR_NONNULL(label, cleanup, "backup label allocation failed");
+
+   backup_dir = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   MCTF_ASSERT_PTR_NONNULL(backup_dir, cleanup, "backup directory null");
+   MCTF_ASSERT_INT_EQ(pgmoneta_load_info(backup_dir, label, &backup_info), 0, cleanup, "load_info failed");
+   MCTF_ASSERT_PTR_NONNULL(backup_info, cleanup, "backup info null");
+   backup_data_dir = pgmoneta_get_server_backup_identifier_data(PRIMARY_SERVER, label);
+   MCTF_ASSERT_PTR_NONNULL(backup_data_dir, cleanup, "backup data directory null");
+   MCTF_ASSERT_INT_EQ((int)pgmoneta_json_get(backup, MANAGEMENT_ARGUMENT_COMPRESSION), COMPRESSION_CLIENT_ZSTD, cleanup,
+                      "backup JSON compression mismatch");
+   MCTF_ASSERT_INT_EQ((int)pgmoneta_json_get(backup, MANAGEMENT_ARGUMENT_ENCRYPTION), ENCRYPTION_AES_256_GCM, cleanup,
+                      "backup JSON encryption mismatch");
+   MCTF_ASSERT_INT_EQ(backup_info->compression, COMPRESSION_CLIENT_ZSTD, cleanup, "backup.info compression mismatch");
+   MCTF_ASSERT_INT_EQ(backup_info->encryption, ENCRYPTION_AES_256_GCM, cleanup, "backup.info encryption mismatch");
+   MCTF_ASSERT_INT_EQ(assert_backup_contains_aes_zstd_artifacts(backup_data_dir), 0, cleanup,
+                      "backup data did not contain expected .zstd.aes artifacts");
+
+   pgmoneta_snprintf(verify_path, sizeof(verify_path), "%s/verify_aes", TEST_BASE_DIR);
+   pgmoneta_mkdir(verify_path);
+
+   MCTF_ASSERT(pgmoneta_tsclient_verify("primary", "newest", verify_path, NULL, &verify_response, 0) == 0, cleanup,
+               "Verify newest failed");
+   MCTF_ASSERT_INT_EQ(get_failed_verify_count(verify_response), 0, cleanup, "Verify reported failed files");
+
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore newest failed");
+
+   pgmoneta_snprintf(restore_path, sizeof(restore_path), "%s/primary-%s", TEST_RESTORE_DIR, label);
+   MCTF_ASSERT_INT_EQ(assert_restored_output_is_plaintext(restore_path), 0, cleanup,
+                      "restored output did not contain expected plaintext files");
+
+cleanup:
+   if (verify_response != NULL)
+   {
+      pgmoneta_json_destroy(verify_response);
+   }
+   if (list_response != NULL)
+   {
+      pgmoneta_json_destroy(list_response);
+   }
+   if (backup_info != NULL)
+   {
+      free(backup_info);
+   }
+   if (label != NULL)
+   {
+      free(label);
+   }
+   if (backup_dir != NULL)
+   {
+      free(backup_dir);
+   }
+   if (backup_data_dir != NULL)
+   {
+      free(backup_data_dir);
+   }
+   if (strlen(verify_path) > 0)
+   {
+      pgmoneta_delete_directory(verify_path);
+   }
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_cli_backup_verify_restore_aes_chain)
+{
+   char verify_path[MAX_PATH];
+   char restore_path[MAX_PATH];
+   struct json* list_response = NULL;
+   struct json* verify_response = NULL;
+   struct json* b[3] = {NULL, NULL, NULL};
+   struct backup* backup_info = NULL;
+   char* labels[3] = {NULL, NULL, NULL};
+   char* newest_label = NULL;
+   char* backup_dir = NULL;
+   char* backup_data_dir = NULL;
+
+   memset(verify_path, 0, sizeof(verify_path));
+   memset(restore_path, 0, sizeof(restore_path));
+
+   pgmoneta_test_setup();
+
+   if (get_test_pg_version() < 17)
+   {
+      MCTF_SKIP("AES CLI compression/encryption integration runs on PostgreSQL 17; TEST_PG_VERSION=%s",
+                getenv("TEST_PG_VERSION") != NULL ? getenv("TEST_PG_VERSION") : "(unset)");
+   }
+
+   MCTF_ASSERT(enable_aes_zstd_configuration() == 0, cleanup_chain,
+               "failed to enable zstd + aes configuration for CLI AES chain test");
+
+   /* Create a FULL -> INCREMENTAL -> INCREMENTAL chain. */
+   MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup_chain,
+               "backup chain failed during setup");
+
+   /* Load the chain and validate its shape. */
+   MCTF_ASSERT(pgmoneta_tsclient_list_backup("primary", NULL, &list_response, 0) == 0, cleanup_chain,
+               "List backup primary failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_tsclient_get_backup_count(list_response), 3, cleanup_chain,
+                      "backup count mismatch");
+
+   for (int i = 0; i < 3; i++)
+   {
+      b[i] = pgmoneta_tsclient_get_backup(list_response, i);
+      MCTF_ASSERT_PTR_NONNULL(b[i], cleanup_chain, "backup %d null", i);
+   }
+
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b[0]), "FULL", cleanup_chain,
+                      "backup 0 type mismatch");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b[1]), "INCREMENTAL", cleanup_chain,
+                      "backup 1 type mismatch");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b[2]), "INCREMENTAL", cleanup_chain,
+                      "backup 2 type mismatch");
+
+   MCTF_ASSERT(pgmoneta_tsclient_verify_backup_chain(b[0], b[1]), cleanup_chain,
+               "backup 1 parent mismatch (should be b0)");
+   MCTF_ASSERT(pgmoneta_tsclient_verify_backup_chain(b[1], b[2]), cleanup_chain,
+               "backup 2 parent mismatch (should be b1)");
+
+   /* Capture labels so the chain can be processed deterministically. */
+   backup_dir = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   MCTF_ASSERT_PTR_NONNULL(backup_dir, cleanup_chain, "backup directory null");
+
+   for (int i = 0; i < 3; i++)
+   {
+      char* lbl = pgmoneta_tsclient_get_backup_label(b[i]);
+      MCTF_ASSERT_PTR_NONNULL(lbl, cleanup_chain, "backup %d label null", i);
+      labels[i] = strdup(lbl);
+      MCTF_ASSERT_PTR_NONNULL(labels[i], cleanup_chain, "backup %d label alloc failed", i);
+   }
+   newest_label = labels[2];
+
+   for (int i = 0; i < 3; i++)
+   {
+      MCTF_ASSERT_INT_EQ(pgmoneta_load_info(backup_dir, labels[i], &backup_info), 0, cleanup_chain,
+                         "load_info failed for backup %d", i);
+      MCTF_ASSERT_PTR_NONNULL(backup_info, cleanup_chain, "backup info null for backup %d", i);
+      MCTF_ASSERT_INT_EQ(backup_info->compression, COMPRESSION_CLIENT_ZSTD, cleanup_chain,
+                         "backup.info compression mismatch for backup %d", i);
+      MCTF_ASSERT_INT_EQ(backup_info->encryption, ENCRYPTION_AES_256_GCM, cleanup_chain,
+                         "backup.info encryption mismatch for backup %d", i);
+
+      if (backup_info->type == TYPE_FULL)
+      {
+         backup_data_dir = pgmoneta_get_server_backup_identifier_data(PRIMARY_SERVER, labels[i]);
+         MCTF_ASSERT_PTR_NONNULL(backup_data_dir, cleanup_chain, "backup data dir null for backup %d", i);
+         MCTF_ASSERT_INT_EQ(assert_backup_contains_aes_zstd_artifacts(backup_data_dir), 0, cleanup_chain,
+                            "backup data did not contain expected .zstd.aes artifacts for backup %d", i);
+         free(backup_data_dir);
+         backup_data_dir = NULL;
+      }
+      free(backup_info);
+      backup_info = NULL;
+   }
+
+   /* Re-list the chain and confirm the management metadata is compressed and encrypted. */
+   pgmoneta_json_destroy(list_response);
+   list_response = NULL;
+
+   MCTF_ASSERT(pgmoneta_tsclient_list_backup("primary", NULL, &list_response, 0) == 0, cleanup_chain,
+               "Re-list backup primary failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_tsclient_get_backup_count(list_response), 3, cleanup_chain,
+                      "re-list backup count mismatch");
+
+   for (int i = 0; i < 3; i++)
+   {
+      struct json* bk = pgmoneta_tsclient_get_backup(list_response, i);
+      MCTF_ASSERT_PTR_NONNULL(bk, cleanup_chain, "re-list backup %d null", i);
+      MCTF_ASSERT_INT_EQ((int)pgmoneta_json_get(bk, MANAGEMENT_ARGUMENT_COMPRESSION), COMPRESSION_CLIENT_ZSTD,
+                         cleanup_chain, "re-list backup %d JSON compression mismatch", i);
+      MCTF_ASSERT_INT_EQ((int)pgmoneta_json_get(bk, MANAGEMENT_ARGUMENT_ENCRYPTION), ENCRYPTION_AES_256_GCM,
+                         cleanup_chain, "re-list backup %d JSON encryption mismatch", i);
+   }
+
+   /* Verify the full backup in the chain. Incremental verify follows a separate product path. */
+   pgmoneta_snprintf(verify_path, sizeof(verify_path), "%s/verify_aes_chain_0", TEST_BASE_DIR);
+   pgmoneta_mkdir(verify_path);
+
+   verify_response = NULL;
+   MCTF_ASSERT(pgmoneta_tsclient_verify("primary", labels[0], verify_path, NULL, &verify_response, 0) == 0,
+               cleanup_chain, "Verify full backup failed");
+   MCTF_ASSERT_INT_EQ(get_failed_verify_count(verify_response), 0, cleanup_chain,
+                      "Verify full backup reported failed files");
+   pgmoneta_json_destroy(verify_response);
+   verify_response = NULL;
+
+   pgmoneta_delete_directory(verify_path);
+   memset(verify_path, 0, sizeof(verify_path));
+
+   /* Restore the newest backup and confirm plaintext output. */
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", newest_label, "current", 0) == 0, cleanup_chain,
+               "Restore newest failed");
+
+   pgmoneta_snprintf(restore_path, sizeof(restore_path), "%s/primary-%s", TEST_RESTORE_DIR, newest_label);
+   MCTF_ASSERT_INT_EQ(assert_restored_output_is_plaintext(restore_path), 0, cleanup_chain,
+                      "restored output did not contain expected plaintext files");
+
+cleanup_chain:
+   if (verify_response != NULL)
+   {
+      pgmoneta_json_destroy(verify_response);
+   }
+   if (list_response != NULL)
+   {
+      pgmoneta_json_destroy(list_response);
+   }
+   if (backup_info != NULL)
+   {
+      free(backup_info);
+   }
+   for (int i = 0; i < 3; i++)
+   {
+      if (labels[i] != NULL)
+      {
+         free(labels[i]);
+      }
+   }
+   if (backup_dir != NULL)
+   {
+      free(backup_dir);
+   }
+   if (backup_data_dir != NULL)
+   {
+      free(backup_data_dir);
+   }
+   if (strlen(verify_path) > 0)
+   {
+      pgmoneta_delete_directory(verify_path);
+   }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }
@@ -389,7 +670,7 @@ MCTF_TEST_NEGATIVE(test_cli_negative)
                "Annotate invalid_server should fail with NOSERVER");
 
    /* Verify invalid server */
-   MCTF_ASSERT(pgmoneta_tsclient_verify("invalid_server", "newest", NULL, NULL, MANAGEMENT_ERROR_VERIFY_NOSERVER) == 0, cleanup,
+   MCTF_ASSERT(pgmoneta_tsclient_verify("invalid_server", "newest", NULL, NULL, NULL, MANAGEMENT_ERROR_VERIFY_NOSERVER) == 0, cleanup,
                "Verify invalid_server should fail with NOSERVER");
 
    /* Archive invalid server */
@@ -463,3 +744,415 @@ cleanup:
 //    /* No teardown - server is dead */
 //    MCTF_FINISH();
 // }
+
+static int
+count_files_with_suffix(char* path, const char* suffix, int* count)
+{
+   DIR* dir = NULL;
+   struct dirent* entry = NULL;
+   struct stat st;
+   char child[MAX_PATH];
+
+   if (path == NULL || suffix == NULL || count == NULL)
+   {
+      goto error;
+   }
+
+   dir = opendir(path);
+   if (dir == NULL)
+   {
+      goto error;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+      {
+         continue;
+      }
+
+      memset(child, 0, sizeof(child));
+      pgmoneta_snprintf(child, sizeof(child), "%s/%s", path, entry->d_name);
+
+      if (lstat(child, &st))
+      {
+         goto error;
+      }
+
+      if (S_ISDIR(st.st_mode))
+      {
+         if (count_files_with_suffix(child, suffix, count))
+         {
+            goto error;
+         }
+      }
+      else if (pgmoneta_ends_with(entry->d_name, (char*)suffix))
+      {
+         (*count)++;
+      }
+   }
+
+   closedir(dir);
+   return 0;
+
+error:
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+   return 1;
+}
+
+static int
+get_failed_verify_count(struct json* response)
+{
+   struct json* response_obj = NULL;
+   struct json* files_obj = NULL;
+   struct json* failed = NULL;
+
+   if (response == NULL)
+   {
+      return -1;
+   }
+
+   response_obj = (struct json*)pgmoneta_json_get(response, MANAGEMENT_CATEGORY_RESPONSE);
+   if (response_obj == NULL)
+   {
+      return -1;
+   }
+
+   files_obj = (struct json*)pgmoneta_json_get(response_obj, MANAGEMENT_ARGUMENT_FILES);
+   if (files_obj == NULL)
+   {
+      return -1;
+   }
+
+   failed = (struct json*)pgmoneta_json_get(files_obj, MANAGEMENT_ARGUMENT_FAILED);
+   return (int)pgmoneta_json_array_length(failed);
+}
+
+static int
+get_test_pg_version(void)
+{
+   char* value = getenv("TEST_PG_VERSION");
+
+   if (value == NULL || strlen(value) == 0)
+   {
+      return 0;
+   }
+
+   return atoi(value);
+}
+
+static int
+enable_aes_zstd_configuration(void)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   if (config == NULL)
+   {
+      return 1;
+   }
+
+   if (configure_aes_zstd_in_config(config->common.configuration_path))
+   {
+      return 1;
+   }
+
+   if (pgmoneta_tsclient_reload(0))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+configure_aes_zstd_in_config(const char* path)
+{
+   FILE* input = NULL;
+   FILE* output = NULL;
+   char temp_path[MAX_PATH];
+   char line[1024];
+   char* trimmed = NULL;
+   bool found_pgmoneta = false;
+   bool in_pgmoneta = false;
+   bool have_compression = false;
+   bool have_encryption = false;
+   bool remove_temp = false;
+   int ret = 1;
+
+   if (path == NULL)
+   {
+      goto cleanup;
+   }
+
+   memset(temp_path, 0, sizeof(temp_path));
+   pgmoneta_snprintf(temp_path, sizeof(temp_path), "%s.tmp", path);
+
+   input = fopen(path, "r");
+   if (input == NULL)
+   {
+      goto cleanup;
+   }
+
+   output = fopen(temp_path, "w");
+   if (output == NULL)
+   {
+      goto cleanup;
+   }
+   remove_temp = true;
+
+   while (fgets(line, sizeof(line), input) != NULL)
+   {
+      trimmed = line;
+      while (*trimmed == ' ' || *trimmed == '\t')
+      {
+         trimmed++;
+      }
+
+      if (trimmed[0] == '[')
+      {
+         if (in_pgmoneta)
+         {
+            if (!have_compression && fputs("compression = zstd\n", output) == EOF)
+            {
+               goto cleanup;
+            }
+            if (!have_encryption && fputs("encryption = aes\n", output) == EOF)
+            {
+               goto cleanup;
+            }
+         }
+
+         in_pgmoneta = !strncmp(trimmed, "[pgmoneta]", strlen("[pgmoneta]"));
+         if (in_pgmoneta)
+         {
+            found_pgmoneta = true;
+            have_compression = false;
+            have_encryption = false;
+         }
+         if (fputs(line, output) == EOF)
+         {
+            goto cleanup;
+         }
+         continue;
+      }
+
+      if (in_pgmoneta && !strncmp(trimmed, "compression", strlen("compression")))
+      {
+         if (fputs("compression = zstd\n", output) == EOF)
+         {
+            goto cleanup;
+         }
+         have_compression = true;
+         continue;
+      }
+
+      if (in_pgmoneta && !strncmp(trimmed, "encryption", strlen("encryption")))
+      {
+         if (fputs("encryption = aes\n", output) == EOF)
+         {
+            goto cleanup;
+         }
+         have_encryption = true;
+         continue;
+      }
+
+      if (fputs(line, output) == EOF)
+      {
+         goto cleanup;
+      }
+   }
+
+   if (in_pgmoneta)
+   {
+      if (!have_compression && fputs("compression = zstd\n", output) == EOF)
+      {
+         goto cleanup;
+      }
+      if (!have_encryption && fputs("encryption = aes\n", output) == EOF)
+      {
+         goto cleanup;
+      }
+   }
+
+   if (!found_pgmoneta)
+   {
+      goto cleanup;
+   }
+
+   if (fflush(output))
+   {
+      goto cleanup;
+   }
+
+   if (fclose(output))
+   {
+      output = NULL;
+      goto cleanup;
+   }
+   output = NULL;
+
+   if (fclose(input))
+   {
+      input = NULL;
+      goto cleanup;
+   }
+   input = NULL;
+
+   if (rename(temp_path, path))
+   {
+      goto cleanup;
+   }
+
+   remove_temp = false;
+   ret = 0;
+
+cleanup:
+   if (output != NULL)
+   {
+      fclose(output);
+   }
+   if (input != NULL)
+   {
+      fclose(input);
+   }
+   if (remove_temp)
+   {
+      remove(temp_path);
+   }
+   return ret;
+}
+
+static int
+assert_backup_contains_aes_zstd_artifacts(char* backup_data_dir)
+{
+   char global_pg_control[MAX_PATH];
+   char pg_version[MAX_PATH];
+   char postgresql_conf[MAX_PATH];
+   char pg_hba_conf[MAX_PATH];
+   int zstd_aes_files = 0;
+
+   if (backup_data_dir == NULL)
+   {
+      return 1;
+   }
+
+   if (count_files_with_suffix(backup_data_dir, ".zstd.aes", &zstd_aes_files))
+   {
+      return 1;
+   }
+
+   if (zstd_aes_files <= 0)
+   {
+      return 1;
+   }
+
+   memset(global_pg_control, 0, sizeof(global_pg_control));
+   memset(pg_version, 0, sizeof(pg_version));
+   memset(postgresql_conf, 0, sizeof(postgresql_conf));
+   memset(pg_hba_conf, 0, sizeof(pg_hba_conf));
+
+   pgmoneta_snprintf(global_pg_control, sizeof(global_pg_control), "%s/global/pg_control.zstd.aes", backup_data_dir);
+   pgmoneta_snprintf(pg_version, sizeof(pg_version), "%s/PG_VERSION.zstd.aes", backup_data_dir);
+   pgmoneta_snprintf(postgresql_conf, sizeof(postgresql_conf), "%s/postgresql.conf.zstd.aes", backup_data_dir);
+   pgmoneta_snprintf(pg_hba_conf, sizeof(pg_hba_conf), "%s/pg_hba.conf.zstd.aes", backup_data_dir);
+
+   if (!pgmoneta_exists(global_pg_control) ||
+       !pgmoneta_exists(pg_version) ||
+       !pgmoneta_exists(postgresql_conf) ||
+       !pgmoneta_exists(pg_hba_conf))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+assert_restored_output_is_plaintext(char* restore_path)
+{
+   char global_pg_control[MAX_PATH];
+   char global_pg_control_zstd[MAX_PATH];
+   char global_pg_control_aes[MAX_PATH];
+   char global_pg_control_zstd_aes[MAX_PATH];
+   char pg_version[MAX_PATH];
+   char pg_version_zstd[MAX_PATH];
+   char pg_version_aes[MAX_PATH];
+   char pg_version_zstd_aes[MAX_PATH];
+   char postgresql_conf[MAX_PATH];
+   char postgresql_conf_zstd[MAX_PATH];
+   char postgresql_conf_aes[MAX_PATH];
+   char postgresql_conf_zstd_aes[MAX_PATH];
+   char pg_hba_conf[MAX_PATH];
+   char pg_hba_conf_zstd[MAX_PATH];
+   char pg_hba_conf_aes[MAX_PATH];
+   char pg_hba_conf_zstd_aes[MAX_PATH];
+
+   if (restore_path == NULL)
+   {
+      return 1;
+   }
+
+   memset(global_pg_control, 0, sizeof(global_pg_control));
+   memset(global_pg_control_zstd, 0, sizeof(global_pg_control_zstd));
+   memset(global_pg_control_aes, 0, sizeof(global_pg_control_aes));
+   memset(global_pg_control_zstd_aes, 0, sizeof(global_pg_control_zstd_aes));
+   memset(pg_version, 0, sizeof(pg_version));
+   memset(pg_version_zstd, 0, sizeof(pg_version_zstd));
+   memset(pg_version_aes, 0, sizeof(pg_version_aes));
+   memset(pg_version_zstd_aes, 0, sizeof(pg_version_zstd_aes));
+   memset(postgresql_conf, 0, sizeof(postgresql_conf));
+   memset(postgresql_conf_zstd, 0, sizeof(postgresql_conf_zstd));
+   memset(postgresql_conf_aes, 0, sizeof(postgresql_conf_aes));
+   memset(postgresql_conf_zstd_aes, 0, sizeof(postgresql_conf_zstd_aes));
+   memset(pg_hba_conf, 0, sizeof(pg_hba_conf));
+   memset(pg_hba_conf_zstd, 0, sizeof(pg_hba_conf_zstd));
+   memset(pg_hba_conf_aes, 0, sizeof(pg_hba_conf_aes));
+   memset(pg_hba_conf_zstd_aes, 0, sizeof(pg_hba_conf_zstd_aes));
+
+   pgmoneta_snprintf(global_pg_control, sizeof(global_pg_control), "%s/global/pg_control", restore_path);
+   pgmoneta_snprintf(global_pg_control_zstd, sizeof(global_pg_control_zstd), "%s/global/pg_control.zstd", restore_path);
+   pgmoneta_snprintf(global_pg_control_aes, sizeof(global_pg_control_aes), "%s/global/pg_control.aes", restore_path);
+   pgmoneta_snprintf(global_pg_control_zstd_aes, sizeof(global_pg_control_zstd_aes), "%s/global/pg_control.zstd.aes", restore_path);
+   pgmoneta_snprintf(pg_version, sizeof(pg_version), "%s/PG_VERSION", restore_path);
+   pgmoneta_snprintf(pg_version_zstd, sizeof(pg_version_zstd), "%s/PG_VERSION.zstd", restore_path);
+   pgmoneta_snprintf(pg_version_aes, sizeof(pg_version_aes), "%s/PG_VERSION.aes", restore_path);
+   pgmoneta_snprintf(pg_version_zstd_aes, sizeof(pg_version_zstd_aes), "%s/PG_VERSION.zstd.aes", restore_path);
+   pgmoneta_snprintf(postgresql_conf, sizeof(postgresql_conf), "%s/postgresql.conf", restore_path);
+   pgmoneta_snprintf(postgresql_conf_zstd, sizeof(postgresql_conf_zstd), "%s/postgresql.conf.zstd", restore_path);
+   pgmoneta_snprintf(postgresql_conf_aes, sizeof(postgresql_conf_aes), "%s/postgresql.conf.aes", restore_path);
+   pgmoneta_snprintf(postgresql_conf_zstd_aes, sizeof(postgresql_conf_zstd_aes), "%s/postgresql.conf.zstd.aes", restore_path);
+   pgmoneta_snprintf(pg_hba_conf, sizeof(pg_hba_conf), "%s/pg_hba.conf", restore_path);
+   pgmoneta_snprintf(pg_hba_conf_zstd, sizeof(pg_hba_conf_zstd), "%s/pg_hba.conf.zstd", restore_path);
+   pgmoneta_snprintf(pg_hba_conf_aes, sizeof(pg_hba_conf_aes), "%s/pg_hba.conf.aes", restore_path);
+   pgmoneta_snprintf(pg_hba_conf_zstd_aes, sizeof(pg_hba_conf_zstd_aes), "%s/pg_hba.conf.zstd.aes", restore_path);
+
+   if (!pgmoneta_exists(restore_path) ||
+       !pgmoneta_exists(global_pg_control) ||
+       !pgmoneta_exists(pg_version) ||
+       !pgmoneta_exists(postgresql_conf) ||
+       !pgmoneta_exists(pg_hba_conf))
+   {
+      return 1;
+   }
+
+   if (pgmoneta_exists(global_pg_control_zstd) ||
+       pgmoneta_exists(global_pg_control_aes) ||
+       pgmoneta_exists(global_pg_control_zstd_aes) ||
+       pgmoneta_exists(pg_version_zstd) ||
+       pgmoneta_exists(pg_version_aes) ||
+       pgmoneta_exists(pg_version_zstd_aes) ||
+       pgmoneta_exists(postgresql_conf_zstd) ||
+       pgmoneta_exists(postgresql_conf_aes) ||
+       pgmoneta_exists(postgresql_conf_zstd_aes) ||
+       pgmoneta_exists(pg_hba_conf_zstd) ||
+       pgmoneta_exists(pg_hba_conf_aes) ||
+       pgmoneta_exists(pg_hba_conf_zstd_aes))
+   {
+      return 1;
+   }
+
+   return 0;
+}

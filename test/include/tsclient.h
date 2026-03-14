@@ -77,11 +77,12 @@ pgmoneta_tsclient_restore(char* server, char* backup_id, char* position, int exp
  * @param backup_id the backup
  * @param directory the directory
  * @param files the files
+ * @param response optional output for JSON response (NULL to ignore)
  * @param expected_error expected error code
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, int expected_error);
+pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, struct json** response, int expected_error);
 
 /**
  * Execute archive command on the server

@@ -150,7 +150,7 @@ error:
 }
 
 int
-pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, int expected_error)
+pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, struct json** response, int expected_error)
 {
    int socket = -1;
 
@@ -165,7 +165,7 @@ pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* f
       goto error;
    }
 
-   if (check_output_outcome(socket, expected_error, NULL))
+   if (check_output_outcome(socket, expected_error, response))
    {
       goto error;
    }
@@ -794,7 +794,7 @@ check_output_outcome(int socket, int expected_error, struct json** output)
 
       if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_ERROR))
       {
-          goto error;
+         goto error;
       }
 
       error = (int)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_ERROR);
@@ -814,10 +814,11 @@ check_output_outcome(int socket, int expected_error, struct json** output)
       pgmoneta_json_destroy(read);
    }
    return 0;
+
 error:
-   if (read)
+   if (read != NULL)
    {
-       pgmoneta_json_destroy(read);
+      pgmoneta_json_destroy(read);
    }
    return 1;
 }

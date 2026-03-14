@@ -310,17 +310,52 @@ error:
 bool
 pgmoneta_is_restore_last_name(char* file_name)
 {
+   char* normalized = NULL;
+   char* tmp = NULL;
+   bool result = false;
    int number_of_elements = sizeof(restore_last_files_names) / sizeof(restore_last_files_names[0]);
 
-   for (int i = 0; i < number_of_elements; i++)
+   if (file_name == NULL)
    {
-      if (strstr(restore_last_files_names[i], file_name) != NULL)
+      return false;
+   }
+
+   normalized = file_name;
+
+   while (*normalized == '/')
+   {
+      normalized++;
+   }
+
+   if (pgmoneta_starts_with(normalized, "data/"))
+   {
+      tmp = pgmoneta_remove_prefix(normalized, "data/");
+      if (tmp != NULL)
       {
-         return true;
+         normalized = tmp;
+
+         while (*normalized == '/')
+         {
+            normalized++;
+         }
       }
    }
 
-   return false;
+   for (int i = 0; i < number_of_elements; i++)
+   {
+      if (pgmoneta_compare_string(normalized, restore_last_files_names[i] + 1))
+      {
+         result = true;
+         break;
+      }
+   }
+
+   if (tmp != NULL)
+   {
+      free(tmp);
+   }
+
+   return result;
 }
 
 void

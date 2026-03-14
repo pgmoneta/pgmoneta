@@ -31,6 +31,7 @@
 #include <compression.h>
 #include <link.h>
 #include <logging.h>
+#include <restore.h>
 #include <utils.h>
 
 /* system */
@@ -90,6 +91,7 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
             // file in newer dir is not added nor changed, nor is an incremental file
             if (!pgmoneta_art_contains_key(added, from_file_trimmed) &&
                 !pgmoneta_art_contains_key(changed, from_file_trimmed) &&
+                !pgmoneta_is_restore_last_name(from_file_trimmed) &&
                 !pgmoneta_is_incremental_path(from_file_trimmed))
             {
                to_entry = pgmoneta_append(to_entry, base_to);

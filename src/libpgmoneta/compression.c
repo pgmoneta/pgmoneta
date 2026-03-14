@@ -367,6 +367,14 @@ pgmoneta_compression_trim_suffix(char* str, int compression_type, int encryption
       return 1;
    }
 
+   /* Strip encryption suffix first so ".zstd.aes" becomes ".zstd" before compression trimming. */
+   if (encryption != ENCRYPTION_NONE && pgmoneta_ends_with(res, ".aes"))
+   {
+      tmp = pgmoneta_remove_suffix(res, ".aes");
+      free(res);
+      res = tmp;
+   }
+
    /* Strip the compression algorithm suffix, if any */
    if (!pgmoneta_compression_get_suffix(compression_type, &alg_suffix) && alg_suffix != NULL)
    {
@@ -376,14 +384,6 @@ pgmoneta_compression_trim_suffix(char* str, int compression_type, int encryption
          free(res);
          res = tmp;
       }
-   }
-
-   /* Strip encryption suffix if present */
-   if (encryption != ENCRYPTION_NONE && pgmoneta_ends_with(res, ".aes"))
-   {
-      tmp = pgmoneta_remove_suffix(res, ".aes");
-      free(res);
-      res = tmp;
    }
 
    *result = res;
