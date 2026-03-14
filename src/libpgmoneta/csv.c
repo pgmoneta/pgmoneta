@@ -35,12 +35,11 @@ int
 pgmoneta_csv_reader_init(char* path, struct csv_reader** reader)
 {
    struct csv_reader* r = malloc(sizeof(struct csv_reader));
-   r->file = fopen(path, "r");
-   memset(r->line, 0, sizeof(r->line));
-   if (r->file == NULL)
+   if (pgmoneta_fopen_secure(path, "r", &r->file))
    {
       goto error;
    }
+   memset(r->line, 0, sizeof(r->line));
    *reader = r;
    return 0;
 error:
@@ -122,8 +121,7 @@ int
 pgmoneta_csv_writer_init(char* path, struct csv_writer** writer)
 {
    struct csv_writer* w = malloc(sizeof(struct csv_writer));
-   w->file = fopen(path, "w+");
-   if (w->file == NULL)
+   if (pgmoneta_fopen_secure(path, "w+", &w->file))
    {
       goto error;
    }

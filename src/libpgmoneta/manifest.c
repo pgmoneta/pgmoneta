@@ -349,8 +349,7 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
    pgmoneta_json_iterator_create(files, &fiter);
    pgmoneta_json_iterator_create(wal_ranges, &riter);
 
-   file = fopen(path, "wb");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(path, "wb", &file))
    {
       pgmoneta_log_error("Failed to create json file %s", path);
       goto error;

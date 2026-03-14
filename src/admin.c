@@ -421,8 +421,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       }
    }
 
-   file = fopen(&buf[0], "w+");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(&buf[0], "w+x", &file))
    {
       warn("Could not write to master key file '%s'", &buf[0]);
       goto error;
@@ -634,8 +633,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
       do_free = false;
    }
 
-   users_file = fopen(users_path, "a+");
-   if (users_file == NULL)
+   if (pgmoneta_fopen_secure(users_path, "a+", &users_file))
    {
       warn("Could not append to users file '%s'", users_path);
       goto error;
@@ -965,10 +963,13 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    }
 
    pgmoneta_snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
-   users_file_tmp = fopen(tmpfilename, "w+");
-   if (users_file_tmp == NULL)
+   if (pgmoneta_exists(tmpfilename))
    {
-      warn("Could not write to temporary user file '%s'", tmpfilename);
+      pgmoneta_delete_file(tmpfilename, NULL);
+   }
+   if (pgmoneta_fopen_secure(tmpfilename, "w+x", &users_file_tmp))
+   {
+      warn("Could not write to %s", tmpfilename);
       goto error;
    }
 
@@ -1293,10 +1294,13 @@ remove_user(char* users_path, char* username, int32_t output_format)
 
    memset(&tmpfilename, 0, sizeof(tmpfilename));
    pgmoneta_snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
-   users_file_tmp = fopen(tmpfilename, "w+");
-   if (users_file_tmp == NULL)
+   if (pgmoneta_exists(tmpfilename))
    {
-      warn("Could not write to temporary user file '%s'", tmpfilename);
+      pgmoneta_delete_file(tmpfilename, NULL);
+   }
+   if (pgmoneta_fopen_secure(tmpfilename, "w+x", &users_file_tmp))
+   {
+      warn("Could not write to %s", tmpfilename);
       goto error;
    }
 

@@ -152,10 +152,8 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
       return PGMONETA_WAL_ERR_PARAM;
    }
 
-   file = fopen(path, "wb");
-   if (!file)
+   if (pgmoneta_fopen_secure(path, "wb", &file))
    {
-      pgmoneta_log_error("Unable to open WAL file for writing: %s", path);
       error_code = PGMONETA_WAL_ERR_IO;
       goto error;
    }

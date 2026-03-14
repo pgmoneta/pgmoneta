@@ -920,8 +920,11 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
 
    history_content = pgmoneta_query_response_get_data(timeline_history_response, 1);
 
-   history_file = fopen(path, "wb");
-   if (history_file == NULL)
+   if (pgmoneta_exists(path))
+   {
+      pgmoneta_delete_file(path, NULL);
+   }
+   if (pgmoneta_fopen_secure(path, "wb", &history_file))
    {
       goto error;
    }
@@ -989,11 +992,11 @@ wal_open(char* root, char* filename, int segsize)
          pgmoneta_log_error("WAL file corrupted: %s", path);
          goto error;
       }
+      // 0-byte file, delete and recreate
+      pgmoneta_delete_file(path, NULL);
    }
 
-   file = fopen(path, "wb");
-
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(path, "wb", &file))
    {
       pgmoneta_log_error("WAL error: %s", strerror(errno));
       errno = 0;
