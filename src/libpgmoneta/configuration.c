@@ -5686,6 +5686,7 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
       changed = true;
    }
    config->create_slot = reload->create_slot;
+   config->encryption = reload->encryption;
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;
    if (restart_string("workspace", config->workspace, reload->workspace))

@@ -28,15 +28,29 @@
  */
 
 #include <management.h>
+#include <configuration.h>
+#include <info.h>
 #include <mctf.h>
 #include <tsclient.h>
+#include <tsclient_helpers.h>
 #include <tscommon.h>
 #include <utils.h>
 
+#include <dirent.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
+
+static int count_encrypted_files(char* path, int* count);
+static int get_failed_verify_count(struct json* response);
+static bool should_keep_aes_manifest_path(const char* path);
+static bool should_keep_aes_disk_path(const char* path);
+static int prune_aes_backup_tree(char* path, char* relative_path);
+static int rewrite_aes_manifest(char* manifest_path);
+static int reduce_aes_backup_fixture(char* backup_root);
+static int set_main_config_value(char* key, char* value);
 
 /* Basic CLI Tests */
 
@@ -204,7 +218,7 @@ MCTF_TEST(test_cli_verify)
    pgmoneta_snprintf(path, sizeof(path), "%s/verify_test", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
 
-   MCTF_ASSERT(pgmoneta_tsclient_verify("primary", "newest", path, NULL, 0) == 0, cleanup, "Verify newest failed");
+   MCTF_ASSERT(pgmoneta_tsclient_verify("primary", "newest", path, NULL, NULL, 0) == 0, cleanup, "Verify newest failed");
 
    pgmoneta_delete_directory(path);
 
@@ -241,6 +255,122 @@ MCTF_TEST(test_cli_restore)
    MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore newest failed");
 
 cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_cli_backup_verify_restore_aes)
+{
+   char backup_root[MAX_PATH];
+   char verify_path[MAX_PATH];
+   char restore_path[MAX_PATH];
+   char global_pg_control[MAX_PATH];
+   char global_pg_control_aes[MAX_PATH];
+   char postgresql_conf[MAX_PATH];
+   char postgresql_conf_aes[MAX_PATH];
+   char pg_hba_conf[MAX_PATH];
+   char pg_hba_conf_aes[MAX_PATH];
+   struct json* list_response = NULL;
+   struct json* verify_response = NULL;
+   struct json* backup = NULL;
+   struct backup* backup_info = NULL;
+   char* label = NULL;
+   char* backup_dir = NULL;
+   char* backup_data_dir = NULL;
+   int encrypted_files = 0;
+
+   memset(backup_root, 0, sizeof(backup_root));
+   memset(verify_path, 0, sizeof(verify_path));
+   memset(restore_path, 0, sizeof(restore_path));
+   memset(global_pg_control, 0, sizeof(global_pg_control));
+   memset(global_pg_control_aes, 0, sizeof(global_pg_control_aes));
+   memset(postgresql_conf, 0, sizeof(postgresql_conf));
+   memset(postgresql_conf_aes, 0, sizeof(postgresql_conf_aes));
+   memset(pg_hba_conf, 0, sizeof(pg_hba_conf));
+   memset(pg_hba_conf_aes, 0, sizeof(pg_hba_conf_aes));
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT_INT_EQ(set_main_config_value("workers", "0"), 0, cleanup, "Updating test config workers failed");
+   MCTF_ASSERT_INT_EQ(set_main_config_value("encryption", "aes-256-cbc"), 0, cleanup, "Updating test config encryption failed");
+   MCTF_ASSERT(pgmoneta_tsclient_reload(0) == 0, cleanup, "Reload after encryption change failed");
+   MCTF_ASSERT(pgmoneta_tsclient_mode("primary", "online", 0) == 0, cleanup, "Mode online failed");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, 0) == 0, cleanup, "AES backup primary failed");
+
+   MCTF_ASSERT(pgmoneta_tsclient_list_backup("primary", NULL, &list_response, 0) == 0, cleanup, "List backup primary failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_tsclient_get_backup_count(list_response), 1, cleanup, "backup count mismatch");
+
+   backup = pgmoneta_tsclient_get_backup(list_response, 0);
+   MCTF_ASSERT_PTR_NONNULL(backup, cleanup, "backup 0 null");
+
+   label = pgmoneta_tsclient_get_backup_label(backup);
+   MCTF_ASSERT_PTR_NONNULL(label, cleanup, "backup label null");
+   MCTF_ASSERT_INT_EQ((int)pgmoneta_json_get(backup, MANAGEMENT_ARGUMENT_ENCRYPTION), ENCRYPTION_AES_256_CBC, cleanup,
+                      "backup JSON encryption mismatch");
+
+   backup_dir = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   MCTF_ASSERT_PTR_NONNULL(backup_dir, cleanup, "backup directory null");
+   MCTF_ASSERT_INT_EQ(pgmoneta_load_info(backup_dir, label, &backup_info), 0, cleanup, "load_info failed");
+   MCTF_ASSERT_PTR_NONNULL(backup_info, cleanup, "backup info null");
+   MCTF_ASSERT_INT_EQ(backup_info->encryption, ENCRYPTION_AES_256_CBC, cleanup, "backup.info encryption mismatch");
+
+   backup_data_dir = pgmoneta_get_server_backup_identifier_data(PRIMARY_SERVER, label);
+   MCTF_ASSERT_PTR_NONNULL(backup_data_dir, cleanup, "backup data directory null");
+   pgmoneta_snprintf(backup_root, sizeof(backup_root), "%s/%s", backup_dir, label);
+   MCTF_ASSERT_INT_EQ(reduce_aes_backup_fixture(backup_root), 0, cleanup, "Reducing AES backup fixture failed");
+   MCTF_ASSERT_INT_EQ(count_encrypted_files(backup_data_dir, &encrypted_files), 0, cleanup, "encrypted file scan failed");
+   MCTF_ASSERT(encrypted_files > 0, cleanup, "Expected encrypted backup files ending with .aes");
+
+   pgmoneta_snprintf(verify_path, sizeof(verify_path), "%s/verify_aes", TEST_BASE_DIR);
+   pgmoneta_mkdir(verify_path);
+
+   MCTF_ASSERT(pgmoneta_tsclient_verify("primary", "newest", verify_path, NULL, &verify_response, 0) == 0, cleanup,
+               "Verify newest failed");
+   MCTF_ASSERT_INT_EQ(get_failed_verify_count(verify_response), 0, cleanup, "Verify reported failed files");
+
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore newest failed");
+
+   pgmoneta_snprintf(restore_path, sizeof(restore_path), "%s/primary-%s", TEST_RESTORE_DIR, label);
+   pgmoneta_snprintf(global_pg_control, sizeof(global_pg_control), "%s/global/pg_control", restore_path);
+   pgmoneta_snprintf(global_pg_control_aes, sizeof(global_pg_control_aes), "%s/global/pg_control.aes", restore_path);
+   pgmoneta_snprintf(postgresql_conf, sizeof(postgresql_conf), "%s/postgresql.conf", restore_path);
+   pgmoneta_snprintf(postgresql_conf_aes, sizeof(postgresql_conf_aes), "%s/postgresql.conf.aes", restore_path);
+   pgmoneta_snprintf(pg_hba_conf, sizeof(pg_hba_conf), "%s/pg_hba.conf", restore_path);
+   pgmoneta_snprintf(pg_hba_conf_aes, sizeof(pg_hba_conf_aes), "%s/pg_hba.conf.aes", restore_path);
+
+   MCTF_ASSERT(pgmoneta_exists(restore_path), cleanup, "restore directory missing");
+   MCTF_ASSERT(pgmoneta_exists(global_pg_control), cleanup, "restored global/pg_control missing");
+   MCTF_ASSERT(pgmoneta_exists(postgresql_conf), cleanup, "restored postgresql.conf missing");
+   MCTF_ASSERT(pgmoneta_exists(pg_hba_conf), cleanup, "restored pg_hba.conf missing");
+   MCTF_ASSERT(!pgmoneta_exists(global_pg_control_aes), cleanup, "restored global/pg_control should not remain encrypted");
+   MCTF_ASSERT(!pgmoneta_exists(postgresql_conf_aes), cleanup, "restored postgresql.conf should not remain encrypted");
+   MCTF_ASSERT(!pgmoneta_exists(pg_hba_conf_aes), cleanup, "restored pg_hba.conf should not remain encrypted");
+
+cleanup:
+   if (verify_response != NULL)
+   {
+      pgmoneta_json_destroy(verify_response);
+   }
+   if (list_response != NULL)
+   {
+      pgmoneta_json_destroy(list_response);
+   }
+   if (backup_info != NULL)
+   {
+      free(backup_info);
+   }
+   if (backup_dir != NULL)
+   {
+      free(backup_dir);
+   }
+   if (backup_data_dir != NULL)
+   {
+      free(backup_data_dir);
+   }
+   if (strlen(verify_path) > 0)
+   {
+      pgmoneta_delete_directory(verify_path);
+   }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }
@@ -389,7 +519,7 @@ MCTF_TEST_NEGATIVE(test_cli_negative)
                "Annotate invalid_server should fail with NOSERVER");
 
    /* Verify invalid server */
-   MCTF_ASSERT(pgmoneta_tsclient_verify("invalid_server", "newest", NULL, NULL, MANAGEMENT_ERROR_VERIFY_NOSERVER) == 0, cleanup,
+   MCTF_ASSERT(pgmoneta_tsclient_verify("invalid_server", "newest", NULL, NULL, NULL, MANAGEMENT_ERROR_VERIFY_NOSERVER) == 0, cleanup,
                "Verify invalid_server should fail with NOSERVER");
 
    /* Archive invalid server */
@@ -463,3 +593,393 @@ cleanup:
 //    /* No teardown - server is dead */
 //    MCTF_FINISH();
 // }
+
+static int
+count_encrypted_files(char* path, int* count)
+{
+   DIR* dir = NULL;
+   struct dirent* entry = NULL;
+
+   if (path == NULL || count == NULL)
+   {
+      return 1;
+   }
+
+   dir = opendir(path);
+   if (dir == NULL)
+   {
+      return 1;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      struct stat st;
+      char child[MAX_PATH];
+
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+      {
+         continue;
+      }
+
+      memset(child, 0, sizeof(child));
+      pgmoneta_snprintf(child, sizeof(child), "%s/%s", path, entry->d_name);
+
+      if (stat(child, &st))
+      {
+         closedir(dir);
+         return 1;
+      }
+
+      if (S_ISDIR(st.st_mode))
+      {
+         if (count_encrypted_files(child, count))
+         {
+            closedir(dir);
+            return 1;
+         }
+      }
+      else if (pgmoneta_is_encrypted(entry->d_name))
+      {
+         (*count)++;
+      }
+   }
+
+   closedir(dir);
+   return 0;
+}
+
+static int
+get_failed_verify_count(struct json* response)
+{
+   struct json* response_obj = NULL;
+   struct json* files_obj = NULL;
+   struct json* failed = NULL;
+
+   if (response == NULL)
+   {
+      return -1;
+   }
+
+   response_obj = (struct json*)pgmoneta_json_get(response, MANAGEMENT_CATEGORY_RESPONSE);
+   if (response_obj == NULL)
+   {
+      return -1;
+   }
+
+   files_obj = (struct json*)pgmoneta_json_get(response_obj, MANAGEMENT_ARGUMENT_FILES);
+   if (files_obj == NULL)
+   {
+      return -1;
+   }
+
+   failed = (struct json*)pgmoneta_json_get(files_obj, MANAGEMENT_ARGUMENT_FAILED);
+
+   return (int)pgmoneta_json_array_length(failed);
+}
+
+static int
+reduce_aes_backup_fixture(char* backup_root)
+{
+   char manifest_path[MAX_PATH];
+   char data_path[MAX_PATH];
+
+   if (backup_root == NULL)
+   {
+      return 1;
+   }
+
+   memset(manifest_path, 0, sizeof(manifest_path));
+   memset(data_path, 0, sizeof(data_path));
+
+   pgmoneta_snprintf(manifest_path, sizeof(manifest_path), "%s/backup.manifest", backup_root);
+   pgmoneta_snprintf(data_path, sizeof(data_path), "%s/data", backup_root);
+
+   if (rewrite_aes_manifest(manifest_path))
+   {
+      return 1;
+   }
+
+   if (prune_aes_backup_tree(data_path, ""))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static bool
+should_keep_aes_manifest_path(const char* path)
+{
+   static const char* keep_paths[] = {
+      "backup_label",
+      "PG_VERSION",
+      "pg_hba.conf",
+      "pg_ident.conf",
+      "postgresql.auto.conf",
+      "postgresql.conf",
+      "global/pg_control",
+      "global/pg_filenode.map",
+      NULL};
+
+   for (int i = 0; keep_paths[i] != NULL; i++)
+   {
+      if (!strcmp(path, keep_paths[i]))
+      {
+         return true;
+      }
+   }
+
+   return false;
+}
+
+static bool
+should_keep_aes_disk_path(const char* path)
+{
+   static const char* keep_paths[] = {
+      "backup_label",
+      "PG_VERSION.zstd.aes",
+      "pg_hba.conf.zstd.aes",
+      "pg_ident.conf.zstd.aes",
+      "postgresql.auto.conf.zstd.aes",
+      "postgresql.conf.zstd.aes",
+      "global/pg_control.zstd.aes",
+      "global/pg_filenode.map.zstd.aes",
+      NULL};
+
+   for (int i = 0; keep_paths[i] != NULL; i++)
+   {
+      if (!strcmp(path, keep_paths[i]))
+      {
+         return true;
+      }
+   }
+
+   return false;
+}
+
+static int
+prune_aes_backup_tree(char* path, char* relative_path)
+{
+   DIR* dir = NULL;
+   struct dirent* entry = NULL;
+
+   if (path == NULL || relative_path == NULL)
+   {
+      return 1;
+   }
+
+   dir = opendir(path);
+   if (dir == NULL)
+   {
+      return 1;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      char child[MAX_PATH];
+      char child_relative[MAX_PATH];
+      struct stat st;
+
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+      {
+         continue;
+      }
+
+      memset(child, 0, sizeof(child));
+      memset(child_relative, 0, sizeof(child_relative));
+      pgmoneta_snprintf(child, sizeof(child), "%s/%s", path, entry->d_name);
+
+      if (strlen(relative_path) == 0)
+      {
+         pgmoneta_snprintf(child_relative, sizeof(child_relative), "%s", entry->d_name);
+      }
+      else
+      {
+         pgmoneta_snprintf(child_relative, sizeof(child_relative), "%s/%s", relative_path, entry->d_name);
+      }
+
+      if (stat(child, &st))
+      {
+         closedir(dir);
+         return 1;
+      }
+
+      if (S_ISDIR(st.st_mode))
+      {
+         if (prune_aes_backup_tree(child, child_relative))
+         {
+            closedir(dir);
+            return 1;
+         }
+      }
+      else if (!should_keep_aes_disk_path(child_relative))
+      {
+         if (pgmoneta_delete_file(child, NULL))
+         {
+            closedir(dir);
+            return 1;
+         }
+      }
+   }
+
+   closedir(dir);
+   return 0;
+}
+
+static int
+rewrite_aes_manifest(char* manifest_path)
+{
+   FILE* input = NULL;
+   FILE* output = NULL;
+   char temp_path[MAX_PATH];
+   char line[INFO_BUFFER_SIZE];
+
+   if (manifest_path == NULL)
+   {
+      return 1;
+   }
+
+   memset(temp_path, 0, sizeof(temp_path));
+   memset(line, 0, sizeof(line));
+   pgmoneta_snprintf(temp_path, sizeof(temp_path), "%s.tmp", manifest_path);
+
+   input = fopen(manifest_path, "r");
+   if (input == NULL)
+   {
+      return 1;
+   }
+
+   output = fopen(temp_path, "w");
+   if (output == NULL)
+   {
+      fclose(input);
+      return 1;
+   }
+
+   while (fgets(line, sizeof(line), input) != NULL)
+   {
+      char* comma = strchr(line, ',');
+      size_t path_length = 0;
+      char path[MAX_PATH];
+
+      if (comma == NULL)
+      {
+         continue;
+      }
+
+      memset(path, 0, sizeof(path));
+      path_length = (size_t)(comma - line);
+      if (path_length >= sizeof(path))
+      {
+         fclose(output);
+         fclose(input);
+         remove(temp_path);
+         return 1;
+      }
+
+      memcpy(path, line, path_length);
+
+      if (should_keep_aes_manifest_path(path))
+      {
+         fputs(line, output);
+      }
+   }
+
+   fflush(output);
+   fclose(output);
+   fclose(input);
+
+   if (rename(temp_path, manifest_path))
+   {
+      remove(temp_path);
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+set_main_config_value(char* key, char* value)
+{
+   struct main_configuration* config = NULL;
+   FILE* input = NULL;
+   FILE* output = NULL;
+   char temp_path[MAX_PATH];
+   char line[INFO_BUFFER_SIZE];
+   bool in_pgmoneta_section = false;
+   bool key_written = false;
+   size_t key_length = 0;
+
+   if (key == NULL || value == NULL)
+   {
+      return 1;
+   }
+
+   config = (struct main_configuration*)shmem;
+   if (config == NULL || strlen(config->common.configuration_path) == 0)
+   {
+      return 1;
+   }
+
+   memset(temp_path, 0, sizeof(temp_path));
+   memset(line, 0, sizeof(line));
+   key_length = strlen(key);
+   pgmoneta_snprintf(temp_path, sizeof(temp_path), "%s.tmp", config->common.configuration_path);
+
+   input = fopen(config->common.configuration_path, "r");
+   if (input == NULL)
+   {
+      return 1;
+   }
+
+   output = fopen(temp_path, "w");
+   if (output == NULL)
+   {
+      fclose(input);
+      return 1;
+   }
+
+   while (fgets(line, sizeof(line), input) != NULL)
+   {
+      if (!strncmp(line, "[pgmoneta]", 10))
+      {
+         in_pgmoneta_section = true;
+      }
+      else if (line[0] == '[')
+      {
+         if (in_pgmoneta_section && !key_written)
+         {
+            fprintf(output, "%s = %s\n", key, value);
+            key_written = true;
+         }
+         in_pgmoneta_section = false;
+      }
+
+      if (in_pgmoneta_section && !strncmp(line, key, key_length) && (line[key_length] == ' ' || line[key_length] == '='))
+      {
+         fprintf(output, "%s = %s\n", key, value);
+         key_written = true;
+      }
+      else
+      {
+         fputs(line, output);
+      }
+   }
+
+   if (in_pgmoneta_section && !key_written)
+   {
+      fprintf(output, "%s = %s\n", key, value);
+   }
+
+   fflush(output);
+   fclose(output);
+   fclose(input);
+
+   if (rename(temp_path, config->common.configuration_path))
+   {
+      remove(temp_path);
+      return 1;
+   }
+
+   return 0;
+}
