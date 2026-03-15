@@ -246,6 +246,7 @@ static void wal_interactive_restore_handlers(void);
 static void wal_interactive_signal_handler(int signum);
 static void wal_interactive_run(struct ui_state* state);
 static void wal_interactive_cleanup(struct ui_state* state);
+static void wal_set_window_theme(WINDOW* win, int color_pair, bool border);
 
 static void
 wal_interactive_endwin(void)
@@ -300,6 +301,23 @@ wal_interactive_restore_handlers(void)
    }
 
    curses_handlers_installed = false;
+}
+
+static void
+wal_set_window_theme(WINDOW* win, int color_pair, bool border)
+{
+   if (win == NULL)
+   {
+      return;
+   }
+
+   wbkgd(win, COLOR_PAIR(color_pair));
+   werase(win);
+
+   if (border)
+   {
+      box(win, 0, 0);
+   }
 }
 
 /**
@@ -364,6 +382,10 @@ wal_interactive_init(struct ui_state* state, const char* wal_filename)
    init_pair(11, COLOR_GREEN, COLOR_BLACK);  /* Descriptions */
    init_pair(15, COLOR_WHITE, COLOR_BLACK);  /* Search result highlighting */
 
+   wbkgd(stdscr, COLOR_PAIR(1));
+   clear();
+   refresh();
+
    int height, width;
    getmaxyx(stdscr, height, width);
 
@@ -372,6 +394,11 @@ wal_interactive_init(struct ui_state* state, const char* wal_filename)
    state->main_win = newwin(height - 6, width, 3, 0);
    state->status_win = newwin(1, width, height - 3, 0);
    state->footer_win = newwin(2, width, height - 2, 0);
+
+   wal_set_window_theme(state->header_win, 1, true);
+   wal_set_window_theme(state->main_win, 2, false);
+   wal_set_window_theme(state->status_win, 1, false);
+   wal_set_window_theme(state->footer_win, 1, true);
 
    scrollok(state->main_win, TRUE);
 
@@ -1472,9 +1499,7 @@ error:
 static void
 draw_header(struct ui_state* state)
 {
-   werase(state->header_win);
-   wbkgd(state->header_win, COLOR_PAIR(1));
-   box(state->header_win, 0, 0);
+   wal_set_window_theme(state->header_win, 1, true);
 
    wattron(state->header_win, A_BOLD | COLOR_PAIR(1));
    mvwprintw(state->header_win, 1, 2, "WAL: %s", state->wal_filename);
@@ -1492,8 +1517,7 @@ draw_header(struct ui_state* state)
 static void
 draw_main_content(struct ui_state* state)
 {
-   werase(state->main_win);
-   wbkgd(state->main_win, COLOR_PAIR(2));
+   wal_set_window_theme(state->main_win, 2, false);
 
    int height, width;
    getmaxyx(state->main_win, height, width);
@@ -1761,7 +1785,7 @@ show_detail_view(struct ui_state* state)
    }
 
    WINDOW* detail_win = newwin(height, width, starty, startx);
-   box(detail_win, 0, 0);
+   wal_set_window_theme(detail_win, 1, true);
 
    wattron(detail_win, A_BOLD);
    mvwprintw(detail_win, 1, 2, "WAL Record Details");
@@ -1927,7 +1951,7 @@ show_detail_view(struct ui_state* state)
 static void
 draw_status(struct ui_state* state)
 {
-   werase(state->status_win);
+   wal_set_window_theme(state->status_win, 1, false);
 
    if (state->search_active && (state->search_result_count > 0 || state->directory_result_count > 0))
    {
@@ -1964,8 +1988,7 @@ draw_status(struct ui_state* state)
 static void
 draw_footer(struct ui_state* state)
 {
-   werase(state->footer_win);
-   box(state->footer_win, 0, 0);
+   wal_set_window_theme(state->footer_win, 1, true);
 
    if (state->search_active && (state->search_result_count > 0 || state->directory_result_count > 0))
    {
@@ -1988,7 +2011,7 @@ show_help(void)
    int startx = (COLS - width) / 2;
 
    WINDOW* help_win = newwin(height, width, starty, startx);
-   box(help_win, 0, 0);
+   wal_set_window_theme(help_win, 1, true);
 
    wattron(help_win, A_BOLD);
    mvwprintw(help_win, 1, 2, "pgmoneta WAL Interactive Viewer - Help");
@@ -2070,7 +2093,7 @@ handle_search_input(struct ui_state* state)
    int startx = (COLS - width) / 2;
 
    WINDOW* search_win = newwin(height, width, starty, startx);
-   box(search_win, 0, 0);
+   wal_set_window_theme(search_win, 1, true);
 
    wattron(search_win, A_BOLD);
    mvwprintw(search_win, 1, 2, "Search WAL Records");
@@ -2306,8 +2329,7 @@ handle_search_input(struct ui_state* state)
    wal_search(state, &criteria);
 
    /* Show results */
-   werase(search_win);
-   box(search_win, 0, 0);
+   wal_set_window_theme(search_win, 1, true);
 
    if (state->directory_result_count > 0)
    {
@@ -2362,6 +2384,7 @@ show_wal_file_selector(struct ui_state* state)
    int startx = (COLS - width) / 2;
 
    WINDOW* load_win = newwin(height, width, starty, startx);
+   wbkgd(load_win, COLOR_PAIR(1));
 
    char* temp_path = strdup(state->wal_filename);
    char current_dir[MAX_PATH * 2];
@@ -2370,8 +2393,7 @@ show_wal_file_selector(struct ui_state* state)
 
    while (1)
    {
-      werase(load_win);
-      box(load_win, 0, 0);
+      wal_set_window_theme(load_win, 1, true);
 
       mvwprintw(load_win, 1, 2, "Browse: %s", current_dir);
       mvwhline(load_win, 2, 1, ACS_HLINE, width - 2);
