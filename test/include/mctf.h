@@ -60,12 +60,13 @@ typedef void (*mctf_hook_func_t)(void);
  */
 typedef struct mctf_test
 {
-   const char* name;       /**< Test name */
-   const char* module;     /**< Module name */
-   const char* file;       /**< Source file name */
-   mctf_test_func_t func;  /**< Test function pointer */
-   bool is_negative;       /**< True if this is a negative test */
-   struct mctf_test* next; /**< Next test in linked list */
+   const char* name;             /**< Test name */
+   const char* module;           /**< Module name */
+   const char* file;             /**< Source file name */
+   mctf_test_func_t func;        /**< Test function pointer */
+   bool is_negative;             /**< True if this is a negative test */
+   unsigned int max_elapsed_sec; /**< Max allowed runtime in seconds; 0 = no limit */
+   struct mctf_test* next;       /**< Next test in linked list */
 } mctf_test_t;
 
 /**
@@ -157,6 +158,29 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
  */
 void
 mctf_register_test_with_flags(const char* name, const char* module, const char* file, mctf_test_func_t func, bool is_negative);
+
+/**
+ * Register a test function with a maximum allowed runtime.
+ * If the test runs longer than @p max_seconds, it is reported as failed (performance regression).
+ * @param name The test name
+ * @param module The module name
+ * @param file The source file name
+ * @param func The test function
+ * @param max_seconds Maximum allowed runtime in seconds; test fails if exceeded
+ */
+void
+mctf_register_test_with_max_time(const char* name, const char* module, const char* file, mctf_test_func_t func, unsigned int max_seconds);
+
+/**
+ * Register a test function that is both negative (allows ERROR in pgmoneta.log) and has a max runtime.
+ * @param name The test name
+ * @param module The module name
+ * @param file The source file name
+ * @param func The test function
+ * @param max_seconds Maximum allowed runtime in seconds; 0 = no limit
+ */
+void
+mctf_register_test_with_max_time_negative(const char* name, const char* module, const char* file, mctf_test_func_t func, unsigned int max_seconds);
 
 /**
  * Register a per-test setup hook for a module.
@@ -434,6 +458,42 @@ mctf_get_results(size_t* count);
       mctf_register_test_with_flags(#name, mctf_extract_module_name(file_path), filename, \
                                     name, true);                                          \
    }                                                                                      \
+   static int name(void)
+
+/**
+ * Register a test function with a maximum allowed runtime (performance gate).
+ * The test is run normally; if it completes successfully but takes longer than
+ * @p max_seconds, it is reported as FAILED with a message that the maximum time
+ * was exceeded. Use this to catch performance regressions (e.g. after OpenSSL
+ * or other dependency changes).
+ *
+ * Usage: MCTF_TEST_MAX(my_test, 60) { ... }
+ * Module name is derived from the source file name (same as MCTF_TEST).
+ */
+#define MCTF_TEST_MAX(name, max_seconds)                                                     \
+   static int name(void);                                                                    \
+   static void __attribute__((constructor)) mctf_register_maxtime_##name(void)               \
+   {                                                                                         \
+      const char* file_path = __FILE__;                                                      \
+      const char* filename = mctf_extract_filename(file_path);                               \
+      mctf_register_test_with_max_time(#name, mctf_extract_module_name(file_path), filename, \
+                                       name, (unsigned int)(max_seconds));                   \
+   }                                                                                         \
+   static int name(void)
+
+/**
+ * Register a test that is both negative (allows ERROR in log) and has a max runtime.
+ * Usage: MCTF_TEST_MAX_NEGATIVE(name, max_seconds) { ... }
+ */
+#define MCTF_TEST_MAX_NEGATIVE(name, max_seconds)                                             \
+   static int name(void);                                                                     \
+   static void __attribute__((constructor)) mctf_register_maxtime_negative_##name(void)       \
+   {                                                                                          \
+      const char* file_path = __FILE__;                                                       \
+      const char* filename = mctf_extract_filename(file_path);                                \
+      mctf_register_test_with_max_time_negative(#name, mctf_extract_module_name(file_path),   \
+                                                filename, name, (unsigned int)(max_seconds)); \
+   }                                                                                          \
    static int name(void)
 
 /**
