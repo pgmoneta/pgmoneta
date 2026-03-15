@@ -65,6 +65,15 @@ static unsigned char* decode_base64(char* base64_data, int* decoded_len);
 static char** get_paths(struct query_response* data, int* count);
 static void extract_file_name(char* path, char* file_name, char* file_path);
 
+enum scan_message_result {
+   SCAN_MESSAGE_NOT_FOUND = 0,
+   SCAN_MESSAGE_FOUND = 1,
+   SCAN_MESSAGE_INCOMPLETE = 2,
+   SCAN_MESSAGE_INVALID = 3
+};
+
+static int scan_messages(char type, void* data, size_t data_size, bool log_response_messages);
+
 int
 pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
 {
@@ -1072,6 +1081,7 @@ error:
 int
 pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_response** response)
 {
+   int scan_status;
    int status;
    int fd = -1;
    bool cont;
@@ -1111,9 +1121,14 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
       {
          data = pgmoneta_memory_dynamic_append(data, data_size, reply->data, reply->length, &data_size);
 
-         if (pgmoneta_has_message('Z', data, data_size))
+         scan_status = scan_messages('Z', data, data_size, false);
+         if (scan_status == SCAN_MESSAGE_FOUND)
          {
             cont = false;
+         }
+         else if (scan_status == SCAN_MESSAGE_INVALID)
+         {
+            goto error;
          }
       }
       else if (status == MESSAGE_STATUS_ZERO)
@@ -1245,51 +1260,70 @@ error:
 bool
 pgmoneta_has_message(char type, void* data, size_t data_size)
 {
+   return scan_messages(type, data, data_size, true) == SCAN_MESSAGE_FOUND;
+}
+
+static int
+scan_messages(char type, void* data, size_t data_size, bool log_response_messages)
+{
    size_t offset = 0;
 
    while (offset < data_size)
    {
+      int m_length;
+      char t;
+      size_t message_size;
       struct message* msg = NULL;
-      char t = (char)pgmoneta_read_byte(data + offset);
+
+      if (offset + 1 + 4 > data_size)
+      {
+         return SCAN_MESSAGE_INCOMPLETE;
+      }
+
+      t = (char)pgmoneta_read_byte(data + offset);
+      m_length = pgmoneta_read_int32(data + offset + 1);
+
+      if (m_length < 4)
+      {
+         pgmoneta_log_error("Invalid message length: %d", m_length);
+         return SCAN_MESSAGE_INVALID;
+      }
+
+      message_size = 1 + (size_t)m_length;
+
+      if (offset + message_size > data_size)
+      {
+         return SCAN_MESSAGE_INCOMPLETE;
+      }
 
       if (t == 'E' || t == 'N')
       {
-         pgmoneta_extract_message_offset(offset, data, &msg);
-
-         if (t == 'E')
+         if (log_response_messages)
          {
-            pgmoneta_log_error_response_message(msg);
-         }
-         else if (t == 'N')
-         {
-            pgmoneta_log_notice_response_message(msg);
-         }
+            pgmoneta_extract_message_offset(offset, data, &msg);
 
-         pgmoneta_free_message(msg);
+            if (t == 'E')
+            {
+               pgmoneta_log_error_response_message(msg);
+            }
+            else if (t == 'N')
+            {
+               pgmoneta_log_notice_response_message(msg);
+            }
+
+            pgmoneta_free_message(msg);
+         }
       }
 
       if (type == t)
       {
-         return true;
+         return SCAN_MESSAGE_FOUND;
       }
-      else
-      {
-         offset += 1;
 
-         /* check if the message length is available */
-         if (offset + 4 <= data_size)
-         {
-            offset += pgmoneta_read_int32(data + offset);
-         }
-         else
-         {
-            pgmoneta_log_error("Message length not available");
-            return false;
-         }
-      }
+      offset += message_size;
    }
 
-   return false;
+   return SCAN_MESSAGE_NOT_FOUND;
 }
 
 char*

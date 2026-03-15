@@ -1666,6 +1666,52 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_has_message_with_incomplete_trailing_fragment)
+{
+   char* command_tag = "SELECT 1";
+   bool found = false;
+   size_t data_capacity = 0;
+   size_t len = 0;
+   unsigned char* data = NULL;
+   void* p = NULL;
+
+   data_capacity = 1 + 4 + strlen(command_tag) + 1 + 1 + 4;
+   data = calloc(1, data_capacity);
+   MCTF_ASSERT_PTR_NONNULL(data, cleanup, "failed to allocate test message buffer");
+
+   p = data;
+
+   /* CommandComplete: Byte1('C') Int32(len) String(command tag) */
+   pgmoneta_write_byte(p, 'C');
+   p += 1;
+   pgmoneta_write_int32(p, 4 + strlen(command_tag) + 1);
+   p += 4;
+   pgmoneta_write_string(p, command_tag);
+   p += strlen(command_tag) + 1;
+
+   /* ReadyForQuery: Byte1('Z') Int32(5) Byte1(status), truncated before status byte */
+   pgmoneta_write_byte(p, 'Z');
+   p += 1;
+   pgmoneta_write_int32(p, 5);
+   p += 4;
+
+   len = (size_t)((unsigned char*)p - data);
+
+   found = pgmoneta_has_message('C', data, len);
+   MCTF_ASSERT(found, cleanup, "expected complete message to be found");
+
+   found = pgmoneta_has_message('Z', data, len);
+   MCTF_ASSERT(!found, cleanup, "incomplete trailing message should not be treated as complete");
+
+cleanup:
+   if (data != NULL)
+   {
+      free(data);
+      data = NULL;
+   }
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_permissions)
 {
    char* dir = "test_perm_dir";
