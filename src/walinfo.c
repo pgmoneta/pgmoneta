@@ -3878,7 +3878,6 @@ main(int argc, char** argv)
       goto error;
    }
 
-   //pgmoneta_init_main_configuration(shmem);
    pgmoneta_init_walinfo_configuration(shmem);
    config = (struct walinfo_configuration*)shmem;
 
@@ -4285,20 +4284,40 @@ main(int argc, char** argv)
             {
                fprintf(stderr, "Error: Failed to load WAL records\n");
                wal_interactive_cleanup(&ui_state);
-               free(first_wal_path);
-               pgmoneta_deque_destroy(tar_wal_files);
-               pgmoneta_delete_directory(tar_temp_dir);
-               free(tar_temp_dir);
+
+               if (first_wal_path != NULL)
+               {
+                  free(first_wal_path);
+               }
+               if (tar_wal_files != NULL)
+               {
+                  pgmoneta_deque_destroy(tar_wal_files);
+               }
+               if (tar_temp_dir != NULL)
+               {
+                  pgmoneta_delete_directory(tar_temp_dir);
+                  free(tar_temp_dir);
+               }
+
                goto error;
             }
 
             wal_interactive_run(&ui_state);
 
             wal_interactive_cleanup(&ui_state);
-            free(first_wal_path);
-            pgmoneta_deque_destroy(tar_wal_files);
-            pgmoneta_delete_directory(tar_temp_dir);
-            free(tar_temp_dir);
+            if (first_wal_path != NULL)
+            {
+               free(first_wal_path);
+            }
+            if (tar_wal_files != NULL)
+            {
+               pgmoneta_deque_destroy(tar_wal_files);
+            }
+            if (tar_temp_dir != NULL)
+            {
+               pgmoneta_delete_directory(tar_temp_dir);
+               free(tar_temp_dir);
+            }
 
             pgmoneta_destroy_shared_memory(shmem, size);
             if (logfile)
