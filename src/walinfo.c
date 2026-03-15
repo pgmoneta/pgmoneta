@@ -2356,27 +2356,27 @@ handle_search_input(struct ui_state* state)
          }
       }
 
-       /* Clear autocomplete area first */
-       for (int i = 0; i < height - autocomplete_row - 3; i++)
-       {
-          mvwprintw(search_win, autocomplete_row + i, 2, "%-76s", "");
-       }
+      /* Clear autocomplete area first */
+      for (int i = 0; i < height - autocomplete_row - 3; i++)
+      {
+         mvwprintw(search_win, autocomplete_row + i, 2, "%-76s", "");
+      }
 
-       {
-          const char* const* known_values = wal_get_known_values_for_field(current_field);
+      {
+         const char* const* known_values = wal_get_known_values_for_field(current_field);
 
-          if (known_values != NULL)
-          {
-             mvwprintw(search_win, autocomplete_row, 2, "Suggestions:");
-             show_known_values_autocomplete(search_win,
-                                            known_values,
-                                            field_inputs[current_field],
-                                            field_inputs[current_field],
-                                            autocomplete_row,
-                                            4,
-                                            height - autocomplete_row - 4);
-          }
-       }
+         if (known_values != NULL)
+         {
+            mvwprintw(search_win, autocomplete_row, 2, "Suggestions:");
+            show_known_values_autocomplete(search_win,
+                                           known_values,
+                                           field_inputs[current_field],
+                                           field_inputs[current_field],
+                                           autocomplete_row,
+                                           4,
+                                           height - autocomplete_row - 4);
+         }
+      }
 
       wrefresh(search_win);
 
