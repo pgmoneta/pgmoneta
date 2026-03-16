@@ -777,7 +777,7 @@ MCTF_TEST(test_walinfo_encrypted_wal)
    MCTF_ASSERT_PTR_NONNULL(config, cleanup, "configuration is null");
 
    memcpy(saved_home, config->common.home_dir, sizeof(saved_home));
-   saved_encryption = config->encryption;
+   saved_encryption = config->common.encryption;
 
    MCTF_ASSERT_INT_EQ(pgmoneta_test_resolve_binary_path("pgmoneta-walinfo", walinfo_bin), 0, cleanup,
                       "pgmoneta-walinfo binary not found or not executable");
@@ -788,7 +788,7 @@ MCTF_TEST(test_walinfo_encrypted_wal)
 
    memset(config->common.home_dir, 0, sizeof(config->common.home_dir));
    pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", base_dir);
-   config->encryption = ENCRYPTION_AES_256_GCM;
+   config->common.encryption = ENCRYPTION_AES_256_GCM;
 
    wf = pgmoneta_test_generate_mixed_heap_wal_v17();
    MCTF_ASSERT_PTR_NONNULL(wf, cleanup, "failed to generate walfile");
@@ -838,7 +838,7 @@ cleanup:
    free(output);
 
    memcpy(config->common.home_dir, saved_home, sizeof(config->common.home_dir));
-   config->encryption = saved_encryption;
+   config->common.encryption = saved_encryption;
 
    if (base_dir[0] != '\0' && pgmoneta_exists(base_dir))
    {

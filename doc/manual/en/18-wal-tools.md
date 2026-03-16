@@ -241,6 +241,27 @@ SELECT nspname || '.' || relname, c.oid FROM pg_class c JOIN pg_namespace n ON c
 - If both `pgmoneta_users.conf` and `mappings.json` are provided, the mapping file takes precedence
 - OIDs not found in the server/mapping will be displayed as-is
 
+## pgmoneta_walinfo.conf
+
+The `pgmoneta_walinfo` configuration file is used for logging and encryption configuration. It is loaded from either the path specified by the `-c` flag or `/etc/pgmoneta/pgmoneta_walinfo.conf` if `-c` wasn't provided.
+
+### [pgmoneta_walinfo]
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| log_type | console | String | No | The logging type (console, file, syslog) |
+| log_level | info | String | No | The logging level, any of the (case insensitive) strings `FATAL`, `ERROR`, `WARN`, `INFO` and `DEBUG` (that can be more specific as `DEBUG1` thru `DEBUG5`). Debug level greater than 5 will be set to `DEBUG5`. Not recognized values will make the log_level be `INFO` |
+| log_path | pgmoneta.log | String | No | The log file location. Can be a strftime(3) compatible string. |
+| encryption | aes-256-gcm | String | No | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes \| aes-256 \| aes-256-gcm`: AES GCM (Galois/Counter Mode) mode with 256 bit key length (Recommended)<br/> `aes-192 \| aes-192-gcm`: AES GCM mode with 192 bit key length<br/> `aes-128 \| aes-128-gcm`: AES GCM mode with 128 bit key length |
+
+### Server section
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| host | | String | Yes | The address of the PostgreSQL instance |
+| port | | Int | Yes | The port of the PostgreSQL instance |
+| user | | String | Yes | The replication user name |
+
 ## pgmoneta-walfilter
 
 `pgmoneta-walfilter` is a command-line utility that reads PostgreSQL Write-Ahead Log (WAL) files from a source directory, filters them based on user-defined rules, recalculates CRC checksums, and writes the filtered WAL files to a target directory.
@@ -349,6 +370,27 @@ pgmoneta-walfilter filter_config.yaml
 **Log Files:**
 
 The tool uses the logging configuration from `pgmoneta_walfilter.conf`. Check the log file specified in the configuration for detailed error messages and processing information.
+
+## pgmoneta_walfilter.conf
+
+The `pgmoneta_walfilter` configuration file is used for logging and encryption configuration. It is loaded from either the path specified in the YAML configuration file or `/etc/pgmoneta/pgmoneta_walfilter.conf` if not provided.
+
+### [pgmoneta_walfilter]
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| log_type | console | String | No | The logging type (console, file, syslog) |
+| log_level | info | String | No | The logging level, any of the (case insensitive) strings `FATAL`, `ERROR`, `WARN`, `INFO` and `DEBUG` (that can be more specific as `DEBUG1` thru `DEBUG5`). Debug level greater than 5 will be set to `DEBUG5`. Not recognized values will make the log_level be `INFO` |
+| log_path | pgmoneta.log | String | No | The log file location. Can be a strftime(3) compatible string. |
+| encryption | none | String | No | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes \| aes-256 \| aes-256-gcm`: AES GCM (Galois/Counter Mode) mode with 256 bit key length (Recommended)<br/> `aes-192 \| aes-192-gcm`: AES GCM mode with 192 bit key length<br/> `aes-128 \| aes-128-gcm`: AES GCM mode with 128 bit key length |
+
+### Server section
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| host | | String | Yes | The address of the PostgreSQL instance |
+| port | | Int | Yes | The port of the PostgreSQL instance |
+| user | | String | Yes | The replication user name |
 
 ### Additional Information
 For more detailed information about the internal APIs and developer documentation, see the [WAL Developer Guide](78-wal.md).

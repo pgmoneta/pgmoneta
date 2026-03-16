@@ -80,8 +80,8 @@ setup_mock_master_key(struct test_env* env)
    }
 
    config = (struct main_configuration*)shmem;
-   env->original_encryption = config->encryption;
-   config->encryption = ENCRYPTION_AES_256_GCM;
+   env->original_encryption = config->common.encryption;
+   config->common.encryption = ENCRYPTION_AES_256_GCM;
 
    pgmoneta_snprintf(env->test_home, MAX_PATH, "%s/test_aes_home_XXXXXX", "/tmp");
    if (mkdtemp(env->test_home) == NULL)
@@ -135,7 +135,7 @@ teardown_mock_master_key(struct test_env* env)
 
    if (config != NULL)
    {
-      config->encryption = env->original_encryption;
+      config->common.encryption = env->original_encryption;
       memset(config->common.home_dir, 0, sizeof(config->common.home_dir));
       pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", env->original_config_home);
    }

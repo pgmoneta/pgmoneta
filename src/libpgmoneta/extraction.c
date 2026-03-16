@@ -320,11 +320,11 @@ bitmask_to_compression(uint32_t file_type)
 static int
 bitmask_to_encryption(uint32_t file_type)
 {
-   struct main_configuration* config = NULL;
+   struct common_configuration* config = NULL;
 
    if (file_type & PGMONETA_FILE_TYPE_ENCRYPTED)
    {
-      config = (struct main_configuration*)shmem;
+      config = (struct common_configuration*)shmem;
 
       if (config != NULL)
       {

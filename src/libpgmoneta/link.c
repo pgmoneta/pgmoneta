@@ -502,7 +502,7 @@ trim_suffix(char* str)
       return pgmoneta_append(NULL, str);
    }
 
-   if (pgmoneta_extraction_get_suffix(config->compression_type, config->encryption, &suffix))
+   if (pgmoneta_extraction_get_suffix(config->compression_type, config->common.encryption, &suffix))
    {
       return pgmoneta_append(NULL, str);
    }

@@ -321,7 +321,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             goto cleanup;
          }
 
-         if (config->encryption != ENCRYPTION_NONE)
+         if (config->common.encryption != ENCRYPTION_NONE)
          {
             if (pgmoneta_decrypt_directory(destination, workers, NULL))
             {

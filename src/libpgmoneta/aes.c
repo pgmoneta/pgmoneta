@@ -1209,16 +1209,16 @@ encrypt_file(char* from, char* to, int enc)
 
    config = (struct main_configuration*)shmem;
 
-   if (config->encryption == ENCRYPTION_NONE)
+   if (config->common.encryption == ENCRYPTION_NONE)
    {
       pgmoneta_log_error("encrypt_file: encryption is not configured (encryption = none)");
       goto error;
    }
 
-   cipher_fp = get_cipher(config->encryption);
+   cipher_fp = get_cipher(config->common.encryption);
    if (cipher_fp == NULL)
    {
-      pgmoneta_log_error("encrypt_file: unsupported encryption mode: %d", config->encryption);
+      pgmoneta_log_error("encrypt_file: unsupported encryption mode: %d", config->common.encryption);
       goto error;
    }
    cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
@@ -1258,7 +1258,7 @@ encrypt_file(char* from, char* to, int enc)
          goto error;
       }
 
-      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, config->encryption) != 0)
+      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, config->common.encryption) != 0)
       {
          pgmoneta_log_error("derive_key_iv: Failed to derive key");
          goto error;
@@ -1333,7 +1333,7 @@ encrypt_file(char* from, char* to, int enc)
          goto error;
       }
 
-      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, config->encryption) != 0)
+      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, config->common.encryption) != 0)
       {
          pgmoneta_log_error("derive_key_iv: Failed to derive key");
          goto error;

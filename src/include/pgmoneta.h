@@ -424,6 +424,8 @@ struct common_configuration
    char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
    atomic_schar log_lock;             /**< The logging lock */
 
+   int encryption; /**< The AES encryption mode for file operations */
+
    struct server servers[NUMBER_OF_SERVERS]; /**< The servers */
    struct user users[NUMBER_OF_USERS];       /**< The users */
    struct user admins[NUMBER_OF_ADMINS];     /**< The admins */
@@ -469,8 +471,6 @@ struct main_configuration
    int create_slot; /**< Create a slot */
 
    int storage_engine; /**< The storage engine */
-
-   int encryption; /**< The AES encryption mode */
 
    char ssh_hostname[MISC_LENGTH];      /**< The SSH hostname */
    char ssh_username[MISC_LENGTH];      /**< The SSH username */

@@ -1761,7 +1761,7 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
 
    config = (struct main_configuration*)shmem;
 
-   if (config->compression_type == COMPRESSION_NONE && config->encryption == ENCRYPTION_NONE)
+   if (config->compression_type == COMPRESSION_NONE && config->common.encryption == ENCRYPTION_NONE)
    {
       return;
    }
@@ -1817,7 +1817,7 @@ retry:
             pgmoneta_compress_file(from, to, config->compression_type, NULL);
          }
 
-         if (config->encryption != ENCRYPTION_NONE)
+         if (config->common.encryption != ENCRYPTION_NONE)
          {
             if (scan)
             {

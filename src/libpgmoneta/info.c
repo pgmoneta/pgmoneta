@@ -1680,7 +1680,7 @@ pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* big
             goto error;
          }
 
-         if (pgmoneta_incremental_rfile_initialize(server, label, relative_path, bare_file_name, config->encryption, config->compression_type, &rf))
+         if (pgmoneta_incremental_rfile_initialize(server, label, relative_path, bare_file_name, config->common.encryption, config->compression_type, &rf))
          {
             pgmoneta_log_error("Unable to create rfile %s", bare_file_name);
             goto error;
@@ -1935,9 +1935,9 @@ create_info(char* directory, char* label, int status)
    pgmoneta_log_trace("%s=%d", INFO_COMPRESSION, config->compression_type);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->encryption);
+   pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->common.encryption);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%d", INFO_ENCRYPTION, config->encryption);
+   pgmoneta_log_trace("%s=%d", INFO_ENCRYPTION, config->common.encryption);
 
    pgmoneta_permission(s, 6, 0, 0);
 

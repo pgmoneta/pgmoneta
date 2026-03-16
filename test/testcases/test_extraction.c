@@ -314,7 +314,7 @@ MCTF_TEST(test_extraction_layered_archive)
    pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", home_dir);
    config->compression_level = 1;
    config->workers = 1;
-   config->encryption = ENCRYPTION_AES_256_GCM;
+   config->common.encryption = ENCRYPTION_AES_256_GCM;
 
    MCTF_ASSERT_INT_EQ(pgmoneta_tar(src_dir, tar_path), 0, cleanup, "tar failed");
    MCTF_ASSERT(pgmoneta_exists(tar_path), cleanup, "tar file missing");

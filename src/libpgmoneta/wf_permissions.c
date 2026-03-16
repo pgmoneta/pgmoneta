@@ -190,7 +190,7 @@ permissions_execute_archive(char* name __attribute__((unused)), struct art* node
 
    {
       char* suffix = NULL;
-      if (pgmoneta_extraction_get_suffix(config->compression_type, config->encryption, &suffix))
+      if (pgmoneta_extraction_get_suffix(config->compression_type, config->common.encryption, &suffix))
       {
          free(path);
          return 1;
