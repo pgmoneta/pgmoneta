@@ -33,11 +33,25 @@
 extern "C" {
 #endif
 
+#include <pgmoneta.h>
+
+/** @enum vfile_type
+ * Defines the type of a virtual file
+ */
+enum vfile_type {
+   VFILE_TYPE_UNKNOWN = 0, /**< Unknown vfile type */
+   VFILE_TYPE_LOCAL,       /**< Local file system */
+   VFILE_TYPE_S3,          /**< S3 storage */
+};
+
 /** @struct vfile
  * Defines a virtual file
  */
 struct vfile
 {
+   enum vfile_type type; /**< The vfile type */
+   char name[MAX_PATH];  /**< The vfile name/path */
+
    /**
     * The read callback
     * @param vfile The vfile
@@ -82,6 +96,14 @@ struct vfile
  */
 int
 pgmoneta_vfile_create_local(char* file_path, char* mode, struct vfile** vfile);
+
+/**
+ * Get the string representation of a vfile type
+ * @param type The vfile type
+ * @return The string representation
+ */
+const char*
+pgmoneta_vfile_type_to_string(enum vfile_type type);
 
 /**
  * Close and destroy current vfile
