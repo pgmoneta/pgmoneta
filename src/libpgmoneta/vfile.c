@@ -29,6 +29,21 @@
 #include <vfile.h>
 
 #include <stdlib.h>
+#include <string.h>
+
+const char*
+pgmoneta_vfile_type_to_string(enum vfile_type type)
+{
+   switch (type)
+   {
+      case VFILE_TYPE_LOCAL:
+         return "local";
+      case VFILE_TYPE_S3:
+         return "s3";
+      default:
+         return "unknown";
+   }
+}
 
 void
 pgmoneta_vfile_destroy(struct vfile* vfile)

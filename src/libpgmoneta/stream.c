@@ -37,6 +37,7 @@
 #include <value.h>
 
 #include <stdlib.h>
+#include <string.h>
 
 static int noop_stream_cb(struct streamer* this, bool last_chunk);
 static int backup_stream_cb(struct streamer* this, bool last_chunk);
@@ -44,6 +45,7 @@ static int restore_stream_cb(struct streamer* this, bool last_chunk);
 static int get_backup_file_name_cb(struct streamer* this, char* file_name, char** dest_file_name);
 static int get_restore_file_name_cb(struct streamer* this, char* file_name, char** dest_file_name);
 static void vfile_destroy_cb(uintptr_t val);
+static void add_failed_destination(struct streamer* streamer, struct vfile* f);
 
 int
 pgmoneta_streamer_create(int mode, int encryption, int compression, struct streamer** streamer)
@@ -113,6 +115,7 @@ pgmoneta_streamer_destroy(struct streamer* streamer)
    pgmoneta_compressor_destroy(streamer->compressor);
    pgmoneta_encryptor_destroy(streamer->encryptor);
    pgmoneta_deque_destroy(streamer->destinations);
+   pgmoneta_deque_destroy(streamer->failed_destinations);
    free(streamer);
 }
 
@@ -140,7 +143,7 @@ pgmoneta_streamer_write(struct streamer* streamer, void* buffer, size_t size, bo
          /* process and send data when the buffer is full or we have no more data to send */
          if (streamer->stream_cb(streamer, last_chk))
          {
-            /* TODO: need to log what has failed at least */
+            pgmoneta_log_error("Streamer callback failed during execution");
             goto error;
          }
          /* update bytes written on success */
@@ -149,6 +152,18 @@ pgmoneta_streamer_write(struct streamer* streamer, void* buffer, size_t size, bo
       }
    }
    while (size > 0);
+
+   if (last_chunk && streamer->failed_destinations != NULL && !pgmoneta_deque_empty(streamer->failed_destinations))
+   {
+      struct deque_iterator* fail_iter = NULL;
+      pgmoneta_deque_iterator_create(streamer->failed_destinations, &fail_iter);
+      while (pgmoneta_deque_iterator_next(fail_iter))
+      {
+         char* desc = (char*)pgmoneta_value_data(fail_iter->value);
+         pgmoneta_log_warn("Streamer: destination failed during streaming: %s", desc);
+      }
+      pgmoneta_deque_iterator_destroy(fail_iter);
+   }
 
    return 0;
 error:
@@ -197,6 +212,7 @@ pgmoneta_streamer_reset(struct streamer* streamer)
    }
 
    pgmoneta_deque_clear(streamer->destinations);
+   pgmoneta_deque_clear(streamer->failed_destinations);
    streamer->size = 0;
    streamer->written = 0;
 }
@@ -218,10 +234,18 @@ noop_stream_cb(struct streamer* this, bool last_chunk)
       f = (struct vfile*)pgmoneta_value_data(vfile_iter->value);
       if (f->write(f, this->buffer, this->size, last_chunk))
       {
-         pgmoneta_log_error("Failed to write buffer");
+         add_failed_destination(this, f);
+         pgmoneta_deque_iterator_remove(vfile_iter);
       }
    }
    pgmoneta_deque_iterator_destroy(vfile_iter);
+
+   if (pgmoneta_deque_empty(this->destinations))
+   {
+      pgmoneta_log_error("Streamer: All destinations have failed");
+      goto error;
+   }
+
    return 0;
 error:
    pgmoneta_deque_iterator_destroy(vfile_iter);
@@ -250,6 +274,7 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
    {
       if (this->compressor->compress(this->compressor, cbuf, sizeof(cbuf), &cbuf_size, &finished))
       {
+         pgmoneta_log_error("Failed to compress data in streamer");
          goto error;
       }
       /* Chances are we may receive no output at all this round before we provide more input
@@ -260,6 +285,7 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
       }
       if (this->encryptor->encrypt(this->encryptor, cbuf, cbuf_size, finished && last_chunk, &ebuf, &ebuf_size))
       {
+         pgmoneta_log_error("Failed to encrypt data in streamer");
          goto error;
       }
       /* write ebuf to file */
@@ -269,11 +295,18 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
          f = (struct vfile*)pgmoneta_value_data(vfile_iter->value);
          if (f->write(f, ebuf, ebuf_size, last_chunk))
          {
-            pgmoneta_log_error("Failed to write buffer");
+            add_failed_destination(this, f);
+            pgmoneta_deque_iterator_remove(vfile_iter);
          }
       }
       pgmoneta_deque_iterator_destroy(vfile_iter);
       vfile_iter = NULL;
+
+      if (pgmoneta_deque_empty(this->destinations))
+      {
+         pgmoneta_log_error("Streamer: All destinations have failed");
+         goto error;
+      }
 
       ebuf_size = 0;
    }
@@ -305,6 +338,7 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
 
    if (this->encryptor->decrypt(this->encryptor, this->buffer, this->size, last_chunk, &ebuf, &ebuf_size))
    {
+      pgmoneta_log_error("Failed to decrypt data in streamer");
       goto error;
    }
 
@@ -313,6 +347,7 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
    {
       if (this->compressor->decompress(this->compressor, cbuf, sizeof(cbuf), &cbuf_size, &finished))
       {
+         pgmoneta_log_error("Failed to decompress data in streamer");
          goto error;
       }
 
@@ -329,11 +364,18 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
          f = (struct vfile*)pgmoneta_value_data(vfile_iter->value);
          if (f->write(f, cbuf, cbuf_size, last_chunk))
          {
-            pgmoneta_log_error("Failed to write buffer");
+            add_failed_destination(this, f);
+            pgmoneta_deque_iterator_remove(vfile_iter);
          }
       }
       pgmoneta_deque_iterator_destroy(vfile_iter);
       vfile_iter = NULL;
+
+      if (pgmoneta_deque_empty(this->destinations))
+      {
+         pgmoneta_log_error("Streamer: All destinations have failed");
+         goto error;
+      }
    }
 
    pgmoneta_deque_iterator_destroy(vfile_iter);
@@ -349,6 +391,27 @@ vfile_destroy_cb(uintptr_t val)
 {
    struct vfile* file = (struct vfile*)val;
    pgmoneta_vfile_destroy(file);
+}
+
+static void
+add_failed_destination(struct streamer* streamer, struct vfile* f)
+{
+   const char* type_str = pgmoneta_vfile_type_to_string(f->type);
+   const char* name_str = strlen(f->name) > 0 ? f->name : "unknown";
+   pgmoneta_log_error("Streamer: Failed to write buffer to %s destination: %s", type_str, name_str);
+
+   if (streamer->failed_destinations == NULL)
+   {
+      pgmoneta_deque_create(false, &streamer->failed_destinations);
+   }
+
+   char* desc = NULL;
+   desc = pgmoneta_append(desc, type_str);
+   desc = pgmoneta_append(desc, ": ");
+   desc = pgmoneta_append(desc, name_str);
+
+   pgmoneta_deque_add(streamer->failed_destinations, NULL, (uintptr_t)desc, ValueString);
+   free(desc);
 }
 
 static int

@@ -48,15 +48,16 @@ extern "C" {
  */
 struct streamer
 {
-   struct compressor* compressor; /**< The compressor */
-   struct encryptor* encryptor;   /**< The encryptor */
-   struct deque* destinations;    /**< The streaming destinations */
-   char buffer[BUFFER_SIZE];      /**< The internal buffer */
-   size_t size;                   /**< The buffer data size */
-   size_t capacity;               /**< The buffer capacity */
-   size_t written;                /**< Total data streamed */
-   int compression;               /**< The compression mode */
-   int encryption;                /**< The encryption mode */
+   struct compressor* compressor;     /**< The compressor */
+   struct encryptor* encryptor;       /**< The encryptor */
+   struct deque* destinations;        /**< The streaming destinations */
+   struct deque* failed_destinations; /**< The failed destinations */
+   char buffer[BUFFER_SIZE];          /**< The internal buffer */
+   size_t size;                       /**< The buffer data size */
+   size_t capacity;                   /**< The buffer capacity */
+   size_t written;                    /**< Total data streamed */
+   int compression;                   /**< The compression mode */
+   int encryption;                    /**< The encryption mode */
    /**
     * The stream callback, this processes the input and streams to destination
     * @param streamer The streamer
