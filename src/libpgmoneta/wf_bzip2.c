@@ -27,8 +27,8 @@
  */
 
 /* pgmoneta */
+#include <compression.h>
 #include <pgmoneta.h>
-#include <bzip2_compression.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -135,8 +135,14 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
       backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
 
-      pgmoneta_bzip2_data(backup_data, workers);
-      pgmoneta_bzip2_tablespaces(backup_base, workers);
+      if (pgmoneta_compress_directory(backup_data, COMPRESSION_SERVER_BZIP2, workers))
+      {
+         ret = 1;
+      }
+      if (pgmoneta_workflow_compress_tablespaces(backup_base, COMPRESSION_SERVER_BZIP2, workers))
+      {
+         ret = 1;
+      }
 
       pgmoneta_workers_wait(workers);
       if (workers != NULL && !workers->outcome)
@@ -162,7 +168,7 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          }
       }
 
-      ret = pgmoneta_bzip2_file(tarfile, d);
+      ret = pgmoneta_compress_file(tarfile, d, COMPRESSION_SERVER_BZIP2, NULL);
    }
 
 #ifdef HAVE_FREEBSD
@@ -249,7 +255,7 @@ bzip2_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   ret = pgmoneta_bunzip2_data(base, workers);
+   ret = pgmoneta_decompress_directory(base, COMPRESSION_SERVER_BZIP2, workers);
 
    pgmoneta_workers_wait(workers);
    if (workers != NULL && !workers->outcome)

@@ -33,6 +33,8 @@
 #include <compression.h>
 #include <json.h>
 #include <logging.h>
+#include <aes.h>
+#include <compression.h>
 #include <extraction.h>
 #include <utils.h>
 #include <wal.h>
@@ -209,7 +211,7 @@ pgmoneta_validate_wal_filename(char* path, char** base_filename, xlog_seg_no* se
       wal_filename = temp;
    }
 
-   if (pgmoneta_is_encrypted(wal_filename) || pgmoneta_compression_is_compressed(wal_filename))
+   if (pgmoneta_is_encrypted(wal_filename) || pgmoneta_is_compressed(wal_filename))
    {
       if (pgmoneta_extraction_strip_suffix(wal_filename, pgmoneta_get_file_type(wal_filename), &temp))
       {

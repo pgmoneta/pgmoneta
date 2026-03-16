@@ -27,8 +27,8 @@
  */
 
 /* pgmoneta */
+#include <compression.h>
 #include <pgmoneta.h>
-#include <gzip_compression.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -137,12 +137,15 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
       backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
-      if (pgmoneta_gzip_data(backup_data, workers))
+      if (pgmoneta_compress_directory(backup_data, COMPRESSION_SERVER_GZIP, workers))
       {
          goto error;
       }
 
-      pgmoneta_gzip_tablespaces(backup_base, workers);
+      if (pgmoneta_workflow_compress_tablespaces(backup_base, COMPRESSION_SERVER_GZIP, workers))
+      {
+         goto error;
+      }
 
       pgmoneta_workers_wait(workers);
       if (workers != NULL && !workers->outcome)
@@ -165,7 +168,10 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_debug("%s doesn't exists", d);
       }
 
-      pgmoneta_gzip_file(tarfile, d);
+      if (pgmoneta_compress_file(tarfile, d, COMPRESSION_SERVER_GZIP, NULL))
+      {
+         goto error;
+      }
    }
 
 #ifdef HAVE_FREEBSD
@@ -255,7 +261,10 @@ gzip_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_gunzip_data(base, workers);
+   if (pgmoneta_decompress_directory(base, COMPRESSION_SERVER_GZIP, workers))
+   {
+      return 1;
+   }
 
    pgmoneta_workers_wait(workers);
    pgmoneta_workers_destroy(workers);

@@ -27,10 +27,10 @@
  */
 
 /* pgmoneta */
+#include <compression.h>
 #include <pgmoneta.h>
 #include <logging.h>
 #include <utils.h>
-#include <zstandard_compression.h>
 #include <workflow.h>
 
 /* system */
@@ -138,8 +138,14 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      pgmoneta_zstandardc_data(backup_data, workers);
-      pgmoneta_zstandardc_tablespaces(backup_base, workers);
+      if (pgmoneta_compress_directory(backup_data, COMPRESSION_SERVER_ZSTD, workers))
+      {
+         goto error;
+      }
+      if (pgmoneta_workflow_compress_tablespaces(backup_base, COMPRESSION_SERVER_ZSTD, workers))
+      {
+         goto error;
+      }
 
       pgmoneta_workers_wait(workers);
       if (workers != NULL && !workers->outcome)
@@ -163,7 +169,10 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_debug("%s doesn't exists", d);
       }
 
-      pgmoneta_zstandardc_file(tarfile, d);
+      if (pgmoneta_compress_file(tarfile, d, COMPRESSION_SERVER_ZSTD, NULL))
+      {
+         goto error;
+      }
    }
 
 #ifdef HAVE_FREEBSD
@@ -252,7 +261,10 @@ zstd_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_zstandardd_directory(base, workers);
+   if (pgmoneta_decompress_directory(base, COMPRESSION_SERVER_ZSTD, workers))
+   {
+      goto error;
+   }
 
    pgmoneta_workers_wait(workers);
    if (workers != NULL && !workers->outcome)

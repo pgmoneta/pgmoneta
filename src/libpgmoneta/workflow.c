@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <art.h>
+#include <compression.h>
 #include <hot_standby.h>
 #include <logging.h>
 #include <management.h>
@@ -40,6 +41,7 @@
 
 /* system */
 #include <assert.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -427,6 +429,48 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
 
    pgmoneta_log_debug("%s (teardown): %s/%s", name, config->common.servers[server].name, label);
 
+   return 0;
+}
+
+int
+pgmoneta_workflow_compress_tablespaces(char* root, int compression_type, struct workers* workers)
+{
+   DIR* dir = NULL;
+   struct dirent* entry = NULL;
+
+   if (root == NULL)
+   {
+      return 1;
+   }
+
+   if (!(dir = opendir(root)))
+   {
+      return 1;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      char path[MAX_PATH];
+
+      if (entry->d_type != DT_DIR)
+      {
+         continue;
+      }
+
+      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, "data") == 0)
+      {
+         continue;
+      }
+
+      pgmoneta_snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
+      if (pgmoneta_compress_directory(path, compression_type, workers))
+      {
+         closedir(dir);
+         return 1;
+      }
+   }
+
+   closedir(dir);
    return 0;
 }
 

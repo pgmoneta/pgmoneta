@@ -338,8 +338,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
          if (COMPRESSION_ALGORITHM(config->compression_type) != COMPRESSION_ALG_NONE)
          {
-            /* TODO: Workers */
-            if (pgmoneta_decompress_directory(destination))
+            if (pgmoneta_decompress_directory(destination, config->compression_type, workers))
             {
                error = true;
                goto cleanup;

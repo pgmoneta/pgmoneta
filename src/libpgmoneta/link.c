@@ -28,7 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <compression.h>
+#include <extraction.h>
 #include <link.h>
 #include <logging.h>
 #include <utils.h>
@@ -483,6 +483,9 @@ static char*
 trim_suffix(char* str)
 {
    struct main_configuration* config;
+   uint32_t file_type;
+   uint32_t configured_mask;
+   uint32_t effective_type;
 
    if (str == NULL)
    {
@@ -498,9 +501,18 @@ trim_suffix(char* str)
       return pgmoneta_append(NULL, str);
    }
 
+   file_type = pgmoneta_get_file_type(str);
+   configured_mask = pgmoneta_extraction_configured_file_type_mask(config->compression_type, config->encryption);
+   effective_type = file_type & configured_mask;
+
+   if (effective_type == PGMONETA_FILE_TYPE_UNKNOWN)
+   {
+      return pgmoneta_append(NULL, str);
+   }
+
    char* res = NULL;
 
-   if (pgmoneta_compression_trim_suffix(str, config->compression_type, config->encryption, &res))
+   if (pgmoneta_extraction_strip_suffix(str, effective_type, &res))
    {
       return NULL;
    }

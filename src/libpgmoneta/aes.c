@@ -28,7 +28,7 @@
 
 #include <pgmoneta.h>
 #include <aes.h>
-#include <compression.h>
+#include <extraction.h>
 #include <logging.h>
 #include <management.h>
 #include <security.h>
@@ -312,22 +312,26 @@ pgmoneta_encrypt_wal(char* d)
    struct dirent* entry;
    char* compress_suffix = NULL;
    struct main_configuration* config;
-   const char* alg_suffix = NULL;
 
    config = (struct main_configuration*)shmem;
 
-   pgmoneta_compression_get_suffix(config->compression_type, &alg_suffix);
-   if (alg_suffix != NULL)
+   if (pgmoneta_extraction_get_suffix(config->compression_type, ENCRYPTION_NONE, &compress_suffix))
    {
-      compress_suffix = (char*)alg_suffix;
+      return 1;
    }
-   else
+
+   if (compress_suffix == NULL)
    {
-      compress_suffix = "";
+      compress_suffix = pgmoneta_append(compress_suffix, "");
+      if (compress_suffix == NULL)
+      {
+         return 1;
+      }
    }
 
    if (!(dir = opendir(d)))
    {
+      free(compress_suffix);
       return 1;
    }
    while ((entry = readdir(dir)) != NULL)
@@ -370,6 +374,7 @@ pgmoneta_encrypt_wal(char* d)
       }
    }
 
+   free(compress_suffix);
    closedir(dir);
    return 0;
 }
@@ -381,18 +386,21 @@ pgmoneta_encrypt_wal_file(char* d, char* f)
    char* to = NULL;
    char* compress_suffix = NULL;
    struct main_configuration* config;
-   const char* alg_suffix = NULL;
 
    config = (struct main_configuration*)shmem;
 
-   pgmoneta_compression_get_suffix(config->compression_type, &alg_suffix);
-   if (alg_suffix != NULL)
+   if (pgmoneta_extraction_get_suffix(config->compression_type, ENCRYPTION_NONE, &compress_suffix))
    {
-      compress_suffix = (char*)alg_suffix;
+      return 1;
    }
-   else
+
+   if (compress_suffix == NULL)
    {
-      compress_suffix = "";
+      compress_suffix = pgmoneta_append(compress_suffix, "");
+      if (compress_suffix == NULL)
+      {
+         return 1;
+      }
    }
 
    from = NULL;
@@ -423,6 +431,7 @@ pgmoneta_encrypt_wal_file(char* d, char* f)
 
    free(from);
    free(to);
+   free(compress_suffix);
 
    return 0;
 }
@@ -1997,14 +2006,9 @@ get_key_length(int mode)
 }
 
 bool
-pgmoneta_is_encrypted(char* f)
+pgmoneta_is_encrypted(char* file_path)
 {
-   if (f == NULL)
-   {
-      return false;
-   }
-
-   if (pgmoneta_ends_with(f, ".aes"))
+   if (pgmoneta_ends_with(file_path, ".aes"))
    {
       return true;
    }

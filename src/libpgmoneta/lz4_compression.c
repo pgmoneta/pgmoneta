@@ -27,6 +27,9 @@
  */
 
 /* pgmoneta */
+#include <aes.h>
+#include <compression.h>
+#include <extraction.h>
 #include <pgmoneta.h>
 #include <aes.h>
 #include <logging.h>
@@ -49,9 +52,6 @@
 
 static int lz4_compress(char* from, char* to);
 static int lz4_decompress(char* from, char* to);
-
-static void do_lz4_compress(struct worker_common* wc);
-static void do_lz4_decompress(struct worker_common* wc);
 
 static int lz4_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
 static int lz4_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
@@ -82,129 +82,6 @@ struct lz4_compressor
    enum lz4_compressor_state state;
 };
 
-int
-pgmoneta_lz4c_data(char* directory, struct workers* workers)
-{
-   char* from = NULL;
-   char* to = NULL;
-   DIR* dir;
-   struct worker_input* wi = NULL;
-   struct dirent* entry;
-
-   if (!(dir = opendir(directory)))
-   {
-      goto error;
-   }
-
-   while ((entry = readdir(dir)) != NULL)
-   {
-      if (entry->d_type == DT_DIR)
-      {
-         char path[1024];
-
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-         {
-            continue;
-         }
-
-         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-         pgmoneta_lz4c_data(path, workers);
-      }
-      else if (entry->d_type == DT_REG)
-      {
-         if (pgmoneta_ends_with(entry->d_name, "backup_manifest") ||
-             pgmoneta_ends_with(entry->d_name, "backup_label"))
-         {
-            continue;
-         }
-
-         if (!pgmoneta_compression_is_compressed(entry->d_name) && !pgmoneta_is_encrypted(entry->d_name))
-         {
-            from = pgmoneta_append(from, directory);
-            from = pgmoneta_append(from, "/");
-            from = pgmoneta_append(from, entry->d_name);
-
-            to = pgmoneta_append(to, directory);
-            to = pgmoneta_append(to, "/");
-            to = pgmoneta_append(to, entry->d_name);
-            to = pgmoneta_append(to, ".lz4");
-
-            if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
-            {
-               if (workers != NULL)
-               {
-                  if (workers->outcome)
-                  {
-                     pgmoneta_workers_add(workers, do_lz4_compress, (struct worker_common*)wi);
-                  }
-                  else
-                  {
-                     do_lz4_compress((struct worker_common*)wi);
-                  }
-               }
-               else
-               {
-                  do_lz4_compress((struct worker_common*)wi);
-               }
-            }
-            else
-            {
-               goto error;
-            }
-
-            free(from);
-            free(to);
-
-            from = NULL;
-            to = NULL;
-         }
-      }
-   }
-
-   closedir(dir);
-
-   free(from);
-   free(to);
-
-   return 0;
-
-error:
-
-   if (dir != NULL)
-   {
-      closedir(dir);
-   }
-
-   free(from);
-   free(to);
-
-   return 1;
-}
-
-static void
-do_lz4_compress(struct worker_common* wc)
-{
-   struct worker_input* wi = (struct worker_input*)wc;
-
-   if (pgmoneta_exists(wi->from))
-   {
-      if (lz4_compress(wi->from, wi->to))
-      {
-         pgmoneta_log_error("LZ4: Could not compress %s", wi->from);
-         if (wi->common.workers != NULL)
-         {
-            wi->common.workers->outcome = false;
-         }
-      }
-      else
-      {
-         pgmoneta_delete_file(wi->from, NULL);
-      }
-   }
-
-   free(wi);
-}
-
 void
 pgmoneta_lz4c_wal(char* directory)
 {
@@ -226,7 +103,7 @@ pgmoneta_lz4c_wal(char* directory)
       }
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_compression_is_compressed(entry->d_name) ||
+         if (pgmoneta_is_compressed(entry->d_name) ||
              pgmoneta_is_encrypted(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
              pgmoneta_ends_with(entry->d_name, ".history"))
@@ -309,163 +186,6 @@ pgmoneta_lz4c_wal_file(char* directory, char* file)
 
    free(from);
    free(to);
-}
-
-void
-pgmoneta_lz4c_tablespaces(char* root, struct workers* workers)
-{
-   DIR* dir;
-   struct dirent* entry;
-
-   if (!(dir = opendir(root)))
-   {
-      return;
-   }
-
-   while ((entry = readdir(dir)) != NULL)
-   {
-      if (entry->d_type == DT_DIR)
-      {
-         char path[1024];
-
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, "data") == 0)
-         {
-            continue;
-         }
-
-         pgmoneta_snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
-         pgmoneta_lz4c_data(path, workers);
-      }
-   }
-
-   closedir(dir);
-}
-
-int
-pgmoneta_lz4d_data(char* directory, struct workers* workers)
-{
-   char* from = NULL;
-   char* to = NULL;
-   char* name = NULL;
-   DIR* dir;
-   struct worker_input* wi = NULL;
-   struct dirent* entry;
-
-   if (!(dir = opendir(directory)))
-   {
-      goto error;
-   }
-
-   while ((entry = readdir(dir)) != NULL)
-   {
-      if (entry->d_type == DT_DIR || entry->d_type == DT_LNK)
-      {
-         char path[1024];
-
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-         {
-            continue;
-         }
-
-         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-         pgmoneta_lz4d_data(path, workers);
-      }
-      else
-      {
-         if (pgmoneta_ends_with(entry->d_name, ".lz4"))
-         {
-            from = pgmoneta_append(from, directory);
-            from = pgmoneta_append(from, "/");
-            from = pgmoneta_append(from, entry->d_name);
-
-            name = pgmoneta_remove_suffix(entry->d_name, ".lz4");
-            if (name == NULL)
-            {
-               goto error;
-            }
-
-            to = pgmoneta_append(to, directory);
-            to = pgmoneta_append(to, "/");
-            to = pgmoneta_append(to, name);
-
-            if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
-            {
-               if (workers != NULL)
-               {
-                  if (workers->outcome)
-                  {
-                     pgmoneta_workers_add(workers, do_lz4_decompress, (struct worker_common*)wi);
-                  }
-                  else
-                  {
-                     do_lz4_decompress((struct worker_common*)wi);
-                  }
-               }
-               else
-               {
-                  do_lz4_decompress((struct worker_common*)wi);
-               }
-            }
-            else
-            {
-               goto error;
-            }
-
-            free(name);
-            free(from);
-            free(to);
-
-            name = NULL;
-            from = NULL;
-            to = NULL;
-         }
-      }
-   }
-
-   closedir(dir);
-
-   free(name);
-   free(from);
-   free(to);
-
-   return 0;
-
-error:
-
-   if (dir != NULL)
-   {
-      closedir(dir);
-   }
-
-   free(name);
-   free(from);
-   free(to);
-
-   return 1;
-}
-
-static void
-do_lz4_decompress(struct worker_common* wc)
-{
-   struct worker_input* wi = (struct worker_input*)wc;
-
-   if (pgmoneta_exists(wi->from))
-   {
-      if (lz4_decompress(wi->from, wi->to))
-      {
-         pgmoneta_log_error("LZ4: Could not decompress %s", wi->from);
-         if (wi->common.workers != NULL)
-         {
-            wi->common.workers->outcome = false;
-         }
-      }
-      else
-      {
-         pgmoneta_delete_file(wi->from, NULL);
-      }
-   }
-
-   free(wi);
 }
 
 void
