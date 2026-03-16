@@ -38,6 +38,9 @@ extern "C" {
  */
 struct vfile
 {
+   char* type;
+   char* name;
+
    /**
     * The read callback
     * @param vfile The vfile

@@ -140,7 +140,7 @@ pgmoneta_streamer_write(struct streamer* streamer, void* buffer, size_t size, bo
          // process and send data when the buffer is full or we have no more data to send
          if (streamer->stream_cb(streamer, last_chk))
          {
-            //TODO: need to log what has failed at least
+            pgmoneta_log_error("Streamer callback failed during execution");
             goto error;
          }
          // update bytes written on success
@@ -218,7 +218,8 @@ noop_stream_cb(struct streamer* this, bool last_chunk)
       f = (struct vfile*)pgmoneta_value_data(vfile_iter->value);
       if (f->write(f, this->buffer, this->size, last_chunk))
       {
-         pgmoneta_log_error("Failed to write buffer");
+         pgmoneta_log_error("Streamer: Failed to write buffer to %s destination: %s", f->type != NULL ? f->type : "unknown", f->name != NULL ? f->name : "unknown");
+         goto error;
       }
    }
    pgmoneta_deque_iterator_destroy(vfile_iter);
@@ -250,6 +251,7 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
    {
       if (this->compressor->compress(this->compressor, cbuf, sizeof(cbuf), &cbuf_size, &finished))
       {
+         pgmoneta_log_error("Failed to compress data in streamer");
          goto error;
       }
       // Chances are we may receive no output at all this round before we provide more input
@@ -260,6 +262,7 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
       }
       if (this->encryptor->encrypt(this->encryptor, cbuf, cbuf_size, finished && last_chunk, &ebuf, &ebuf_size))
       {
+         pgmoneta_log_error("Failed to encrypt data in streamer");
          goto error;
       }
       //write ebuf to file
@@ -269,7 +272,8 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
          f = (struct vfile*)pgmoneta_value_data(vfile_iter->value);
          if (f->write(f, ebuf, ebuf_size, last_chunk))
          {
-            pgmoneta_log_error("Failed to write buffer");
+            pgmoneta_log_error("Streamer: Failed to write buffer to %s destination: %s", f->type != NULL ? f->type : "unknown", f->name != NULL ? f->name : "unknown");
+            goto error;
          }
       }
       pgmoneta_deque_iterator_destroy(vfile_iter);
@@ -305,6 +309,7 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
 
    if (this->encryptor->decrypt(this->encryptor, this->buffer, this->size, last_chunk, &ebuf, &ebuf_size))
    {
+      pgmoneta_log_error("Failed to decrypt data in streamer");
       goto error;
    }
 
@@ -313,6 +318,7 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
    {
       if (this->compressor->decompress(this->compressor, cbuf, sizeof(cbuf), &cbuf_size, &finished))
       {
+         pgmoneta_log_error("Failed to decompress data in streamer");
          goto error;
       }
 
@@ -329,7 +335,8 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
          f = (struct vfile*)pgmoneta_value_data(vfile_iter->value);
          if (f->write(f, cbuf, cbuf_size, last_chunk))
          {
-            pgmoneta_log_error("Failed to write buffer");
+            pgmoneta_log_error("Streamer: Failed to write buffer to %s destination: %s", f->type != NULL ? f->type : "unknown", f->name != NULL ? f->name : "unknown");
+            goto error;
          }
       }
       pgmoneta_deque_iterator_destroy(vfile_iter);
