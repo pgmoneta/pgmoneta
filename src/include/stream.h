@@ -51,6 +51,7 @@ struct streamer
    struct compressor* compressor; /**< The compressor */
    struct encryptor* encryptor;   /**< The encryptor */
    struct deque* destinations;    /**< The streaming destinations */
+   struct deque* failed_destinations; /**< The failed destinations */
    char buffer[BUFFER_SIZE];      /**< The internal buffer */
    size_t size;                   /**< The buffer data size */
    size_t capacity;               /**< The buffer capacity */
