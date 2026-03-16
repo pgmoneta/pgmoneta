@@ -50,11 +50,13 @@
 #define ENV_VAR_USER_CONF        "PGMONETA_TEST_USER_CONF"
 #define ENV_VAR_RESTORE_DIR      "PGMONETA_TEST_RESTORE_DIR"
 #define ENV_VAR_RETROSPECT_DIR   "PGMONETA_TEST_RETROSPECT_DIR"
+#define ENV_VAR_HOT_STANDBY_DIR  "PGMONETA_TEST_HOT_STANDBY_DIR"
 
 char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 char TEST_RESTORE_DIR[MAX_PATH];
 char TEST_BASE_DIR[MAX_PATH];
 char TEST_RETROSPECT_DIR[MAX_PATH];
+char TEST_HOT_STANDBY_DIR[MAX_PATH];
 
 /* In-process snapshot of the configuration used for save/restore */
 static struct main_configuration config_snapshot;
@@ -69,13 +71,16 @@ pgmoneta_test_environment_create(void)
    char* restore_dir = NULL;
    char* base_dir = NULL;
    char* retrospect_dir = NULL;
+   char* hot_standby_dir = NULL;
    int ret = 0;
    size_t size = 0;
 
    memset(TEST_CONFIG_SAMPLE_PATH, 0, sizeof(TEST_CONFIG_SAMPLE_PATH));
    memset(TEST_RESTORE_DIR, 0, sizeof(TEST_RESTORE_DIR));
    memset(TEST_BASE_DIR, 0, sizeof(TEST_BASE_DIR));
-
+   memset(TEST_RETROSPECT_DIR, 0, sizeof(TEST_RETROSPECT_DIR));
+   memset(TEST_HOT_STANDBY_DIR, 0, sizeof(TEST_HOT_STANDBY_DIR));
+   
    conf_path = getenv(ENV_VAR_CONF_PATH);
    assert(conf_path != NULL);
    // Create the shared memory for the configuration
@@ -117,6 +122,10 @@ pgmoneta_test_environment_create(void)
    assert(retrospect_dir != NULL);
    memcpy(TEST_RETROSPECT_DIR, retrospect_dir, strlen(retrospect_dir));
 
+   hot_standby_dir = getenv(ENV_VAR_HOT_STANDBY_DIR);
+   assert(hot_standby_dir != NULL);
+   memcpy(TEST_HOT_STANDBY_DIR, hot_standby_dir, strlen(hot_standby_dir));
+
    user_conf_path = getenv(ENV_VAR_USER_CONF);
    assert(user_conf_path != NULL);
 
@@ -136,6 +145,9 @@ pgmoneta_test_environment_destroy(void)
 
    memset(TEST_CONFIG_SAMPLE_PATH, 0, sizeof(TEST_CONFIG_SAMPLE_PATH));
    memset(TEST_RESTORE_DIR, 0, sizeof(TEST_RESTORE_DIR));
+   memset(TEST_BASE_DIR, 0, sizeof(TEST_BASE_DIR));
+   memset(TEST_RETROSPECT_DIR, 0, sizeof(TEST_RETROSPECT_DIR));
+   memset(TEST_HOT_STANDBY_DIR, 0, sizeof(TEST_HOT_STANDBY_DIR));
 
    pgmoneta_stop_logging();
 
@@ -226,6 +238,9 @@ pgmoneta_test_basedir_cleanup(void)
 
    pgmoneta_delete_directory(wal_dir);
    pgmoneta_mkdir(wal_dir);
+
+   pgmoneta_delete_directory(TEST_HOT_STANDBY_DIR);
+   pgmoneta_mkdir(TEST_HOT_STANDBY_DIR);
 
    if (pgmoneta_delete_file(config->common.configuration_path, NULL))
    {

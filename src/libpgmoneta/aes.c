@@ -1995,3 +1995,19 @@ get_key_length(int mode)
          return 32;
    }
 }
+
+bool
+pgmoneta_is_encrypted(char* f)
+{
+   if (f == NULL)
+   {
+      return false;
+   }
+
+   if (pgmoneta_ends_with(f, ".aes"))
+   {
+      return true;
+   }
+
+   return false;
+}

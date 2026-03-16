@@ -47,6 +47,7 @@ COVERAGE_DIR="$PGMONETA_ROOT_DIR/coverage"
 LOG_DIR="$PGMONETA_ROOT_DIR/log"
 PG_LOG_DIR="$PGMONETA_ROOT_DIR/pg_log"
 RETROSPECT_DIR="$PGMONETA_ROOT_DIR/retrospect"
+HOT_STANDBY_DIRECTORY="$PGMONETA_ROOT_DIR/standby"
 
 # BASE DIR holds all the run time data
 WORKSPACE_DIRECTORY="$BASE_DIR/pgmoneta-workspace/"
@@ -283,6 +284,8 @@ host = localhost
 port = $PORT
 user = $PG_REPL_USER_NAME
 wal_slot = repl
+hot_standby = $HOT_STANDBY_DIRECTORY
+hot_standby_overrides = $HOT_STANDBY_DIRECTORY/overrides
 EOF
    echo "Add test configuration to pgmoneta.conf ... ok"
    if [[ ! -e $HOME/.pgmoneta/master.key ]]; then
@@ -313,6 +316,9 @@ export_pgmoneta_test_variables() {
 
   echo "export PGMONETA_TEST_RETROSPECT_DIR=$RETROSPECT_DIR"
   export PGMONETA_TEST_RETROSPECT_DIR=$RETROSPECT_DIR
+
+  echo "export PGMONETA_TEST_HOT_STANDBY_DIR=$HOT_STANDBY_DIRECTORY"
+  export PGMONETA_TEST_HOT_STANDBY_DIR=$HOT_STANDBY_DIRECTORY
 }
 
 unset_pgmoneta_test_variables() {
@@ -321,6 +327,7 @@ unset_pgmoneta_test_variables() {
   unset PGMONETA_TEST_USER_CONF
   unset PGMONETA_TEST_CONF_SAMPLE
   unset PGMONETA_TEST_RESTORE_DIR
+  unset PGMONETA_TEST_HOT_STANDBY_DIR
   unset LLVM_PROFILE_FILE
   unset CC
 }
@@ -357,7 +364,7 @@ do_setup() {
   export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p-%m.profraw"
   rm -Rf "$PGMONETA_ROOT_DIR"
   mkdir -p "$PGMONETA_ROOT_DIR"
-  mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR" "$RETROSPECT_DIR"
+  mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR" "$RETROSPECT_DIR" "$HOT_STANDBY_DIRECTORY"
   mkdir -p "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY" "$WORKSPACE_DIRECTORY" "$RESOURCE_DIRECTORY" "$PGCONF_DIRECTORY"
   cp -R "$PROJECT_DIRECTORY/test/resource" $BASE_DIR
   cp -R $TEST_PG_DIRECTORY/conf/* $PGCONF_DIRECTORY/

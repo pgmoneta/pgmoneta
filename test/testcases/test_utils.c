@@ -1288,14 +1288,14 @@ MCTF_TEST(test_utils_enc_comp)
    MCTF_ASSERT(!pgmoneta_is_encrypted("file.txt"), cleanup, "is_encrypted negative 1 failed");
    MCTF_ASSERT(!pgmoneta_is_encrypted(NULL), cleanup, "is_encrypted NULL failed");
 
-   // Is compressed
+   // Is compressed (via compression helpers)
 
-   MCTF_ASSERT(pgmoneta_is_compressed("file.zstd"), cleanup, "is_compressed zstd failed");
-   MCTF_ASSERT(pgmoneta_is_compressed("file.lz4"), cleanup, "is_compressed lz4 failed");
-   MCTF_ASSERT(pgmoneta_is_compressed("file.bz2"), cleanup, "is_compressed bz2 failed");
-   MCTF_ASSERT(pgmoneta_is_compressed("file.gz"), cleanup, "is_compressed gz failed");
-   MCTF_ASSERT(!pgmoneta_is_compressed("file.txt"), cleanup, "is_compressed negative failed");
-   MCTF_ASSERT(!pgmoneta_is_compressed(NULL), cleanup, "is_compressed NULL failed");
+   MCTF_ASSERT(pgmoneta_compression_is_compressed("file.zstd"), cleanup, "is_compressed zstd failed");
+   MCTF_ASSERT(pgmoneta_compression_is_compressed("file.lz4"), cleanup, "is_compressed lz4 failed");
+   MCTF_ASSERT(pgmoneta_compression_is_compressed("file.bz2"), cleanup, "is_compressed bz2 failed");
+   MCTF_ASSERT(pgmoneta_compression_is_compressed("file.gz"), cleanup, "is_compressed gz failed");
+   MCTF_ASSERT(!pgmoneta_compression_is_compressed("file.txt"), cleanup, "is_compressed negative failed");
+   MCTF_ASSERT(!pgmoneta_compression_is_compressed(NULL), cleanup, "is_compressed NULL failed");
 
    MCTF_ASSERT_INT_EQ(pgmoneta_extraction_strip_suffix("file.zstd.aes",
                                                        PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_ZSTD | PGMONETA_FILE_TYPE_ENCRYPTED,
