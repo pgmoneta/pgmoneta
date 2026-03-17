@@ -68,8 +68,9 @@ cmake -DCMAKE_BUILD_TYPE=Release -DDOCS=FALSE ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta.service %{buildroot}%{_docdir}/%{name}/etc/pgmoneta.service
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/manual/en/*.md %{buildroot}%{_docdir}/%{name}/manual/en/
-%{__mkdir_p} %{buildroot}%{_docdir}/%{name}/images/
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/* %{buildroot}%{_docdir}/%{name}/images/*
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/*.jpg %{buildroot}%{_docdir}/%{name}/images/*.jpg
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/*.jpg %{buildroot}%{_docdir}/%{name}/images/*.png
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/*.jpg %{buildroot}%{_docdir}/%{name}/images/*.svg
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta.conf %{buildroot}%{_sysconfdir}/pgmoneta/pgmoneta.conf
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta_walfilter.conf %{buildroot}%{_sysconfdir}/pgmoneta/pgmoneta_walfilter.conf
@@ -153,7 +154,9 @@ cd %{buildroot}%{_libdir}/
 %{_mandir}/man5/pgmoneta.conf.5*
 %{_mandir}/man5/pgmoneta-cli.conf.5*
 
-%{_docdir}/%{name}/images/*
+%{_docdir}/%{name}/images/*.jpg
+%{_docdir}/%{name}/images/*.png
+%{_docdir}/%{name}/images/*.svg
 
 %{_mandir}/man1/pgmoneta-walfilter.1*
 %{_mandir}/man1/pgmoneta-walinfo.1*
@@ -170,3 +173,6 @@ cd %{buildroot}%{_libdir}/
 %{_libdir}/libpgmoneta.so.%{version}
 
 %changelog
+* Thu Jan 1 2026 Jesper Pedersen <jesperpedersen.db@gmail.com> 0.21.0
+  - Sample entry
+
