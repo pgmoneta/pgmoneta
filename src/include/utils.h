@@ -1472,6 +1472,25 @@ char*
 pgmoneta_wal_file_name(uint32_t tli, size_t segno, int segsize);
 
 /**
+ * Get the actual backup file path with appropriate compression/encryption extensions
+ * 
+ * Checks for file existence in this order:
+ * 1. Base path without extensions (uncompressed)
+ * 2. Base path with compression extension
+ * 3. Base path with compression + encryption extensions
+ * 
+ * Returns a newly allocated string with the actual file path that exists.
+ * Caller is responsible for freeing the returned string.
+ * 
+ * @param base_path The base file path without extensions
+ * @param compression The compression type (COMPRESSION_* constants)
+ * @param encryption The encryption type (ENCRYPTION_* constants)
+ * @return The actual file path that exists, or NULL if not found
+ */
+char*
+pgmoneta_get_backup_file_path(char* base_path, int compression, int encryption);
+
+/**
  * Is the string a number ?
  * @param str The string
  * @param base The base (10 or 16)
