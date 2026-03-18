@@ -302,6 +302,9 @@ export_pgmoneta_test_variables() {
   echo "export PGMONETA_TEST_BASE_DIR=$BASE_DIR"
   export PGMONETA_TEST_BASE_DIR=$BASE_DIR
 
+  echo "export PGMONETA_TEST_EXECUTABLE_DIR=$EXECUTABLE_DIRECTORY"
+  export PGMONETA_TEST_EXECUTABLE_DIR=$EXECUTABLE_DIRECTORY
+
   echo "export PGMONETA_TEST_CONF=$CONFIGURATION_DIRECTORY/pgmoneta.conf"
   export PGMONETA_TEST_CONF=$CONFIGURATION_DIRECTORY/pgmoneta.conf
 
@@ -323,6 +326,7 @@ export_pgmoneta_test_variables() {
 
 unset_pgmoneta_test_variables() {
   unset PGMONETA_TEST_BASE_DIR
+  unset PGMONETA_TEST_EXECUTABLE_DIR
   unset PGMONETA_TEST_CONF
   unset PGMONETA_TEST_USER_CONF
   unset PGMONETA_TEST_CONF_SAMPLE

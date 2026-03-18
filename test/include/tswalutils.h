@@ -91,4 +91,12 @@
 #define RANDOM_WALFILE_NAME "/00000001000000000000001D"
 
 struct walfile*
-pgmoneta_test_generate_check_point_shutdown_v17();
+pgmoneta_test_generate_check_point_shutdown_v17(void);
+
+/**
+ * Generate a WAL file with 3 records: CHECKPOINT_SHUTDOWN, HEAP INSERT, HEAP DELETE.
+ * The INSERT has XID 100, the DELETE has XID 200.
+ * @return The generated walfile, or NULL on failure
+ */
+struct walfile*
+pgmoneta_test_generate_mixed_heap_wal_v17(void);
