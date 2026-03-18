@@ -727,6 +727,20 @@ pgmoneta_get_directories(char* base, int* number_of_directories, char*** dirs);
  */
 int
 pgmoneta_delete_directory(char* path);
+/**
+ * Append a buffer to a file (create if missing), with an optional offset check.
+ *
+ * The function will create parent directories for tmp_path if needed.
+ *
+ * @param tmp_path The temporary/in-progress file path (e.g. "<final>.tmp")
+ * @param data The buffer to append
+ * @param data_size The number of bytes to append
+ * @param expected_offset The expected current size of tmp_path before writing,
+ *                        or (size_t)-1 to skip the check
+ * @return 0 on success, otherwise 1
+*/
+int
+pgmoneta_append_file_chunk(const char* tmp_path, const void* data, size_t data_size, long expected_offset);
 
 /**
  * Get files with type filtering and optional recursion

@@ -96,6 +96,7 @@ extern "C" {
 
 #define MANAGEMENT_S3_LS          200
 #define MANAGEMENT_S3_DELETE      201
+#define MANAGEMENT_S3_RESTORE     202
 
 /**
  * Management categories
@@ -400,6 +401,12 @@ extern "C" {
 #define MANAGEMENT_ERROR_DELETE_S3_INVALID_PREFIX           3104
 #define MANAGEMENT_ERROR_DELETE_S3_ERROR                    3105
 
+#define MANAGEMENT_ERROR_RESTORE_S3_NOSERVER                3200
+#define MANAGEMENT_ERROR_RESTORE_S3_NOFORK                  3201
+#define MANAGEMENT_ERROR_RESTORE_S3_WORKFLOW                3202
+#define MANAGEMENT_ERROR_RESTORE_S3_NETWORK                 3203
+#define MANAGEMENT_ERROR_RESTORE_S3_ERROR                   3204
+
 /**
  * Output formats
  */
@@ -504,6 +511,20 @@ pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, 
  */
 int
 pgmoneta_management_request_delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a restore s3 objects request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param prefix The prefix to delete under the server backup path
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request

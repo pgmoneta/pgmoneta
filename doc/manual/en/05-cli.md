@@ -169,6 +169,31 @@ pgmoneta-cli restore primary newest time=2025-01-15\ 10:30:00 /tmp
 pgmoneta-cli restore primary newest timeline=2 /tmp
 ```
 
+## s3 restore
+
+Download a backup from S3 to the local backup directory
+
+This subcommand downloads a backup from S3 storage and makes it available locally. The flow is:
+
+* Download `backup.sha512`, `backup.info`, and `backup.manifest` from S3
+* Verify `backup.info` integrity using the SHA512 checksum
+* Download all data files listed in the manifest, applying the correct compression and encryption extensions
+* Atomically move the downloaded backup into the local backup directory
+
+After `s3 restore` completes, the backup appears in `status details` and can be restored using `pgmoneta-cli restore`.
+
+Command
+
+``` sh
+pgmoneta-cli s3 restore <server> <timestamp>
+```
+
+Example
+
+``` sh
+pgmoneta-cli s3 restore primary 20260316000957
+```
+
 ## verify
 
 Verify a backup from a server
@@ -524,12 +549,14 @@ Subcommand
 
 - `ls` : List all the files in s3
 - `delete` : Delete all files under a remote prefix in s3
+- `restore` : Download a backup from s3 to the local backup directory
 
 Example
 
 ```sh
 pgmoneta-cli s3 ls primary
 pgmoneta-cli s3 delete primary 20260302163357
+pgmoneta-cli s3 restore primary 20260316000957
 ```
 
 ### s3 ls
@@ -558,6 +585,19 @@ pgmoneta-cli s3 delete primary 20260302163357/
 pgmoneta-cli s3 delete primary wal/
 ```
 
+### s3 restore
+
+Download a backup from S3 to the local backup directory.
+
+- Downloads and verifies `backup.info` integrity via SHA512
+- Downloads all data files with correct compression/encryption extensions
+- The backup becomes available for `pgmoneta-cli restore`
+
+Examples
+
+``` sh
+pgmoneta-cli s3 restore primary 20260316000957
+```
 
 ## clear
 

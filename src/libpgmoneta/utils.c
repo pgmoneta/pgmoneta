@@ -2020,6 +2020,48 @@ pgmoneta_delete_directory(char* path)
 
    return r;
 }
+int
+pgmoneta_append_file_chunk(const char* tmp_path, const void* data, size_t data_size, long expected_offset)
+{
+   // check if the temp path exists
+   char* parent_dir = NULL;
+   FILE* f = NULL;
+
+   parent_dir = pgmoneta_get_parent_dir(tmp_path);
+   if (parent_dir == NULL)
+   {
+      goto error;
+   }
+   // create the parent dir
+   if (pgmoneta_mkdir(parent_dir))
+      goto error;
+   // create the file with append if exists
+   f = fopen(tmp_path, "a+");
+   if (f == NULL)
+   {
+      goto error;
+   }
+   // check if the expected offset is correct
+   if (expected_offset != ftell(f))
+   {
+      goto error;
+   }
+   // write the data
+   if (fwrite(data, 1, data_size, f) != data_size)
+   {
+      goto error;
+   }
+   // close the file
+   fclose(f);
+   free(parent_dir);
+
+   return 0;
+error:
+   if (f != NULL)
+      fclose(f);
+   free(parent_dir);
+   return 1;
+}
 
 int
 pgmoneta_get_files(uint32_t file_type_mask, char* base, bool recursive, struct deque** files)
