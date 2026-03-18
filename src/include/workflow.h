@@ -54,6 +54,7 @@ extern "C" {
 
 #define WORKFLOW_TYPE_S3_LIST            100
 #define WORKFLOW_TYPE_S3_DELETE          101
+#define WORKFLOW_TYPE_S3_RESTORE         102
 
 #define PERMISSION_TYPE_BACKUP           0
 #define PERMISSION_TYPE_RESTORE          1

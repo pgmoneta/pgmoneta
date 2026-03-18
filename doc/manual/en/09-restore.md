@@ -94,6 +94,26 @@ Response:
 
 This command take the latest backup and all Write-Ahead Log (WAL) segments and restore it into the `/tmp/primary-20240928065644` directory for an up-to-date copy.
 
+## Restore from S3
+
+If your backups are stored in S3, you first need to download them to the local backup directory using `pgmoneta-cli s3 restore`, then restore normally.
+
+Step 1: Download the backup from S3
+
+```
+pgmoneta-cli s3 restore primary 20260316000957
+```
+
+This downloads the backup files from S3, verifies `backup.info` integrity via SHA512, and places the backup in the local backup directory.
+
+Step 2: Restore the backup
+
+```
+pgmoneta-cli restore primary 20260316000957 current /tmp
+```
+
+This decompresses, decrypts, applies WAL, and produces a usable PostgreSQL data directory.
+
 ## Hot standby
 
 In order to use hot standby, simply add

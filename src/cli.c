@@ -124,6 +124,7 @@ static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8
 static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int list_s3_objects(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -276,6 +277,12 @@ struct pgmoneta_command command_table[] = {
     .action = MANAGEMENT_S3_DELETE,
     .deprecated = false,
     .log_message = "<s3 delete>"},
+   {.command = "s3",
+    .subcommand = "restore",
+    .accepted_argument_count = {1, 2},
+    .action = MANAGEMENT_S3_RESTORE,
+    .deprecated = false,
+    .log_message = "<s3 restore>"},
    {
       .command = "restore",
       .subcommand = "",
@@ -931,6 +938,10 @@ execute:
    {
       exit_code = delete_s3_objects(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_S3_RESTORE)
+   {
+      exit_code = restore_s3_objects(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+   }
    else if (parsed.cmd->action == MANAGEMENT_RESTORE)
    {
       if (parsed.args[3])
@@ -1139,6 +1150,7 @@ help_s3(void)
    printf("Manage the s3\n");
    printf("  pgmoneta-cli s3 ls <server>\n");
    printf("  pgmoneta-cli s3 delete <server> <prefix>\n");
+   printf("  pgmoneta-cli s3 restore <server> <prefix> \n");
 }
 
 static void
@@ -1433,6 +1445,24 @@ static int
 delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    if (pgmoneta_management_request_delete_s3_objects(ssl, socket, server, prefix, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+   return 1;
+}
+static int
+restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_restore_s3_objects(ssl, socket, server, prefix, compression, encryption, output_format))
    {
       goto error;
    }
@@ -2621,6 +2651,11 @@ translate_command(int32_t cmd_code)
          command_output = pgmoneta_append_char(command_output, ' ');
          command_output = pgmoneta_append(command_output, "delete");
          break;
+      case MANAGEMENT_S3_RESTORE:
+         command_output = pgmoneta_append(command_output, COMMAND_S3);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "restore");
+         break;
       case MANAGEMENT_RESTORE:
          command_output = pgmoneta_append(command_output, COMMAND_RESTORE);
          break;
@@ -3302,6 +3337,7 @@ translate_json_object(struct json* j)
                }
                pgmoneta_json_iterator_destroy(server_it);
                break;
+            case MANAGEMENT_S3_RESTORE:
             case MANAGEMENT_S3_DELETE:
                break;
             case MANAGEMENT_STATUS_DETAILS:
