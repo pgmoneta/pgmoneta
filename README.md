@@ -1,7 +1,7 @@
 # pgmoneta
 
 <p align="center">
-  <img src="doc/images/logo-reversed.svg" alt="pgmoneta logo" width="256"/>
+  <img src="doc/images/logo-reversed-transparent.svg" alt="pgmoneta logo" width="256"/>
 </p>
 
 **pgmoneta** is a backup / restore solution for [PostgreSQL](https://www.postgresql.org).
