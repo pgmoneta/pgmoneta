@@ -211,6 +211,7 @@ azure_upload_files(char* local_root, char* azure_root, char* relative_path)
    char* local_path = NULL;
    char* relative_file;
    char* new_file;
+   FILE* file = NULL;
    bool copied_files = false;
    DIR* dir;
    struct dirent* entry;
@@ -287,9 +288,10 @@ azure_upload_files(char* local_root, char* azure_root, char* relative_path)
       new_file = pgmoneta_append(new_file, local_root);
       new_file = pgmoneta_append(new_file, relative_file);
 
-      FILE* file = fopen(new_file, "w");
-
-      pgmoneta_permission(new_file, 6, 4, 4);
+      if (pgmoneta_fopen_secure(new_file, "w", &file))
+      {
+         goto error;
+      }
 
       azure_send_upload_request(local_root, azure_root, relative_file);
 
@@ -377,8 +379,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
-   file = fopen(local_path, "rb");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(local_path, "rb", &file))
    {
       goto error;
    }

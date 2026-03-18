@@ -3182,19 +3182,19 @@ create_pidfile(void)
 
    if (strlen(config->pidfile) > 0)
    {
-      // check pidfile is not there
-      if (access(config->pidfile, F_OK) == 0)
-      {
-         pgmoneta_log_fatal("PID file [%s] exists, is there another instance running ?", config->pidfile);
-         goto error;
-      }
-
       pid = getpid();
 
       fd = open(config->pidfile, O_WRONLY | O_CREAT | O_EXCL, 0644);
       if (fd < 0)
       {
-         warn("Could not create PID file '%s'", config->pidfile);
+         if (errno == EEXIST)
+         {
+            pgmoneta_log_fatal("PID file [%s] exists, is there another instance running ?", config->pidfile);
+         }
+         else
+         {
+            warn("Could not create PID file '%s'", config->pidfile);
+         }
          goto error;
       }
 
@@ -3206,6 +3206,7 @@ create_pidfile(void)
       if (r < 0)
       {
          warn("Could not write pidfile '%s'", config->pidfile);
+         close(fd);
          goto error;
       }
 
