@@ -43,6 +43,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #define ENV_VAR_CONF_PATH        "PGMONETA_TEST_CONF"
@@ -51,6 +52,7 @@
 #define ENV_VAR_RESTORE_DIR      "PGMONETA_TEST_RESTORE_DIR"
 #define ENV_VAR_RETROSPECT_DIR   "PGMONETA_TEST_RETROSPECT_DIR"
 #define ENV_VAR_HOT_STANDBY_DIR  "PGMONETA_TEST_HOT_STANDBY_DIR"
+#define ENV_VAR_EXECUTABLE_DIR   "PGMONETA_TEST_EXECUTABLE_DIR"
 
 char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 char TEST_RESTORE_DIR[MAX_PATH];
@@ -80,7 +82,7 @@ pgmoneta_test_environment_create(void)
    memset(TEST_BASE_DIR, 0, sizeof(TEST_BASE_DIR));
    memset(TEST_RETROSPECT_DIR, 0, sizeof(TEST_RETROSPECT_DIR));
    memset(TEST_HOT_STANDBY_DIR, 0, sizeof(TEST_HOT_STANDBY_DIR));
-   
+
    conf_path = getenv(ENV_VAR_CONF_PATH);
    assert(conf_path != NULL);
    // Create the shared memory for the configuration
@@ -345,4 +347,124 @@ error:
    pgmoneta_free_query_response(response);
 
    return 1;
+}
+
+int
+pgmoneta_test_resolve_binary_path(const char* binary_name, char* out)
+{
+   char* executable_dir = NULL;
+   char self[MAX_PATH];
+   size_t len;
+   char* slash = NULL;
+
+   if (binary_name == NULL || out == NULL)
+   {
+      return 1;
+   }
+
+   executable_dir = getenv(ENV_VAR_EXECUTABLE_DIR);
+   if (executable_dir != NULL && strlen(executable_dir) > 0)
+   {
+      pgmoneta_snprintf(out, MAX_PATH, "%s/%s", executable_dir, binary_name);
+      return access(out, X_OK) == 0 ? 0 : 1;
+   }
+
+   len = readlink("/proc/self/exe", self, sizeof(self) - 1);
+   if (len <= 0)
+   {
+      return 1;
+   }
+   self[len] = '\0';
+
+   /* Fallback when check.sh env vars are unavailable: derive .../build from .../build/test/pgmoneta-test */
+   slash = strrchr(self, '/');
+   if (slash == NULL)
+   {
+      return 1;
+   }
+   *slash = '\0'; /* .../build/test */
+
+   slash = strrchr(self, '/');
+   if (slash == NULL)
+   {
+      return 1;
+   }
+   *slash = '\0'; /* .../build */
+
+   pgmoneta_snprintf(out, MAX_PATH, "%s/src/%s", self, binary_name);
+
+   return access(out, X_OK) == 0 ? 0 : 1;
+}
+
+int
+pgmoneta_test_exec_command(const char* command, char** output, int* exit_code)
+{
+   FILE* fp = NULL;
+   char* cmd = NULL;
+   char buffer[512];
+   char full_output[4096];
+   size_t available = 0;
+   size_t cmd_len = 0;
+   int status = 0;
+
+   if (command == NULL || output == NULL || exit_code == NULL)
+   {
+      return 1;
+   }
+
+   cmd_len = strlen(command) + strlen(" 2>&1") + 1;
+   cmd = malloc(cmd_len);
+   if (cmd == NULL)
+   {
+      return 1;
+   }
+
+   pgmoneta_snprintf(cmd, cmd_len, "%s 2>&1", command);
+
+   fp = popen(cmd, "r");
+   if (fp == NULL)
+   {
+      free(cmd);
+      return 1;
+   }
+
+   memset(full_output, 0, sizeof(full_output));
+   available = sizeof(full_output) - 1;
+
+   while (fgets(buffer, sizeof(buffer), fp) != NULL)
+   {
+      size_t chunk = strlen(buffer);
+      if (available == 0)
+      {
+         break;
+      }
+
+      if (chunk > available)
+      {
+         chunk = available;
+      }
+
+      strncat(full_output, buffer, chunk);
+      available -= chunk;
+   }
+
+   status = pclose(fp);
+   free(cmd);
+
+   if (WIFEXITED(status))
+   {
+      *exit_code = WEXITSTATUS(status);
+   }
+   else
+   {
+      *exit_code = 1;
+   }
+
+   *output = strdup(full_output);
+   if (*output == NULL)
+   {
+      return 1;
+   }
+
+   return 0;
 }

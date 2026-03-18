@@ -126,6 +126,26 @@ pgmoneta_test_config_restore(void);
 int
 pgmoneta_test_execute_query(int srv, SSL* ssl, int skt, char* query, struct query_response** qr);
 
+/**
+ * Resolve an executable path under build/src from a test process.
+ * Example: "pgmoneta-walinfo" -> ".../build/src/pgmoneta-walinfo"
+ * @param binary_name The executable name
+ * @param out Output path buffer (MAX_PATH bytes)
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_test_resolve_binary_path(const char* binary_name, char* out);
+
+/**
+ * Execute a shell command and capture combined stdout/stderr output.
+ * @param command Command to execute
+ * @param output [out] Captured output (caller must free)
+ * @param exit_code [out] Process exit code
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_test_exec_command(const char* command, char** output, int* exit_code);
+
 #ifdef __cplusplus
 }
 #endif
