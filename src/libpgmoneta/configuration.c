@@ -103,7 +103,6 @@ static int write_config_value(char* buffer, char* config_key, size_t buffer_size
 static bool is_valid_config_key(const char* config_key, struct config_key_info* key_info);
 static bool is_empty_string(char* s);
 static int remove_leading_whitespace_and_comments(char* s, char** trimmed_line);
-static bool pgmoneta_is_binary_file(const char* path);
 
 static void split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count);
 
@@ -6167,39 +6166,4 @@ split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count)
    }
 
    *count = i;
-}
-
-static bool
-pgmoneta_is_binary_file(const char* path)
-{
-   FILE* fp = NULL;
-   unsigned char buffer[1024];
-   size_t bytes;
-   int error;
-
-   fp = fopen(path, "rb");
-   if (fp == NULL)
-   {
-      goto error;
-   }
-
-   while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
-   {
-      for (size_t i = 0; i < bytes; i++)
-      {
-         if (buffer[i] == '\0')
-         {
-            fclose(fp);
-            goto error;
-         }
-      }
-   }
-
-   error = ferror(fp);
-   fclose(fp);
-
-   return error != 0;
-
-error:
-   return true;
 }
