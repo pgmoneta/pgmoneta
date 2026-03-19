@@ -852,6 +852,14 @@ bool
 pgmoneta_is_file(char* file);
 
 /**
+ * Check if a file is binary (contains null bytes)
+ * @param path The file path
+ * @return true if binary, false if text
+ */
+bool
+pgmoneta_is_binary_file(char* path);
+
+/**
  * Parse an LSN string
  * @param lsn The LSN string (e.g., "0/16B0938")
  * @return The LSN, or 0 on error
