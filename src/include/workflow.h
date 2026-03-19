@@ -40,6 +40,8 @@ extern "C" {
 #include <stdlib.h>
 #include <stdbool.h>
 
+struct workers;
+
 #define WORKFLOW_TYPE_BACKUP             0
 #define WORKFLOW_TYPE_RESTORE            1
 #define WORKFLOW_TYPE_ARCHIVE            2
@@ -171,6 +173,20 @@ pgmoneta_common_setup(char* name, struct art* nodes);
  */
 int
 pgmoneta_common_teardown(char* name, struct art* nodes);
+
+/**
+ * Compress all tablespace directories under a backup base using the generic compression API.
+ *
+ * The backup base root may contain a "data" directory that is handled separately; this helper
+ * skips that directory and compresses the remaining immediate child directories.
+ *
+ * @param root The backup base root
+ * @param compression_type The compression type to use
+ * @param workers Optional worker pool
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_workflow_compress_tablespaces(char* root, int compression_type, struct workers* workers);
 
 #ifdef __cplusplus
 }

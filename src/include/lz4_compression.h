@@ -36,28 +36,10 @@ extern "C" {
 #include <pgmoneta.h>
 #include <compression.h>
 #include <json.h>
-#include <workers.h>
 
 #include <stdlib.h>
 
 #define BLOCK_BYTES 1024 * 4
-
-/**
- * Compress a data directory with Lz4
- * @param directory The directory
- * @param workers The optional workers
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_lz4c_data(char* directory, struct workers* workers);
-
-/**
- * Compress tablespace directories
- * @param root The root directory
- * @param workers The optional workers
- */
-void
-pgmoneta_lz4c_tablespaces(char* root, struct workers* workers);
 
 /**
  * Compress a WAL directory with Lz4
@@ -73,15 +55,6 @@ pgmoneta_lz4c_wal(char* directory);
  */
 void
 pgmoneta_lz4c_wal_file(char* directory, char* file);
-
-/**
- * Decompress a Lz4 directory
- * @param directory The directory
- * @param workers The optional workers
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_lz4d_data(char* directory, struct workers* workers);
 
 /**
  * LZ4 decompress a single file, also remove the original file

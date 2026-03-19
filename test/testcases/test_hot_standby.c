@@ -78,7 +78,7 @@ check_files_recursive(const char* dir_path, int* found_files)
             pgmoneta_log_error("File %s/%s is encrypted (.aes)", dir_path, entry->d_name);
             goto error;
          }
-         if (pgmoneta_compression_is_compressed(entry->d_name))
+         if (pgmoneta_is_compressed(entry->d_name))
          {
             pgmoneta_log_error("File %s/%s is compressed", dir_path, entry->d_name);
             goto error;

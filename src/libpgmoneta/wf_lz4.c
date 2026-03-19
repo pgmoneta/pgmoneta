@@ -27,10 +27,10 @@
  */
 
 /* pgmoneta */
+#include <compression.h>
 #include <pgmoneta.h>
 #include <logging.h>
 #include <utils.h>
-#include <lz4_compression.h>
 #include <workflow.h>
 
 /* system */
@@ -136,8 +136,14 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      pgmoneta_lz4c_data(backup_data, workers);
-      pgmoneta_lz4c_tablespaces(backup_base, workers);
+      if (pgmoneta_compress_directory(backup_data, COMPRESSION_SERVER_LZ4, workers))
+      {
+         goto error;
+      }
+      if (pgmoneta_workflow_compress_tablespaces(backup_base, COMPRESSION_SERVER_LZ4, workers))
+      {
+         goto error;
+      }
 
       pgmoneta_workers_wait(workers);
       if (workers != NULL && !workers->outcome)
@@ -160,7 +166,7 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_debug("%s doesn't exists", d);
       }
 
-      if (pgmoneta_lz4c_file(tarfile, d))
+      if (pgmoneta_compress_file(tarfile, d, COMPRESSION_SERVER_LZ4, NULL))
       {
          goto error;
       }
@@ -254,7 +260,10 @@ lz4_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_lz4d_data(base, workers);
+   if (pgmoneta_decompress_directory(base, COMPRESSION_SERVER_LZ4, workers))
+   {
+      return 1;
+   }
 
    pgmoneta_workers_wait(workers);
    pgmoneta_workers_destroy(workers);

@@ -31,6 +31,8 @@
 #include <aes.h>
 #include <compression.h>
 #include <deque.h>
+#include <aes.h>
+#include <compression.h>
 #include <extraction.h>
 #include <info.h>
 #include <logging.h>
@@ -1839,7 +1841,7 @@ pgmoneta_calculate_wal_size(char* directory, char* start)
          basename = strdup(filename);
       }
 
-      if (pgmoneta_compression_is_compressed(basename))
+      if (pgmoneta_is_compressed(basename))
       {
          char* bn = basename;
          basename = NULL;
@@ -2847,46 +2849,6 @@ pgmoneta_move_file(char* from, char* to)
    return ret;
 }
 
-int
-pgmoneta_strip_extension(char* s, char** name)
-{
-   size_t size;
-   char* ext = NULL;
-   char* r = NULL;
-
-   *name = NULL;
-
-   ext = strrchr(s, '.');
-   if (ext != NULL)
-   {
-      size = ext - s + 1;
-      r = (char*)malloc(size);
-      if (r == NULL)
-      {
-         goto error;
-      }
-
-      memset(r, 0, size);
-      memcpy(r, s, size - 1);
-   }
-   else
-   {
-      r = pgmoneta_append(r, s);
-      if (r == NULL)
-      {
-         goto error;
-      }
-   }
-
-   *name = r;
-
-   return 0;
-
-error:
-
-   return 1;
-}
-
 char*
 pgmoneta_translate_file_size(uint64_t size)
 {
@@ -3240,7 +3202,7 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
          basename = pgmoneta_append(basename, wal_file);
       }
 
-      if (pgmoneta_compression_is_compressed(basename))
+      if (pgmoneta_is_compressed(basename))
       {
          char* bn = basename;
          basename = NULL;
@@ -3344,7 +3306,7 @@ pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
          basename = pgmoneta_append(basename, wal_file);
       }
 
-      if (pgmoneta_compression_is_compressed(basename))
+      if (pgmoneta_is_compressed(basename))
       {
          char* bn = basename;
          basename = NULL;
@@ -4492,201 +4454,6 @@ pgmoneta_get_file_size(char* file_path)
    }
 
    return file_stat.st_size;
-}
-
-uint32_t
-pgmoneta_normalize_file_type(uint32_t type)
-{
-   uint32_t normalized = type;
-
-   if ((normalized & (PGMONETA_FILE_TYPE_GZIP |
-                      PGMONETA_FILE_TYPE_LZ4 |
-                      PGMONETA_FILE_TYPE_ZSTD |
-                      PGMONETA_FILE_TYPE_BZ2)) != 0)
-   {
-      normalized |= PGMONETA_FILE_TYPE_COMPRESSED;
-   }
-
-   return normalized;
-}
-
-uint32_t
-pgmoneta_get_file_type(char* file_path)
-{
-   uint32_t type = PGMONETA_FILE_TYPE_UNKNOWN;
-   char* file_path_copy = NULL;
-   char* basename_copy = NULL;
-   char* current = NULL;
-   char* dot = NULL;
-
-   if (file_path == NULL)
-   {
-      return type;
-   }
-
-   file_path_copy = pgmoneta_append(file_path_copy, file_path);
-   if (file_path_copy == NULL)
-   {
-      return type;
-   }
-
-   basename_copy = pgmoneta_append(basename_copy, basename(file_path_copy));
-   free(file_path_copy);
-   file_path_copy = NULL;
-   if (basename_copy == NULL)
-   {
-      return type;
-   }
-
-   current = basename_copy;
-
-   /* Check for encryption suffix first (.aes) */
-   if (pgmoneta_ends_with(current, ".aes"))
-   {
-      type |= PGMONETA_FILE_TYPE_ENCRYPTED;
-      current[strlen(current) - 4] = '\0';
-   }
-
-   /* Check for compression suffixes - set both generic and specific flags */
-   if (pgmoneta_ends_with(current, ".gz"))
-   {
-      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_GZIP;
-      dot = strrchr(current, '.');
-      if (dot != NULL)
-      {
-         *dot = '\0';
-      }
-   }
-   else if (pgmoneta_ends_with(current, ".lz4"))
-   {
-      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_LZ4;
-      dot = strrchr(current, '.');
-      if (dot != NULL)
-      {
-         *dot = '\0';
-      }
-   }
-   else if (pgmoneta_ends_with(current, ".zstd"))
-   {
-      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_ZSTD;
-      dot = strrchr(current, '.');
-      if (dot != NULL)
-      {
-         *dot = '\0';
-      }
-   }
-   else if (pgmoneta_ends_with(current, ".bz2"))
-   {
-      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_BZ2;
-      dot = strrchr(current, '.');
-      if (dot != NULL)
-      {
-         *dot = '\0';
-      }
-   }
-
-   /* Check for TAR archive after stripping compression */
-   if (pgmoneta_ends_with(current, ".tar"))
-   {
-      type |= PGMONETA_FILE_TYPE_TAR;
-      current[strlen(current) - 4] = '\0';
-   }
-
-   /* Check for .tgz (tar.gz shorthand) */
-   if (pgmoneta_ends_with(current, ".tgz"))
-   {
-      type |= PGMONETA_FILE_TYPE_TAR;
-      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_GZIP;
-      current[strlen(current) - 4] = '\0';
-   }
-
-   /* Check for partial suffix */
-   if (pgmoneta_ends_with(current, ".partial"))
-   {
-      type |= PGMONETA_FILE_TYPE_PARTIAL;
-      current[strlen(current) - 8] = '\0';
-   }
-
-   /* Check for WAL file pattern (24-char hex) */
-   if (strlen(current) == 24 && pgmoneta_is_wal_file(current))
-   {
-      type |= PGMONETA_FILE_TYPE_WAL;
-   }
-
-   free(basename_copy);
-
-   return type;
-}
-
-int
-pgmoneta_get_type_suffix(uint32_t type, char** suffix)
-{
-   char* s = NULL;
-   uint32_t effective_type = pgmoneta_normalize_file_type(type);
-   const char* compression_suffix = NULL;
-   int compression_bits = 0;
-
-   if (suffix == NULL)
-   {
-      goto error;
-   }
-
-   *suffix = NULL;
-
-   if (effective_type & PGMONETA_FILE_TYPE_TAR)
-   {
-      s = pgmoneta_append(s, ".tar");
-   }
-
-   if (effective_type & PGMONETA_FILE_TYPE_GZIP)
-   {
-      compression_suffix = ".gz";
-      compression_bits++;
-   }
-   if (effective_type & PGMONETA_FILE_TYPE_ZSTD)
-   {
-      compression_suffix = ".zstd";
-      compression_bits++;
-   }
-   if (effective_type & PGMONETA_FILE_TYPE_LZ4)
-   {
-      compression_suffix = ".lz4";
-      compression_bits++;
-   }
-   if (effective_type & PGMONETA_FILE_TYPE_BZ2)
-   {
-      compression_suffix = ".bz2";
-      compression_bits++;
-   }
-
-   if (compression_bits > 1)
-   {
-      pgmoneta_log_error("pgmoneta_get_type_suffix: multiple compression methods in bitmask: 0x%X", effective_type);
-      goto error;
-   }
-
-   if (effective_type & PGMONETA_FILE_TYPE_COMPRESSION_MASK)
-   {
-      if (compression_suffix == NULL)
-      {
-         pgmoneta_log_error("pgmoneta_get_type_suffix: compression type missing in bitmask: 0x%X", effective_type);
-         goto error;
-      }
-
-      s = pgmoneta_append(s, (char*)compression_suffix);
-   }
-
-   if (effective_type & PGMONETA_FILE_TYPE_ENCRYPTED)
-   {
-      s = pgmoneta_append(s, ".aes");
-   }
-
-   *suffix = s;
-   return 0;
-
-error:
-   free(s);
-   return 1;
 }
 
 /* Parser for pgmoneta-cli amd pgmoneta-admin commands */
