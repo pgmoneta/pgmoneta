@@ -57,7 +57,7 @@ pgmoneta_streamer_create(int mode, int encryption, int compression, struct strea
 
    if (encryption == ENCRYPTION_NONE && compression == COMPRESSION_NONE)
    {
-      // fall back to NONE to avoid unnecessary overhead
+      /* fall back to NONE to avoid unnecessary overhead */
       mode = STREAMER_MODE_NONE;
    }
 
@@ -137,13 +137,13 @@ pgmoneta_streamer_write(struct streamer* streamer, void* buffer, size_t size, bo
       last_chk = last_chunk && size == 0;
       if (streamer->size == streamer->capacity || last_chk)
       {
-         // process and send data when the buffer is full or we have no more data to send
+         /* process and send data when the buffer is full or we have no more data to send */
          if (streamer->stream_cb(streamer, last_chk))
          {
-            //TODO: need to log what has failed at least
+            /* TODO: need to log what has failed at least */
             goto error;
          }
-         // update bytes written on success
+         /* update bytes written on success */
          streamer->written += streamer->size;
          streamer->size = 0;
       }
@@ -252,9 +252,9 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
       {
          goto error;
       }
-      // Chances are we may receive no output at all this round before we provide more input
-      // in that case skip the following steps
-      if (cbuf_size == 0)
+      /* Chances are we may receive no output at all this round before we provide more input
+         in that case skip the following steps */
+      if (cbuf_size == 0 && !(finished && last_chunk))
       {
          continue;
       }
@@ -262,7 +262,7 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
       {
          goto error;
       }
-      //write ebuf to file
+      /* write ebuf to file */
       pgmoneta_deque_iterator_create(this->destinations, &vfile_iter);
       while (pgmoneta_deque_iterator_next(vfile_iter))
       {
@@ -316,8 +316,8 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
          goto error;
       }
 
-      // Chances are we may receive no output at all this round before we provide more input
-      // in that case skip the following steps
+      /* Chances are we may receive no output at all this round before we provide more input
+         in that case skip the following steps */
       if (cbuf_size == 0)
       {
          continue;

@@ -588,19 +588,19 @@ main(int argc, char** argv)
       {
          if (!strncmp(optarg, "aes", MISC_LENGTH))
          {
-            encryption = MANAGEMENT_ENCRYPTION_AES256;
+            encryption = MANAGEMENT_ENCRYPTION_AES256_GCM;
          }
          else if (!strncmp(optarg, "aes256", MISC_LENGTH))
          {
-            encryption = MANAGEMENT_ENCRYPTION_AES256;
+            encryption = MANAGEMENT_ENCRYPTION_AES256_GCM;
          }
          else if (!strncmp(optarg, "aes192", MISC_LENGTH))
          {
-            encryption = MANAGEMENT_ENCRYPTION_AES192;
+            encryption = MANAGEMENT_ENCRYPTION_AES192_GCM;
          }
          else if (!strncmp(optarg, "aes128", MISC_LENGTH))
          {
-            encryption = MANAGEMENT_ENCRYPTION_AES128;
+            encryption = MANAGEMENT_ENCRYPTION_AES128_GCM;
          }
          else if (!strncmp(optarg, "none", MISC_LENGTH))
          {
@@ -800,7 +800,7 @@ main(int argc, char** argv)
    }
    if (encryption == MANAGEMENT_ENCRYPTION_UNKNOWN)
    {
-      encryption = MANAGEMENT_ENCRYPTION_AES256;
+      encryption = MANAGEMENT_ENCRYPTION_AES256_GCM;
    }
 
    bool have_host_port = host != NULL && port != NULL;
@@ -1742,10 +1742,12 @@ decrypt_data_client(char* from)
       goto error;
    }
 
+   pgmoneta_clear_aes_cache();
    free(to);
    return 0;
 
 error:
+   pgmoneta_clear_aes_cache();
    free(to);
    return 1;
 }
@@ -1770,10 +1772,12 @@ encrypt_data_client(char* from)
       goto error;
    }
 
+   pgmoneta_clear_aes_cache();
    free(to);
    return 0;
 
 error:
+   pgmoneta_clear_aes_cache();
    free(to);
    return 1;
 }
@@ -2804,23 +2808,14 @@ translate_encryption(int32_t encryption_code)
    char* encryption_output = NULL;
    switch (encryption_code)
    {
-      case ENCRYPTION_AES_256_CBC:
-         encryption_output = pgmoneta_append(encryption_output, "aes-256-cbc");
+      case ENCRYPTION_AES_256_GCM:
+         encryption_output = pgmoneta_append(encryption_output, "aes-256-gcm");
          break;
-      case ENCRYPTION_AES_192_CBC:
-         encryption_output = pgmoneta_append(encryption_output, "aes-192-cbc");
+      case ENCRYPTION_AES_192_GCM:
+         encryption_output = pgmoneta_append(encryption_output, "aes-192-gcm");
          break;
-      case ENCRYPTION_AES_128_CBC:
-         encryption_output = pgmoneta_append(encryption_output, "aes-128-cbc");
-         break;
-      case ENCRYPTION_AES_256_CTR:
-         encryption_output = pgmoneta_append(encryption_output, "aes-256-ctr");
-         break;
-      case ENCRYPTION_AES_192_CTR:
-         encryption_output = pgmoneta_append(encryption_output, "aes-192-ctr");
-         break;
-      case ENCRYPTION_AES_128_CTR:
-         encryption_output = pgmoneta_append(encryption_output, "aes-128-ctr");
+      case ENCRYPTION_AES_128_GCM:
+         encryption_output = pgmoneta_append(encryption_output, "aes-128-gcm");
          break;
       default:
          encryption_output = pgmoneta_append(encryption_output, "none");

@@ -42,22 +42,27 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-#define NAME               "aes"
-#define ENC_BUF_SIZE       (1024 * 1024)
+#define NAME         "aes"
+#define ENC_BUF_SIZE (1024 * 1024)
 
-#define PBKDF2_ITERATIONS  600000
-#define PBKDF2_SALT_LENGTH 16
+static _Thread_local unsigned char master_key_cache[EVP_MAX_KEY_LENGTH];
+static _Thread_local unsigned char cached_password_hash[EVP_MAX_MD_SIZE];
+static _Thread_local bool password_hash_cached = false;
+static _Thread_local bool master_key_cached = false;
+static unsigned char master_salt_cache[PBKDF2_SALT_LENGTH];
+static bool master_salt_cached = false;
 
-static int encrypt_file(char* from, char* to, int enc);
-static int derive_key_iv(char* password, unsigned char* salt, unsigned char* key, unsigned char* iv, int mode);
+static bool is_gcm(int mode);
+static void do_encrypt_file(struct worker_common* wc);
+static void do_decrypt_file(struct worker_common* wc);
+static int get_tag_length(int mode);
+static int derive_key_iv(char* password, size_t password_length, unsigned char* salt, unsigned char* key, unsigned char* iv, int mode);
 static int aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphertext, int* ciphertext_length, int mode);
 static int aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigned char* iv, char** plaintext, int mode);
 static const EVP_CIPHER* (*get_cipher(int mode))(void);
 static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 static int get_key_length(int mode);
-
-static void do_encrypt_file(struct worker_common* wc);
-static void do_decrypt_file(struct worker_common* wc);
+static int encrypt_file(char* from, char* to, int enc);
 
 static int encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode);
 
@@ -86,8 +91,10 @@ struct aes_encryptor
    unsigned char salt[PBKDF2_SALT_LENGTH];
    bool key_derived;
    int mode;
-   unsigned char* out_buf; /**< reusable output buffer */
-   size_t out_capacity;    /**< allocated capacity of out_buf */
+   unsigned char* out_buf;                   /**< reusable output buffer */
+   size_t out_capacity;                      /**< allocated capacity of out_buf */
+   unsigned char tag_buffer[GCM_TAG_LENGTH]; /**< Buffer to hold the tag during streaming */
+   size_t tag_buffer_size;                   /**< Current size of data in tag_buffer */
 };
 
 struct noop_encryptor
@@ -721,7 +728,7 @@ pgmoneta_encryptor_create(int encryption_type, struct encryptor** encryptor)
 {
    if (encryption_type == ENCRYPTION_NONE)
    {
-      //create noop encryptor
+      /* create noop encryptor */
       return create_noop_encryptor(encryptor);
    }
    return create_aes_encryptor(encryption_type, encryptor);
@@ -856,7 +863,7 @@ error:
 }
 
 int
-pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* ciphertext_length, int mode)
+pgmoneta_encrypt(char* plaintext, char* password, size_t password_length, char** ciphertext, int* ciphertext_length, int mode)
 {
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
@@ -865,38 +872,51 @@ pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* cipher
    int encrypted_length = 0;
    char* output = NULL;
    int ret = 1;
+   const EVP_CIPHER* (*cipher_fp)(void) = NULL;
 
    memset(&key, 0, sizeof(key));
    memset(&iv, 0, sizeof(iv));
 
    /* Generate a cryptographically random salt */
-   if (RAND_bytes(salt, PBKDF2_SALT_LENGTH) != 1)
+   if (!RAND_bytes(salt, PBKDF2_SALT_LENGTH))
    {
       goto cleanup;
    }
 
-   if (derive_key_iv(password, salt, key, iv, mode) != 0)
+   if (derive_key_iv(password, password_length, salt, key, NULL, mode) != 0)
    {
       goto cleanup;
    }
 
-   if (aes_encrypt(plaintext, key, iv, &encrypted, &encrypted_length, mode) != 0)
+   cipher_fp = get_cipher(mode);
+   if (cipher_fp == NULL)
    {
       goto cleanup;
    }
 
-   /* Prepend salt to ciphertext: [salt][encrypted] */
-   output = malloc(PBKDF2_SALT_LENGTH + encrypted_length);
+   if (!RAND_bytes(iv, EVP_CIPHER_iv_length(cipher_fp())))
+   {
+      goto cleanup;
+   }
+
+   if (aes_encrypt(plaintext, key, iv, &encrypted, &encrypted_length, mode))
+   {
+      goto cleanup;
+   }
+
+   /* Prepend salt and IV to ciphertext: [salt][iv][encrypted] */
+   output = malloc(PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + encrypted_length);
    if (output == NULL)
    {
       goto cleanup;
    }
 
    memcpy(output, salt, PBKDF2_SALT_LENGTH);
-   memcpy(output + PBKDF2_SALT_LENGTH, encrypted, encrypted_length);
+   memcpy(output + PBKDF2_SALT_LENGTH, iv, EVP_MAX_IV_LENGTH);
+   memcpy(output + PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH, encrypted, encrypted_length);
 
    *ciphertext = output;
-   *ciphertext_length = PBKDF2_SALT_LENGTH + encrypted_length;
+   *ciphertext_length = PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + encrypted_length;
 
    ret = 0;
 
@@ -906,20 +926,21 @@ cleanup:
    /* Wipe key material from stack */
    pgmoneta_cleanse(key, sizeof(key));
    pgmoneta_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(salt, sizeof(salt));
 
    return ret;
 }
 
 int
-pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char** plaintext, int mode)
+pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, size_t password_length, char** plaintext, int mode)
 {
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
    unsigned char salt[PBKDF2_SALT_LENGTH];
    int ret = 1;
 
-   /* The ciphertext must be at least salt_length + 1 byte */
-   if (ciphertext_length <= PBKDF2_SALT_LENGTH)
+   /* The ciphertext must be at least salt_length + iv_length + 1 byte */
+   if (ciphertext_length <= PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH)
    {
       return 1;
    }
@@ -930,43 +951,122 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char**
    /* Extract salt from the first PBKDF2_SALT_LENGTH bytes */
    memcpy(salt, ciphertext, PBKDF2_SALT_LENGTH);
 
-   if (derive_key_iv(password, salt, key, iv, mode) != 0)
+   /* Extract IV */
+   memcpy(iv, ciphertext + PBKDF2_SALT_LENGTH, EVP_MAX_IV_LENGTH);
+
+   if (derive_key_iv(password, password_length, salt, key, NULL, mode) != 0)
    {
       goto cleanup;
    }
 
-   ret = aes_decrypt(ciphertext + PBKDF2_SALT_LENGTH,
-                     ciphertext_length - PBKDF2_SALT_LENGTH,
+   ret = aes_decrypt(ciphertext + PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH,
+                     ciphertext_length - PBKDF2_SALT_LENGTH - EVP_MAX_IV_LENGTH,
                      key, iv, plaintext, mode);
 
 cleanup:
    /* Wipe key material from stack */
    pgmoneta_cleanse(key, sizeof(key));
    pgmoneta_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(salt, sizeof(salt));
 
    return ret;
 }
 
-// [private]
-static int
-derive_key_iv(char* password, unsigned char* salt, unsigned char* key, unsigned char* iv, int mode)
+void
+pgmoneta_clear_aes_cache(void)
 {
+   pgmoneta_cleanse(master_key_cache, sizeof(master_key_cache));
+   pgmoneta_cleanse(cached_password_hash, sizeof(cached_password_hash));
+   password_hash_cached = false;
+   master_key_cached = false;
+   pgmoneta_cleanse(master_salt_cache, sizeof(master_salt_cache));
+   master_salt_cached = false;
+
+   pgmoneta_clear_security_cache();
+}
+
+void
+pgmoneta_set_master_salt(unsigned char* salt)
+{
+   if (salt == NULL)
+   {
+      pgmoneta_cleanse(master_salt_cache, sizeof(master_salt_cache));
+      master_salt_cached = false;
+      return;
+   }
+   memcpy(master_salt_cache, salt, PBKDF2_SALT_LENGTH);
+   master_salt_cached = true;
+}
+
+/* [private] */
+static int
+derive_key_iv(char* password, size_t password_length, unsigned char* salt, unsigned char* key, unsigned char* iv, int mode)
+{
+   unsigned char ms[PBKDF2_SALT_LENGTH];
    int key_length;
    int iv_length;
    unsigned char derived[EVP_MAX_KEY_LENGTH + EVP_MAX_IV_LENGTH];
    int ret = 1;
 
-   key_length = get_key_length(mode);
-   iv_length = EVP_CIPHER_iv_length(get_cipher(mode)());
+   if (master_salt_cached)
+   {
+      memcpy(ms, master_salt_cache, PBKDF2_SALT_LENGTH);
+   }
+   else
+   {
+      pgmoneta_log_error("derive_key_iv: Master salt not initialized. Please run 'pgmoneta-admin user master-key' to generate a secure master key file.");
+      return 1;
+   }
 
-   /* Derive key_length + iv_length bytes from password using PBKDF2 */
-   if (!PKCS5_PBKDF2_HMAC(password, strlen(password),
+   unsigned char current_password_hash[EVP_MAX_MD_SIZE];
+   unsigned int hash_len = 0;
+
+   key_length = get_key_length(mode);
+   if (key_length == 0)
+   {
+      goto cleanup;
+   }
+
+   if (password_length > MAX_PASSWORD_LENGTH)
+   {
+      pgmoneta_log_error("derive_key_iv: password length exceeds maximum allowed length");
+      goto cleanup;
+   }
+
+   /* Calculate SHA-256 hash of the input password for cache validation */
+   if (!EVP_Digest(password, password_length, current_password_hash, &hash_len, EVP_sha256(), NULL))
+   {
+      pgmoneta_log_error("Failed to calculate password hash");
+      goto cleanup;
+   }
+
+   /* Step 1: Ensure Master Key is derived and cached */
+   if (!master_key_cached || !password_hash_cached || memcmp(current_password_hash, cached_password_hash, hash_len) != 0)
+   {
+      if (!PKCS5_PBKDF2_HMAC(password, password_length,
+                             ms, PBKDF2_SALT_LENGTH,
+                             PBKDF2_ITERATIONS,
+                             EVP_sha256(),
+                             EVP_MAX_KEY_LENGTH,
+                             master_key_cache))
+      {
+         pgmoneta_log_error("Failed to derive Master Key");
+         goto cleanup;
+      }
+      memcpy(cached_password_hash, current_password_hash, hash_len);
+      password_hash_cached = true;
+      master_key_cached = true;
+   }
+
+   /* Step 2: Use Master Key to derive File Key fast (1 iteration) */
+   if (!PKCS5_PBKDF2_HMAC((char*)master_key_cache, EVP_MAX_KEY_LENGTH,
                           salt, PBKDF2_SALT_LENGTH,
-                          PBKDF2_ITERATIONS,
+                          1,
                           EVP_sha256(),
-                          key_length + iv_length,
+                          EVP_MAX_KEY_LENGTH + EVP_MAX_IV_LENGTH,
                           derived))
    {
+      pgmoneta_log_error("Failed to derive File Key");
       goto cleanup;
    }
 
@@ -976,6 +1076,7 @@ derive_key_iv(char* password, unsigned char* salt, unsigned char* key, unsigned 
    }
    if (iv != NULL)
    {
+      iv_length = EVP_CIPHER_iv_length(get_cipher(mode)());
       memcpy(iv, derived + key_length, iv_length);
    }
 
@@ -984,11 +1085,12 @@ derive_key_iv(char* password, unsigned char* salt, unsigned char* key, unsigned 
 cleanup:
    /* Wipe sensitive derived material */
    pgmoneta_cleanse(derived, sizeof(derived));
+   pgmoneta_cleanse(current_password_hash, sizeof(current_password_hash));
 
    return ret;
 }
 
-// [private]
+/* [private] */
 static int
 aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphertext, int* ciphertext_length, int mode)
 {
@@ -996,19 +1098,27 @@ aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphe
    int length;
    size_t size;
    unsigned char* ct = NULL;
-   int ct_length;
+   int ct_length = 0;
+   int gcm = is_gcm(mode);
+   int tag_len = get_tag_length(mode);
    const EVP_CIPHER* (*cipher_fp)(void) = get_cipher(mode);
+
+   if (cipher_fp == NULL)
+   {
+      goto error;
+   }
+
    if (!(ctx = EVP_CIPHER_CTX_new()))
    {
       goto error;
    }
 
-   if (EVP_EncryptInit_ex(ctx, cipher_fp(), NULL, key, iv) != 1)
+   if (!EVP_EncryptInit_ex(ctx, cipher_fp(), NULL, key, iv))
    {
       goto error;
    }
 
-   size = strlen(plaintext) + EVP_CIPHER_block_size(cipher_fp());
+   size = strlen(plaintext) + tag_len + EVP_CIPHER_block_size(cipher_fp());
    ct = malloc(size);
 
    if (ct == NULL)
@@ -1018,21 +1128,30 @@ aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphe
 
    memset(ct, 0, size);
 
-   if (EVP_EncryptUpdate(ctx,
-                         ct, &length,
-                         (unsigned char*)plaintext, strlen((char*)plaintext)) != 1)
+   if (!EVP_EncryptUpdate(ctx,
+                          ct, &length,
+                          (unsigned char*)plaintext, strlen((char*)plaintext)))
    {
       goto error;
    }
 
    ct_length = length;
 
-   if (EVP_EncryptFinal_ex(ctx, ct + length, &length) != 1)
+   if (!EVP_EncryptFinal_ex(ctx, ct + length, &length))
    {
       goto error;
    }
 
    ct_length += length;
+
+   if (gcm)
+   {
+      if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, tag_len, ct + ct_length))
+      {
+         goto error;
+      }
+      ct_length += tag_len;
+   }
 
    EVP_CIPHER_CTX_free(ctx);
 
@@ -1056,7 +1175,7 @@ error:
    return 1;
 }
 
-// [private]
+/* [private] */
 static int
 aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigned char* iv, char** plaintext, int mode)
 {
@@ -1065,14 +1184,26 @@ aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigne
    int length;
    size_t size;
    char* pt = NULL;
+   int gcm = is_gcm(mode);
+   int tag_len = get_tag_length(mode);
    const EVP_CIPHER* (*cipher_fp)(void) = get_cipher(mode);
+
+   if (cipher_fp == NULL)
+   {
+      return 1;
+   }
+
+   if (gcm && ciphertext_length < tag_len)
+   {
+      return 1;
+   }
 
    if (!(ctx = EVP_CIPHER_CTX_new()))
    {
       goto error;
    }
 
-   if (EVP_DecryptInit_ex(ctx, cipher_fp(), NULL, key, iv) != 1)
+   if (!EVP_DecryptInit_ex(ctx, cipher_fp(), NULL, key, iv))
    {
       goto error;
    }
@@ -1087,16 +1218,24 @@ aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigne
 
    memset(pt, 0, size);
 
-   if (EVP_DecryptUpdate(ctx,
-                         (unsigned char*)pt, &length,
-                         (unsigned char*)ciphertext, ciphertext_length) != 1)
+   if (!EVP_DecryptUpdate(ctx,
+                          (unsigned char*)pt, &length,
+                          (unsigned char*)ciphertext, ciphertext_length - tag_len))
    {
       goto error;
    }
 
    plaintext_length = length;
 
-   if (EVP_DecryptFinal_ex(ctx, (unsigned char*)pt + length, &length) != 1)
+   if (gcm)
+   {
+      if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, tag_len, ciphertext + ciphertext_length - tag_len))
+      {
+         goto error;
+      }
+   }
+
+   if (!EVP_DecryptFinal_ex(ctx, (unsigned char*)pt + length, &length))
    {
       goto error;
    }
@@ -1127,40 +1266,39 @@ error:
 
 static const EVP_CIPHER* (*get_cipher(int mode))(void)
 {
-   if (mode == ENCRYPTION_AES_256_CBC)
+   if (mode == ENCRYPTION_AES_256_GCM)
    {
-      return &EVP_aes_256_cbc;
+      return &EVP_aes_256_gcm;
    }
-   if (mode == ENCRYPTION_AES_192_CBC)
+   if (mode == ENCRYPTION_AES_192_GCM)
    {
-      return &EVP_aes_192_cbc;
+      return &EVP_aes_192_gcm;
    }
-   if (mode == ENCRYPTION_AES_128_CBC)
+   if (mode == ENCRYPTION_AES_128_GCM)
    {
-      return &EVP_aes_128_cbc;
+      return &EVP_aes_128_gcm;
    }
-   if (mode == ENCRYPTION_AES_256_CTR)
-   {
-      return &EVP_aes_256_ctr;
-   }
-   if (mode == ENCRYPTION_AES_192_CTR)
-   {
-      return &EVP_aes_192_ctr;
-   }
-   if (mode == ENCRYPTION_AES_128_CTR)
-   {
-      return &EVP_aes_128_ctr;
-   }
-   return &EVP_aes_256_cbc;
+   return NULL;
 }
 
-// enc: 1 for encrypt, 0 for decrypt
+static bool
+is_gcm(int mode)
+{
+   if (mode == ENCRYPTION_AES_256_GCM || mode == ENCRYPTION_AES_192_GCM || mode == ENCRYPTION_AES_128_GCM)
+   {
+      return true;
+   }
+   return false;
+}
+
+/* enc: 1 for encrypt, 0 for decrypt */
 static int
 encrypt_file(char* from, char* to, int enc)
 {
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
    unsigned char salt[PBKDF2_SALT_LENGTH];
+   unsigned char tag[GCM_TAG_LENGTH];
    char* master_key = NULL;
    EVP_CIPHER_CTX* ctx = NULL;
    struct main_configuration* config;
@@ -1175,19 +1313,55 @@ encrypt_file(char* from, char* to, int enc)
    int f_len = 0;
    int ret = 1;
    char* tmp_to = NULL;
+   int gcm = 0;
+   int tag_len = 0;
+   size_t iv_len = 0;
+   unsigned char* inbuf = NULL;
+   unsigned char* outbuf = NULL;
+   long remaining = 0;
 
    config = (struct main_configuration*)shmem;
+
+   if (config->encryption == ENCRYPTION_NONE)
+   {
+      pgmoneta_log_error("encrypt_file: encryption is not configured (encryption = none)");
+      goto error;
+   }
+
    cipher_fp = get_cipher(config->encryption);
+   if (cipher_fp == NULL)
+   {
+      pgmoneta_log_error("encrypt_file: unsupported encryption mode: %d", config->encryption);
+      goto error;
+   }
    cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
    inbuf_size = ENC_BUF_SIZE;
    outbuf_size = inbuf_size + cipher_block_size - 1;
-   unsigned char inbuf[inbuf_size];
-   unsigned char outbuf[outbuf_size];
+   inbuf = malloc(inbuf_size);
+   outbuf = malloc(outbuf_size);
+   if (inbuf == NULL || outbuf == NULL)
+   {
+      goto error;
+   }
 
-   if (pgmoneta_get_master_key(&master_key))
+   gcm = is_gcm(config->encryption);
+   tag_len = get_tag_length(config->encryption);
+   iv_len = EVP_CIPHER_iv_length(cipher_fp());
+
+   size_t master_key_length = 0;
+   unsigned char* master_salt = NULL;
+   size_t master_salt_length = 0;
+
+   if (pgmoneta_get_master_key(&master_key, &master_key_length, &master_salt, &master_salt_length))
    {
       pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
       goto error;
+   }
+
+   if (master_salt != NULL)
+   {
+      pgmoneta_set_master_salt(master_salt);
+      free(master_salt);
    }
    memset(&key, 0, sizeof(key));
    memset(&iv, 0, sizeof(iv));
@@ -1195,19 +1369,19 @@ encrypt_file(char* from, char* to, int enc)
    if (enc == 1)
    {
       /* Encryption: generate a random salt */
-      if (RAND_bytes(salt, PBKDF2_SALT_LENGTH) != 1)
+      if (!RAND_bytes(salt, PBKDF2_SALT_LENGTH))
       {
          pgmoneta_log_error("RAND_bytes: Failed to generate salt");
          goto error;
       }
 
-      if (derive_key_iv(master_key, salt, key, NULL, config->encryption) != 0)
+      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, config->encryption) != 0)
       {
          pgmoneta_log_error("derive_key_iv: Failed to derive key");
          goto error;
       }
 
-      if (RAND_bytes(iv, EVP_CIPHER_iv_length(cipher_fp())) != 1)
+      if (!RAND_bytes(iv, iv_len))
       {
          pgmoneta_log_error("RAND_bytes: Failed to generate unique IV");
          goto error;
@@ -1215,7 +1389,6 @@ encrypt_file(char* from, char* to, int enc)
    }
    else
    {
-      /* Decryption: extract salt and IV from the file */
       in = fopen(from, "rb");
       if (in == NULL)
       {
@@ -1223,19 +1396,64 @@ encrypt_file(char* from, char* to, int enc)
          goto error;
       }
 
-      if (fread(salt, sizeof(char), PBKDF2_SALT_LENGTH, in) != PBKDF2_SALT_LENGTH)
+      if (fread(salt, 1, PBKDF2_SALT_LENGTH, in) != PBKDF2_SALT_LENGTH)
       {
          pgmoneta_log_error("fread: failed to read salt from %s", from);
          goto error;
       }
 
-      if (fread(iv, sizeof(char), EVP_CIPHER_iv_length(cipher_fp()), in) != (size_t)EVP_CIPHER_iv_length(cipher_fp()))
+      if (fread(iv, 1, EVP_MAX_IV_LENGTH, in) != EVP_MAX_IV_LENGTH)
       {
          pgmoneta_log_error("fread: failed to read IV from %s", from);
          goto error;
       }
 
-      if (derive_key_iv(master_key, salt, key, NULL, config->encryption) != 0)
+      if (gcm)
+      {
+         long file_size;
+         long header_size = PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH;
+
+         if (fseek(in, 0L, SEEK_END) != 0)
+         {
+            pgmoneta_log_error("fseek: failed to seek to end of %s", from);
+            goto error;
+         }
+
+         file_size = ftell(in);
+         if (file_size < 0)
+         {
+            pgmoneta_log_error("ftell: failed to determine file size for %s", from);
+            goto error;
+         }
+
+         if (file_size < header_size + tag_len)
+         {
+            pgmoneta_log_error("Invalid encrypted file size for %s", from);
+            goto error;
+         }
+
+         remaining = file_size - header_size - tag_len;
+
+         /* Seek to the end to read the GCM tag */
+         if (fseek(in, -((long)tag_len), SEEK_END) != 0)
+         {
+            pgmoneta_log_error("fseek: failed to find GCM tag in %s", from);
+            goto error;
+         }
+         if (fread(tag, 1, tag_len, in) != (size_t)tag_len)
+         {
+            pgmoneta_log_error("fread: failed to read GCM tag from %s", from);
+            goto error;
+         }
+         /* Seek back to data start (after salt + IV) */
+         if (fseek(in, header_size, SEEK_SET) != 0)
+         {
+            pgmoneta_log_error("fseek: failed to return to data in %s", from);
+            goto error;
+         }
+      }
+
+      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, config->encryption) != 0)
       {
          pgmoneta_log_error("derive_key_iv: Failed to derive key");
          goto error;
@@ -1267,7 +1485,7 @@ encrypt_file(char* from, char* to, int enc)
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   out = fopen(tmp_to, "w");
+   out = fopen(tmp_to, "wb");
    if (out == NULL)
    {
       pgmoneta_log_error("fopen: Could not open %s", tmp_to);
@@ -1277,15 +1495,25 @@ encrypt_file(char* from, char* to, int enc)
    if (enc == 1)
    {
       /* Prepend salt and IV to the output file */
-      if (fwrite(salt, sizeof(char), PBKDF2_SALT_LENGTH, out) != PBKDF2_SALT_LENGTH)
+      if (fwrite(salt, 1, PBKDF2_SALT_LENGTH, out) != PBKDF2_SALT_LENGTH)
       {
          pgmoneta_log_error("fwrite: failed to write salt");
          goto error;
       }
-      if (fwrite(iv, sizeof(char), EVP_CIPHER_iv_length(cipher_fp()), out) != (size_t)EVP_CIPHER_iv_length(cipher_fp()))
+      if (fwrite(iv, 1, iv_len, out) != iv_len)
       {
          pgmoneta_log_error("fwrite: failed to write IV");
          goto error;
+      }
+      if (iv_len < EVP_MAX_IV_LENGTH)
+      {
+         unsigned char zeros[EVP_MAX_IV_LENGTH];
+         memset(zeros, 0, sizeof(zeros));
+         if (fwrite(zeros, 1, EVP_MAX_IV_LENGTH - iv_len, out) != (EVP_MAX_IV_LENGTH - iv_len))
+         {
+            pgmoneta_log_error("fwrite: failed to write IV padding");
+            goto error;
+         }
       }
    }
 
@@ -1295,7 +1523,16 @@ encrypt_file(char* from, char* to, int enc)
       goto error;
    }
 
-   while ((inl = fread(inbuf, sizeof(char), inbuf_size, in)) > 0)
+   if (!enc && gcm)
+   {
+      if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, tag_len, tag) == 0)
+      {
+         pgmoneta_log_error("EVP_CIPHER_CTX_ctrl: failed to set GCM tag");
+         goto error;
+      }
+   }
+
+   while ((inl = fread(inbuf, sizeof(char), (!enc && gcm && remaining < inbuf_size) ? remaining : inbuf_size, in)) > 0)
    {
       if (EVP_CipherUpdate(ctx, outbuf, &outl, inbuf, inl) == 0)
       {
@@ -1306,6 +1543,15 @@ encrypt_file(char* from, char* to, int enc)
       {
          pgmoneta_log_error("fwrite: failed to write cipher");
          goto error;
+      }
+
+      if (!enc && gcm)
+      {
+         remaining -= inl;
+         if (remaining == 0)
+         {
+            break;
+         }
       }
    }
 
@@ -1330,6 +1576,20 @@ encrypt_file(char* from, char* to, int enc)
       }
    }
 
+   if (enc && gcm)
+   {
+      if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, tag_len, tag) == 0)
+      {
+         pgmoneta_log_error("EVP_CIPHER_CTX_ctrl: failed to get GCM tag");
+         goto error;
+      }
+      if (fwrite(tag, sizeof(char), tag_len, out) != (size_t)tag_len)
+      {
+         pgmoneta_log_error("fwrite: failed to write GCM tag at the end");
+         goto error;
+      }
+   }
+
    ret = 0;
 
 cleanup:
@@ -1341,10 +1601,12 @@ cleanup:
    /* Wipe key material from stack */
    pgmoneta_cleanse(key, sizeof(key));
    pgmoneta_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(salt, sizeof(salt));
+   pgmoneta_cleanse(tag, sizeof(tag));
 
    if (master_key != NULL)
    {
-      pgmoneta_cleanse(master_key, strlen(master_key));
+      pgmoneta_cleanse(master_key, master_key_length);
       free(master_key);
    }
 
@@ -1373,6 +1635,16 @@ cleanup:
    }
 
    free(tmp_to);
+   if (inbuf != NULL)
+   {
+      pgmoneta_cleanse(inbuf, inbuf_size);
+      free(inbuf);
+   }
+   if (outbuf != NULL)
+   {
+      pgmoneta_cleanse(outbuf, outbuf_size);
+      free(outbuf);
+   }
 
    return ret;
 
@@ -1398,6 +1670,7 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
    unsigned char salt[PBKDF2_SALT_LENGTH];
+   unsigned char tag[GCM_TAG_LENGTH];
    char* master_key = NULL;
    EVP_CIPHER_CTX* ctx = NULL;
    const EVP_CIPHER* (*cipher_fp)(void) = NULL;
@@ -1405,8 +1678,13 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
    size_t outbuf_size = 0;
    size_t outl = 0;
    size_t f_len = 0;
+   int outl_int = 0;
+   int f_len_int = 0;
+   size_t iv_len = 0;
    unsigned char* actual_input = NULL;
    size_t actual_input_size = 0;
+   int tag_len = 0;
+   int gcm = is_gcm(mode);
    int ret = 1;
 
    *res_buffer = NULL;
@@ -1419,40 +1697,64 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
    }
 
    cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
+   tag_len = get_tag_length(mode);
+   iv_len = EVP_CIPHER_iv_length(cipher_fp());
 
-   if (pgmoneta_get_master_key(&master_key))
+   size_t master_key_length = 0;
+   unsigned char* master_salt = NULL;
+   size_t master_salt_length = 0;
+
+   if (pgmoneta_get_master_key(&master_key, &master_key_length, &master_salt, &master_salt_length))
    {
       pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
       goto error;
    }
 
+   if (master_salt != NULL)
+   {
+      pgmoneta_set_master_salt(master_salt);
+      free(master_salt);
+   }
+
    memset(&key, 0, sizeof(key));
    memset(&iv, 0, sizeof(iv));
+   memset(&tag, 0, sizeof(tag));
 
    if (enc == 1)
    {
       /* Encryption: generate a random salt */
-      if (RAND_bytes(salt, PBKDF2_SALT_LENGTH) != 1)
+      if (!RAND_bytes(salt, PBKDF2_SALT_LENGTH))
       {
          pgmoneta_log_error("RAND_bytes: Failed to generate salt");
          goto error;
       }
 
-      if (derive_key_iv(master_key, salt, key, NULL, mode) != 0)
+      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, mode) != 0)
       {
          pgmoneta_log_error("derive_key_iv: Failed to derive key");
          goto error;
       }
 
-      if (RAND_bytes(iv, EVP_CIPHER_iv_length(cipher_fp())) != 1)
+      if (!RAND_bytes(iv, iv_len))
       {
          pgmoneta_log_error("RAND_bytes: Failed to generate unique IV");
          goto error;
       }
 
-      size_t iv_len = EVP_CIPHER_iv_length(cipher_fp());
-      /* Output buffer: salt + iv + encrypted data + padding */
-      outbuf_size = PBKDF2_SALT_LENGTH + iv_len + origin_size + cipher_block_size;
+      /* Output buffer: salt (16) + iv field (16) + encrypted data + padding + tag (16 if GCM) */
+      outbuf_size = PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH;
+      if (origin_size > SIZE_MAX - outbuf_size - cipher_block_size - (gcm ? tag_len : 0))
+      {
+         pgmoneta_log_error("pgmoneta_encrypt_decrypt_buffer: Size overflow computing output buffer");
+         goto error;
+      }
+      outbuf_size += origin_size + cipher_block_size + (gcm ? tag_len : 0);
+
+      if (outbuf_size > SIZE_MAX - 1)
+      {
+         pgmoneta_log_error("pgmoneta_encrypt_decrypt_buffer: Size overflow computing output buffer (+1)");
+         goto error;
+      }
       *res_buffer = (unsigned char*)malloc(outbuf_size + 1);
       if (*res_buffer == NULL)
       {
@@ -1463,6 +1765,10 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
       /* Prepend salt and iv */
       memcpy(*res_buffer, salt, PBKDF2_SALT_LENGTH);
       memcpy(*res_buffer + PBKDF2_SALT_LENGTH, iv, iv_len);
+      if (iv_len < EVP_MAX_IV_LENGTH)
+      {
+         memset(*res_buffer + PBKDF2_SALT_LENGTH + iv_len, 0, EVP_MAX_IV_LENGTH - iv_len);
+      }
 
       if (!(ctx = EVP_CIPHER_CTX_new()))
       {
@@ -1476,44 +1782,84 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
          goto error;
       }
 
-      if (EVP_CipherUpdate(ctx, *res_buffer + PBKDF2_SALT_LENGTH + iv_len, (int*)&outl, origin_buffer, origin_size) == 0)
+      if (origin_size > INT_MAX)
+      {
+         pgmoneta_log_error("pgmoneta_encrypt_decrypt_buffer: Input size exceeds INT_MAX");
+         goto error;
+      }
+
+      if (EVP_CipherUpdate(ctx, *res_buffer + PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH, &outl_int, origin_buffer, (int)origin_size) == 0)
       {
          pgmoneta_log_error("EVP_CipherUpdate: Failed to process data");
          goto error;
       }
 
-      *res_size = PBKDF2_SALT_LENGTH + iv_len + outl;
+      outl = (size_t)outl_int;
+      *res_size = PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + outl;
 
-      if (EVP_CipherFinal_ex(ctx, *res_buffer + PBKDF2_SALT_LENGTH + iv_len + outl, (int*)&f_len) == 0)
+      if (EVP_CipherFinal_ex(ctx, *res_buffer + *res_size, &f_len_int) == 0)
       {
          pgmoneta_log_error("EVP_CipherFinal_ex: Failed to finalize operation");
          goto error;
       }
-
+      f_len = (size_t)f_len_int;
       *res_size += f_len;
+
+      if (gcm)
+      {
+         if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, tag_len, tag))
+         {
+            pgmoneta_log_error("EVP_CIPHER_CTX_ctrl: Failed to get GCM tag");
+            goto error;
+         }
+         /* Append tag to the end */
+         memcpy(*res_buffer + *res_size, tag, tag_len);
+         *res_size += tag_len;
+      }
    }
    else
    {
-      size_t iv_len = EVP_CIPHER_iv_length(cipher_fp());
-      /* Decryption: extract salt and iv from the first bytes */
-      if (origin_size <= (size_t)(PBKDF2_SALT_LENGTH + iv_len))
+      /* Decryption: extract metadata from the first bytes */
+      if (origin_size < (size_t)(PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + (gcm ? tag_len : 0)))
       {
          pgmoneta_log_error("encrypt_decrypt_buffer: Input too short for decryption");
          goto error;
       }
 
       memcpy(salt, origin_buffer, PBKDF2_SALT_LENGTH);
-      memcpy(iv, origin_buffer + PBKDF2_SALT_LENGTH, iv_len);
-      actual_input = origin_buffer + PBKDF2_SALT_LENGTH + iv_len;
-      actual_input_size = origin_size - (PBKDF2_SALT_LENGTH + iv_len);
+      memcpy(iv, origin_buffer + PBKDF2_SALT_LENGTH, EVP_MAX_IV_LENGTH);
 
-      if (derive_key_iv(master_key, salt, key, NULL, mode) != 0)
+      if (gcm)
+      {
+         /* Read tag from the end of the buffer */
+         memcpy(tag, origin_buffer + origin_size - tag_len, tag_len);
+         actual_input_size = origin_size - (PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + tag_len);
+      }
+      else
+      {
+         actual_input_size = origin_size - (PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH);
+      }
+
+      actual_input = origin_buffer + PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH;
+
+      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, mode) != 0)
       {
          pgmoneta_log_error("derive_key_iv: Failed to derive key");
          goto error;
       }
 
-      outbuf_size = actual_input_size;
+      if (actual_input_size > SIZE_MAX - cipher_block_size)
+      {
+         pgmoneta_log_error("pgmoneta_encrypt_decrypt_buffer: Size overflow computing output buffer (decrypt)");
+         goto error;
+      }
+      outbuf_size = actual_input_size + cipher_block_size;
+
+      if (outbuf_size > SIZE_MAX - 1)
+      {
+         pgmoneta_log_error("pgmoneta_encrypt_decrypt_buffer: Size overflow computing output buffer (+1)");
+         goto error;
+      }
       *res_buffer = (unsigned char*)malloc(outbuf_size + 1);
       if (*res_buffer == NULL)
       {
@@ -1533,19 +1879,37 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
          goto error;
       }
 
-      if (EVP_CipherUpdate(ctx, *res_buffer, (int*)&outl, actual_input, actual_input_size) == 0)
+      if (gcm)
       {
-         pgmoneta_log_error("EVP_CipherUpdate: Failed to process data");
+         if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, tag_len, tag))
+         {
+            pgmoneta_log_error("EVP_CIPHER_CTX_ctrl: Failed to set GCM tag");
+            goto error;
+         }
+      }
+
+      if (actual_input_size > INT_MAX)
+      {
+         pgmoneta_log_error("pgmoneta_encrypt_decrypt_buffer: Input size exceeds INT_MAX");
          goto error;
       }
 
+      if (EVP_CipherUpdate(ctx, *res_buffer, &outl_int, actual_input, (int)actual_input_size) == 0)
+      {
+         pgmoneta_log_error("EVP_CipherUpdate: Failed to process data (size: %zu)", actual_input_size);
+         goto error;
+      }
+
+      outl = (size_t)outl_int;
       *res_size = outl;
 
-      if (EVP_CipherFinal_ex(ctx, *res_buffer + outl, (int*)&f_len) == 0)
+      if (EVP_CipherFinal_ex(ctx, *res_buffer + outl, &f_len_int) == 0)
       {
-         pgmoneta_log_error("EVP_CipherFinal_ex: Failed to finalize operation");
+         pgmoneta_log_error("EVP_CipherFinal_ex: Failed to finalize operation (size: %zu, outl: %zu)", actual_input_size, outl);
          goto error;
       }
+
+      f_len = (size_t)f_len_int;
 
       *res_size += f_len;
       (*res_buffer)[*res_size] = '\0';
@@ -1559,13 +1923,15 @@ cleanup:
       EVP_CIPHER_CTX_free(ctx);
    }
 
-   /* Wipe key material from stack */
+   /* Wipe material from stack */
    pgmoneta_cleanse(key, sizeof(key));
    pgmoneta_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(salt, sizeof(salt));
+   pgmoneta_cleanse(tag, sizeof(tag));
 
    if (master_key != NULL)
    {
-      pgmoneta_cleanse(master_key, strlen(master_key));
+      pgmoneta_cleanse(master_key, master_key_length);
       free(master_key);
    }
 
@@ -1584,19 +1950,19 @@ error:
 
 static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void)
 {
-   if (mode == ENCRYPTION_AES_256_CBC)
+   if (mode == ENCRYPTION_AES_256_GCM)
    {
-      return &EVP_aes_256_cbc;
+      return &EVP_aes_256_gcm;
    }
-   if (mode == ENCRYPTION_AES_192_CBC)
+   if (mode == ENCRYPTION_AES_192_GCM)
    {
-      return &EVP_aes_192_cbc;
+      return &EVP_aes_192_gcm;
    }
-   if (mode == ENCRYPTION_AES_128_CBC)
+   if (mode == ENCRYPTION_AES_128_GCM)
    {
-      return &EVP_aes_128_cbc;
+      return &EVP_aes_128_gcm;
    }
-   return &EVP_aes_256_cbc;
+   return NULL;
 }
 
 static int
@@ -1605,6 +1971,10 @@ create_aes_encryptor(int mode, struct encryptor** encryptor)
    struct aes_encryptor* ae = NULL;
 
    ae = (struct aes_encryptor*)malloc(sizeof(struct aes_encryptor));
+   if (ae == NULL)
+   {
+      return 1;
+   }
    memset(ae, 0, sizeof(struct aes_encryptor));
 
    ae->super.close = aes_encryptor_close;
@@ -1612,6 +1982,11 @@ create_aes_encryptor(int mode, struct encryptor** encryptor)
    ae->super.encrypt = aes_encryptor_encrypt;
    ae->super.reset = aes_encryptor_reset;
    ae->cipher_fp = get_cipher(mode);
+   if (ae->cipher_fp == NULL)
+   {
+      free(ae);
+      return 1;
+   }
    ae->cipher_block_size = EVP_CIPHER_block_size(ae->cipher_fp());
    ae->mode = mode;
 
@@ -1655,6 +2030,8 @@ aes_encryptor_reset(struct encryptor* encryptor)
       EVP_CIPHER_CTX_free(this->ctx);
       this->ctx = NULL;
    }
+   this->tag_buffer_size = 0;
+   memset(this->tag_buffer, 0, sizeof(this->tag_buffer));
 }
 
 static void
@@ -1679,12 +2056,18 @@ aes_encryptor_close(struct encryptor* encryptor)
       this->ctx = NULL;
    }
 
-   free(this->out_buf);
-   this->out_buf = NULL;
+   if (this->out_buf != NULL)
+   {
+      pgmoneta_cleanse(this->out_buf, this->out_capacity);
+      free(this->out_buf);
+      this->out_buf = NULL;
+   }
    this->out_capacity = 0;
 
    pgmoneta_cleanse(this->key, sizeof(this->key));
    pgmoneta_cleanse(this->iv, sizeof(this->iv));
+   pgmoneta_cleanse(this->salt, sizeof(this->salt));
+   pgmoneta_cleanse(this->tag_buffer, sizeof(this->tag_buffer));
 }
 
 static int
@@ -1709,34 +2092,56 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
    bool write_header = false;
    int offset = 0;
    int iv_len = 0;
+   int tag_len = 0;
+   int gcm = 0;
+   unsigned char tag[GCM_TAG_LENGTH];
    char* master_key = NULL;
+   size_t master_key_length = 0;
 
-   if (this == NULL || in_buf == NULL || in_size == 0)
+   if (this == NULL || (in_buf == NULL && in_size > 0))
    {
       goto error;
+   }
+
+   if (in_size == 0 && !last_chunk)
+   {
+      return 0;
    }
 
    *out_buf = NULL;
    *out_size = 0;
 
+   gcm = is_gcm(this->mode);
+   tag_len = get_tag_length(this->mode);
+   iv_len = EVP_CIPHER_iv_length(this->cipher_fp());
+
    if (this->ctx == NULL)
    {
-      if (pgmoneta_get_master_key(&master_key))
+      unsigned char* master_salt = NULL;
+      size_t master_salt_length = 0;
+
+      if (pgmoneta_get_master_key(&master_key, &master_key_length, &master_salt, &master_salt_length))
       {
          pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
          goto error;
+      }
+
+      if (master_salt != NULL)
+      {
+         pgmoneta_set_master_salt(master_salt);
+         free(master_salt);
       }
 
       if (enc == 1)
       {
          if (!this->key_derived)
          {
-            if (RAND_bytes(this->salt, PBKDF2_SALT_LENGTH) != 1)
+            if (!RAND_bytes(this->salt, PBKDF2_SALT_LENGTH))
             {
                pgmoneta_log_error("RAND_bytes: Failed to generate salt");
                goto error;
             }
-            if (derive_key_iv(master_key, this->salt, this->key, NULL, this->mode) != 0)
+            if (derive_key_iv(master_key, master_key_length, this->salt, this->key, NULL, this->mode) != 0)
             {
                pgmoneta_log_error("derive_key_iv: Failed to derive master key");
                goto error;
@@ -1744,8 +2149,7 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
             this->key_derived = true;
          }
 
-         iv_len = EVP_CIPHER_iv_length(this->cipher_fp());
-         if (RAND_bytes(this->iv, iv_len) != 1)
+         if (!RAND_bytes(this->iv, iv_len))
          {
             pgmoneta_log_error("RAND_bytes: Failed to generate unique IV");
             goto error;
@@ -1755,10 +2159,11 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
       }
       else
       {
-         iv_len = EVP_CIPHER_iv_length(this->cipher_fp());
-         if (in_size < (size_t)(PBKDF2_SALT_LENGTH + iv_len))
+         size_t header_len = PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH;
+
+         if (in_size < header_len)
          {
-            pgmoneta_log_error("Unable to load 32-byte Salt+IV header");
+            pgmoneta_log_error("Unable to load Salt+IV header");
             goto error;
          }
 
@@ -1766,7 +2171,7 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
          if (!this->key_derived || memcmp(this->salt, in_buf, PBKDF2_SALT_LENGTH) != 0)
          {
             memcpy(this->salt, in_buf, PBKDF2_SALT_LENGTH);
-            if (derive_key_iv(master_key, this->salt, this->key, NULL, this->mode) != 0)
+            if (derive_key_iv(master_key, master_key_length, this->salt, this->key, NULL, this->mode) != 0)
             {
                pgmoneta_log_error("derive_key_iv: Failed to derive master key");
                goto error;
@@ -1774,10 +2179,9 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
             this->key_derived = true;
          }
 
-         memcpy(this->iv, in_buf + PBKDF2_SALT_LENGTH, iv_len);
-
-         in_buf = in_buf + PBKDF2_SALT_LENGTH + iv_len;
-         in_size -= (PBKDF2_SALT_LENGTH + iv_len);
+         memcpy(this->iv, (unsigned char*)in_buf + PBKDF2_SALT_LENGTH, (size_t)iv_len);
+         in_buf = (unsigned char*)in_buf + PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH;
+         in_size -= (PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH);
       }
 
       if (!(this->ctx = EVP_CIPHER_CTX_new()))
@@ -1799,32 +2203,38 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
       goto error;
    }
 
-   if (in_size > SIZE_MAX - (size_t)this->cipher_block_size)
+   required = in_size;
+
+   if (required > SIZE_MAX - (size_t)this->cipher_block_size)
    {
-      pgmoneta_log_error("aes_encryptor_process: input size overflow");
       goto error;
    }
-   required = in_size + (size_t)this->cipher_block_size;
+   required += (size_t)this->cipher_block_size;
 
    if (last_chunk)
    {
       if (required > SIZE_MAX - (size_t)this->cipher_block_size)
       {
-         pgmoneta_log_error("aes_encryptor_process: capacity overflow for final chunk");
          goto error;
       }
       required += (size_t)this->cipher_block_size;
+      if (gcm)
+      {
+         if (required > SIZE_MAX - (size_t)tag_len)
+         {
+            goto error;
+         }
+         required += (size_t)tag_len;
+      }
    }
 
    if (write_header)
    {
-      size_t header_size = PBKDF2_SALT_LENGTH + (size_t)iv_len;
-      if (required > SIZE_MAX - header_size)
+      if (required > SIZE_MAX - (PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH))
       {
-         pgmoneta_log_error("aes_encryptor_process: capacity overflow for header");
          goto error;
       }
-      required += header_size;
+      required += PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH;
    }
 
    if (ensure_capacity(&this->out_buf, &this->out_capacity, required))
@@ -1837,23 +2247,134 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
    {
       memcpy(this->out_buf, this->salt, PBKDF2_SALT_LENGTH);
       memcpy(this->out_buf + PBKDF2_SALT_LENGTH, this->iv, (size_t)iv_len);
-      offset += PBKDF2_SALT_LENGTH + iv_len;
-   }
-
-   if (EVP_CipherUpdate(this->ctx, this->out_buf + offset, &size, in_buf, (int)in_size) == 0)
-   {
-      pgmoneta_log_error("EVP_CipherUpdate: failed to process block");
-      goto error;
-   }
-
-   if (last_chunk)
-   {
-      if (EVP_CipherFinal_ex(this->ctx, this->out_buf + size + offset, &final_size) == 0)
+      if (iv_len < EVP_MAX_IV_LENGTH)
       {
-         pgmoneta_log_error("EVP_CipherFinal_ex: failed to process final cipher block");
+         memset(this->out_buf + PBKDF2_SALT_LENGTH + iv_len, 0, EVP_MAX_IV_LENGTH - iv_len);
+      }
+      offset += PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH;
+   }
+
+   if (enc)
+   {
+      if (EVP_CipherUpdate(this->ctx, this->out_buf + offset, &size, in_buf, (int)in_size) == 0)
+      {
+         pgmoneta_log_error("EVP_CipherUpdate: failed to process block");
          goto error;
       }
-      size += final_size;
+
+      if (last_chunk)
+      {
+         if (EVP_CipherFinal_ex(this->ctx, this->out_buf + size + offset, &final_size) == 0)
+         {
+            pgmoneta_log_error("EVP_CipherFinal_ex: failed to process final cipher block");
+            goto error;
+         }
+         size += final_size;
+
+         if (gcm)
+         {
+            if (EVP_CIPHER_CTX_ctrl(this->ctx, EVP_CTRL_GCM_GET_TAG, tag_len, tag) == 0)
+            {
+               pgmoneta_log_error("EVP_CIPHER_CTX_ctrl: failed to get GCM tag");
+               goto error;
+            }
+            memcpy(this->out_buf + size + offset, tag, (size_t)tag_len);
+            size += tag_len;
+         }
+      }
+   }
+   else
+   {
+      if (gcm)
+      {
+         /* Decryption sliding window for GCM tag */
+         size_t total_in = this->tag_buffer_size + in_size;
+         if (total_in <= (size_t)tag_len)
+         {
+            /* All current input + what we had is still potentially just the tag */
+            memcpy(this->tag_buffer + this->tag_buffer_size, in_buf, in_size);
+            this->tag_buffer_size += in_size;
+            size = 0;
+         }
+         else
+         {
+            /* We have more than tag_len bytes. */
+            size_t to_decrypt = total_in - (size_t)tag_len;
+            size_t from_tag_buf = (to_decrypt < this->tag_buffer_size) ? to_decrypt : this->tag_buffer_size;
+            size_t from_in_buf = to_decrypt - from_tag_buf;
+            int out_len;
+
+            size = 0;
+            /* Decrypt from tag_buffer */
+            if (from_tag_buf > 0)
+            {
+               if (EVP_CipherUpdate(this->ctx, this->out_buf + offset, &out_len, this->tag_buffer, (int)from_tag_buf) == 0)
+               {
+                  pgmoneta_log_error("EVP_CipherUpdate: failed to process tag_buffer block");
+                  goto error;
+               }
+               size += out_len;
+            }
+
+            /* Decrypt from in_buf */
+            if (from_in_buf > 0)
+            {
+               if (EVP_CipherUpdate(this->ctx, this->out_buf + offset + size, &out_len, in_buf, (int)from_in_buf) == 0)
+               {
+                  pgmoneta_log_error("EVP_CipherUpdate: failed to process in_buf block");
+                  goto error;
+               }
+               size += out_len;
+            }
+
+            /* Update tag_buffer to hold the last tag_len bytes */
+            if (in_size >= (size_t)tag_len)
+            {
+               /* All new tag_buffer bytes come from the end of in_buf */
+               memcpy(this->tag_buffer, (unsigned char*)in_buf + (in_size - tag_len), (size_t)tag_len);
+            }
+            else
+            {
+               /* New tag_buffer is a mix of old tag_buffer and in_buf */
+               size_t keep_old = (size_t)tag_len - in_size;
+               memmove(this->tag_buffer, this->tag_buffer + (this->tag_buffer_size - keep_old), keep_old);
+               memcpy(this->tag_buffer + keep_old, in_buf, in_size);
+            }
+            this->tag_buffer_size = (size_t)tag_len;
+         }
+      }
+      else
+      {
+         if (EVP_CipherUpdate(this->ctx, this->out_buf + offset, &size, in_buf, (int)in_size) == 0)
+         {
+            pgmoneta_log_error("EVP_CipherUpdate: failed to process block");
+            goto error;
+         }
+      }
+
+      if (last_chunk)
+      {
+         if (gcm)
+         {
+            if (this->tag_buffer_size != (size_t)tag_len)
+            {
+               pgmoneta_log_error("aes_encryptor_process: GCM tag missing or truncated");
+               goto error;
+            }
+            if (EVP_CIPHER_CTX_ctrl(this->ctx, EVP_CTRL_GCM_SET_TAG, tag_len, this->tag_buffer) == 0)
+            {
+               pgmoneta_log_error("EVP_CIPHER_CTX_ctrl: failed to set GCM tag");
+               goto error;
+            }
+         }
+
+         if (EVP_CipherFinal_ex(this->ctx, this->out_buf + size + offset, &final_size) == 0)
+         {
+            pgmoneta_log_error("EVP_CipherFinal_ex: failed to process final cipher block");
+            goto error;
+         }
+         size += final_size;
+      }
    }
 
    *out_buf = (void*)this->out_buf;
@@ -1861,7 +2382,7 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
 
    if (master_key != NULL)
    {
-      pgmoneta_cleanse(master_key, strlen(master_key));
+      pgmoneta_cleanse(master_key, master_key_length);
       free(master_key);
    }
 
@@ -1871,7 +2392,7 @@ error:
 
    if (master_key != NULL)
    {
-      pgmoneta_cleanse(master_key, strlen(master_key));
+      pgmoneta_cleanse(master_key, master_key_length);
       free(master_key);
    }
    if (out_buf != NULL)
@@ -1982,18 +2503,25 @@ get_key_length(int mode)
 {
    switch (mode)
    {
-      case ENCRYPTION_AES_256_CBC:
-      case ENCRYPTION_AES_256_CTR:
-         return 32;
-      case ENCRYPTION_AES_192_CBC:
-      case ENCRYPTION_AES_192_CTR:
-         return 24;
-      case ENCRYPTION_AES_128_CBC:
-      case ENCRYPTION_AES_128_CTR:
+      case ENCRYPTION_AES_128_GCM:
          return 16;
-      default:
+      case ENCRYPTION_AES_192_GCM:
+         return 24;
+      case ENCRYPTION_AES_256_GCM:
          return 32;
+      default:
+         return 0;
    }
+}
+
+static int
+get_tag_length(int mode)
+{
+   if (is_gcm(mode))
+   {
+      return GCM_TAG_LENGTH;
+   }
+   return 0;
 }
 
 bool
@@ -2010,4 +2538,13 @@ pgmoneta_is_encrypted(char* f)
    }
 
    return false;
+}
+
+/**
+ * Automatically clear the AES cache on process exit
+ */
+__attribute__((destructor)) static void
+pgmoneta_aes_destructor(void)
+{
+   pgmoneta_clear_aes_cache();
 }

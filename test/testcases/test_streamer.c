@@ -38,7 +38,7 @@
 #include <stdlib.h>
 
 int compression_methods[] = {COMPRESSION_NONE, COMPRESSION_CLIENT_ZSTD, COMPRESSION_CLIENT_GZIP, COMPRESSION_CLIENT_BZIP2, COMPRESSION_CLIENT_LZ4};
-int encryption_methods[] = {ENCRYPTION_NONE, ENCRYPTION_AES_128_CBC};
+int encryption_methods[] = {ENCRYPTION_NONE, ENCRYPTION_AES_256_GCM, ENCRYPTION_AES_192_GCM, ENCRYPTION_AES_128_GCM};
 
 static char* translate_compression(int compression);
 static char* translate_encryption(int encryption);
@@ -55,7 +55,7 @@ MCTF_TEST(test_streamer)
    pgmoneta_mkdir(retrospect_dir);
    bigfile = pgmoneta_append(bigfile, dir);
    bigfile = pgmoneta_append(bigfile, "/bigfile.txt");
-   char buf[256] = {0};
+   char buf[DEFAULT_BUFFER_SIZE] = {0};
    char backup_dest[MAX_PATH];
    char restore_dest[MAX_PATH];
    struct vfile* reader = NULL;
@@ -66,7 +66,7 @@ MCTF_TEST(test_streamer)
    bool same = false;
    size_t num_read = 0;
 
-   // generate a large file for testing
+   /* generate a large file for testing */
    pgmoneta_snprintf(cmd, sizeof(cmd), "dd bs=102400000 if=/dev/urandom count=1 2>/dev/null | LC_ALL=C tr -dc \"A-Za-z0-9@#*=[]\" | fold -w100 | head -n 100000 > %s", bigfile);
    pgmoneta_mkdir(dir);
    system(cmd);
@@ -82,7 +82,7 @@ MCTF_TEST(test_streamer)
          memset(restore_dest, 0, sizeof(restore_dest));
          pgmoneta_snprintf(backup_dest, sizeof(backup_dest), "%s/bigfile_backup_%s_%s", dir, translate_compression(compression), translate_encryption(encryption));
          pgmoneta_snprintf(restore_dest, sizeof(restore_dest), "%s/bigfile_restore_%s_%s", dir, translate_compression(compression), translate_encryption(encryption));
-         //backup
+         /* backup */
          MCTF_ASSERT(!pgmoneta_vfile_create_local(bigfile, "r", &reader), cleanup);
          MCTF_ASSERT(!pgmoneta_vfile_create_local(backup_dest, "wb", &writer), cleanup);
          MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_BACKUP, encryption, compression, &backup_streamer), cleanup);
@@ -100,7 +100,7 @@ MCTF_TEST(test_streamer)
          reader = NULL;
          backup_streamer = NULL;
 
-         //restore
+         /* restore */
          MCTF_ASSERT(!pgmoneta_vfile_create_local(backup_dest, "r", &reader), cleanup);
          MCTF_ASSERT(!pgmoneta_vfile_create_local(restore_dest, "wb", &writer), cleanup);
          MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_RESTORE, encryption, compression, &restore_streamer), cleanup);
@@ -121,7 +121,7 @@ MCTF_TEST(test_streamer)
          same = pgmoneta_compare_files(bigfile, restore_dest);
          if (!same)
          {
-            // save the test input to retrospect/ for inspection
+            /* save the test input to retrospect/ for inspection */
             pgmoneta_copy_directory(dir, retrospect_dir, NULL, NULL);
          }
 
@@ -166,18 +166,12 @@ translate_encryption(int encryption)
 {
    switch (encryption)
    {
-      case ENCRYPTION_AES_256_CBC:
-         return "aes-256-cbc";
-      case ENCRYPTION_AES_192_CBC:
-         return "aes-192-cbc";
-      case ENCRYPTION_AES_128_CBC:
-         return "aes-128-cbc";
-      case ENCRYPTION_AES_256_CTR:
-         return "aes-256-ctr";
-      case ENCRYPTION_AES_192_CTR:
-         return "aes-192-ctr";
-      case ENCRYPTION_AES_128_CTR:
-         return "aes-128-ctr";
+      case ENCRYPTION_AES_256_GCM:
+         return "aes-256-gcm";
+      case ENCRYPTION_AES_192_GCM:
+         return "aes-192-gcm";
+      case ENCRYPTION_AES_128_GCM:
+         return "aes-128-gcm";
       case ENCRYPTION_NONE:
          return "none";
       default:

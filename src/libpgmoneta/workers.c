@@ -27,10 +27,13 @@
  */
 
 #include <pgmoneta.h>
+#include <security.h>
+#include <utils.h>
 #include <deque.h>
 #include <logging.h>
 #include <workers.h>
 #include <value.h>
+#include <aes.h>
 
 #include <errno.h>
 #include <signal.h>
@@ -380,6 +383,8 @@ worker_do(struct worker* worker)
    pthread_mutex_lock(&workers->worker_lock);
    workers->number_of_alive--;
    pthread_mutex_unlock(&workers->worker_lock);
+
+   pgmoneta_clear_aes_cache();
 
    return NULL;
 }

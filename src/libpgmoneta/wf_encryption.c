@@ -212,6 +212,7 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
+   pgmoneta_clear_aes_cache();
    free(d);
    free(enc_file);
 
@@ -224,6 +225,7 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
+   pgmoneta_clear_aes_cache();
    free(d);
    free(enc_file);
 
@@ -293,5 +295,6 @@ decryption_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
+   pgmoneta_clear_aes_cache();
    return 0;
 }

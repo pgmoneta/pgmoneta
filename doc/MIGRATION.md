@@ -29,17 +29,22 @@ max_rate = 1000000
 
 ### Encryption Format
 
-The AES encryption format has been refined for improved security and performance. 
-Each encrypted file now starts with a 32-byte header:
+The AES encryption format has been upgraded to use Authenticated Encryption with Associated Data (AEAD) via AES-GCM mode for improved security and data integrity. AES-GCM is now the **only** supported encryption mode for backups.
+
+Legacy modes (**AES-CBC** and **AES-CTR**) have been **removed** for security and performance reasons. AES-GCM is now the only supported encryption method.
+
+Each encrypted file now starts with a unified 32-byte header:
 * `Salt` (16 bytes)
 * `IV` (16 bytes)
+
+A unique, random Initialization Vector (IV) is generated for every encryption operation and stored in the header. For **AES-GCM**, an additional **Authentication Tag (16 bytes)** is stored at the **end of the data** (after the ciphertext). This unified format is used for streaming, file-based, and one-shot operations.
 
 The PBKDF2 Master Key is now cached in volatile memory for the duration of the backup stream, 
 and securely wiped once processing is complete, significantly improving performance for 
 large backup sets.
 
 This is a **breaking change**. Backups created with versions prior to 0.21.0 
-cannot be decrypted by this version.
+cannot be decrypted by this version as the internal framing and header format has changed for all encryption modes.
 
 **Action required:**
 

@@ -422,14 +422,20 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    string_to_sign = pgmoneta_append(string_to_sign, "/");
    string_to_sign = pgmoneta_append(string_to_sign, azure_path);
 
-   pgmoneta_base64_decode(config->azure_shared_key, strlen(config->azure_shared_key), (void**)&signing_key, &signing_key_length);
+   if (pgmoneta_base64_decode(config->azure_shared_key, strlen(config->azure_shared_key), (void**)&signing_key, &signing_key_length))
+   {
+      goto error;
+   }
 
    if (pgmoneta_generate_string_hmac_sha256_hash(signing_key, signing_key_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
    {
       goto error;
    }
 
-   pgmoneta_base64_encode((char*)signature_hmac, hmac_length, &base64_signature, &base64_signature_length);
+   if (pgmoneta_base64_encode((char*)signature_hmac, hmac_length, &base64_signature, &base64_signature_length))
+   {
+      goto error;
+   }
 
    auth_value = pgmoneta_append(auth_value, "SharedKey ");
    auth_value = pgmoneta_append(auth_value, config->azure_storage_account);
