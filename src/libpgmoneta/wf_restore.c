@@ -810,8 +810,6 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
    char* to = NULL;
    char* suffix = NULL;
    struct backup* backup = NULL;
-   struct workers* workers = NULL;
-   int number_of_workers = 0;
    char** restore_last_files_names = NULL;
    struct main_configuration* config = (struct main_configuration*)shmem;
 
@@ -842,12 +840,6 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
    from = pgmoneta_append(from, (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA));
    to = pgmoneta_append(to, (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
 
-   number_of_workers = pgmoneta_get_number_of_workers(server);
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
-   }
-
    for (int i = 0; restore_last_files_names[i] != NULL; i++)
    {
       char* from_file = NULL;
@@ -863,25 +855,17 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
 
       pgmoneta_log_trace("Excluded: %s -> %s", from_file, to_file);
 
-      if (pgmoneta_copy_file(from_file, to_file, workers))
+      if (pgmoneta_extract_file(from_file, 0, true, &to_file))
       {
          pgmoneta_log_error("Restore: Could not copy file %s to %s", from_file, to_file);
+         free(from_file);
+         free(to_file);
          goto error;
       }
 
       free(from_file);
-      from_file = NULL;
-
       free(to_file);
-      to_file = NULL;
    }
-
-   pgmoneta_workers_wait(workers);
-   if (workers != NULL && !workers->outcome)
-   {
-      goto error;
-   }
-   pgmoneta_workers_destroy(workers);
 
    for (int i = 0; restore_last_files_names[i] != NULL; i++)
    {
@@ -895,11 +879,6 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
    return 0;
 
 error:
-
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_destroy(workers);
-   }
 
    for (int i = 0; restore_last_files_names[i] != NULL; i++)
    {

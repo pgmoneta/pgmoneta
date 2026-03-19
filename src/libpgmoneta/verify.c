@@ -238,11 +238,14 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    }
 
    pgmoneta_json_put(filesj, MANAGEMENT_ARGUMENT_FAILED, (uintptr_t)failed, ValueJSON);
+   failed = NULL;
    pgmoneta_json_put(filesj, MANAGEMENT_ARGUMENT_ALL, (uintptr_t)all, ValueJSON);
+   all = NULL;
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)label, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILES, (uintptr_t)filesj, ValueJSON);
+   filesj = NULL;
 
    pgmoneta_delete_directory((char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
 
@@ -290,6 +293,10 @@ error:
    pgmoneta_deque_iterator_destroy(aiter);
 
    pgmoneta_art_destroy(nodes);
+
+   pgmoneta_json_destroy(filesj);
+   pgmoneta_json_destroy(failed);
+   pgmoneta_json_destroy(all);
 
    pgmoneta_json_destroy(payload);
 
