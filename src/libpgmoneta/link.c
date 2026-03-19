@@ -500,7 +500,7 @@ trim_suffix(char* str)
 
    char* res = NULL;
 
-   if (pgmoneta_compression_trim_suffix(str, config->compression_type, config->encryption, &res))
+   if (pgmoneta_compression_trim_suffix(str, config->compression_type, config->common.encryption, &res))
    {
       return NULL;
    }

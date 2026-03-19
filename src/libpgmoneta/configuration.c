@@ -157,7 +157,7 @@ pgmoneta_init_main_configuration(void* shm)
    config->compression_type = COMPRESSION_CLIENT_ZSTD;
    config->compression_level = 3;
 
-   config->encryption = ENCRYPTION_NONE;
+   config->common.encryption = ENCRYPTION_NONE;
 
    config->storage_engine = STORAGE_ENGINE_LOCAL;
 
@@ -1655,7 +1655,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->encryption = as_encryption_mode(value);
+                     config->common.encryption = as_encryption_mode(value);
                   }
                   else
                   {
@@ -2281,6 +2281,8 @@ pgmoneta_init_walinfo_configuration(void* shmem)
    config->common.log_mode = PGMONETA_LOGGING_MODE_APPEND;
    atomic_init(&config->common.log_lock, STATE_FREE);
 
+   config->common.encryption = ENCRYPTION_AES_256_CBC;
+
    return 0;
 }
 
@@ -2469,6 +2471,17 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "encryption"))
+               {
+                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  {
+                     config->common.encryption = as_encryption_mode(value);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else
                {
                   unknown = true;
@@ -2540,6 +2553,8 @@ pgmoneta_init_walfilter_configuration(void* shmem)
    config->common.log_level = PGMONETA_LOGGING_LEVEL_INFO;
    config->common.log_mode = PGMONETA_LOGGING_MODE_APPEND;
    atomic_init(&config->common.log_lock, STATE_FREE);
+
+   config->common.encryption = ENCRYPTION_NONE;
 
    return 0;
 }
@@ -2723,6 +2738,17 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(config->common.log_path, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "encryption"))
+               {
+                  if (!strcmp(section, "pgmoneta-walfilter"))
+                  {
+                     config->common.encryption = as_encryption_mode(value);
                   }
                   else
                   {
@@ -3291,7 +3317,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PROGRESS, (uintptr_t)config->progress, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, (uintptr_t)config->storage_engine, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)config->encryption, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)config->common.encryption, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->create_slot, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_HOSTNAME, (uintptr_t)config->ssh_hostname, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_USERNAME, (uintptr_t)config->ssh_username, ValueString);

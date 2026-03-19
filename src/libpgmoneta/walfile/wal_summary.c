@@ -399,7 +399,7 @@ get_wal_file_name(char* dir_path, char* file)
    }
 
    /* Build expected compression/encryption suffix */
-   if (pgmoneta_extraction_get_suffix(config->compression_type, config->encryption, &suffix))
+   if (pgmoneta_extraction_get_suffix(config->compression_type, config->common.encryption, &suffix))
    {
       pgmoneta_log_error("WAL: failed to build suffix for %s", file);
       free(base);

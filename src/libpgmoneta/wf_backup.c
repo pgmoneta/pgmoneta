@@ -364,7 +364,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_snprintf(backup->label, sizeof(backup->label), "%s", label);
    backup->number_of_tablespaces = 0;
    backup->compression = config->compression_type;
-   backup->encryption = config->encryption;
+   backup->encryption = config->common.encryption;
    pgmoneta_snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
    backup->restore_size = size;
    backup->biggest_file_size = biggest_file_size;

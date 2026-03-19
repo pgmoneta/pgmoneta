@@ -181,7 +181,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       filename = pgmoneta_append(filename, (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE));
       {
          char* suffix = NULL;
-         if (pgmoneta_extraction_get_suffix(config->compression_type, config->encryption, &suffix))
+         if (pgmoneta_extraction_get_suffix(config->compression_type, config->common.encryption, &suffix))
          {
             goto error;
          }
@@ -896,7 +896,7 @@ pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art*
    }
 
    pgmoneta_streamer_create(STREAMER_MODE_NONE, ENCRYPTION_NONE, COMPRESSION_NONE, &noop_strm);
-   pgmoneta_streamer_create(STREAMER_MODE_BACKUP, config->encryption, config->compression_type, &backup_strm);
+   pgmoneta_streamer_create(STREAMER_MODE_BACKUP, config->common.encryption, config->compression_type, &backup_strm);
 
    // open tar file in a suitable buffer size, I'm using 10240 here
    if (archive_read_open_filename(a, archive_name, 10240) != ARCHIVE_OK)

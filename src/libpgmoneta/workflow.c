@@ -755,7 +755,7 @@ wf_incremental_backup(void)
          break;
    }
 
-   if (config->encryption != ENCRYPTION_NONE)
+   if (config->common.encryption != ENCRYPTION_NONE)
    {
       current->next = pgmoneta_encryption(true);
       current = current->next;
