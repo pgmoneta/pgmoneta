@@ -2958,6 +2958,46 @@ pgmoneta_is_file(char* file)
 }
 
 bool
+pgmoneta_is_binary_file(char* path)
+{
+   FILE* fp = NULL;
+   unsigned char buffer[1024];
+   size_t bytes;
+   int error;
+
+   fp = fopen(path, "rb");
+   if (fp == NULL)
+   {
+      goto error;
+   }
+
+   while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
+   {
+      for (size_t i = 0; i < bytes; i++)
+      {
+         unsigned char c = buffer[i];
+         /* Allow printable chars, newline, tab, carriage return */
+         if (!isprint(c) && c != '\n' && c != '\t' && c != '\r')
+         {
+            goto error;
+         }
+      }
+   }
+
+   error = ferror(fp);
+   fclose(fp);
+
+   return error != 0;
+
+error:
+   if (fp != NULL)
+   {
+      fclose(fp);
+   }
+   return true;
+}
+
+bool
 pgmoneta_compare_files(char* f1, char* f2)
 {
    FILE* fp1 = NULL;

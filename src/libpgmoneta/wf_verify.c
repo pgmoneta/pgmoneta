@@ -136,15 +136,40 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
+   if (pgmoneta_is_binary_file(manifest_file))
+   {
+      pgmoneta_log_error("Verify: Manifest file is not a text file");
+      goto error;
+   }
+
    if (pgmoneta_csv_reader_init(manifest_file, &csv))
    {
       goto error;
    }
 
+   int line_number = 0;
+
    while (pgmoneta_csv_next_row(csv, &number_of_columns, &columns))
    {
       struct worker_input* payload = NULL;
       struct json* j = NULL;
+
+      line_number++;
+
+      /* Column check - heap buffer overflow prevention */
+      if (number_of_columns != 2)
+      {
+         pgmoneta_log_error("Verify: Invalid manifest at line %d", line_number);
+         goto error;
+      }
+
+      /* Empty filename or hash */
+      if (columns[0] == NULL || strlen(columns[0]) == 0 ||
+          columns[1] == NULL || strlen(columns[1]) == 0)
+      {
+         pgmoneta_log_error("Verify: Invalid manifest at line %d", line_number);
+         goto error;
+      }
 
       if (pgmoneta_create_worker_input(NULL, NULL, NULL, -1, workers, &payload))
       {
@@ -216,6 +241,7 @@ error:
 
    pgmoneta_csv_reader_destroy(csv);
 
+   free(columns);
    free(base);
    free(manifest_file);
 
