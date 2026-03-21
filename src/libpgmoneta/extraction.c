@@ -154,12 +154,9 @@ pgmoneta_extraction_get_suffix(int compression, int encryption, char** suffix)
 
    switch (encryption)
    {
-      case ENCRYPTION_AES_256_CBC:
-      case ENCRYPTION_AES_192_CBC:
-      case ENCRYPTION_AES_128_CBC:
-      case ENCRYPTION_AES_256_CTR:
-      case ENCRYPTION_AES_192_CTR:
-      case ENCRYPTION_AES_128_CTR:
+      case ENCRYPTION_AES_256_GCM:
+      case ENCRYPTION_AES_192_GCM:
+      case ENCRYPTION_AES_128_GCM:
          type |= PGMONETA_FILE_TYPE_ENCRYPTED;
          break;
       case ENCRYPTION_NONE:
@@ -228,19 +225,16 @@ bitmask_to_encryption(uint32_t file_type)
       {
          switch (config->encryption)
          {
-            case ENCRYPTION_AES_256_CBC:
-            case ENCRYPTION_AES_192_CBC:
-            case ENCRYPTION_AES_128_CBC:
-            case ENCRYPTION_AES_256_CTR:
-            case ENCRYPTION_AES_192_CTR:
-            case ENCRYPTION_AES_128_CTR:
+            case ENCRYPTION_AES_256_GCM:
+            case ENCRYPTION_AES_192_GCM:
+            case ENCRYPTION_AES_128_GCM:
                return config->encryption;
             default:
                break;
          }
       }
 
-      return ENCRYPTION_AES_256_CBC;
+      return ENCRYPTION_AES_256_GCM;
    }
 
    return ENCRYPTION_NONE;

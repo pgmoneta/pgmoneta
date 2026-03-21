@@ -1,6 +1,6 @@
 \newpage
 
-#Write - Ahead Log(WAL) Tools
+# Write - Ahead Log(WAL) Tools
 
 pgmoneta provides two powerful command-line utilities for working with PostgreSQL Write-Ahead Log (WAL) files:
 

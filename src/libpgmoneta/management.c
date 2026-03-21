@@ -1179,7 +1179,7 @@ pgmoneta_management_read_json(SSL* ssl, int socket, uint8_t* compression, uint8_
       // First, perform decode
       if (pgmoneta_base64_decode(s, strlen(s), (void**)&decoded_buffer, &decoded_size) != 0)
       {
-         pgmoneta_log_error("pgmoneta_management_read_json: Decoding failedg");
+         pgmoneta_log_error("pgmoneta_management_read_json: Decoding failed");
          goto error;
       }
       free(s);
@@ -1188,47 +1188,39 @@ pgmoneta_management_read_json(SSL* ssl, int socket, uint8_t* compression, uint8_
       transfer_size = decoded_size;
       decoded_buffer = NULL;
 
-      // Second, perform dencrypt
+      // Second, perform decrypt
+      int mode = 0;
       switch (encrypt_method)
       {
-         case MANAGEMENT_ENCRYPTION_AES256:
-            if (pgmoneta_decrypt_buffer(transfer_buffer, transfer_size, &decrypted_buffer, &decrypted_size, MANAGEMENT_ENCRYPTION_AES256))
-            {
-               pgmoneta_log_error("pgmoneta_management_read_json: Failed to aes256 dencrypt the string");
-               goto error;
-            }
-            free(transfer_buffer);
-            transfer_buffer = decrypted_buffer;
-            transfer_size = decrypted_size;
-            decrypted_buffer = NULL;
-
+         case MANAGEMENT_ENCRYPTION_AES256_GCM:
+            mode = ENCRYPTION_AES_256_GCM;
             break;
-         case MANAGEMENT_ENCRYPTION_AES192:
-            if (pgmoneta_decrypt_buffer(transfer_buffer, transfer_size, &decrypted_buffer, &decrypted_size, MANAGEMENT_ENCRYPTION_AES192))
-            {
-               pgmoneta_log_error("pgmoneta_management_read_json: Failed to aes192 dencrypt the string");
-               goto error;
-            }
-            free(transfer_buffer);
-            transfer_buffer = decrypted_buffer;
-            transfer_size = decrypted_size;
-            decrypted_buffer = NULL;
-
+         case MANAGEMENT_ENCRYPTION_AES192_GCM:
+            mode = ENCRYPTION_AES_192_GCM;
             break;
-         case MANAGEMENT_ENCRYPTION_AES128:
-            if (pgmoneta_decrypt_buffer(transfer_buffer, transfer_size, &decrypted_buffer, &decrypted_size, MANAGEMENT_ENCRYPTION_AES128))
-            {
-               pgmoneta_log_error("pgmoneta_management_read_json: Failed to aes128 dencrypt the string");
-               goto error;
-            }
-            free(transfer_buffer);
-            transfer_buffer = decrypted_buffer;
-            transfer_size = decrypted_size;
-            decrypted_buffer = NULL;
-
+         case MANAGEMENT_ENCRYPTION_AES128_GCM:
+            mode = ENCRYPTION_AES_128_GCM;
             break;
          default:
+            if (encrypt_method != MANAGEMENT_ENCRYPTION_NONE)
+            {
+               pgmoneta_log_error("pgmoneta_management_read_json: Unsupported management encryption code %d", encrypt_method);
+               goto error;
+            }
             break;
+      }
+
+      if (mode != 0)
+      {
+         if (pgmoneta_decrypt_buffer(transfer_buffer, transfer_size, &decrypted_buffer, &decrypted_size, mode))
+         {
+            pgmoneta_log_error("pgmoneta_management_read_json: Decryption failed");
+            goto error;
+         }
+         free(transfer_buffer);
+         transfer_buffer = decrypted_buffer;
+         transfer_size = decrypted_size;
+         decrypted_buffer = NULL;
       }
 
       // Third, perform decompress
@@ -1442,46 +1434,38 @@ pgmoneta_management_write_json(SSL* ssl, int socket, uint8_t compression, uint8_
       }
 
       // Second, perform encrypt
+      int mode = 0;
       switch (encryption)
       {
-         case MANAGEMENT_ENCRYPTION_AES256:
-            if (pgmoneta_encrypt_buffer(transfer_buffer, transfer_size, &encrypted_buffer, &encrypted_size, MANAGEMENT_ENCRYPTION_AES256))
-            {
-               pgmoneta_log_error("pgmoneta_management_write_json: Failed to aes256 encrypt the string");
-               goto error;
-            }
-            free(transfer_buffer);
-            transfer_buffer = encrypted_buffer;
-            transfer_size = encrypted_size;
-            encrypted_buffer = NULL;
-
+         case MANAGEMENT_ENCRYPTION_AES256_GCM:
+            mode = ENCRYPTION_AES_256_GCM;
             break;
-         case MANAGEMENT_ENCRYPTION_AES192:
-            if (pgmoneta_encrypt_buffer(transfer_buffer, transfer_size, &encrypted_buffer, &encrypted_size, MANAGEMENT_ENCRYPTION_AES192))
-            {
-               pgmoneta_log_error("pgmoneta_management_write_json: Failed to aes192 encrypt the string");
-               goto error;
-            }
-            free(transfer_buffer);
-            transfer_buffer = encrypted_buffer;
-            transfer_size = encrypted_size;
-            encrypted_buffer = NULL;
-
+         case MANAGEMENT_ENCRYPTION_AES192_GCM:
+            mode = ENCRYPTION_AES_192_GCM;
             break;
-         case MANAGEMENT_ENCRYPTION_AES128:
-            if (pgmoneta_encrypt_buffer(transfer_buffer, transfer_size, &encrypted_buffer, &encrypted_size, MANAGEMENT_ENCRYPTION_AES128))
-            {
-               pgmoneta_log_error("pgmoneta_management_write_json: Failed to aes128 encrypt the string");
-               goto error;
-            }
-            free(transfer_buffer);
-            transfer_buffer = encrypted_buffer;
-            transfer_size = encrypted_size;
-            encrypted_buffer = NULL;
-
+         case MANAGEMENT_ENCRYPTION_AES128_GCM:
+            mode = ENCRYPTION_AES_128_GCM;
             break;
          default:
+            if (encryption != MANAGEMENT_ENCRYPTION_NONE)
+            {
+               pgmoneta_log_error("pgmoneta_management_write_json: Unsupported management encryption code %d", encryption);
+               goto error;
+            }
             break;
+      }
+
+      if (mode != 0)
+      {
+         if (pgmoneta_encrypt_buffer(transfer_buffer, transfer_size, &encrypted_buffer, &encrypted_size, mode))
+         {
+            pgmoneta_log_error("pgmoneta_management_write_json: Encryption failed");
+            goto error;
+         }
+         free(transfer_buffer);
+         transfer_buffer = encrypted_buffer;
+         transfer_size = encrypted_size;
+         encrypted_buffer = NULL;
       }
 
       // Third, perform base64 encode

@@ -55,6 +55,7 @@ Abdelrhman Sersawy <abdelrhmansersawy@gmail.com>
 Zeyad Daowd <zeyaddaowd@yahoo.com>
 Sakshi Aggarwal <sakshiaggarwal2706@gmail.com>
 Chen Shen <scisbeloved23@gmail.com>
+Jozef Hernández <jozefhdez2@gmail.com>
 ```
 
 ## Committers
@@ -84,3 +85,5 @@ community.
 Consider giving the project a [star][star] on
 [GitHub][pgmoneta] if you find it useful. And, feel free to follow
 the project on [X][twitter] as well.
+
+Sanskriti <sanscode19@gmail.com>

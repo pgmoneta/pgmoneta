@@ -33,6 +33,11 @@
 extern "C" {
 #endif
 
+#define PBKDF2_ITERATIONS  600000
+#define PBKDF2_SALT_LENGTH 16
+#define GCM_TAG_LENGTH     16
+#define AES_GCM_IV_LENGTH  12
+
 #include <pgmoneta.h>
 #include <json.h>
 #include <workers.h>
@@ -105,25 +110,27 @@ pgmoneta_encryptor_destroy(struct encryptor* encryptor);
  * Encrypt a string
  * @param plaintext The string
  * @param password The master password
+ * @param password_length The length of the master password
  * @param ciphertext The ciphertext output
  * @param ciphertext_length The length of the ciphertext
  * @param mode The encryption mode
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* ciphertext_length, int mode);
+pgmoneta_encrypt(char* plaintext, char* password, size_t password_length, char** ciphertext, int* ciphertext_length, int mode);
 
 /**
  * Decrypt a string
  * @param ciphertext The string
  * @param ciphertext_length The length of the ciphertext
  * @param password The master password
+ * @param password_length The length of the master password
  * @param plaintext The plaintext output
  * @param mode The decryption mode
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char** plaintext, int mode);
+pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, size_t password_length, char** plaintext, int mode);
 
 /**
  * Encrypt the files under the directory in place recursively, also remove unencrypted files.
@@ -133,6 +140,19 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char**
  */
 int
 pgmoneta_encrypt_data(char* d, struct workers* workers);
+
+/**
+ * Clear the thread-local AES cache securely
+ */
+void
+pgmoneta_clear_aes_cache(void);
+
+/**
+ * Set the master salt for the high-iteration KDF
+ * @param salt The 16-byte salt
+ */
+void
+pgmoneta_set_master_salt(unsigned char* salt);
 
 /**
  * Encrypt the files under the tablespace directories in place recursively, also remove unencrypted files.

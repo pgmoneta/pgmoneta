@@ -89,10 +89,19 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
 /**
  * Get the master key
  * @param masterkey The master key
+ * @param masterkey_length The length of the master key
+ * @param master_salt The master salt
+ * @param master_salt_length The length of the master salt
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_get_master_key(char** masterkey);
+pgmoneta_get_master_key(char** masterkey, size_t* masterkey_length, unsigned char** master_salt, size_t* master_salt_length);
+
+/**
+ * Clear the security cache
+ */
+void
+pgmoneta_clear_security_cache(void);
 
 /**
  * Is the TLS configuration valid

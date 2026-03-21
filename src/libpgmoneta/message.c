@@ -2718,7 +2718,10 @@ pgmoneta_send_file(SSL* ssl, int socket, char* username, char* source_path, char
       // Send the file content in chunks
       while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0)
       {
-         pgmoneta_base64_encode(buffer, bytes_read, &encode_chunk, &encoded_size);
+         if (pgmoneta_base64_encode(buffer, bytes_read, &encode_chunk, &encoded_size))
+         {
+            goto error;
+         }
 
          pgmoneta_ext_send_file_chunk(ssl, socket, target_path, encode_chunk, &qr);
          if (!qr)

@@ -74,9 +74,9 @@ static int as_direct_io(char* str);
 static int as_compression(char* str);
 static int as_storage_engine(char* str);
 static char* as_ciphers(char* str);
-static int as_encryption_mode(char* str);
-static int as_management_encryption(char* str);
-static int as_management_compression(char* str);
+static int as_encryption_mode(char* str, int* encryption);
+static int as_management_encryption(char* str, int* encryption);
+static int as_management_compression(char* str, int* compression);
 static int as_output_format(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
 static int as_logging_rotation_size(char* str, int* size);
@@ -1655,7 +1655,10 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->encryption = as_encryption_mode(value);
+                     if (as_encryption_mode(value, &config->encryption))
+                     {
+                        unknown = true;
+                     }
                   }
                   else
                   {
@@ -1880,6 +1883,15 @@ pgmoneta_validate_main_configuration(void* shm)
    if (config->common.number_of_servers <= 0)
    {
       pgmoneta_log_fatal("No servers defined");
+      return 1;
+   }
+
+   if (config->encryption != ENCRYPTION_NONE &&
+       config->encryption != ENCRYPTION_AES_256_GCM &&
+       config->encryption != ENCRYPTION_AES_192_GCM &&
+       config->encryption != ENCRYPTION_AES_128_GCM)
+   {
+      pgmoneta_log_fatal("Invalid encryption mode: %d", config->encryption);
       return 1;
    }
 
@@ -2186,18 +2198,16 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
             }
             else if (!strcmp(key, CONFIGURATION_ARGUMENT_COMPRESSION))
             {
-               int mc = as_management_compression(value);
-               if (mc != -1)
+               if (as_management_compression(value, &config->compression))
                {
-                  config->compression = mc;
+                  warnx("Unknown management compression: %s", value);
                }
             }
             else if (!strcmp(key, CONFIGURATION_ARGUMENT_ENCRYPTION))
             {
-               int me = as_management_encryption(value);
-               if (me != -1)
+               if (as_management_encryption(value, &config->encryption))
                {
-                  config->encryption = me;
+                  warnx("Unknown management encryption mode: %s", value);
                }
             }
             else
@@ -2258,9 +2268,9 @@ pgmoneta_validate_cli_configuration(void* shmem)
    switch (config->encryption)
    {
       case MANAGEMENT_ENCRYPTION_NONE:
-      case MANAGEMENT_ENCRYPTION_AES256:
-      case MANAGEMENT_ENCRYPTION_AES192:
-      case MANAGEMENT_ENCRYPTION_AES128:
+      case MANAGEMENT_ENCRYPTION_AES256_GCM:
+      case MANAGEMENT_ENCRYPTION_AES192_GCM:
+      case MANAGEMENT_ENCRYPTION_AES128_GCM:
          break;
       default:
          config->encryption = MANAGEMENT_ENCRYPTION_NONE;
@@ -2813,9 +2823,25 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
    {
       goto error;
    }
-   if (pgmoneta_get_master_key(&master_key))
+   size_t master_key_length = 0;
+   unsigned char* master_salt = NULL;
+   size_t master_salt_length = 0;
+   if (pgmoneta_get_master_key(&master_key, &master_key_length, &master_salt, &master_salt_length))
    {
       goto masterkey;
+   }
+
+   if (master_salt != NULL)
+   {
+      if (master_salt_length == PBKDF2_SALT_LENGTH)
+      {
+         pgmoneta_set_master_salt(master_salt);
+      }
+      else
+      {
+         pgmoneta_log_error("Invalid master salt length");
+      }
+      free(master_salt);
    }
 
    index = 0;
@@ -2855,7 +2881,7 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
             goto error;
          }
 
-         if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
+         if (pgmoneta_decrypt(decoded, decoded_length, master_key, master_key_length, &password, ENCRYPTION_AES_256_GCM))
          {
             goto error;
          }
@@ -3021,9 +3047,26 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
       goto error;
    }
 
-   if (pgmoneta_get_master_key(&master_key))
+   size_t master_key_length = 0;
+   unsigned char* master_salt = NULL;
+   size_t master_salt_length = 0;
+
+   if (pgmoneta_get_master_key(&master_key, &master_key_length, &master_salt, &master_salt_length))
    {
       goto masterkey;
+   }
+
+   if (master_salt != NULL)
+   {
+      if (master_salt_length == PBKDF2_SALT_LENGTH)
+      {
+         pgmoneta_set_master_salt(master_salt);
+      }
+      else
+      {
+         pgmoneta_log_error("Invalid master salt length");
+      }
+      free(master_salt);
    }
 
    index = 0;
@@ -3063,7 +3106,7 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
             goto error;
          }
 
-         if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
+         if (pgmoneta_decrypt(decoded, decoded_length, master_key, master_key_length, &password, ENCRYPTION_AES_256_GCM))
          {
             goto error;
          }
@@ -5464,107 +5507,99 @@ error:
 }
 
 static int
-as_encryption_mode(char* str)
+as_encryption_mode(char* str, int* encryption)
 {
    if (!strcasecmp(str, "none"))
    {
-      return ENCRYPTION_NONE;
+      *encryption = ENCRYPTION_NONE;
+      return 0;
    }
 
-   if (!strcasecmp(str, "aes") || !strcasecmp(str, "aes-256") || !strcasecmp(str, "aes-256-cbc"))
+   if (!strcasecmp(str, "aes") || !strcasecmp(str, "aes-256") || !strcasecmp(str, "aes-256-gcm"))
    {
-      return ENCRYPTION_AES_256_CBC;
+      *encryption = ENCRYPTION_AES_256_GCM;
+      return 0;
    }
 
-   if (!strcasecmp(str, "aes-192") || !strcasecmp(str, "aes-192-cbc"))
+   if (!strcasecmp(str, "aes-192") || !strcasecmp(str, "aes-192-gcm"))
    {
-      return ENCRYPTION_AES_192_CBC;
+      *encryption = ENCRYPTION_AES_192_GCM;
+      return 0;
    }
 
-   if (!strcasecmp(str, "aes-128") || !strcasecmp(str, "aes-128-cbc"))
+   if (!strcasecmp(str, "aes-128") || !strcasecmp(str, "aes-128-gcm"))
    {
-      return ENCRYPTION_AES_128_CBC;
+      *encryption = ENCRYPTION_AES_128_GCM;
+      return 0;
    }
 
-   if (!strcasecmp(str, "aes-256-ctr"))
-   {
-      return ENCRYPTION_AES_256_CTR;
-   }
-
-   if (!strcasecmp(str, "aes-192-ctr"))
-   {
-      return ENCRYPTION_AES_192_CTR;
-   }
-
-   if (!strcasecmp(str, "aes-128-ctr"))
-   {
-      return ENCRYPTION_AES_128_CTR;
-   }
-
-   warnx("Unknown encryption mode: %s", str);
-
-   return ENCRYPTION_NONE;
+   return 1;
 }
 
 static int
-as_management_encryption(char* str)
+as_management_encryption(char* str, int* encryption)
 {
    if (!strcasecmp(str, "none"))
    {
-      return MANAGEMENT_ENCRYPTION_NONE;
+      *encryption = MANAGEMENT_ENCRYPTION_NONE;
+      return 0;
    }
 
-   if (!strcasecmp(str, "aes") || !strcasecmp(str, "aes256"))
+   if (!strcasecmp(str, "aes") || !strcasecmp(str, "aes256") || !strcasecmp(str, "aes-gcm") || !strcasecmp(str, "aes256-gcm"))
    {
-      return MANAGEMENT_ENCRYPTION_AES256;
+      *encryption = MANAGEMENT_ENCRYPTION_AES256_GCM;
+      return 0;
    }
 
-   if (!strcasecmp(str, "aes192"))
+   if (!strcasecmp(str, "aes192") || !strcasecmp(str, "aes192-gcm"))
    {
-      return MANAGEMENT_ENCRYPTION_AES192;
+      *encryption = MANAGEMENT_ENCRYPTION_AES192_GCM;
+      return 0;
    }
 
-   if (!strcasecmp(str, "aes128"))
+   if (!strcasecmp(str, "aes128") || !strcasecmp(str, "aes128-gcm"))
    {
-      return MANAGEMENT_ENCRYPTION_AES128;
+      *encryption = MANAGEMENT_ENCRYPTION_AES128_GCM;
+      return 0;
    }
 
-   warnx("Unknown management encryption mode: %s", str);
-
-   return -1;
+   return 1;
 }
 
 static int
-as_management_compression(char* str)
+as_management_compression(char* str, int* compression)
 {
    if (!strcasecmp(str, "gz"))
    {
-      return MANAGEMENT_COMPRESSION_GZIP;
+      *compression = MANAGEMENT_COMPRESSION_GZIP;
+      return 0;
    }
 
    if (!strcasecmp(str, "zstd"))
    {
-      return MANAGEMENT_COMPRESSION_ZSTD;
+      *compression = MANAGEMENT_COMPRESSION_ZSTD;
+      return 0;
    }
 
    if (!strcasecmp(str, "lz4"))
    {
-      return MANAGEMENT_COMPRESSION_LZ4;
+      *compression = MANAGEMENT_COMPRESSION_LZ4;
+      return 0;
    }
 
    if (!strcasecmp(str, "bz2"))
    {
-      return MANAGEMENT_COMPRESSION_BZIP2;
+      *compression = MANAGEMENT_COMPRESSION_BZIP2;
+      return 0;
    }
 
    if (!strcasecmp(str, "none"))
    {
-      return MANAGEMENT_COMPRESSION_NONE;
+      *compression = MANAGEMENT_COMPRESSION_NONE;
+      return 0;
    }
 
-   warnx("Unknown management compression: %s", str);
-
-   return -1;
+   return 1;
 }
 
 static int

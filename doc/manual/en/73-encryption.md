@@ -2,29 +2,17 @@
 
 ### Overview
 
-AES Cipher block chaining (CBC) mode and AES Counter (CTR) mode are supported in [**pgmoneta**][pgmoneta]. The default setup is no encryption.
-
-CBC is the most commonly used and considered save mode. Its main drawbacks are that encryption is sequential (decryption can be parallelized).
-
-Along with CBC, CTR mode is one of two block cipher modes recommended by Niels Ferguson and Bruce Schneier. Both encryption and decryption are parallelizable.
-
-Longer the key length, safer the encryption. However, with 20% (192 bit) and 40% (256 bit) extra workload compare to 128 bit.
+AES-GCM (Galois/Counter Mode) is the recommended encryption mode in [**pgmoneta**][pgmoneta]. It provides both confidentiality (encryption) and integrity/authenticity (verification), ensuring that encrypted data has not been tampered with.
 
 ### Encryption Configuration
 
 `none`: No encryption (default value)
 
-`aes | aes-256 | aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length
+`aes | aes-256 | aes-256-gcm`: AES-256 GCM mode with 256 bit key length (Recommended)
 
-`aes-192 | aes-192-cbc`: AES CBC mode with 192 bit key length
+`aes-192 | aes-192-gcm`: AES-192 GCM mode with 192 bit key length
 
-`aes-128 | aes-128-cbc`: AES CBC mode with 128 bit key length
-
-`aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length
-
-`aes-192-ctr`: AES CTR mode with 192 bit key length
-
-`aes-128-ctr`: AES CTR mode with 128 bit key length
+`aes-128 | aes-128-gcm`: AES-128 GCM mode with 128 bit key length
 
 ### Encryption / Decryption CLI Commands
 
@@ -52,22 +40,26 @@ pgmoneta-cli encrypt <file>
 
 #### File Format (Since 0.21.0)
 
-Each encrypted file starts with a 32-byte header:
+Each encrypted file starts with a unified 28-byte header:
 
 | Offset | Length | Description |
 |--------|--------|-------------|
 | 0      | 16     | Salt used for PBKDF2 key derivation |
-| 16     | 16     | Initialization Vector (IV) |
+| 16     | 12     | Initialization Vector (IV) field |
 
-The actual encrypted data follows immediately after the header.
+A unique, random 12-byte IV is generated for every encryption operation and stored directly after the salt. The **Authentication Tag (16 bytes)** is appended at the **end of the file** (after the ciphertext).
+
+The actual encrypted data follows after the header and (for GCM) before the tag.
 
 #### Key Derivation and Caching
 
-The master key is derived from the user-provided password and the per-file salt using `PKCS5_PBKDF2_HMAC` (SHA-256).
+To encrypt many files efficiently without paying the computational cost of thousands of iterations for every file, `pgmoneta` uses a two-step key derivation process:
 
-For backup performance, pgmoneta generates a global salt on startup. The derived key is cached in volatile memory and reused across all files in a backup stream that share the same salt, eliminating the computational overhead of PBKDF2 for every file. This cache persists for the duration of the backup stream and is securely wiped once processing is complete. A unique random IV is still generated for every file to ensure cryptographic security.
+1. **Master Key Derivation (Slow):** The master key is derived from the user-provided password and a **randomly generated salt** (stored in `master.key`) using `PKCS5_PBKDF2_HMAC` (SHA-256) with a high number of iterations (600,000). This provides strong resistance against brute-force attacks. The presence of a random salt in the `master.key` file is **mandatory**. Legacy key files containing only a password are no longer supported and must be regenerated using `pgmoneta-admin user master-key`.
+2. **Key Caching:** This master key is cached in volatile memory for the duration of the backup or restore stream, eliminating the overhead of repeating the expensive PBKDF2 operation.
+3. **File Key Derivation (Fast):** For every individual file, a unique random salt and Initialization Vector (IV) are generated. A file-specific key is then derived from the cached master key and the random file salt using `PKCS5_PBKDF2_HMAC` with 1 iteration. This ensures every file is cryptographically isolated.
 
-During decryption, pgmoneta reads the salt from the file header. If it matches the cached salt, the cached key is reused; otherwise, a new key is derived and cached.
+During decryption, `pgmoneta` reads the salt and IV from the file header. If the master key has not been cached yet, it performs the slow derivation. Then, it uses the cached master key, the file's header salt, and 1 iteration to quickly derive the correct file key.
 
 ### Benchmark
 

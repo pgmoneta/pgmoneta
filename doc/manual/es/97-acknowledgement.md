@@ -1,0 +1,89 @@
+\newpage
+
+# Reconocimiento
+
+## Autores
+
+[**pgmoneta**][pgmoneta] fue creado por los siguientes autores:
+
+```
+Jesper Pedersen <jesperpedersen.db@gmail.com>
+David Fetter <david@fetter.org>
+Will Leinweber <will@bitfission.com>
+Luca Ferrari <fluca1978@gmail.com>
+Nikita Bugrovsky <nbugrovs@redhat.com>
+Mariam Fahmy <mariamfahmy66@gmail.com>
+Jichen Xu <kyokitisin@gmail.com>
+Saurav Pal <resyfer.dev@gmail.com>
+Bokket <bokkett@gmail.com>
+Haoran Zhang <andrewzhr9911@gmail.com>
+Hazem Alrawi <hazemalrawi7@gmail.com>
+Shahryar Soltanpour <shahryar.soltanpour@gmail.com>
+Shikhar Soni <shikharish05@gmail.com>
+Nguyen Cong Nhat Le <lenguyencongnhat2001@gmail.com>
+Chao Gu <chadraven369@gmail.com>
+Luchen Zhao <lucian.zlc@gmail.com>
+Joan Jeremiah J <joanjeremiah04@gmail.com>
+Iury Santos <iuryroberto@gmail.com>
+Palak Chaturvedi <palakchaturvedi2843@gmail.com>
+Jakub Jirutka <jakub@jirutka.cz>
+Ashutosh Sharma <ash2003sharma@gmail.com>
+Mario Rodas
+Annupamaa <annu242005@gmail.com>
+Mohab Yaser <mohabyaserofficial2003@gmail.com>
+Georg Pfuetzenreuter <mail@georg-pfuetzenreuter.net>
+Ahmed Ashour <a8087027@gmail.com>
+Sangkeun J.C. Kim <jchrys@me.com>
+Tejas Tyagi <tejastyagi.tt@gmail.com>
+Aryan Arora <aryanarora.w1@gmail.com>
+Arshdeep Singh <balarsh535@gmail.com>
+Din Xin Chen <s990346@gmail.com>
+Mingzhuo Yin <yinmingzhuo@gmail.com>
+Vanes Angelo <k124k3n@gmail.com>
+Bassam Adnan <mailbassam@gmail.com>
+Sara Nabih <nabihsara8@gmail.com>
+Shashank Singh <shashanksgh3@gmail.com>
+Mahmoud Hamdy (TutTrue) <mahmoud.hamdy5113@gmail.com>
+Amr Shams (NightBird) <amr.shams2015.a@gmail.com>
+Somye Mahajan <mahajan.somye@gmail.com>
+Shashidhar B M <shashidhar.i.0119@gmail.com>
+Seongjun Shin <shinsj4653@gmail.com>
+Bishoy Wadea Fathy <bishoyw.fathy@gmail.com>
+Mazen Kamal <mazenkamal212@gmail.com>
+Trevor Jacob Mathews <trevorjacobmathews@gmail.com>
+Abdelrhman Sersawy <abdelrhmansersawy@gmail.com>
+Zeyad Daowd <zeyaddaowd@yahoo.com>
+Sakshi Aggarwal <sakshiaggarwal2706@gmail.com>
+Chen Shen <scisbeloved23@gmail.com>
+Jozef Hernández <jozefhdez2@gmail.com>
+```
+
+## Committers
+
+```
+Jesper Pedersen <jesperpedersen.db@gmail.com>
+Haoran Zhang <andrewzhr9911@gmail.com>
+Luca Ferrari <fluca1978@gmail.com>
+Bassam Adnan <mailbassam@gmail.com>
+Tejas Tyagi <tejastyagi.tt@gmail.com>
+```
+
+## Contribuyendo
+
+Las contribuciones a [**pgmoneta**][pgmoneta] se administran en [GitHub][pgmoneta]
+
+* [Haz una pregunta][ask]
+* [Reporta un problema][issue]
+* [Solicita una función][request]
+* [Envía código][submission]
+
+¡Las contribuciones son muy bienvenidas!
+
+Por favor, consulta nuestras políticas de [Código de Conducta][conduct] para interactuar en nuestra
+comunidad.
+
+Considera darle estrellas al proyecto en
+[GitHub][pgmoneta] si te resulta útil. Y, siéntete libre de seguir
+el proyecto en [X][twitter] también.
+
+Sanskriti <sanscode19@gmail.com>

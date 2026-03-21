@@ -335,6 +335,8 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    char* home_dir = NULL;
    char* encoded = NULL;
    size_t encoded_length;
+   char* encoded_salt = NULL;
+   size_t encoded_salt_length = 0;
    struct stat st = {0};
    bool do_free = true;
    struct json* j = NULL;
@@ -496,9 +498,29 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       pgmoneta_json_print(j, FORMAT_TEXT);
    }
 
-   pgmoneta_base64_encode(password, strlen(password), &encoded, &encoded_length);
+   unsigned char salt[PBKDF2_SALT_LENGTH];
+
+   if (!RAND_bytes(salt, PBKDF2_SALT_LENGTH))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_base64_encode(password, strlen(password), &encoded, &encoded_length))
+   {
+      goto error;
+   }
+   if (pgmoneta_base64_encode((char*)salt, PBKDF2_SALT_LENGTH, &encoded_salt, &encoded_salt_length))
+   {
+      goto error;
+   }
+
    fputs(encoded, file);
+   fputs("\n", file);
+   fputs(encoded_salt, file);
+   fputs("\n", file);
+
    free(encoded);
+   free(encoded_salt);
 
    free(home_dir);
 
@@ -521,6 +543,7 @@ error:
 
    free(home_dir);
    free(encoded);
+   free(encoded_salt);
 
    if (do_free)
    {
@@ -622,10 +645,26 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
       goto error;
    }
 
-   if (pgmoneta_get_master_key(&master_key))
+   size_t master_key_length = 0;
+   unsigned char* master_salt = NULL;
+   size_t master_salt_length = 0;
+   if (pgmoneta_get_master_key(&master_key, &master_key_length, &master_salt, &master_salt_length))
    {
       warnx("Invalid master key");
       goto error;
+   }
+
+   if (master_salt != NULL)
+   {
+      if (master_salt_length == PBKDF2_SALT_LENGTH)
+      {
+         pgmoneta_set_master_salt(master_salt);
+      }
+      else
+      {
+         warnx("Invalid master salt length");
+      }
+      free(master_salt);
    }
 
    if (password != NULL)
@@ -818,8 +857,14 @@ password:
       }
    }
 
-   pgmoneta_encrypt(password, master_key, &encrypted, &encrypted_length, ENCRYPTION_AES_256_CBC);
-   pgmoneta_base64_encode(encrypted, encrypted_length, &encoded, &encoded_length);
+   if (pgmoneta_encrypt(password, master_key, master_key_length, &encrypted, &encrypted_length, ENCRYPTION_AES_256_GCM))
+   {
+      goto error;
+   }
+   if (pgmoneta_base64_encode(encrypted, encrypted_length, &encoded, &encoded_length))
+   {
+      goto error;
+   }
 
    entry = pgmoneta_append(entry, username);
    entry = pgmoneta_append(entry, ":");
@@ -945,10 +990,26 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
 
    memset(&tmpfilename, 0, sizeof(tmpfilename));
 
-   if (pgmoneta_get_master_key(&master_key))
+   size_t master_key_length = 0;
+   unsigned char* master_salt = NULL;
+   size_t master_salt_length = 0;
+   if (pgmoneta_get_master_key(&master_key, &master_key_length, &master_salt, &master_salt_length))
    {
       warnx("Invalid master key");
       goto error;
+   }
+
+   if (master_salt != NULL)
+   {
+      if (master_salt_length == PBKDF2_SALT_LENGTH)
+      {
+         pgmoneta_set_master_salt(master_salt);
+      }
+      else
+      {
+         warnx("Invalid master salt length");
+      }
+      free(master_salt);
    }
 
    if (password != NULL)
@@ -1138,8 +1199,14 @@ password:
             }
          }
 
-         pgmoneta_encrypt(password, master_key, &encrypted, &encrypted_length, ENCRYPTION_AES_256_CBC);
-         pgmoneta_base64_encode(encrypted, encrypted_length, &encoded, &encoded_length);
+         if (pgmoneta_encrypt(password, master_key, master_key_length, &encrypted, &encrypted_length, ENCRYPTION_AES_256_GCM))
+         {
+            goto error;
+         }
+         if (pgmoneta_base64_encode(encrypted, encrypted_length, &encoded, &encoded_length))
+         {
+            goto error;
+         }
 
          memset(&line, 0, sizeof(line));
          entry = NULL;

@@ -267,6 +267,8 @@ base_dir = $BACKUP_DIRECTORY
 
 compression = zstd
 
+encryption = aes-256-gcm
+
 retention = 7
 retention_interval = 3600 # 1h
 

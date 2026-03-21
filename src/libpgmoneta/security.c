@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
 #include <logging.h>
 #include <network.h>
 #include <security.h>
@@ -81,6 +82,12 @@
 static signed char has_security;
 static ssize_t security_lengths[NUMBER_OF_SECURITY_MESSAGES];
 static char security_messages[NUMBER_OF_SECURITY_MESSAGES][SECURITY_BUFFER_SIZE];
+
+static char* cached_master_key = NULL;
+static size_t cached_master_key_length = 0;
+static unsigned char* cached_master_salt = NULL;
+static size_t cached_master_salt_length = 0;
+static atomic_schar security_cache_lock = 0;
 
 static int get_auth_type(struct message* msg, int* auth_type);
 static int get_salt(void* data, char** salt);
@@ -509,7 +516,10 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   pgmoneta_base64_decode(base64_salt, strlen(base64_salt), (void**)&salt, &salt_length);
+   if (pgmoneta_base64_decode(base64_salt, strlen(base64_salt), (void**)&salt, &salt_length))
+   {
+      goto error;
+   }
 
    iteration = atoi(iteration_string);
 
@@ -531,7 +541,10 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   pgmoneta_base64_encode((char*)proof, proof_length, &proof_base, &proof_base_length);
+   if (pgmoneta_base64_encode((char*)proof, proof_length, &proof_base, &proof_base_length))
+   {
+      goto error;
+   }
 
    status = pgmoneta_create_auth_scram256_continue_response(&wo_proof[0], (char*)proof_base, &sasl_continue_response);
    if (status != MESSAGE_STATUS_OK)
@@ -558,7 +571,10 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
 
    /* Get 'v' attribute */
    base64_server_signature = sasl_final->data + 11;
-   pgmoneta_base64_decode(base64_server_signature, sasl_final->length - 11, (void**)&server_signature_received, &server_signature_received_length);
+   if (pgmoneta_base64_decode(base64_server_signature, sasl_final->length - 11, (void**)&server_signature_received, &server_signature_received_length))
+   {
+      goto error;
+   }
 
    if (server_signature(password_prep, salt, salt_length, iteration,
                         NULL, 0,
@@ -901,7 +917,10 @@ retry:
    get_scram_attribute('r', (char*)msg->data + 26, msg->length - 26, &client_nounce);
    generate_nounce(&server_nounce);
    generate_salt(&salt, &salt_length);
-   pgmoneta_base64_encode(salt, salt_length, &base64_salt, &base64_salt_length);
+   if (pgmoneta_base64_encode(salt, salt_length, &base64_salt, &base64_salt_length))
+   {
+      goto error;
+   }
 
    server_first_message = malloc(89);
 
@@ -937,7 +956,10 @@ retry:
    }
 
    get_scram_attribute('p', (char*)msg->data + 5, msg->length - 5, &base64_client_proof);
-   pgmoneta_base64_decode(base64_client_proof, strlen(base64_client_proof), (void**)&client_proof_received, &client_proof_received_length);
+   if (pgmoneta_base64_decode(base64_client_proof, strlen(base64_client_proof), (void**)&client_proof_received, &client_proof_received_length))
+   {
+      goto error;
+   }
 
    client_final_message_without_proof = malloc(58);
    memset(client_final_message_without_proof, 0, 58);
@@ -970,7 +992,10 @@ retry:
       goto error;
    }
 
-   pgmoneta_base64_encode((char*)server_signature_calc, server_signature_calc_length, &base64_server_signature_calc, &base64_server_signature_calc_length);
+   if (pgmoneta_base64_encode((char*)server_signature_calc, server_signature_calc_length, &base64_server_signature_calc, &base64_server_signature_calc_length))
+   {
+      goto error;
+   }
 
    status = pgmoneta_create_auth_scram256_final(base64_server_signature_calc, &msg);
    if (status != MESSAGE_STATUS_OK)
@@ -1575,7 +1600,11 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
-   pgmoneta_base64_decode(base64_salt, strlen(base64_salt), (void**)&salt, &salt_length);
+   if (pgmoneta_base64_decode(base64_salt, strlen(base64_salt), (void**)&salt, &salt_length))
+   {
+      pgmoneta_log_error("Failed to decode salt");
+      goto error;
+   }
 
    iteration = atoi(iteration_string);
 
@@ -1597,7 +1626,10 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
-   pgmoneta_base64_encode((char*)proof, proof_length, &proof_base, &proof_base_length);
+   if (pgmoneta_base64_encode((char*)proof, proof_length, &proof_base, &proof_base_length))
+   {
+      goto error;
+   }
 
    status = pgmoneta_create_auth_scram256_continue_response(&wo_proof[0], (char*)proof_base, &sasl_continue_response);
    if (status != MESSAGE_STATUS_OK)
@@ -1630,7 +1662,6 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    if (pgmoneta_has_message('N', msg->data, msg->length))
    {
       pgmoneta_log_error("Received notice during startup - verify cluster");
-      goto error;
    }
 
    if (pgmoneta_extract_message('R', msg, &sasl_final))
@@ -1640,8 +1671,12 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
 
    /* Get 'v' attribute */
    base64_server_signature = sasl_final->data + 11;
-   pgmoneta_base64_decode(base64_server_signature, sasl_final->length - 11,
-                          (void**)&server_signature_received, &server_signature_received_length);
+   if (pgmoneta_base64_decode(base64_server_signature, sasl_final->length - 11,
+                              (void**)&server_signature_received, &server_signature_received_length))
+   {
+      pgmoneta_log_error("Failed to decode server signature");
+      goto error;
+   }
 
    if (server_signature(password_prep, salt, salt_length, iteration,
                         NULL, 0,
@@ -1744,8 +1779,14 @@ get_admin_password(char* username)
 }
 
 int
-pgmoneta_get_master_key(char** masterkey)
+pgmoneta_get_master_key(char** masterkey, size_t* masterkey_length, unsigned char** master_salt, size_t* master_salt_length)
 {
+   if (masterkey == NULL || masterkey_length == NULL)
+   {
+      pgmoneta_log_error("Invalid master key buffer");
+      return 1;
+   }
+
    FILE* master_key_file = NULL;
    char buf[2 * MAX_PATH];
    char line[MISC_LENGTH];
@@ -1754,18 +1795,57 @@ pgmoneta_get_master_key(char** masterkey)
    char* home_dir = NULL;
    bool do_free = false;
    struct stat st = {0};
-   struct common_configuration* config;
+   struct common_configuration* config = NULL;
+
+   /* Fast path: return from cache if available (avoiding disk I/O and malloc overhead) */
+   while (atomic_exchange(&security_cache_lock, 1))
+   {
+      SLEEP(1000000L);
+   }
+
+   if (cached_master_key != NULL)
+   {
+      *masterkey = malloc(cached_master_key_length + 1);
+      if (*masterkey == NULL)
+      {
+         atomic_store(&security_cache_lock, 0);
+         goto error;
+      }
+      memcpy(*masterkey, cached_master_key, cached_master_key_length);
+      (*masterkey)[cached_master_key_length] = '\0';
+      *masterkey_length = cached_master_key_length;
+
+      if (master_salt != NULL && master_salt_length != NULL && cached_master_salt != NULL)
+      {
+         *master_salt = malloc(cached_master_salt_length);
+         if (*master_salt == NULL)
+         {
+            free(*masterkey);
+            *masterkey = NULL;
+            atomic_store(&security_cache_lock, 0);
+            goto error;
+         }
+         memcpy(*master_salt, cached_master_salt, cached_master_salt_length);
+         *master_salt_length = cached_master_salt_length;
+      }
+      atomic_store(&security_cache_lock, 0);
+      return 0;
+   }
+   atomic_store(&security_cache_lock, 0);
 
    config = (struct common_configuration*)shmem;
-
-   if (config == NULL || strlen(config->home_dir) == 0)
+   if (config != NULL && config->home_dir[0] != '\0')
    {
-      home_dir = pgmoneta_get_home_directory();
-      do_free = true;
+      home_dir = config->home_dir;
    }
    else
    {
-      home_dir = config->home_dir;
+      home_dir = pgmoneta_get_home_directory();
+      if (home_dir == NULL)
+      {
+         goto error;
+      }
+      do_free = true;
    }
 
    memset(&buf, 0, sizeof(buf));
@@ -1830,7 +1910,83 @@ pgmoneta_get_master_key(char** masterkey)
       goto error;
    }
 
+   if (master_salt != NULL && master_salt_length != NULL)
+   {
+      memset(&line, 0, sizeof(line));
+      if (fgets(line, sizeof(line), master_key_file) != NULL)
+      {
+         unsigned char* ms = NULL;
+         size_t ms_length = 0;
+
+         size_t salt_line_length = strlen(&line[0]);
+         while (salt_line_length > 0 && (line[salt_line_length - 1] == '\n' || line[salt_line_length - 1] == '\r'))
+         {
+            line[--salt_line_length] = '\0';
+         }
+
+         if (pgmoneta_base64_decode(&line[0], salt_line_length, (void**)&ms, &ms_length))
+         {
+            pgmoneta_log_error("Can't decode master salt");
+            goto error;
+         }
+
+         if (ms_length != PBKDF2_SALT_LENGTH)
+         {
+            pgmoneta_log_error("Invalid master salt length");
+            free(ms);
+            goto error;
+         }
+
+         *master_salt = ms;
+         *master_salt_length = ms_length;
+      }
+      else
+      {
+         pgmoneta_log_error("Master salt not found in key file. Please regenerate your master key with 'pgmoneta-admin user master-key'.");
+         goto error;
+      }
+   }
+
    *masterkey = mk;
+   *masterkey_length = mk_length;
+
+   /* Update cache */
+   while (atomic_exchange(&security_cache_lock, 1))
+   {
+      SLEEP(1000000L);
+   }
+
+   if (cached_master_key == NULL)
+   {
+      cached_master_key = malloc(mk_length + 1);
+      if (cached_master_key != NULL)
+      {
+         memcpy(cached_master_key, mk, mk_length);
+         cached_master_key[mk_length] = '\0';
+         cached_master_key_length = mk_length;
+      }
+      else
+      {
+         pgmoneta_log_error("Out of memory while caching master key");
+         cached_master_key_length = 0;
+      }
+
+      if (master_salt != NULL && *master_salt != NULL)
+      {
+         cached_master_salt = malloc(*master_salt_length);
+         if (cached_master_salt != NULL)
+         {
+            memcpy(cached_master_salt, *master_salt, *master_salt_length);
+            cached_master_salt_length = *master_salt_length;
+         }
+         else
+         {
+            pgmoneta_log_error("Out of memory while caching master salt");
+            cached_master_salt_length = 0;
+         }
+      }
+   }
+   atomic_store(&security_cache_lock, 0);
 
    if (do_free)
    {
@@ -1856,6 +2012,33 @@ error:
    }
 
    return 1;
+}
+
+void
+pgmoneta_clear_security_cache(void)
+{
+   while (atomic_exchange(&security_cache_lock, 1))
+   {
+      SLEEP(1000000L);
+   }
+
+   if (cached_master_key != NULL)
+   {
+      pgmoneta_cleanse(cached_master_key, cached_master_key_length);
+      free(cached_master_key);
+      cached_master_key = NULL;
+      cached_master_key_length = 0;
+   }
+
+   if (cached_master_salt != NULL)
+   {
+      pgmoneta_cleanse(cached_master_salt, cached_master_salt_length);
+      free(cached_master_salt);
+      cached_master_salt = NULL;
+      cached_master_salt_length = 0;
+   }
+
+   atomic_store(&security_cache_lock, 0);
 }
 
 int
@@ -2033,7 +2216,10 @@ generate_nounce(char** nounce)
 
    r[s] = '\0';
 
-   pgmoneta_base64_encode((char*)&r[0], s, &base, &base_length);
+   if (pgmoneta_base64_encode((char*)&r[0], s, &base, &base_length))
+   {
+      goto error;
+   }
 
    *nounce = base;
 
