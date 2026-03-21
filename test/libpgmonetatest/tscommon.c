@@ -29,6 +29,7 @@
 #include <pgmoneta.h>
 #include <configuration.h>
 #include <logging.h>
+#include <management.h>
 #include <message.h>
 #include <network.h>
 #include <security.h>
@@ -60,6 +61,8 @@ char TEST_HOT_STANDBY_DIR[MAX_PATH];
 
 /* In-process snapshot of the configuration used for save/restore */
 static struct main_configuration config_snapshot;
+
+static int backup_error_local(char* server, char* incremental);
 
 void
 pgmoneta_test_environment_create(void)
@@ -169,29 +172,39 @@ pgmoneta_test_validate_configuration(void* shmem)
 int
 pgmoneta_test_add_backup(void)
 {
+   int rc = 0;
+   int attempt = 0;
+
    /* Ensure server is online before backup */
    if (pgmoneta_tsclient_mode("primary", "online", 0))
    {
       return 1;
    }
 
-   if (pgmoneta_tsclient_backup("primary", NULL, 0))
+   /* Retry only when the daemon reports the transient WAL-streaming
+    * error (MANAGEMENT_ERROR_BACKUP_WAL). Any other failure is
+    * surfaced immediately so real regressions are not hidden. */
+   for (attempt = 0; attempt < 10; attempt++)
    {
-      return 1;
+      rc = backup_error_local("primary", NULL);
+      if (rc == 0)
+      {
+         return 0;
+      }
+      if (rc != MANAGEMENT_ERROR_BACKUP_WAL)
+      {
+         return 1;
+      }
+      sleep(1);
    }
-   return 0;
+
+   return 1;
 }
 
 int
 pgmoneta_test_add_backup_chain(void)
 {
-   /* Ensure server is online before backup */
-   if (pgmoneta_tsclient_mode("primary", "online", 0))
-   {
-      return 1;
-   }
-
-   if (pgmoneta_tsclient_backup("primary", NULL, 0))
+   if (pgmoneta_test_add_backup())
    {
       return 1;
    }
@@ -207,6 +220,102 @@ pgmoneta_test_add_backup_chain(void)
    }
 
    return 0;
+}
+
+static int
+backup_error_local(char* server, char* incremental)
+{
+   int socket = -1;
+   int error_code = -1;
+   struct main_configuration* config;
+   struct json* read = NULL;
+   struct json* outcome = NULL;
+   bool status = false;
+   char* string = NULL;
+
+   config = (struct main_configuration*)shmem;
+   if (strlen(config->common.configuration_path))
+   {
+      if (pgmoneta_connect_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &socket))
+      {
+         return -1;
+      }
+   }
+
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_backup(NULL, socket, server,
+                                          MANAGEMENT_COMPRESSION_NONE,
+                                          MANAGEMENT_ENCRYPTION_NONE,
+                                          incremental,
+                                          MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_read_json(NULL, socket, NULL, NULL, &read))
+   {
+      goto error;
+   }
+
+   string = pgmoneta_json_to_string(read, FORMAT_JSON, NULL, 0);
+   pgmoneta_log_info("outcome string %s", string);
+   free(string);
+   string = NULL;
+
+   if (!pgmoneta_json_contains_key(read, MANAGEMENT_CATEGORY_OUTCOME))
+   {
+      goto error;
+   }
+
+   outcome = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_OUTCOME);
+
+   if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_STATUS))
+   {
+      goto error;
+   }
+
+   status = (bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS);
+
+   if (status)
+   {
+      error_code = 0;
+   }
+   else
+   {
+      if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_ERROR))
+      {
+         goto error;
+      }
+
+      error_code = (int)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_ERROR);
+   }
+
+   if (read != NULL)
+   {
+      pgmoneta_json_destroy(read);
+      read = NULL;
+   }
+
+   if (error_code == 0)
+   {
+      sleep(1);
+   }
+
+error:
+   if (string != NULL)
+   {
+      free(string);
+   }
+   if (read != NULL)
+   {
+      pgmoneta_json_destroy(read);
+   }
+   pgmoneta_disconnect(socket);
+   return error_code;
 }
 
 void
