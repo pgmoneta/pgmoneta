@@ -227,7 +227,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
 
    if (!file)
    {
-      return 1;
+      return ENOENT;
    }
 
    memset(&section, 0, LINE_LENGTH);
@@ -2082,18 +2082,21 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
    char* value = NULL;
    size_t max;
    struct cli_configuration* config;
+   int line_number = 0;
+   char error_context[512] = {0};
 
    file = fopen(filename, "r");
 
    if (!file)
    {
-      return 1;
+      return ENOENT;
    }
 
    config = (struct cli_configuration*)shmem;
 
    while (fgets(line, sizeof(line), file))
    {
+      line_number++;
       if (!is_empty_string(line))
       {
          if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
@@ -2107,9 +2110,16 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
          }
          else
          {
+            snprintf(error_context, sizeof(error_context),
+                     "Failed to process line %d: memory allocation error while parsing comments/whitespace",
+                     line_number);
+            fclose(file);
+            if (strlen(error_context) > 0)
+            {
+               warnx("%s", error_context);
+            }
             free(trimmed_line);
-            trimmed_line = NULL;
-            continue;
+            return EINVAL;
          }
 
          /* Skip section markers */
@@ -2298,12 +2308,14 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
    struct walinfo_configuration* config;
    int idx_server = 0;
    struct server srv = {0};
+   int line_number = 0;
+   char error_context[512] = {0};
 
    file = fopen(filename, "r");
 
    if (!file)
    {
-      return 1;
+      return ENOENT;
    }
 
    memset(&section, 0, LINE_LENGTH);
@@ -2311,6 +2323,7 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
+      line_number++;
       if (!is_empty_string(line))
       {
          if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
@@ -2324,6 +2337,9 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
          }
          else
          {
+            snprintf(error_context, sizeof(error_context),
+                     "Failed to process line %d: memory allocation error while parsing comments/whitespace",
+                     line_number);
             goto error;
          }
 
@@ -2339,7 +2355,7 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                   max = MISC_LENGTH - 1;
                }
                memcpy(&section, trimmed_line + 1, max);
-               if (strcmp(section, "pgmoneta-walinfo"))
+               if (strcmp(section, "pgmoneta-walinfo") != 0)
                {
                   if (idx_server == 1)
                   {
@@ -2354,6 +2370,13 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                   memcpy(&srv.name, &section, strlen(section));
                   idx_server++;
                }
+            }
+            else
+            {
+               snprintf(error_context, sizeof(error_context),
+                        "Line %d: malformed section header (missing closing bracket ']')",
+                        line_number);
+               goto error;
             }
          }
          else
@@ -2476,7 +2499,18 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
 
                if (unknown)
                {
-                  warnx("Unknown: Section=%s, Key=%s, Value=%s", strlen(section) > 0 ? section : "<unknown>", key, value);
+                  if (strlen(section) > 0 && strcmp(section, "pgmoneta-walinfo") != 0)
+                  {
+                     // Key-value pair in non-walinfo section (e.g., server section) - this is a warning but not fatal
+                     warnx("Line %d: ignoring key '%s' in section [%s] (only [pgmoneta-walinfo] is used)",
+                           line_number, key, section);
+                  }
+                  else
+                  {
+                     // Key is not recognized in pgmoneta-walinfo section
+                     warnx("Line %d: unknown key '%s' in section [%s]",
+                           line_number, key, strlen(section) > 0 ? section : "<no section>");
+                  }
                }
 
                free(key);
@@ -2486,7 +2520,10 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
             }
             else
             {
-               warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", line);
+               snprintf(error_context, sizeof(error_context),
+                        "Line %d: malformed configuration line (no '=' separator found)",
+                        line_number);
+               goto error;
             }
          }
       }
@@ -2507,6 +2544,11 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
 
 error:
 
+   if (strlen(error_context) > 0)
+   {
+      warnx("%s", error_context);
+   }
+
    free(trimmed_line);
    trimmed_line = NULL;
    if (file)
@@ -2514,7 +2556,7 @@ error:
       fclose(file);
    }
 
-   return 1;
+   return EINVAL;
 }
 
 int
@@ -2558,12 +2600,14 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
    struct walfilter_configuration* config;
    int idx_server = 0;
    struct server srv = {0};
+   int line_number = 0;
+   char error_context[512] = {0};
 
    file = fopen(filename, "r");
 
    if (!file)
    {
-      return 1;
+      return ENOENT;
    }
 
    memset(&section, 0, LINE_LENGTH);
@@ -2571,6 +2615,7 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
+      line_number++;
       if (!is_empty_string(line))
       {
          if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
@@ -2584,7 +2629,16 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
          }
          else
          {
-            goto error;
+            snprintf(error_context, sizeof(error_context),
+                     "Failed to process line %d: memory allocation error while parsing comments/whitespace",
+                     line_number);
+            fclose(file);
+            if (strlen(error_context) > 0)
+            {
+               warnx("%s", error_context);
+            }
+            free(trimmed_line);
+            return EINVAL;
          }
 
          if (trimmed_line[0] == '[')
@@ -2615,6 +2669,19 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                   idx_server++;
                }
             }
+            else
+            {
+               snprintf(error_context, sizeof(error_context),
+                        "Line %d: malformed section header (missing closing bracket ']')",
+                        line_number);
+               fclose(file);
+               if (strlen(error_context) > 0)
+               {
+                  warnx("%s", error_context);
+               }
+               free(trimmed_line);
+               return EINVAL;
+            }
          }
          else
          {
@@ -2626,7 +2693,6 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
             {
                extract_key_value(trimmed_line, &key, &value);
             }
-
             if (key && value)
             {
                bool unknown = false;
@@ -2764,17 +2830,6 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
    fclose(file);
 
    return 0;
-
-error:
-
-   free(trimmed_line);
-   trimmed_line = NULL;
-   if (file)
-   {
-      fclose(file);
-   }
-
-   return 1;
 }
 
 int
@@ -6088,7 +6143,8 @@ remove_leading_whitespace_and_comments(char* s, char** trimmed_line)
    }
    else
    {
-      result = pgmoneta_append(result, "");
+      // Allocate an empty string when result is NULL
+      result = (char*)calloc(1, 1);
       if (result == NULL)
       {
          goto error;
