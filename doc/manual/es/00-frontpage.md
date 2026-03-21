@@ -1,8 +1,8 @@
 ---
 title: "pgmoneta"
-subtitle: "Backup/Restore for PostgreSQL"
+subtitle: "Backup/Restauración para PostgreSQL"
 keywords: [pgmoneta, PostgreSQL]
-lang: "en"
+lang: "es"
 titlepage: true
 titlepage-logo: "../images/logo-2048.png"
 titlepage-color: "0064A5"

@@ -98,6 +98,7 @@ endif()
 #
 if (DOCS)
   FILE(GLOB EN "manual/en/??-*.md")
+  FILE(GLOB ES "manual/es/??-*.md")
 
   # Manuals definitions
   set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
@@ -124,13 +125,33 @@ if (DOCS)
     COMMENT "Generating English HTML documentation"
   )
 
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-es.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-es.pdf --from markdown --template eisvogel --listings -N --toc ${ES}
+    DEPENDS ${ES}
+    COMMENT "Generating Spanish PDF documentation"
+  )
+
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-es.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-es.html -s -f markdown-smart -N --toc -t html5 ${ES}
+    DEPENDS ${ES}
+    COMMENT "Generating Spanish HTML documentation"
+  )
+
   add_custom_target(
     all_docs ALL
-    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html
+    DEPENDS copy_images
+      ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf
+      ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html
+      ${MANUAL_OUTPUT_DIR}/pgmoneta-es.pdf
+      ${MANUAL_OUTPUT_DIR}/pgmoneta-es.html
   )
 
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf DESTINATION share/doc/pgmoneta/manual)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-es.pdf DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-es.html DESTINATION share/doc/pgmoneta/manual)
 
   #
   # Generate API docs

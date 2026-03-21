@@ -1,10 +1,10 @@
 \newpage
 
-# Acknowledgement
+# Reconocimiento
 
-## Authors
+## Autores
 
-[**pgmoneta**][pgmoneta] was created by the following authors:
+[**pgmoneta**][pgmoneta] fue creado por los siguientes autores:
 
 ```
 Jesper Pedersen <jesperpedersen.db@gmail.com>
@@ -68,20 +68,20 @@ Bassam Adnan <mailbassam@gmail.com>
 Tejas Tyagi <tejastyagi.tt@gmail.com>
 ```
 
-## Contributing
+## Contribuyendo
 
-Contributions to [**pgmoneta**][pgmoneta] are managed on [GitHub][pgmoneta]
+Las contribuciones a [**pgmoneta**][pgmoneta] se administran en [GitHub][pgmoneta]
 
-* [Ask a question][ask]
-* [Raise an issue][issue]
-* [Feature request][request]
-* [Code submission][submission]
+* [Haz una pregunta][ask]
+* [Reporta un problema][issue]
+* [Solicita una función][request]
+* [Envía código][submission]
 
-Contributions are most welcome!
+¡Las contribuciones son muy bienvenidas!
 
-Please, consult our [Code of Conduct][conduct] policies for interacting in our
-community.
+Por favor, consulta nuestras políticas de [Código de Conducta][conduct] para interactuar en nuestra
+comunidad.
 
-Consider giving the project a [star][star] on
-[GitHub][pgmoneta] if you find it useful. And, feel free to follow
-the project on [X][twitter] as well.
+Considera darle estrellas al proyecto en
+[GitHub][pgmoneta] si te resulta útil. Y, siéntete libre de seguir
+el proyecto en [X][twitter] también.
