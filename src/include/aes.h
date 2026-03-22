@@ -36,6 +36,7 @@ extern "C" {
 #define PBKDF2_ITERATIONS  600000
 #define PBKDF2_SALT_LENGTH 16
 #define GCM_TAG_LENGTH     16
+#define AES_GCM_IV_LENGTH  12
 
 #include <pgmoneta.h>
 #include <json.h>

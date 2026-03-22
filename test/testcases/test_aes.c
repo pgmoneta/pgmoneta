@@ -197,11 +197,11 @@ MCTF_TEST(test_aes_gcm_authentication_failure)
    char* decrypted = NULL;
 
    MCTF_ASSERT(pgmoneta_encrypt(plaintext, password, strlen(password), &ciphertext, &ciphertext_length, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt should succeed");
-   MCTF_ASSERT(ciphertext_length > PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext_length should be greater than salt + IV + tag size");
+   MCTF_ASSERT(ciphertext_length > PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext_length should be greater than salt + IV + tag size");
 
    /* Flip a bit in the encrypted data area (between IV and tag) */
-   /* Format: [salt(16)][iv(16)][data...][tag(16)] */
-   ciphertext[PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH] ^= 0x01;
+   /* Format: [salt(16)][iv(12)][data...][tag(16)] */
+   ciphertext[PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH] ^= 0x01;
 
    MCTF_ASSERT(pgmoneta_decrypt(ciphertext, ciphertext_length, password, strlen(password), &decrypted, ENCRYPTION_AES_256_GCM) != 0, cleanup, "pgmoneta_decrypt should fail if ciphertext is tampered (GCM)");
    MCTF_ASSERT_PTR_NULL(decrypted, cleanup, "decrypted should be NULL on authentication failure");
@@ -225,7 +225,7 @@ MCTF_TEST(test_aes_gcm_tag_tampering_fails)
    char* decrypted = NULL;
 
    MCTF_ASSERT(pgmoneta_encrypt(plaintext, password, strlen(password), &ciphertext, &ciphertext_length, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt should succeed");
-   MCTF_ASSERT(ciphertext_length > PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext_length should be greater than salt + iv + tag size");
+   MCTF_ASSERT(ciphertext_length > PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext_length should be greater than salt + iv + tag size");
 
    /* Tamper with the GCM tag (at the very end of the ciphertext) */
    ciphertext[ciphertext_length - 1] ^= 0xFF;
@@ -256,7 +256,7 @@ MCTF_TEST(test_aes_buffer_roundtrip)
    /* Test AES-256-GCM (default for management) */
    MCTF_ASSERT(pgmoneta_encrypt_buffer((unsigned char*)plaintext, plaintext_len, &ciphertext, &ciphertext_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt_buffer should succeed");
    MCTF_ASSERT_PTR_NONNULL(ciphertext, cleanup, "ciphertext should not be NULL");
-   MCTF_ASSERT(ciphertext_len > PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext should contain salt, IV and tag");
+   MCTF_ASSERT(ciphertext_len > PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext should contain salt, IV and tag");
 
    MCTF_ASSERT(pgmoneta_decrypt_buffer(ciphertext, ciphertext_len, &decrypted, &decrypted_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_decrypt_buffer should succeed");
    MCTF_ASSERT_PTR_NONNULL(decrypted, cleanup, "decrypted buffer should not be NULL");
@@ -287,10 +287,10 @@ MCTF_TEST_NEGATIVE(test_aes_buffer_tamper_fails)
 
    MCTF_ASSERT(pgmoneta_encrypt_buffer((unsigned char*)plaintext, plaintext_len, &ciphertext, &ciphertext_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt_buffer should succeed");
    MCTF_ASSERT_PTR_NONNULL(ciphertext, cleanup, "ciphertext should not be NULL");
-   MCTF_ASSERT(ciphertext_len > PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext should contain salt, IV and tag");
+   MCTF_ASSERT(ciphertext_len > PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext should contain salt, IV and tag");
 
    /* Tamper with the tag area (last byte of tag) */
-   /* Format: [salt(16)][iv(16)][ciphertext...][tag(16)] */
+   /* Format: [salt(16)][iv(12)][ciphertext...][tag(16)] */
    ciphertext[ciphertext_len - 1] ^= 0x42;
 
    MCTF_ASSERT(pgmoneta_decrypt_buffer(ciphertext, ciphertext_len, &decrypted, &decrypted_len, ENCRYPTION_AES_256_GCM) != 0, cleanup, "pgmoneta_decrypt_buffer should fail on tampered tag");
@@ -319,7 +319,7 @@ MCTF_TEST(test_aes_buffer_empty_payload)
    MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
 
    MCTF_ASSERT(pgmoneta_encrypt_buffer((unsigned char*)plaintext, plaintext_len, &ciphertext, &ciphertext_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt_buffer should succeed for empty payload");
-   MCTF_ASSERT(ciphertext_len == PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext_len should be exactly salt + IV + tag");
+   MCTF_ASSERT(ciphertext_len == PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext_len should be exactly salt + IV + tag");
 
    MCTF_ASSERT(pgmoneta_decrypt_buffer(ciphertext, ciphertext_len, &decrypted, &decrypted_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_decrypt_buffer should succeed for empty payload");
    MCTF_ASSERT(decrypted_len == 0, cleanup, "decrypted_len should be 0");
@@ -517,11 +517,11 @@ MCTF_TEST(test_aes_decrypt_truncated_ciphertext_fails)
    MCTF_ASSERT(pgmoneta_encrypt(plaintext, password, strlen(password), &ciphertext, &ciphertext_length, ENCRYPTION_AES_256_GCM) == 0, cleanup, "Encryption should succeed");
 
    /* Truncate to just the salt + half IV */
-   MCTF_ASSERT(pgmoneta_decrypt(ciphertext, PBKDF2_SALT_LENGTH + (EVP_MAX_IV_LENGTH / 2), password, strlen(password), &decrypted, ENCRYPTION_AES_256_GCM) != 0, cleanup, "Decryption of truncated IV should fail");
+   MCTF_ASSERT(pgmoneta_decrypt(ciphertext, PBKDF2_SALT_LENGTH + 6, password, strlen(password), &decrypted, ENCRYPTION_AES_256_GCM) != 0, cleanup, "Decryption of truncated IV should fail");
    MCTF_ASSERT_PTR_NULL(decrypted, cleanup, "Decrypted pointer should be NULL");
 
    /* Truncate to salt + IV + partial data (no tag) */
-   MCTF_ASSERT(pgmoneta_decrypt(ciphertext, PBKDF2_SALT_LENGTH + EVP_MAX_IV_LENGTH + 5, password, strlen(password), &decrypted, ENCRYPTION_AES_256_GCM) != 0, cleanup, "Decryption without tag should fail");
+   MCTF_ASSERT(pgmoneta_decrypt(ciphertext, PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH + 5, password, strlen(password), &decrypted, ENCRYPTION_AES_256_GCM) != 0, cleanup, "Decryption without tag should fail");
    MCTF_ASSERT_PTR_NULL(decrypted, cleanup, "Decrypted pointer should be NULL");
 
 cleanup:

@@ -34,15 +34,15 @@ pgmoneta-cli encrypt <file>
 
 ### File Format (Since 0.21.0)
 
-Each encrypted file starts with a 32-byte header:
+Each encrypted file starts with a 28-byte header:
 
 | Offset | Length | Description |
 |--------|--------|-------------|
 | 0      | 16     | Salt used for PBKDF2 key derivation |
-| 16     | 16     | Initialization Vector (IV) field (zero-padded) |
+| 16     | 12     | Initialization Vector (IV) field |
 
 **Note on AES-GCM**:
-*   A unique, random IV (12 bytes for GCM) is generated for every encryption operation and stored in the fixed 16-byte field with the remaining bytes zero-padded.
+*   A unique, random 12-byte IV is generated for every encryption operation and stored directly after the salt.
 *   The **Authentication Tag (16 bytes)** is stored at the **end of the file** (after the ciphertext).
 
 The actual encrypted data follows immediately after the header and (for GCM) before the tag.
