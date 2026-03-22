@@ -108,7 +108,7 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | s3_storage_class | REDUCED_REDUNDANCY | String | No | The S3 storage class |
 | s3_port | | Int | No | The port number for the S3 endpoint |
 | s3_use_tls | `off` | Bool | No | Use TLS for S3 connections |
-| s3_endpoint | | String | No | The S3 endpoint URL (e.g., `https://s3.amazonaws.com`). Required when using a custom or self-hosted S3-compatible storage service. |
+| s3_endpoint | | String | No | The S3 endpoint hostname or path-style URL for custom or self-hosted S3-compatible storage services. |
 | s3_region | | String | Yes | The AWS region |
 | s3_access_key_id | | String | Yes | The IAM access key ID |
 | s3_secret_access_key | | String | Yes | The IAM secret access key |
