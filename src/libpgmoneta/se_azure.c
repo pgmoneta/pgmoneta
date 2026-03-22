@@ -171,7 +171,7 @@ error:
    free(local_root);
    free(azure_root);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -314,7 +314,7 @@ error:
 
    free(local_path);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -582,7 +582,7 @@ error:
       fclose(file);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char*
@@ -624,22 +624,22 @@ azure_add_request_headers(struct http_request* request, char* auth_value, char* 
 {
    if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    if (pgmoneta_http_request_add_header(request, "x-ms-blob-type", "BlockBlob"))
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    if (pgmoneta_http_request_add_header(request, "x-ms-date", utc_date))
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    if (pgmoneta_http_request_add_header(request, "x-ms-version", "2021-08-06"))
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    return 0;

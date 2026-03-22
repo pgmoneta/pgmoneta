@@ -271,7 +271,7 @@ error:
 
    ssh_disconnect(session);
    ssh_free(session);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -430,7 +430,7 @@ error:
    free(remote_root);
    free(local_root);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -476,7 +476,7 @@ error:
    free(remote_root);
    free(local_root);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -595,7 +595,7 @@ sftp_make_directory(char* local_dir, char* remote_dir)
    return 0;
 
 error:
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -678,7 +678,7 @@ error:
    free(from);
    free(to);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -794,7 +794,7 @@ error:
       free(latest_backup_path);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -805,7 +805,7 @@ sftp_wal_prepare(sftp_file* file, int segsize)
 
    if (file == NULL || *file == NULL)
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    while (written < (size_t)segsize)
@@ -816,7 +816,7 @@ sftp_wal_prepare(sftp_file* file, int segsize)
    if (sftp_seek(*file, 0) < 0)
    {
       pgmoneta_log_error("WAL error: %s", ssh_get_error(session));
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
    return 0;
 }
@@ -880,7 +880,7 @@ error:
       fclose(file);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char*
@@ -1005,7 +1005,7 @@ error:
       sftp_close(*file);
    }
    free(path);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 int
@@ -1019,7 +1019,7 @@ pgmoneta_sftp_wal_close(int server, char* filename, bool partial, sftp_file* fil
 
    if (file == NULL || *file == NULL || root == NULL || filename == NULL || strlen(root) == 0 || strlen(filename) == 0)
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    if (partial)
@@ -1051,7 +1051,7 @@ pgmoneta_sftp_wal_close(int server, char* filename, bool partial, sftp_file* fil
 
 error:
    sftp_close(*file);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 static bool
 sftp_exists(char* path)
@@ -1097,7 +1097,7 @@ error:
    {
       sftp_attributes_free(attributes);
    }
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1109,7 +1109,7 @@ sftp_permission(char* path, int user, int group, int all)
    ret = sftp_chmod(sftp, path, mode);
    if (ret != 0)
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    return 0;

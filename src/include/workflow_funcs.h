@@ -202,6 +202,14 @@ pgmoneta_create_manifest(void);
  */
 struct workflow*
 pgmoneta_create_extra(void);
+
+/**
+ * Create a workflow for the finalize step
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_create_finalize(void);
+
 #ifdef __cplusplus
 }
 #endif

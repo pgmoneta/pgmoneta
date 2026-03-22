@@ -193,7 +193,7 @@ permissions_execute_archive(char* name __attribute__((unused)), struct art* node
       if (pgmoneta_extraction_get_suffix(config->compression_type, config->encryption, &suffix))
       {
          free(path);
-         return 1;
+         return WORKFLOW_RESULT_ERROR;
       }
       if (suffix != NULL)
       {

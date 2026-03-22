@@ -38,6 +38,7 @@
 #include <utils.h>
 #include <workers.h>
 #include <workflow.h>
+#include <workflow_funcs.h>
 
 /* system */
 #include <assert.h>
@@ -78,8 +79,6 @@ static char* restore_last_files_names[] = {"/global/pg_control", "/postgresql.co
 static int restore_backup_full(struct art* nodes);
 
 static int restore_backup_incremental(struct art* nodes);
-
-static int carry_out_workflow(struct workflow* workflow, struct art* nodes);
 
 static void clear_manifest_incremental_entries(struct json* manifest);
 /**
@@ -361,17 +360,12 @@ pgmoneta_is_restore_last_name(char* file_name)
 void
 pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   bool active = false;
-   bool locked = false;
    bool explicit_label = false;
    int ret = RESTORE_OK;
    char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
-   char* elapsed = NULL;
    struct timespec start_t;
-   struct timespec end_t;
-   double total_seconds = 0;
    char* output = NULL;
    char* en = NULL;
    int ec = -1;
@@ -381,7 +375,6 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    struct backup* backup = NULL;
    struct art* nodes = NULL;
    struct json* req = NULL;
-   struct json* response = NULL;
    struct main_configuration* config;
 
    pgmoneta_start_logging();
@@ -393,22 +386,6 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 #else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
-
-   if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
-   {
-      ec = MANAGEMENT_ERROR_RESTORE_ACTIVE;
-      pgmoneta_log_info("Restore: Server %s is active", config->common.servers[server].name);
-      pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
-                         config->common.servers[server].active_backup ? "Yes" : "No",
-                         config->common.servers[server].active_restore ? "Yes" : "No",
-                         config->common.servers[server].active_archive ? "Yes" : "No",
-                         config->common.servers[server].active_delete ? "Yes" : "No",
-                         config->common.servers[server].active_retention ? "Yes" : "No");
-      goto error;
-   }
-
-   config->common.servers[server].active_restore = true;
-   locked = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -425,6 +402,14 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    {
       goto error;
    }
+
+   pgmoneta_art_insert(nodes, NODE_FINALIZE_TYPE, (uintptr_t)FINALIZE_TYPE_RESTORE, ValueInt32);
+   pgmoneta_art_insert(nodes, NODE_CLIENT_FD, (uintptr_t)client_fd, ValueInt32);
+   pgmoneta_art_insert(nodes, NODE_SSL, (uintptr_t)ssl, ValueRef);
+   pgmoneta_art_insert(nodes, NODE_PAYLOAD, (uintptr_t)payload, ValueRef);
+   pgmoneta_art_insert(nodes, NODE_COMPRESSION, (uintptr_t)compression, ValueUInt8);
+   pgmoneta_art_insert(nodes, NODE_ENCRYPTION, (uintptr_t)encryption, ValueUInt8);
+   pgmoneta_art_insert(nodes, NODE_START_TIME, (uintptr_t)&start_t, ValueRef);
 
    memset(&label[0], 0, sizeof(label));
 
@@ -622,42 +607,9 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    }
 
    ret = pgmoneta_restore_backup(nodes);
-   if (ret == RESTORE_OK)
+   if (ret == RESTORE_OK || ret == 1) /* 1 = RESTORE_ERROR */
    {
-      if (pgmoneta_management_create_response(payload, server, &response))
-      {
-         ec = MANAGEMENT_ERROR_ALLOCATION;
-         goto error;
-      }
-
-      backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
-
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backup->backup_size, ValueUInt64);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backup->restore_size, ValueUInt64);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE, (uintptr_t)backup->biggest_file_size, ValueUInt64);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backup->comments, ValueString);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)backup->compression, ValueInt32);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)backup->encryption, ValueInt32);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_INCREMENTAL, (uintptr_t)backup->type, ValueBool);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_INCREMENTAL_PARENT, (uintptr_t)backup->parent_label, ValueString);
-
-#ifdef HAVE_FREEBSD
-      clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
-#else
-      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
-#endif
-
-      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
-      {
-         ec = MANAGEMENT_ERROR_RESTORE_NETWORK;
-         pgmoneta_log_error("Restore: Error sending response for %s", config->common.servers[server].name);
-         goto error;
-      }
-
-      elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
-      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->common.servers[server].name, backup->label, elapsed);
+      /* The workflow executed, so finalize_teardown already sent the response (success or error). */
    }
    else if (ret == RESTORE_MISSING_LABEL)
    {
@@ -671,9 +623,6 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   config->common.servers[server].active_restore = false;
-   atomic_store(&config->common.servers[server].repository, false);
-
    pgmoneta_json_destroy(payload);
 
    pgmoneta_disconnect(client_fd);
@@ -681,7 +630,6 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    pgmoneta_stop_logging();
 
    free(backup);
-   free(elapsed);
    free(output);
    free(target_identifier);
    free(timeline_value);
@@ -700,14 +648,7 @@ error:
 
    pgmoneta_stop_logging();
 
-   if (locked)
-   {
-      config->common.servers[server].active_restore = false;
-      atomic_store(&config->common.servers[server].repository, false);
-   }
-
    free(backup);
-   free(elapsed);
    free(output);
    free(target_identifier);
    free(timeline_value);
@@ -1015,6 +956,8 @@ error:
 int
 pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
 {
+   char* en = NULL;
+   int ec = -1;
    struct art* nodes = NULL;
    struct backup* newest_backup = NULL;
    struct backup* oldest_backup = NULL;
@@ -1117,7 +1060,7 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    }
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_POST_ROLLUP, tmp_backup);
-   if (carry_out_workflow(workflow, nodes) != RESTORE_OK)
+   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;
    }
@@ -2384,6 +2327,8 @@ clear_manifest_incremental_entries(struct json* manifest)
 static int
 restore_backup_full(struct art* nodes)
 {
+   char* en = NULL;
+   int ec = -1;
    int ret = RESTORE_OK;
    int server = -1;
    char* directory = NULL;
@@ -2479,8 +2424,9 @@ restore_backup_full(struct art* nodes)
    }
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, backup);
-   if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
+   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
+      ret = RESTORE_MISSING_LABEL;
       goto error;
    }
 
@@ -2503,6 +2449,8 @@ error:
 static int
 restore_backup_incremental(struct art* nodes)
 {
+   char* en = NULL;
+   int ec = -1;
    int ret = RESTORE_OK;
    int server = -1;
    bool combine_as_is = false;
@@ -2615,8 +2563,9 @@ restore_backup_incremental(struct art* nodes)
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE_AS_IS, backup);
    }
 
-   if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
+   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
+      ret = RESTORE_MISSING_LABEL;
       goto error;
    }
 
@@ -2685,52 +2634,6 @@ error:
    {
       ret = RESTORE_ERROR;
    }
-   return ret;
-}
-
-static int
-carry_out_workflow(struct workflow* workflow, struct art* nodes)
-{
-   struct workflow* current = NULL;
-   int ret = RESTORE_OK;
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->setup(current->name(), nodes))
-      {
-         ret = RESTORE_MISSING_LABEL;
-         pgmoneta_log_error("setup/%s", current->name());
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->execute(current->name(), nodes))
-      {
-         ret = RESTORE_MISSING_LABEL;
-         pgmoneta_log_error("execute/%s", current->name());
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->teardown(current->name(), nodes))
-      {
-         ret = RESTORE_MISSING_LABEL;
-         pgmoneta_log_error("teardown/%s", current->name());
-         goto error;
-      }
-      current = current->next;
-   }
-
-   return ret;
-error:
    return ret;
 }
 

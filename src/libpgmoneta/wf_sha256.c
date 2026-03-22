@@ -135,7 +135,7 @@ error:
    free(root);
    free(d);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -219,5 +219,5 @@ error:
 
    free(dir_path);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }

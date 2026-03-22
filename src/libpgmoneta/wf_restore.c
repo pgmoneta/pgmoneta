@@ -250,7 +250,7 @@ error:
    free(waldir);
    free(waltarget);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char*
@@ -349,7 +349,7 @@ combine_incremental_execute(char* name __attribute__((unused)), struct art* node
 
 error:
    free(input_dir);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char*
@@ -709,7 +709,7 @@ error:
    free(t);
    free(path);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char*
@@ -792,7 +792,7 @@ error:
    free(origwal);
    free(waldir);
    free(waltarget);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char*
@@ -889,7 +889,7 @@ error:
    free(to);
    free(suffix);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -971,7 +971,7 @@ error:
    free(to);
    free(suffix);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char*

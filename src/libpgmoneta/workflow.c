@@ -42,6 +42,7 @@
 /* system */
 #include <assert.h>
 #include <dirent.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -312,7 +313,10 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
 {
    char* en = NULL;
    int ec = -1;
+   int ret = 0;
+   int count = 0;
    struct workflow* current = NULL;
+   struct workflow** chain = NULL;
 
    *error_name = en;
    *error_code = ec;
@@ -320,10 +324,41 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(current->name(), nodes))
+      count++;
+      current = current->next;
+   }
+
+   chain = (struct workflow**)malloc(count * sizeof(struct workflow*));
+   if (chain == NULL)
+   {
+      goto error;
+   }
+
+   current = workflow;
+   for (int i = 0; i < count; i++)
+   {
+      chain[i] = current;
+      current = current->next;
+   }
+
+   current = workflow;
+   while (current != NULL)
+   {
+      ret = current->setup(current->name(), nodes);
+      if (ret != WORKFLOW_RESULT_SUCCESS)
       {
          en = current->name();
          ec = get_error_code(current->type, SETUP, nodes);
+
+         if (ret == WORKFLOW_RESULT_FATAL)
+         {
+            pgmoneta_log_warn("setup/%s", current->name());
+         }
+         else
+         {
+            pgmoneta_log_debug("setup/%s", current->name());
+         }
+
          goto error;
       }
       current = current->next;
@@ -332,34 +367,75 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(current->name(), nodes))
+      ret = current->execute(current->name(), nodes);
+      if (ret != WORKFLOW_RESULT_SUCCESS)
       {
          en = current->name();
          ec = get_error_code(current->type, EXECUTE, nodes);
+
+         if (ret == WORKFLOW_RESULT_FATAL)
+         {
+            pgmoneta_log_warn("execute/%s", current->name());
+         }
+         else
+         {
+            pgmoneta_log_debug("execute/%s", current->name());
+         }
+
          goto error;
       }
       current = current->next;
    }
 
-   current = workflow;
-   while (current != NULL)
+   /* Teardown in reverse order */
+   for (int i = count - 1; i >= 0; i--)
    {
-      if (current->teardown(current->name(), nodes))
+      ret = chain[i]->teardown(chain[i]->name(), nodes);
+      if (ret != WORKFLOW_RESULT_SUCCESS)
       {
-         en = current->name();
-         ec = get_error_code(current->type, TEARDOWN, nodes);
-         goto error;
+         if (en == NULL)
+         {
+            en = chain[i]->name();
+            ec = get_error_code(chain[i]->type, TEARDOWN, nodes);
+         }
+
+         if (ret == WORKFLOW_RESULT_FATAL)
+         {
+            pgmoneta_log_warn("teardown/%s", chain[i]->name());
+         }
+         else
+         {
+            pgmoneta_log_debug("teardown/%s", chain[i]->name());
+         }
       }
-      current = current->next;
    }
 
+   if (en != NULL)
+   {
+      *error_name = en;
+      *error_code = ec;
+
+      free(chain);
+      return 1;
+   }
+
+   free(chain);
    return 0;
 
 error:
 
+   pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)ec, ValueInt32);
+
+   /* Teardown in reverse order */
+   for (int i = count - 1; i >= 0; i--)
+   {
+      chain[i]->teardown(chain[i]->name(), nodes);
+   }
+
    *error_name = en;
    *error_code = ec;
 
+   free(chain);
    return 1;
 }
 
@@ -394,6 +470,14 @@ pgmoneta_common_setup(char* name, struct art* nodes)
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
+
+   /* Guard: if finalize is part of this workflow but lock was not acquired, skip */
+   if (pgmoneta_art_contains_key(nodes, NODE_FINALIZE_TYPE) &&
+       (!pgmoneta_art_contains_key(nodes, NODE_FINALIZE_VALUE) ||
+        !(bool)pgmoneta_art_search(nodes, NODE_FINALIZE_VALUE)))
+   {
+      return 0;
+   }
 
 #ifdef DEBUG
    pgmoneta_dump_art(nodes);
@@ -445,8 +529,11 @@ wf_backup(void)
 
    config = (struct main_configuration*)shmem;
 
-   head = pgmoneta_create_basebackup();
+   head = pgmoneta_create_finalize();
    current = head;
+
+   current->next = pgmoneta_create_basebackup();
+   current = current->next;
 
    current->next = pgmoneta_create_manifest();
    current = current->next;
@@ -519,8 +606,11 @@ wf_restore(struct backup* backup)
    struct workflow* head = NULL;
    struct workflow* current = NULL;
 
-   head = pgmoneta_create_restore();
+   head = pgmoneta_create_finalize();
    current = head;
+
+   current->next = pgmoneta_create_restore();
+   current = current->next;
 
    if (backup->encryption != ENCRYPTION_NONE)
    {
@@ -584,8 +674,11 @@ wf_combine(bool combine_as_is)
    struct workflow* head = NULL;
    struct workflow* current = NULL;
 
-   head = pgmoneta_create_combine_incremental();
+   head = pgmoneta_create_finalize();
    current = head;
+
+   current->next = pgmoneta_create_combine_incremental();
+   current = current->next;
 
    if (!combine_as_is)
    {
@@ -722,8 +815,11 @@ wf_incremental_backup(void)
 
    config = (struct main_configuration*)shmem;
 
-   head = pgmoneta_create_incremental_backup();
+   head = pgmoneta_create_finalize();
    current = head;
+
+   current->next = pgmoneta_create_incremental_backup();
+   current = current->next;
 
    current->next = pgmoneta_create_manifest();
    current = current->next;
@@ -814,8 +910,11 @@ wf_verify(struct backup* backup)
    struct workflow* head = NULL;
    struct workflow* current = NULL;
 
-   head = pgmoneta_create_restore();
+   head = pgmoneta_create_finalize();
    current = head;
+
+   current->next = pgmoneta_create_restore();
+   current = current->next;
 
    if (backup->encryption != ENCRYPTION_NONE)
    {

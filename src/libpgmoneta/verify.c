@@ -36,9 +36,11 @@
 #include <security.h>
 #include <utils.h>
 #include <workflow.h>
+#include <workflow_funcs.h>
 
 /* system */
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -47,28 +49,17 @@
 void
 pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
+   char* en = NULL;
+   int ec = -1;
    char* identifier = NULL;
    char* directory = NULL;
    char* real_directory = NULL;
    char* files = NULL;
-   char* elapsed = NULL;
    struct timespec start_t;
-   struct timespec end_t;
-   double total_seconds;
-   char* label = NULL;
    struct backup* backup = NULL;
    struct workflow* workflow = NULL;
-   struct workflow* current = NULL;
    struct art* nodes = NULL;
-   struct deque* f = NULL;
-   struct deque* a = NULL;
-   struct deque_iterator* fiter = NULL;
-   struct deque_iterator* aiter = NULL;
-   struct json* failed = NULL;
-   struct json* all = NULL;
    struct json* req = NULL;
-   struct json* response = NULL;
-   struct json* filesj = NULL;
    struct main_configuration* config;
 
    pgmoneta_start_logging();
@@ -90,6 +81,14 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    {
       goto error;
    }
+
+   pgmoneta_art_insert(nodes, NODE_FINALIZE_TYPE, (uintptr_t)FINALIZE_TYPE_VERIFY, ValueInt32);
+   pgmoneta_art_insert(nodes, NODE_CLIENT_FD, (uintptr_t)client_fd, ValueInt32);
+   pgmoneta_art_insert(nodes, NODE_SSL, (uintptr_t)ssl, ValueRef);
+   pgmoneta_art_insert(nodes, NODE_PAYLOAD, (uintptr_t)payload, ValueRef);
+   pgmoneta_art_insert(nodes, NODE_COMPRESSION, (uintptr_t)compression, ValueUInt8);
+   pgmoneta_art_insert(nodes, NODE_ENCRYPTION, (uintptr_t)encryption, ValueUInt8);
+   pgmoneta_art_insert(nodes, NODE_START_TIME, (uintptr_t)&start_t, ValueRef);
 
    if (pgmoneta_art_insert(nodes, USER_POSITION, (uintptr_t)"", ValueString))
    {
@@ -144,131 +143,12 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_VERIFY, backup);
 
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->setup(current->name(), nodes))
-      {
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->execute(current->name(), nodes))
-      {
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->teardown(current->name(), nodes))
-      {
-         goto error;
-      }
-      current = current->next;
-   }
-
-   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-
-   f = (struct deque*)pgmoneta_art_search(nodes, NODE_FAILED);
-   a = (struct deque*)pgmoneta_art_search(nodes, NODE_ALL);
-
-   if (pgmoneta_json_create(&failed))
+   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;
    }
-
-   if (pgmoneta_deque_iterator_create(f, &fiter))
-   {
-      goto error;
-   }
-
-   while (pgmoneta_deque_iterator_next(fiter))
-   {
-      struct json* j = NULL;
-
-      if (pgmoneta_json_clone((struct json*)pgmoneta_value_data(fiter->value), &j))
-      {
-         goto error;
-      }
-
-      pgmoneta_json_append(failed, (uintptr_t)j, ValueJSON);
-   }
-
-   if (files != NULL && !strcasecmp(files, "all"))
-   {
-      pgmoneta_json_create(&all);
-
-      if (pgmoneta_deque_iterator_create(a, &aiter))
-      {
-         goto error;
-      }
-
-      while (pgmoneta_deque_iterator_next(aiter))
-      {
-         struct json* j = NULL;
-
-         if (pgmoneta_json_clone((struct json*)pgmoneta_value_data(aiter->value), &j))
-         {
-            goto error;
-         }
-
-         pgmoneta_json_append(all, (uintptr_t)j, ValueJSON);
-      }
-   }
-
-   if (pgmoneta_management_create_response(payload, server, &response))
-   {
-      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
-
-      goto error;
-   }
-
-   if (pgmoneta_json_create(&filesj))
-   {
-      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
-
-      goto error;
-   }
-
-   pgmoneta_json_put(filesj, MANAGEMENT_ARGUMENT_FAILED, (uintptr_t)failed, ValueJSON);
-   failed = NULL;
-   pgmoneta_json_put(filesj, MANAGEMENT_ARGUMENT_ALL, (uintptr_t)all, ValueJSON);
-   all = NULL;
-
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)label, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILES, (uintptr_t)filesj, ValueJSON);
-   filesj = NULL;
 
    pgmoneta_delete_directory((char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
-
-#ifdef HAVE_FREEBSD
-   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
-#else
-   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
-#endif
-
-   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
-   {
-      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, NAME, compression, encryption, payload);
-      pgmoneta_log_error("Verify: Error sending response for %s/%s", config->common.servers[server].name, identifier);
-
-      goto error;
-   }
-
-   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
-
-   pgmoneta_log_info("Verify: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, elapsed);
-
-   pgmoneta_deque_iterator_destroy(fiter);
-   pgmoneta_deque_iterator_destroy(aiter);
 
    pgmoneta_art_destroy(nodes);
 
@@ -281,22 +161,16 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    pgmoneta_stop_logging();
 
    free(real_directory);
-   free(elapsed);
 
    exit(0);
 
 error:
 
+   pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_VERIFY_ERROR,
+                                      en != NULL ? en : NAME, compression, encryption, payload);
+
    pgmoneta_delete_directory((char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
-
-   pgmoneta_deque_iterator_destroy(fiter);
-   pgmoneta_deque_iterator_destroy(aiter);
-
-   pgmoneta_art_destroy(nodes);
-
-   pgmoneta_json_destroy(filesj);
-   pgmoneta_json_destroy(failed);
-   pgmoneta_json_destroy(all);
 
    pgmoneta_json_destroy(payload);
 
@@ -307,7 +181,6 @@ error:
    pgmoneta_stop_logging();
 
    free(real_directory);
-   free(elapsed);
 
    exit(1);
 }

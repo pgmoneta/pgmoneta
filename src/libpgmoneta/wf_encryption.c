@@ -246,7 +246,7 @@ error:
    free(d);
    free(enc_file);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int

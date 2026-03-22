@@ -646,7 +646,7 @@ error:
    pgmoneta_free_query_response(response);
    pgmoneta_brt_destroy(summarized_brt);
    pgmoneta_memory_destroy();
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1024,7 +1024,7 @@ error:
    free(tag);
    free(wal);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1088,7 +1088,7 @@ compare_block_numbers(const void* a, const void* b)
    }
    else if (aa > bb)
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
    return 0;
 }
@@ -1127,7 +1127,7 @@ error:
       free(paths);
    }
    pgmoneta_free_query_response(qr);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static void
@@ -1235,7 +1235,7 @@ error:
       fclose(prev_label_file);
    }
    free(write_buffer);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1376,7 +1376,7 @@ error:
    free_string_array(results, count);
    free(relation_file);
    free(base_directory_path);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1517,7 +1517,7 @@ error:
       fflush(file);
       fclose(file);
    }
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1586,7 +1586,7 @@ error:
       fflush(file);
       fclose(file);
    }
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1618,7 +1618,7 @@ write_padding(FILE* file, size_t padding_length, size_t* bw)
 
    return 0;
 error:
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char**
@@ -1778,7 +1778,7 @@ error:
    free(dst_file);
    free(src_file);
    free(pg_wal_dir);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1831,7 +1831,7 @@ wait_for_wal_switch(char* wal_dir, char* wal_file)
 error:
    pgmoneta_deque_destroy(files);
    pgmoneta_deque_iterator_destroy(it);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1851,7 +1851,7 @@ send_upload_manifest(SSL* ssl, int socket)
 
 error:
    pgmoneta_free_message(msg);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1891,5 +1891,5 @@ error:
    {
       fclose(manifest);
    }
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }

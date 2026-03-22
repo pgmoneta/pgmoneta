@@ -460,7 +460,7 @@ error:
       atomic_store(&config->common.servers[server].backup_progress.state, BACKUP_PROGRESS_NONE);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static unsigned long

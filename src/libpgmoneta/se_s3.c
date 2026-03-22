@@ -389,7 +389,7 @@ error:
    free(base_dir);
    free(s3_root);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -435,7 +435,7 @@ s3_storage_list(char* name __attribute__((unused)), struct art* nodes)
 error:
    free(s3_root);
    pgmoneta_deque_destroy(objects);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -515,7 +515,7 @@ s3_storage_cleanup(char* name __attribute__((unused)), struct art* nodes)
 
 error:
    free(s3_root);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 static int
 s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
@@ -654,7 +654,7 @@ error:
    free(sha512_final);
    free(info_tmp);
    free(info_final);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -824,7 +824,7 @@ error:
    free(manifest_path);
    free(computed_hash);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -939,7 +939,7 @@ error:
    free(s3_path);
    free(local_file_path);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 static void
 do_download_file(struct worker_common* wc)
@@ -1136,7 +1136,7 @@ error:
    free(manifest_path);
    free(suffix);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 static int
 s3_list_objects(char* relative_path, char* s3_root, int server, struct deque** objects)
@@ -1174,7 +1174,7 @@ s3_list_objects(char* relative_path, char* s3_root, int server, struct deque** o
 error:
    pgmoneta_http_response_destroy(response);
    free(continuationToken);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1249,7 +1249,7 @@ error:
    pgmoneta_deque_destroy(objects);
    free(delete_xml);
    free(continuation_token);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 static int
 s3_build_signing_key(char* secret_access_key, char* short_date, char* region,
@@ -1629,7 +1629,7 @@ error:
       pgmoneta_http_request_destroy(request);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -1832,7 +1832,7 @@ error:
       pgmoneta_http_request_destroy(request);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 static int
 s3_send_get_request(char* relative_path, char* s3_root, int server,
@@ -1980,7 +1980,7 @@ error:
       pgmoneta_http_request_destroy(request);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -2210,7 +2210,7 @@ error:
       fclose(file);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static char*
@@ -2319,14 +2319,14 @@ xml_extract_tag(char* xml, char* tag, struct deque** values)
 
    if (xml == NULL || tag == NULL || values == NULL)
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    if (*values == NULL)
    {
       if (pgmoneta_deque_create(false, values))
       {
-         return 1;
+         return WORKFLOW_RESULT_ERROR;
       }
    }
 
@@ -2343,7 +2343,7 @@ xml_extract_tag(char* xml, char* tag, struct deque** values)
          char* val = malloc(len + 1);
          if (val == NULL)
          {
-            return 1;
+            return WORKFLOW_RESULT_ERROR;
          }
          memcpy(val, ptr, len);
          val[len] = '\0';
@@ -2374,7 +2374,7 @@ xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuation_t
 
    if (xml == NULL || is_truncated == NULL || continuation_token == NULL)
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    *is_truncated = false;
@@ -2417,7 +2417,7 @@ xml_parse_s3_delete_result(char* xml, bool* has_fatal_error)
 
    if (xml == NULL || has_fatal_error == NULL)
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    *has_fatal_error = false;
@@ -2437,7 +2437,7 @@ xml_parse_s3_delete_result(char* xml, bool* has_fatal_error)
 
       if (end == NULL)
       {
-         return 1;
+         return WORKFLOW_RESULT_ERROR;
       }
 
       end += strlen("</Error>");
@@ -2446,7 +2446,7 @@ xml_parse_s3_delete_result(char* xml, bool* has_fatal_error)
       error_block = (char*)malloc(block_len + 1);
       if (error_block == NULL)
       {
-         return 1;
+         return WORKFLOW_RESULT_ERROR;
       }
       memcpy(error_block, cursor, block_len);
       error_block[block_len] = '\0';
@@ -2454,20 +2454,20 @@ xml_parse_s3_delete_result(char* xml, bool* has_fatal_error)
       if (xml_extract_tag(error_block, "Key", &key_values))
       {
          free(error_block);
-         return 1;
+         return WORKFLOW_RESULT_ERROR;
       }
       if (xml_extract_tag(error_block, "Code", &code_values))
       {
          pgmoneta_deque_destroy(key_values);
          free(error_block);
-         return 1;
+         return WORKFLOW_RESULT_ERROR;
       }
       if (xml_extract_tag(error_block, "Message", &message_values))
       {
          pgmoneta_deque_destroy(key_values);
          pgmoneta_deque_destroy(code_values);
          free(error_block);
-         return 1;
+         return WORKFLOW_RESULT_ERROR;
       }
 
       key = key_values != NULL && pgmoneta_deque_size(key_values) > 0 ? (char*)pgmoneta_deque_peek(key_values, NULL) : "unknown";
@@ -2500,7 +2500,7 @@ xml_s3_build_delete_key(char** xml, char* key)
 
    if (xml == NULL || key == NULL)
    {
-      return 1;
+      return WORKFLOW_RESULT_ERROR;
    }
 
    *xml = pgmoneta_append(*xml, open_tag);
@@ -2545,5 +2545,5 @@ xml_s3_build_delete_list(char** xml, struct deque* keys, size_t max_keys)
    return 0;
 
 error:
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }

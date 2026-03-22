@@ -248,5 +248,5 @@ error:
    pgmoneta_art_destroy(added_files);
    pgmoneta_art_destroy(deleted_files);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }

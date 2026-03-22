@@ -62,9 +62,19 @@ extern "C" {
 
 #define CLEANUP_TYPE_RESTORE             0
 
+#define FINALIZE_TYPE_BACKUP             0
+#define FINALIZE_TYPE_RESTORE            1
+#define FINALIZE_TYPE_VERIFY             2
+
+#define WORKFLOW_RESULT_SUCCESS          0
+#define WORKFLOW_RESULT_ERROR            1
+#define WORKFLOW_RESULT_FATAL            2
+
 #define NODE_ALL                         "all"                 /* All the files in a manifest */
 #define NODE_BACKUP                      "backup"              /* The backup structure */
 #define NODE_COMBINE_AS_IS               "combine_as_is"       /* Whether to combine the backups as is*/
+#define NODE_FINALIZE_TYPE               "finalize_type"       /* The finalize type */
+#define NODE_FINALIZE_VALUE              "finalize_value"      /* The finalize value (locked state) */
 #define NODE_COPY_WAL                    "copy_wal"            /* Whether to copy WAL */
 #define NODE_BACKUP_BASE                 "backup_base"         /* The base directory of the backup */
 #define NODE_BACKUP_DATA                 "backup_data"         /* The data directory of the backup */
@@ -86,6 +96,12 @@ extern "C" {
 #define NODE_TARGET_BASE                 "target_base"         /* The target base directory */
 #define NODE_TARGET_FILE                 "target_file"         /* The target file */
 #define NODE_TARGET_ROOT                 "target_root"         /* The target root directory */
+#define NODE_CLIENT_FD                   "client_fd"           /* The client fd */
+#define NODE_SSL                         "ssl"                 /* The SSL connection */
+#define NODE_PAYLOAD                     "payload"             /* The JSON payload */
+#define NODE_COMPRESSION                 "compression"         /* The compression type */
+#define NODE_ENCRYPTION                  "encryption"          /* The encryption type */
+#define NODE_START_TIME                  "start_time"          /* The start time */
 
 /* Supplied by the user */
 #define USER_DIRECTORY  "directory"  /* The target root directory */

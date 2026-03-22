@@ -227,7 +227,7 @@ error:
    }
    free(d);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -312,5 +312,5 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
