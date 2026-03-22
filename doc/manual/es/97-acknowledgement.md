@@ -56,6 +56,7 @@ Zeyad Daowd <zeyaddaowd@yahoo.com>
 Sakshi Aggarwal <sakshiaggarwal2706@gmail.com>
 Chen Shen <scisbeloved23@gmail.com>
 Jozef Hernández <jozefhdez2@gmail.com>
+Sanskriti <sanscode19@gmail.com>
 ```
 
 ## Committers
@@ -85,4 +86,3 @@ comunidad.
 Considera darle estrellas al proyecto en
 [GitHub][pgmoneta] si te resulta útil. Y, siéntete libre de seguir
 el proyecto en [X][twitter] también.
-Sanskriti <sanscode19@gmail.com>
