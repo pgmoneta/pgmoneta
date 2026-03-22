@@ -45,7 +45,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | s3_storage_class | REDUCED_REDUNDANCY | String | No | The S3 storage class | 
 | s3_port   | | Int | No | The port number for the S3 endpoint |
 | s3_use_tls | `off` | Bool | No | Use TLS for S3 connections |
-| s3_endpoint | String | No | s3 endpoint url |
+| s3_endpoint | | String | No | The hostname for a custom or self-hosted S3-compatible storage service. |
 | s3_region | | String | Yes | The AWS region |
 | s3_access_key_id | | String | Yes | The IAM access key ID |
 | s3_secret_access_key | | String | Yes | The IAM secret access key |

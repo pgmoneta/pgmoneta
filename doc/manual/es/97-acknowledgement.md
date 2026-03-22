@@ -85,3 +85,4 @@ comunidad.
 Considera darle estrellas al proyecto en
 [GitHub][pgmoneta] si te resulta útil. Y, siéntete libre de seguir
 el proyecto en [X][twitter] también.
+Sanskriti <sanscode19@gmail.com>
