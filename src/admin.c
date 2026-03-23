@@ -338,7 +338,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    char* encoded_salt = NULL;
    size_t encoded_salt_length = 0;
    struct stat st = {0};
-   bool do_free = true;
+   bool do_free = false;
    struct json* j = NULL;
    struct json* outcome = NULL;
    struct timespec start_t;
@@ -627,7 +627,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
    int number_of_users = 0;
    bool do_verify = true;
    char* verify = NULL;
-   bool do_free = true;
+   bool do_free = false;
    struct json* j = NULL;
    struct json* outcome = NULL;
    struct json* response = NULL;
@@ -970,7 +970,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    bool found = false;
    bool do_verify = true;
    char* verify = NULL;
-   bool do_free = true;
+   bool do_free = false;
    struct json* j = NULL;
    struct json* outcome = NULL;
    struct json* response = NULL;
