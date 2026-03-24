@@ -61,35 +61,53 @@ The `-I` or `--interactive` flag launches an interactive ncurses-based user inte
 
 **Features:**
 
-- **File Browser**: Navigate directories to select WAL files
-- **Record Display**: View detailed WAL records in a table format
-- **Search Functionality**: Search records by resource manager, LSN range, XID, or description
-- **Color-Coded Display**: Different colors for different record types and components
-- **Keyboard Navigation**: Use arrow keys to navigate, Enter to select, `?` for help
-- **Bounded WAL Navigation**: Navigate WAL records using Home to jump to the first record, arrow up for the previous record, and arrow down for the next, across all WAL files in the current directory.
+- **File browser**: Navigate directories to select WAL files
+- **Record display**: View WAL records in a table; **t** / **b** switches text vs binary (hex) view
+- **Search**: **s** opens search by resource manager, LSN fields, XID, or description; **n** / **p** move between matches; **Esc** clears search (not filters)
+- **Filtering**: **f** opens a filter dialog. Criteria restrict which rows remain. **u** clears all filters and reloads the full file. Active filters are summarized in the header; the status line shows *showing N of M records* when filtered
+- **Marks & YAML**: **m** marks or unmarks rows; **g** writes a **pgmoneta-walfilter** YAML from XIDs of marked rows
+- **Color-coded display**: Different colors for record types and columns
+- **WAL navigation**: At file boundaries, **Up** / **Down** can move to the previous/next WAL file in the same directory when applicable; **Home** / **End** jump to first/last record
+
+**Filter semantics (interactive dialog)**
+
+- **AND across fields**: Each non-empty field you set must match (RMGR, Start LSN, End LSN, XID, Relation).
+- **OR within a field**: For **RMGR**, **XID**, and **Relation**, enter **comma-separated** values; a row matches if it matches **any** token in that field.
+- **Start LSN** / **End LSN**: Together they define a range: record start greater than the filter start (if set) and record end less than the filter end (if set). You may set only one bound.
+- The dialog is **pre-filled** when you reopen **f**. **Ctrl+U** in the dialog clears all fields.
 
 **Usage:**
 
 ```bash
-#Interactive mode on a directory
+# Interactive mode on a directory
 pgmoneta-walinfo -I /path/to/wal_directory/
 
-#Interactive mode on a single WAL file
+# Interactive mode on a single WAL file
 pgmoneta-walinfo -I /path/to/000000010000000000000001
 ```
 
-**Keyboard Shortcuts:**
+**Keyboard shortcuts:**
 
-- `Arrow Keys`: Navigate records and menus
-- `Enter`: Select file or option
-- `?`: Display help
-- `q`: Quit application
-- `s`: Start search
-- `n`: Next search result
-- `p`: Previous search result
-- `l`: Load different file from the current directory
-- `home`: Go to the first record at the WAL file
-- `end`: Go to the last record at the WAL file
+| Key | Action |
+|-----|--------|
+| Arrow keys | Move between records |
+| PgUp / PgDn | Page scroll |
+| Home / End | First / last record |
+| Enter | Detail view for current record |
+| t / b | Text mode / Binary (hex) mode |
+| s | Open search |
+| n / p | Next / previous search match (when search active) |
+| f | Open filter dialog |
+| u | Clear all filters and reload full list |
+| m | Mark / unmark row for export |
+| g | Write walfilter YAML from marked XIDs |
+| v | Verify records |
+| l | Load different WAL file / browse |
+| ? | Help overlay |
+| Esc | Clear search highlights |
+| q | Quit |
+
+See **doc/man/pgmoneta-walinfo.1.rst** for the full **INTERACTIVE MODE** section.
 
 #### Raw Output Format
 

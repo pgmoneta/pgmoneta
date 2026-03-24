@@ -53,6 +53,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <ncurses.h>
 #include <sys/stat.h>
@@ -69,6 +70,8 @@
 #define COL_WIDTH_FPI_PCT       8
 #define COL_WIDTH_COMBINED_SIZE 14
 #define COL_WIDTH_COMBINED_PCT  10
+
+#define WAL_FILTER_MAX_TOKENS   32
 
 static int describe_walfile(char* path, enum value_type type, FILE* output, bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, bool summary, char** included_objects);
 static int describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, bool summary, char** included_objects, struct column_widths* provided_widths);
@@ -102,6 +105,7 @@ enum column_index {
 /* WAL record wrapper for UI display */
 struct wal_record_ui
 {
+   char filename[512];
    char rmgr[32];
    uint64_t start_lsn;
    uint64_t end_lsn;
@@ -113,6 +117,7 @@ struct wal_record_ui
    bool verified;
    char verification_status[64];
    struct decoded_xlog_record* record; /* Pointer to actual record */
+   bool marked;                        /* For YAML file generation */
 };
 
 /* Field types for search queries */
@@ -147,6 +152,21 @@ struct wal_search_criteria
    bool has_end_lsn;
    bool has_xid;
    bool has_description;
+};
+
+/* Filter criteria for interactive mode */
+struct wal_filter_criteria
+{
+   char rmgr[256];
+   uint64_t start_lsn;
+   uint64_t end_lsn;
+   char xid_csv[256];
+   char relation[256];
+   bool has_rmgr;
+   bool has_start_lsn;
+   bool has_end_lsn;
+   bool has_xid;
+   bool has_relation;
 };
 
 static const char* wal_search_rmgr_values[] = {
@@ -198,8 +218,12 @@ struct ui_state
    char* wal_filename;
    struct wal_record_ui* records;
    size_t record_count;
+   size_t record_count_unfiltered;
    size_t record_capacity;
    struct walfile* wf;
+
+   /* Filter state */
+   struct wal_filter_criteria filters;
 
    /* Navigation */
    size_t current_row;
@@ -724,8 +748,7 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
       char* desc = get_simple_record_description(record, wf->magic_number);
       if (desc != NULL)
       {
-         strncpy(rec_ui->description, desc, sizeof(rec_ui->description) - 1);
-         rec_ui->description[sizeof(rec_ui->description) - 1] = '\0';
+         pgmoneta_snprintf(rec_ui->description, sizeof(rec_ui->description), "%s", desc);
          free(desc);
       }
       else
@@ -756,11 +779,10 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
       }
 
       rec_ui->verified = false;
-      strncpy(rec_ui->verification_status, "Unchecked",
-              sizeof(rec_ui->verification_status) - 1);
-      rec_ui->verification_status[sizeof(rec_ui->verification_status) - 1] = '\0';
+      pgmoneta_snprintf(rec_ui->verification_status, sizeof(rec_ui->verification_status), "Unchecked");
 
       rec_ui->record = record;
+      rec_ui->marked = false;
 
       state->record_count++;
    }
@@ -776,7 +798,437 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
    }
    free(from);
 
+   state->record_count_unfiltered = state->record_count;
+
    return 0;
+}
+
+/**
+ * Split comma-separated values, trim spaces; tokens up to 256 chars each.
+ *
+ * @param csv The string
+ * @param tokens Output rows
+ * @param max_tokens Maximum tokens
+ * @return Number of tokens
+ */
+static int
+wal_split_csv_trim(const char* csv, char (*tokens)[256], int max_tokens)
+{
+   char buf[1024];
+   int n = 0;
+
+   if (csv == NULL || *csv == '\0' || max_tokens <= 0)
+   {
+      return 0;
+   }
+
+   pgmoneta_snprintf(buf, sizeof(buf), "%s", csv);
+
+   char* p = buf;
+   while (*p != '\0' && n < max_tokens)
+   {
+      while (*p != '\0' && isspace((unsigned char)*p))
+      {
+         p++;
+      }
+      if (*p == '\0')
+      {
+         break;
+      }
+
+      char* start = p;
+      while (*p != '\0' && *p != ',')
+      {
+         p++;
+      }
+      char saved = *p;
+      *p = '\0';
+
+      char* t = start + strlen(start);
+      while (t > start && isspace((unsigned char)*(t - 1)))
+      {
+         t--;
+      }
+      *t = '\0';
+
+      if (start[0] != '\0')
+      {
+         pgmoneta_snprintf(tokens[n], 256, "%s", start);
+         n++;
+      }
+
+      if (saved == '\0')
+      {
+         break;
+      }
+      p++;
+   }
+
+   return n;
+}
+
+static bool
+wal_relation_token_matches(struct wal_record_ui* rec, const char* token)
+{
+   uint32_t oid_val = 0;
+   char token_buf[256];
+
+   if (rec == NULL || token == NULL || strlen(token) == 0)
+   {
+      return false;
+   }
+
+   pgmoneta_snprintf(token_buf, sizeof(token_buf), "%s", token);
+
+   char* resolved_oid = NULL;
+   if (pgmoneta_get_relation_oid(token_buf, &resolved_oid) == 0 && resolved_oid != NULL)
+   {
+      char* endptr;
+      oid_val = (uint32_t)strtoul(resolved_oid, &endptr, 10);
+      free(resolved_oid);
+      if (*endptr != '\0' || oid_val == 0)
+      {
+         oid_val = 0;
+      }
+   }
+   else
+   {
+      char* endptr;
+      oid_val = (uint32_t)strtoul(token, &endptr, 10);
+      if (*endptr != '\0' || oid_val == 0)
+      {
+         oid_val = 0;
+      }
+   }
+
+   if (oid_val > 0 && rec->record != NULL)
+   {
+      for (int block_id = 0; block_id <= rec->record->max_block_id; block_id++)
+      {
+         if (rec->record->blocks[block_id].in_use)
+         {
+            if (rec->record->blocks[block_id].rlocator.relNumber == oid_val)
+            {
+               return true;
+            }
+         }
+      }
+   }
+
+   if (strstr(rec->description, token) != NULL)
+   {
+      return true;
+   }
+
+   return false;
+}
+
+static bool
+wal_filters_active(struct ui_state* state)
+{
+   struct wal_filter_criteria* f = &state->filters;
+
+   return f->has_rmgr || f->has_start_lsn || f->has_end_lsn || f->has_xid || f->has_relation;
+}
+
+/**
+ * Short human-readable summary of active filters (truncated for header line).
+ */
+static void
+wal_format_filter_summary(struct ui_state* state, char* buf, size_t buf_size)
+{
+   struct wal_filter_criteria* f = &state->filters;
+   size_t pos = 0;
+   bool need_sep = false;
+
+   buf[0] = '\0';
+
+#define WAL_SUM_APPEND(fmt, ...)                                                                          \
+   do                                                                                                     \
+   {                                                                                                      \
+      int w = pgmoneta_snprintf(buf + pos, buf_size - pos, "%s" fmt, need_sep ? " · " : "", __VA_ARGS__); \
+      if (w < 0 || (size_t)w >= buf_size - pos)                                                           \
+      {                                                                                                   \
+         return;                                                                                          \
+      }                                                                                                   \
+      pos += (size_t)w;                                                                                   \
+      need_sep = true;                                                                                    \
+   }                                                                                                      \
+   while (0)
+
+   if (f->has_rmgr)
+   {
+      WAL_SUM_APPEND("RMGR:%s", f->rmgr);
+   }
+   if (f->has_start_lsn)
+   {
+      char* s = pgmoneta_lsn_to_string(f->start_lsn);
+      WAL_SUM_APPEND("start>=%s", s != NULL ? s : "?");
+      free(s);
+   }
+   if (f->has_end_lsn)
+   {
+      char* s = pgmoneta_lsn_to_string(f->end_lsn);
+      WAL_SUM_APPEND("end<=%s", s != NULL ? s : "?");
+      free(s);
+   }
+   if (f->has_xid)
+   {
+      WAL_SUM_APPEND("XID:%s", f->xid_csv);
+   }
+   if (f->has_relation)
+   {
+      WAL_SUM_APPEND("Rel:%s", f->relation);
+   }
+
+#undef WAL_SUM_APPEND
+}
+
+/**
+ * Apply current filters to the records
+ * 
+ * @param state UI state structure
+ */
+static void
+wal_apply_filters(struct ui_state* state)
+{
+   if (!wal_filters_active(state))
+   {
+      return;
+   }
+
+   char rmgr_tok[WAL_FILTER_MAX_TOKENS][256];
+   char xid_tok[WAL_FILTER_MAX_TOKENS][256];
+   char rel_tok[WAL_FILTER_MAX_TOKENS][256];
+   int n_rmgr = 0;
+   int n_xid = 0;
+   int n_rel = 0;
+
+   if (state->filters.has_rmgr)
+   {
+      n_rmgr = wal_split_csv_trim(state->filters.rmgr, rmgr_tok, WAL_FILTER_MAX_TOKENS);
+   }
+   if (state->filters.has_xid)
+   {
+      n_xid = wal_split_csv_trim(state->filters.xid_csv, xid_tok, WAL_FILTER_MAX_TOKENS);
+   }
+   if (state->filters.has_relation)
+   {
+      n_rel = wal_split_csv_trim(state->filters.relation, rel_tok, WAL_FILTER_MAX_TOKENS);
+   }
+
+   size_t new_count = 0;
+   for (size_t i = 0; i < state->record_count; i++)
+   {
+      struct wal_record_ui* rec = &state->records[i];
+      bool matches = true;
+
+      if (state->filters.has_rmgr && n_rmgr > 0)
+      {
+         bool rmgr_ok = false;
+         for (int t = 0; t < n_rmgr; t++)
+         {
+            if (strcasecmp(rec->rmgr, rmgr_tok[t]) == 0)
+            {
+               rmgr_ok = true;
+               break;
+            }
+         }
+         if (!rmgr_ok)
+         {
+            matches = false;
+         }
+      }
+
+      if (matches && state->filters.has_start_lsn)
+      {
+         if (rec->start_lsn < state->filters.start_lsn)
+         {
+            matches = false;
+         }
+      }
+
+      if (matches && state->filters.has_end_lsn)
+      {
+         if (rec->end_lsn > state->filters.end_lsn)
+         {
+            matches = false;
+         }
+      }
+
+      if (matches && state->filters.has_xid && n_xid > 0)
+      {
+         bool xid_ok = false;
+         for (int t = 0; t < n_xid; t++)
+         {
+            uint32_t xv = (uint32_t)strtoul(xid_tok[t], NULL, 10);
+            if (rec->xid == xv)
+            {
+               xid_ok = true;
+               break;
+            }
+         }
+         if (!xid_ok)
+         {
+            matches = false;
+         }
+      }
+
+      if (matches && state->filters.has_relation && n_rel > 0)
+      {
+         bool relation_ok = false;
+         for (int t = 0; t < n_rel; t++)
+         {
+            if (wal_relation_token_matches(rec, rel_tok[t]))
+            {
+               relation_ok = true;
+               break;
+            }
+         }
+         if (!relation_ok)
+         {
+            matches = false;
+         }
+      }
+
+      if (matches)
+      {
+         if (new_count != i)
+         {
+            state->records[new_count] = state->records[i];
+         }
+         new_count++;
+      }
+   }
+
+   state->record_count = new_count;
+}
+
+/**
+ * Generate walfilter YAML from marked records
+ * 
+ * @param state UI state structure
+ */
+static void
+generate_walfilter_yaml(struct ui_state* state)
+{
+   FILE* yaml_file = NULL;
+   char filename[256];
+   int* xids = NULL;
+   int xid_count = 0;
+   int xid_capacity = 10;
+
+   xids = (int*)malloc(sizeof(int) * xid_capacity);
+   if (xids == NULL)
+   {
+      goto error;
+   }
+
+   for (size_t i = 0; i < state->record_count; i++)
+   {
+      struct wal_record_ui* record = &state->records[i];
+      if (record->marked && record->xid > 0)
+      {
+         bool exists = false;
+         for (int j = 0; j < xid_count; j++)
+         {
+            if ((uint32_t)xids[j] == record->xid)
+            {
+               exists = true;
+               break;
+            }
+         }
+
+         if (!exists)
+         {
+            if (xid_count >= xid_capacity)
+            {
+               xid_capacity *= 2;
+               int* new_xids = (int*)realloc(xids, sizeof(int) * xid_capacity);
+               if (new_xids == NULL)
+               {
+                  goto error;
+               }
+               xids = new_xids;
+            }
+            xids[xid_count++] = record->xid;
+         }
+      }
+   }
+
+   if (xid_count == 0)
+   {
+      WINDOW* no_xid_win = newwin(5, 50, (LINES - 5) / 2, (COLS - 50) / 2);
+      wbkgd(no_xid_win, COLOR_PAIR(1));
+      box(no_xid_win, 0, 0);
+      mvwprintw(no_xid_win, 1, 2, "No marked records with XIDs found");
+      mvwprintw(no_xid_win, 2, 2, "Press any key to continue...");
+      wrefresh(no_xid_win);
+      getch();
+      delwin(no_xid_win);
+      free(xids);
+      return;
+   }
+
+   // Generate filename
+   time_t now = time(NULL);
+   struct tm* tm_info = localtime(&now);
+   strftime(filename, sizeof(filename), "walfilter_rules_%Y%m%d_%H%M%S.yaml", tm_info);
+
+   // Open file
+   yaml_file = fopen(filename, "w");
+   if (yaml_file == NULL)
+   {
+      goto error;
+   }
+
+   // Write YAML header
+   fprintf(yaml_file, "source_dir: /path/to/source/wal/directory\n");
+   fprintf(yaml_file, "target_dir: /path/to/target/directory\n");
+   fprintf(yaml_file, "configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf\n");
+   fprintf(yaml_file, "rules:\n");
+   fprintf(yaml_file, "  - xids:\n");
+
+   // Write XIDs
+   for (int i = 0; i < xid_count; i++)
+   {
+      fprintf(yaml_file, "    - %d\n", xids[i]);
+   }
+
+   fclose(yaml_file);
+
+   // Show success message
+   WINDOW* msg_win = newwin(7, 60, (LINES - 7) / 2, (COLS - 60) / 2);
+   wbkgd(msg_win, COLOR_PAIR(1));
+   box(msg_win, 0, 0);
+   mvwprintw(msg_win, 1, 2, "YAML file generated: %s", filename);
+   mvwprintw(msg_win, 2, 2, "XIDs to filter: %d", xid_count);
+   mvwprintw(msg_win, 4, 2, "Press any key to continue...");
+   wrefresh(msg_win);
+   getch();
+   delwin(msg_win);
+
+   free(xids);
+   return;
+
+error:
+   if (yaml_file)
+   {
+      fclose(yaml_file);
+   }
+   if (xids)
+   {
+      free(xids);
+   }
+
+   WINDOW* error_win = newwin(5, 50, (LINES - 5) / 2, (COLS - 50) / 2);
+   wbkgd(error_win, COLOR_PAIR(1));
+   box(error_win, 0, 0);
+   mvwprintw(error_win, 1, 2, "Error generating YAML file");
+   mvwprintw(error_win, 2, 2, "Press any key to continue...");
+   wrefresh(error_win);
+   getch();
+   delwin(error_win);
 }
 
 /**
@@ -1601,6 +2053,19 @@ draw_header(struct ui_state* state)
    mvwprintw(state->header_win, 1, width - 12, "Mode: %s", mode_str);
    wattroff(state->header_win, A_BOLD | COLOR_PAIR(1));
 
+   if (wal_filters_active(state))
+   {
+      char sum[512];
+      wal_format_filter_summary(state, sum, sizeof(sum));
+      wattron(state->header_win, COLOR_PAIR(3));
+      mvwprintw(state->header_win, 2, 2, "Active filters (AND across fields, comma=OR within a field): %s", sum);
+      wattroff(state->header_win, COLOR_PAIR(3));
+   }
+   else
+   {
+      mvwprintw(state->header_win, 2, 2, "%-*s", width - 4, "");
+   }
+
    wrefresh(state->header_win);
 }
 
@@ -1791,8 +2256,7 @@ draw_main_content(struct ui_state* state)
 
          /* description in GREEN or HIGHLIGHT */
          char desc_display[512];
-         strncpy(desc_display, rec_ui->description, sizeof(desc_display) - 1);
-         desc_display[sizeof(desc_display) - 1] = '\0';
+         pgmoneta_snprintf(desc_display, sizeof(desc_display), "%s", rec_ui->description);
 
          /* Replace newlines with spaces */
          for (int j = 0; desc_display[j] != '\0'; j++)
@@ -2067,6 +2531,13 @@ draw_status(struct ui_state* state)
                 filename_display);
       wattroff(state->status_win, A_BOLD | COLOR_PAIR(3));
    }
+   else if (wal_filters_active(state))
+   {
+      wattron(state->status_win, A_BOLD | COLOR_PAIR(3));
+      mvwprintw(state->status_win, 0, 2, "Showing %zu of %zu records (filtered) | Row %zu",
+                state->record_count, state->record_count_unfiltered, state->current_row + 1);
+      wattroff(state->status_win, A_BOLD | COLOR_PAIR(3));
+   }
    else
    {
       mvwprintw(state->status_win, 0, 2, "Records: %zu | Current: %zu",
@@ -2085,9 +2556,13 @@ draw_footer(struct ui_state* state)
    {
       mvwprintw(state->footer_win, 0, 2, "Search: n=Next | p=Prev | s=New Search | Esc=Clear | q=Quit");
    }
+   else if (wal_filters_active(state))
+   {
+      mvwprintw(state->footer_win, 0, 2, "Filter: m=mark | g=YAML from marks | u=Clear Filters | q=Quit");
+   }
    else
    {
-      mvwprintw(state->footer_win, 0, 2, "Cmd: Up/Down=Navigate | Enter=Detail | s=Search | v=Verify | l=Load | ?=Help | q=Quit");
+      mvwprintw(state->footer_win, 0, 2, "Cmd: Up/Down=Navigate | Enter=Detail | s=Search | f=Filter | v=Verify | l=Load | ?=Help | q=Quit");
    }
 
    wrefresh(state->footer_win);
@@ -2096,7 +2571,7 @@ draw_footer(struct ui_state* state)
 static void
 show_help(void)
 {
-   int height = 24;
+   int height = 36;
    int width = 80;
    int starty = (LINES - height) / 2;
    int startx = (COLS - width) / 2;
@@ -2113,24 +2588,34 @@ show_help(void)
    mvwprintw(help_win, 5, 4, "PgUp/PgDn  - Scroll page");
    mvwprintw(help_win, 6, 4, "Home/End   - Go to first/last record");
 
-   mvwprintw(help_win, 8, 2, "Display Modes:");
+   mvwprintw(help_win, 8, 2, "Display:");
    mvwprintw(help_win, 9, 4, "T          - Text mode (human-readable)");
    mvwprintw(help_win, 10, 4, "B          - Binary mode (hex dump)");
    mvwprintw(help_win, 11, 4, "Enter      - Detailed record view");
 
-   mvwprintw(help_win, 13, 2, "Search (KMP Algorithm):");
+   mvwprintw(help_win, 13, 2, "Search:");
    mvwprintw(help_win, 14, 4, "S          - Start search");
    mvwprintw(help_win, 15, 4, "Tab        - Complete/cycle known values");
-   mvwprintw(help_win, 16, 4, "N/→        - Next search result");
-   mvwprintw(help_win, 17, 4, "P/←        - Previous search result");
+   mvwprintw(help_win, 16, 4, "N / Right  - Next search result");
+   mvwprintw(help_win, 17, 4, "P / Left   - Previous search result");
    mvwprintw(help_win, 18, 4, "ESC        - Clear search results");
 
-   mvwprintw(help_win, 19, 2, "Other Actions:");
-   mvwprintw(help_win, 20, 4, "V          - Verify records");
-   mvwprintw(help_win, 21, 4, "L          - Load different file");
-   mvwprintw(help_win, 22, 4, "Q          - Quit");
+   mvwprintw(help_win, 20, 2, "Filtering:");
+   mvwprintw(help_win, 21, 4, "F          - Open filter dialog (current rules are pre-filled)");
+   mvwprintw(help_win, 22, 4, "U          - Clear all filters (reload full record list)");
+   mvwprintw(help_win, 23, 4, "Logic      - Comma separates OR within RMGR, XID, or Relation;");
+   mvwprintw(help_win, 24, 4, "             different fields combine with AND. Start LSN (min) and");
+   mvwprintw(help_win, 25, 4, "             End LSN (max) bound the span together (start >= min,");
+   mvwprintw(help_win, 26, 4, "             end <= max). Active filters are shown in the header.");
 
-   mvwprintw(help_win, height - 2, 2, "Press any key to return...");
+   mvwprintw(help_win, 28, 2, "Marks & export:");
+   mvwprintw(help_win, 29, 4, "M          - Mark/unmark row for YAML export");
+   mvwprintw(help_win, 30, 4, "G          - Write walfilter YAML from marked rows (XIDs)");
+
+   mvwprintw(help_win, 32, 2, "Other:");
+   mvwprintw(help_win, 33, 4, "V / L / Q  - Verify, load different WAL file, quit");
+
+   mvwprintw(help_win, height - 1, 2, "Press any key to return...");
    wrefresh(help_win);
    getch();
    delwin(help_win);
@@ -2537,6 +3022,331 @@ handle_search_input(struct ui_state* state)
    delwin(search_win);
 }
 
+static void
+wal_clear_filters(struct ui_state* state)
+{
+   memset(&state->filters, 0, sizeof(state->filters));
+   if (state->wal_filename != NULL)
+   {
+      wal_interactive_load_records(state, state->wal_filename);
+   }
+   state->current_row = 0;
+   state->scroll_offset = 0;
+}
+
+static void
+handle_filter_input(struct ui_state* state)
+{
+   int height = 30;
+   int width = 80;
+   int starty = (LINES - height) / 2;
+   int startx = (COLS - width) / 2;
+
+   WINDOW* search_win = newwin(height, width, starty, startx);
+   wal_set_window_theme(search_win, 1, true);
+   keypad(search_win, TRUE);
+
+   wattron(search_win, A_BOLD);
+   mvwprintw(search_win, 1, 2, "Filter WAL Records");
+   wattroff(search_win, A_BOLD);
+   mvwhline(search_win, 2, 1, ACS_HLINE, width - 2);
+
+   /* Draw Table */
+   int table_start_row = 4;
+   mvwprintw(search_win, table_start_row, 2, "Field");
+   mvwprintw(search_win, table_start_row, 20, "| Value");
+   mvwhline(search_win, table_start_row + 1, 2, ACS_HLINE, width - 4);
+
+   mvwprintw(search_win, table_start_row + 2, 2, "RMGR");
+   mvwprintw(search_win, table_start_row + 2, 20, "|");
+
+   mvwprintw(search_win, table_start_row + 3, 2, "Start LSN");
+   mvwprintw(search_win, table_start_row + 3, 20, "|");
+
+   mvwprintw(search_win, table_start_row + 4, 2, "End LSN");
+   mvwprintw(search_win, table_start_row + 4, 20, "|");
+
+   mvwprintw(search_win, table_start_row + 5, 2, "XID");
+   mvwprintw(search_win, table_start_row + 5, 20, "|");
+
+   mvwprintw(search_win, table_start_row + 6, 2, "Relation");
+   mvwprintw(search_win, table_start_row + 6, 20, "|");
+
+   mvwprintw(search_win, height - 5, 2, "Logic: fields AND; RMGR/XID/Relation accept comma-separated OR");
+   mvwprintw(search_win, height - 4, 2, "Start LSN: record start >= min (if set)");
+   mvwprintw(search_win, height - 3, 2, "End LSN:   record end   <= max (if set)");
+
+   /* Input buffers */
+   char rmgr_input[256] = {0};
+   char start_lsn_input[64] = {0};
+   char end_lsn_input[64] = {0};
+   char xid_input[256] = {0};
+   char relation_input[256] = {0};
+
+   if (wal_filters_active(state))
+   {
+      if (state->filters.has_rmgr)
+      {
+         pgmoneta_snprintf(rmgr_input, sizeof(rmgr_input), "%s", state->filters.rmgr);
+      }
+      if (state->filters.has_start_lsn)
+      {
+         char* s = pgmoneta_lsn_to_string(state->filters.start_lsn);
+         if (s != NULL)
+         {
+            pgmoneta_snprintf(start_lsn_input, sizeof(start_lsn_input), "%s", s);
+            free(s);
+         }
+      }
+      if (state->filters.has_end_lsn)
+      {
+         char* s = pgmoneta_lsn_to_string(state->filters.end_lsn);
+         if (s != NULL)
+         {
+            pgmoneta_snprintf(end_lsn_input, sizeof(end_lsn_input), "%s", s);
+            free(s);
+         }
+      }
+      if (state->filters.has_xid)
+      {
+         pgmoneta_snprintf(xid_input, sizeof(xid_input), "%s", state->filters.xid_csv);
+      }
+      if (state->filters.has_relation)
+      {
+         pgmoneta_snprintf(relation_input, sizeof(relation_input), "%s", state->filters.relation);
+      }
+   }
+
+   char* field_inputs[] = {rmgr_input, start_lsn_input, end_lsn_input, xid_input, relation_input};
+   size_t field_input_sizes[] = {sizeof(rmgr_input), sizeof(start_lsn_input), sizeof(end_lsn_input), sizeof(xid_input), sizeof(relation_input)};
+   bool completion_active[5] = {false};
+   int completion_cycle[5] = {0};
+   char completion_seed[5][128] = {{0}};
+
+   int current_field = 0; //0=RMGR, 1=Start LSN, 2=End LSN, 3=XID, 4=Relation
+   int num_fields = 5;
+   int autocomplete_row = table_start_row + 8;
+   int footer_row = height - 5;
+
+   wrefresh(search_win);
+
+   while (1)
+   {
+      mvwprintw(search_win, table_start_row + 2, 2, "RMGR");
+      mvwprintw(search_win, table_start_row + 2, 20, "|");
+      mvwprintw(search_win, table_start_row + 3, 2, "Start LSN");
+      mvwprintw(search_win, table_start_row + 3, 20, "|");
+      mvwprintw(search_win, table_start_row + 4, 2, "End LSN");
+      mvwprintw(search_win, table_start_row + 4, 20, "|");
+      mvwprintw(search_win, table_start_row + 5, 2, "XID");
+      mvwprintw(search_win, table_start_row + 5, 20, "|");
+      mvwprintw(search_win, table_start_row + 6, 2, "Relation");
+      mvwprintw(search_win, table_start_row + 6, 20, "|");
+
+      for (int i = 0; i < num_fields; i++)
+      {
+         int row = table_start_row + 2 + i;
+         char* field_value = NULL;
+
+         switch (i)
+         {
+            case 0:
+               field_value = rmgr_input;
+               break;
+            case 1:
+               field_value = start_lsn_input;
+               break;
+            case 2:
+               field_value = end_lsn_input;
+               break;
+            case 3:
+               field_value = xid_input;
+               break;
+            case 4:
+               field_value = relation_input;
+               break;
+         }
+
+         if (i == current_field)
+         {
+            wattron(search_win, A_BOLD | COLOR_PAIR(12));
+         }
+
+         mvwprintw(search_win, row, 22, "%-50s", field_value ? field_value : "");
+
+         if (i == current_field)
+         {
+            wattroff(search_win, A_BOLD | COLOR_PAIR(12));
+         }
+      }
+
+      /* Clear suggestions area (do not overwrite footer lines) */
+      int max_suggest_rows = footer_row - autocomplete_row - 1;
+      if (max_suggest_rows < 0)
+      {
+         max_suggest_rows = 0;
+      }
+
+      for (int i = 0; i < max_suggest_rows; i++)
+      {
+         mvwprintw(search_win, autocomplete_row + i, 2, "%-76s", "");
+      }
+
+      {
+         const char* const* known_values = wal_get_known_values_for_field(current_field);
+
+         if (known_values != NULL && max_suggest_rows > 2)
+         {
+            mvwprintw(search_win, autocomplete_row, 2, "Suggestions:");
+            show_known_values_autocomplete(search_win,
+                                           known_values,
+                                           field_inputs[current_field],
+                                           field_inputs[current_field],
+                                           autocomplete_row,
+                                           4,
+                                           max_suggest_rows - 1);
+         }
+      }
+
+      wrefresh(search_win);
+
+      int ch = wgetch(search_win);
+
+      if (ch == 27)
+      {
+         delwin(search_win);
+         return;
+      }
+      else if (ch == 21) /* Ctrl+U: clear all fields */
+      {
+         memset(rmgr_input, 0, sizeof(rmgr_input));
+         memset(start_lsn_input, 0, sizeof(start_lsn_input));
+         memset(end_lsn_input, 0, sizeof(end_lsn_input));
+         memset(xid_input, 0, sizeof(xid_input));
+         memset(relation_input, 0, sizeof(relation_input));
+         wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
+      }
+      else if (ch == KEY_DOWN)
+      {
+         wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
+         current_field = (current_field + 1) % num_fields;
+      }
+      else if (ch == KEY_UP)
+      {
+         wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
+         current_field = (current_field + num_fields - 1) % num_fields;
+      }
+      else if (ch == '\t')
+      {
+         const char* const* known_values = wal_get_known_values_for_field(current_field);
+         char* current_input = field_inputs[current_field];
+         size_t input_size = field_input_sizes[current_field];
+         const char* completion = NULL;
+
+         if (known_values == NULL || current_input == NULL)
+         {
+            continue;
+         }
+
+         if (!completion_active[current_field] && !wal_input_has_letter(current_input))
+         {
+            continue;
+         }
+
+         if (!completion_active[current_field])
+         {
+            completion_active[current_field] = true;
+            completion_cycle[current_field] = 0;
+            pgmoneta_snprintf(completion_seed[current_field], sizeof(completion_seed[current_field]), "%s", current_input);
+         }
+
+         completion = wal_get_known_value_completion(known_values, completion_seed[current_field], completion_cycle[current_field]);
+         if (completion == NULL)
+         {
+            completion_cycle[current_field] = 0;
+            completion = wal_get_known_value_completion(known_values, completion_seed[current_field], completion_cycle[current_field]);
+         }
+
+         if (completion != NULL)
+         {
+            pgmoneta_snprintf(current_input, input_size, "%s", completion);
+            completion_cycle[current_field]++;
+         }
+      }
+      else if (ch == '\n')
+      {
+         break;
+      }
+      else if (ch == KEY_BACKSPACE || ch == 127)
+      {
+         char* current_input = field_inputs[current_field];
+
+         if (current_input != NULL && strlen(current_input) > 0)
+         {
+            current_input[strlen(current_input) - 1] = '\0';
+            wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
+         }
+      }
+      else if (isprint(ch))
+      {
+         char* current_input = field_inputs[current_field];
+         int max_len = (int)field_input_sizes[current_field] - 1;
+
+         if (current_input != NULL && strlen(current_input) < (size_t)max_len)
+         {
+            size_t len = strlen(current_input);
+            current_input[len] = (char)ch;
+            current_input[len + 1] = '\0';
+            wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
+         }
+      }
+   }
+
+   for (int i = 0; i < 6; i++)
+   {
+      mvwprintw(search_win, autocomplete_row + i, 2, "%-76s", "");
+   }
+
+   memset(&state->filters, 0, sizeof(state->filters));
+
+   if (strlen(rmgr_input) > 0)
+   {
+      pgmoneta_snprintf(state->filters.rmgr, sizeof(state->filters.rmgr), "%s", rmgr_input);
+      state->filters.has_rmgr = true;
+   }
+
+   if (strlen(start_lsn_input) > 0)
+   {
+      state->filters.start_lsn = pgmoneta_string_to_lsn(start_lsn_input);
+      state->filters.has_start_lsn = true;
+   }
+
+   if (strlen(end_lsn_input) > 0)
+   {
+      state->filters.end_lsn = pgmoneta_string_to_lsn(end_lsn_input);
+      state->filters.has_end_lsn = true;
+   }
+
+   if (strlen(xid_input) > 0)
+   {
+      pgmoneta_snprintf(state->filters.xid_csv, sizeof(state->filters.xid_csv), "%s", xid_input);
+      state->filters.has_xid = true;
+   }
+
+   if (strlen(relation_input) > 0)
+   {
+      pgmoneta_snprintf(state->filters.relation, sizeof(state->filters.relation), "%s", relation_input);
+      state->filters.has_relation = true;
+   }
+
+   if (wal_interactive_load_records(state, state->wal_filename) == 0)
+   {
+      wal_apply_filters(state);
+   }
+
+   delwin(search_win);
+}
+
 static int
 wal_interactive_verify(struct ui_state* state)
 {
@@ -2544,9 +3354,7 @@ wal_interactive_verify(struct ui_state* state)
    for (size_t i = 0; i < state->record_count; i++)
    {
       state->records[i].verified = true;
-      strncpy(state->records[i].verification_status, "Verified",
-              sizeof(state->records[i].verification_status) - 1);
-      state->records[i].verification_status[sizeof(state->records[i].verification_status) - 1] = '\0';
+      pgmoneta_snprintf(state->records[i].verification_status, sizeof(state->records[i].verification_status), "Verified");
    }
 
    return 0; // Success
@@ -2627,8 +3435,7 @@ show_wal_file_selector(struct ui_state* state)
                if (strlen(entry->d_name) >= 24)
                {
                   char prefix[25];
-                  strncpy(prefix, entry->d_name, 24);
-                  prefix[24] = '\0';
+                  pgmoneta_snprintf(prefix, sizeof(prefix), "%.*s", 24, entry->d_name);
 
                   bool is_hex = true;
                   for (int i = 0; i < 24; i++)
@@ -3250,6 +4057,29 @@ wal_interactive_run(struct ui_state* state)
          case 's':
          case 'S':
             handle_search_input(state);
+            break;
+
+         case 'f':
+         case 'F':
+            handle_filter_input(state);
+            break;
+
+         case 'u':
+         case 'U':
+            wal_clear_filters(state);
+            break;
+
+         case 'm':
+         case 'M':
+            if (state->current_row < state->record_count)
+            {
+               state->records[state->current_row].marked = !state->records[state->current_row].marked;
+            }
+            break;
+
+         case 'g':
+         case 'G':
+            generate_walfilter_yaml(state);
             break;
 
          case 'n':

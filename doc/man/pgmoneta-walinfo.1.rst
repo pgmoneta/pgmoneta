@@ -27,7 +27,7 @@ OPTIONS
 =======
 
 -I, --interactive 
-  Interactive mode for WAL files with ncurses
+  Interactive mode for WAL files with ncurses (see **INTERACTIVE MODE** below).
 
 -c, --config CONFIG_FILE
   Set the path to the pgmoneta.conf file
@@ -39,7 +39,7 @@ OPTIONS
   Output file
 
 -F, --format raw|json
-  Set the output format. Default is `raw`.
+  Set the output format. Default is ``raw``.
 
 -L, --logfile FILE
   Set the log file
@@ -85,6 +85,57 @@ ARGUMENTS
 
 <file|directory|tar_archive>
   The path to the WAL file, directory containing WAL files, or TAR archive to be analyzed.
+
+INTERACTIVE MODE
+================
+
+With **-I** (**--interactive**), pgmoneta-walinfo runs a full-screen **ncurses** viewer. You can browse WAL records in a table, search, filter, mark rows, and export XIDs for **pgmoneta-walfilter**.
+
+**Navigation**
+
+- **Up / Down** -- Move to previous/next record (at file boundaries, moves to adjacent WAL files in the same directory when applicable).
+- **PgUp / PgDn** -- Scroll by page.
+- **Home / End** -- First / last record in the current list.
+- **Enter** -- Open detailed view for the current record.
+
+**Display**
+
+- **t** -- Text mode (human-readable columns).
+- **b** -- Binary mode (hex dump).
+
+**Search** (separate from filtering)
+
+- **s** -- Open the search dialog (resource manager, LSN fields, XID, description).
+- **n** / **p** (or **Right** / **Left** when search is active) -- Next / previous search match; **Right** / **Left** can cycle multiple matches in a field.
+- **Esc** -- Clear **search** highlights and results (does not clear **filters**).
+
+**Filtering**
+
+- **f** -- Open the **filter** dialog. Criteria you set restrict which rows remain in the list. The dialog is **pre-filled** with the current rules so you can edit or remove them.
+- **u** -- **Clear all filters** and reload the full record list from the WAL file.
+- **Ctrl+U** (in the filter dialog only) -- Clear all filter fields.
+
+**Filter semantics**
+
+- **AND across fields**: Every non-empty field you set must match (RMGR, Start LSN range, End LSN range, XID, Relation).
+- **OR within a field**: For **RMGR**, **XID**, and **Relation**, you may enter **comma-separated** values; a record matches if it matches **any** token in that field.
+- **Start LSN** and **End LSN** in the filter dialog define a **range** together: the record’s start LSN must be greater than or equal to the filter start (if set) and the record’s end LSN must be less than or equal to the filter end (if set). If only one bound is set, only that bound applies.
+
+**Visibility**
+
+- While filters are active, the **header** shows a short summary of the rules; the **status** line shows how many records are shown versus the total loaded (e.g. filtered vs full file).
+
+**Marks and YAML export**
+
+- **m** -- Mark or unmark the current row (for export).
+- **g** -- Write a **walfilter** YAML file listing **XIDs** from **marked** rows (for use with **pgmoneta-walfilter**).
+
+**Other**
+
+- **v** -- Verify records (stub in current viewer).
+- **l** -- Load a different WAL file or browse directories.
+- **?** -- Help overlay listing shortcuts.
+- **q** -- Quit.
 
 USAGE
 =====

@@ -1,19 +1,19 @@
-#pgmoneta_walinfo configuration
+# pgmoneta_walinfo configuration
 The `pgmoneta_walinfo` configuration defines the info needed for `walinfo` to work.
 
-The configuration is loaded from either the path specified by the `-c` flag or `/etc/pgmoneta/pgmoneta_walinfo.conf` if -c wasn't provided.
+The configuration is loaded from either the path specified by the `-c` flag or `/etc/pgmoneta/pgmoneta_walinfo.conf` if `-c` was not provided.
 
 ## Features
 
 `pgmoneta-walinfo` provides multiple ways to analyze WAL files:
 
-- **Command-Line Mode**: Raw text or JSON output with filtering options
-- **Interactive Mode**: Full-featured ncurses UI for browsing and searching WAL records
-- **Format Support**: Plain, compressed (zstd, gz, lz4, bz2), encrypted (aes), and combined compression+encryption
-- **OID Translation**: Convert OIDs to human-readable object names
-- **Summary Statistics**: Analyze WAL record distribution by resource manager
+- **Command-line mode**: Raw text or JSON output with filtering options (`-r`, `-s`, `-e`, `-x`, `-l`, etc.)
+- **Interactive mode**: Full-screen ncurses UI for browsing, searching, filtering, marking rows, and exporting walfilter YAML
+- **Format support**: Plain, compressed (zstd, gz, lz4, bz2), encrypted (aes), and combined compression+encryption
+- **OID translation**: Convert OIDs to human-readable object names (`-t` with `-m` or `-u`)
+- **Summary statistics**: Analyze WAL record distribution by resource manager (`-S`)
 
-## Interactive Mode
+## Interactive mode
 
 Launch the interactive viewer with the `-I` flag:
 
@@ -22,25 +22,44 @@ pgmoneta-walinfo -I <file>
 pgmoneta-walinfo -I <directory>
 ```
 
-**Features:**
+**Capabilities**
 
-- **File Browser**: Navigate through directories to select WAL files
-- **Record Viewer**: Display detailed information about each WAL record in a table format
-- **Search**: Find records by resource manager, LSN range, transaction ID (XID), or description
-- **Color-Coded UI**: Different colors highlight different record types and record components
-- **Easy Navigation**: Use keyboard shortcuts for navigation and searching
+- **File browser**: Choose WAL files from a directory
+- **Record table**: RMGR, LSNs, lengths, XID, description; **t** / **b** toggles text vs binary (hex) view
+- **Detail view**: **Enter** opens the current record
+- **Search** (**s**): Find records by RMGR, LSN fields, XID, or description (KMP-based). **n** / **p** step results; **Esc** clears search (not filters)
+- **Filter** (**f**): Restrict the visible rows by criteria; **u** clears all filters and reloads the full file. Active rules are summarized in the **header**; the **status** line shows *showing N of M records* when filtered
+- **Marks & export** (**m** / **g**): Mark rows, then **g** writes a **pgmoneta-walfilter** YAML from marked XIDs
 
-**Keyboard Controls:**
+### Filter dialog semantics
+
+- **AND across fields**: Each non-empty field you set must match.
+- **OR within a field**: For **RMGR**, **XID**, and **Relation**, use **comma-separated** values; a row matches if it matches **any** token.
+- **Start LSN** / **End LSN**: Together they bound the visible span: record start **>=** filter start (if set) and record end **<=** filter end (if set). Only one bound may be set.
+- Reopening **f** **pre-fills** the dialog with current rules. **Ctrl+U** inside the dialog clears all fields.
+
+### Keyboard reference (interactive)
 
 | Key | Action |
 |-----|--------|
-| Arrow Keys ↑↓ | Navigate records |
-| Arrow Keys ←→ | Navigate columns |
-| Enter | Select file or confirm |
-| `/` | Start search |
-| `n` / `p` | Next / Previous search result |
-| `?` | Show help |
-| `q` | Quit |
+| **↑** / **↓** | Previous / next record (may move to adjacent WAL files at boundaries) |
+| **PgUp** / **PgDn** | Page scroll |
+| **Home** / **End** | First / last record |
+| **Enter** | Detail view for current record |
+| **t** / **b** | Text mode / Binary (hex) mode |
+| **s** | Open **search** dialog |
+| **n** / **p** | Next / previous search match (when search is active) |
+| **f** | Open **filter** dialog |
+| **u** | **Clear all filters** and reload full record list |
+| **m** | Mark / unmark row (for YAML export) |
+| **g** | Generate **walfilter** YAML from marked XIDs |
+| **v** | Verify (viewer integration) |
+| **l** | Load another WAL file / browse |
+| **?** | Help overlay |
+| **Esc** | Clear **search** state |
+| **q** | Quit |
+
+For the full list, see **doc/man/pgmoneta-walinfo.1.rst** (INTERACTIVE MODE) or the built-in **?** help.
 
 ## [pgmoneta_walinfo]
 
