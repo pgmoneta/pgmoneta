@@ -549,27 +549,25 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    char* str = (char*)data;
-   char buf[MISC_LENGTH];
    char* translated_string = NULL;
 
    ret = pgmoneta_indent(ret, tag, indent);
-   memset(buf, 0, MISC_LENGTH);
    if (str == NULL)
    {
       if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
-         pgmoneta_snprintf(buf, MISC_LENGTH, "null");
+         ret = pgmoneta_append(ret, "null");
       }
    }
    else if (strlen(str) == 0)
    {
       if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
-         pgmoneta_snprintf(buf, MISC_LENGTH, "\"%s\"", str);
+         ret = pgmoneta_append(ret, "\"\"");
       }
       else if (format == FORMAT_TEXT)
       {
-         pgmoneta_snprintf(buf, MISC_LENGTH, "''");
+         ret = pgmoneta_append(ret, "''");
       }
    }
    else
@@ -577,15 +575,17 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
       if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
          translated_string = pgmoneta_escape_string(str);
-         pgmoneta_snprintf(buf, MISC_LENGTH, "\"%s\"", translated_string);
+         ret = pgmoneta_append_char(ret, '"');
+         ret = pgmoneta_append(ret, translated_string);
+         ret = pgmoneta_append_char(ret, '"');
          free(translated_string);
       }
       else if (format == FORMAT_TEXT)
       {
-         pgmoneta_snprintf(buf, MISC_LENGTH, "%s", str);
+         ret = pgmoneta_append(ret, str);
       }
    }
-   ret = pgmoneta_append(ret, buf);
+
    return ret;
 }
 
