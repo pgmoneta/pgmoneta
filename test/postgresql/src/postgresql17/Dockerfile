@@ -24,7 +24,7 @@
  # TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-FROM rockylinux:9
+FROM rockylinux:10
 
 LABEL maintainer="Jesper Pedersen <jesperpedersen.db@gmail.com>"
 
@@ -37,9 +37,9 @@ ENV PATH="/usr/pgsql-${PGVERSION}/bin:$PATH"
 ENV EXTENSION_NAME="pgmoneta_ext"
 ENV GITHUB_REPO="https://github.com/pgmoneta/pgmoneta_ext.git"
 
-RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-RUN dnf -y install --nogpgcheck --allowerasing https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
-RUN dnf -qy --nogpgcheck module disable postgresql
+RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+RUN dnf -y install --nogpgcheck --allowerasing https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+RUN dnf -qy --nogpgcheck module disable postgresql 2>/dev/null || true
 RUN dnf -y upgrade
 RUN dnf install -y dnf-plugins-core
 RUN dnf config-manager --set-enabled crb
