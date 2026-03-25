@@ -25,10 +25,11 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 IMAGE_SHORT_NAME = pgmoneta-test-postgresql15
-IMAGE_NAME = pgmoneta-test-postgresql15-rocky9
+IMAGE_NAME = pgmoneta-test-postgresql15-rocky10
 CONTAINER_ENGINE := $(shell \
 	if command -v podman >/dev/null 2>&1; then echo podman; \
-	elif command -v docker >/dev/null 2>&1; then echo "sudo docker"; \
+	elif command -v docker >/dev/null 2>&1; then \
+		if [ "$$(id -u)" -eq 0 ]; then echo docker; else echo "sudo docker"; fi; \
 	else echo "Neither Docker nor Podman is installed" >&2; exit 1; \
 	fi)
 

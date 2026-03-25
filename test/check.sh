@@ -32,7 +32,7 @@ set -eo pipefail
 PG_VERSION="${TEST_PG_VERSION:-17}"
 export TEST_PG_VERSION="${TEST_PG_VERSION:-17}"
 
-IMAGE_NAME="pgmoneta-test-postgresql$PG_VERSION-rocky9"
+IMAGE_NAME="pgmoneta-test-postgresql$PG_VERSION-rocky10"
 CONTAINER_NAME="pgmoneta-test-postgresql$PG_VERSION"
 
 SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
@@ -66,15 +66,25 @@ USER=$(whoami)
 MODE="dev"
 PORT=6432
 
-# Detect container engine: Docker or Podman
-if command -v podman &> /dev/null; then
-  CONTAINER_ENGINE="podman"
-elif command -v docker &> /dev/null; then
-  CONTAINER_ENGINE="sudo docker"
+# Use sudo only when not running as root (CI containers run as root)
+if [ "$(id -u)" -eq 0 ]; then
+  SUDO=""
 else
-  echo "Neither Docker nor Podman is installed. Please install one to proceed."
-  exit 1
+  SUDO="sudo"
 fi
+
+# Detect container engine: Docker or Podman
+# Called lazily since CI mode does not need containers
+detect_container_engine() {
+  if command -v podman &> /dev/null; then
+    CONTAINER_ENGINE="podman"
+  elif command -v docker &> /dev/null; then
+    CONTAINER_ENGINE="$SUDO docker"
+  else
+    echo "Neither Docker nor Podman is installed. Please install one to proceed."
+    exit 1
+  fi
+}
 
 if [ -n "$PGMONETA_TEST_PORT" ]; then
     PORT=$PGMONETA_TEST_PORT
@@ -220,16 +230,16 @@ start_postgresql_container() {
 start_postgresql() {
   echo "Setting up PostgreSQL $PG_VERSION directory"
   set +e
-  sudo rm -Rf /conf /pgconf /pgdata /pgwal
-  sudo cp -R $TEST_PG_DIRECTORY/root /
-  sudo ls /root
-  sudo mkdir -p /conf /pgconf /pgdata /pgwal /pglog
-  sudo cp -R $TEST_PG_DIRECTORY/conf/* /conf/
-  sudo ls /conf
-  sudo chown -R postgres:postgres /conf /pgconf /pgdata /pgwal /pglog
-  sudo chmod -R 777 /conf /pgconf /pgdata /pgwal /pglog /root
-  sudo chmod +x /root/usr/bin/run-postgresql-local
-  sudo mkdir -p /root/usr/local/bin
+  $SUDO rm -Rf /conf /pgconf /pgdata /pgwal
+  $SUDO cp -R $TEST_PG_DIRECTORY/root /
+  $SUDO ls /root
+  $SUDO mkdir -p /conf /pgconf /pgdata /pgwal /pglog
+  $SUDO cp -R $TEST_PG_DIRECTORY/conf/* /conf/
+  $SUDO ls /conf
+  $SUDO chown -R postgres:postgres /conf /pgconf /pgdata /pgwal /pglog
+  $SUDO chmod -R 777 /conf /pgconf /pgdata /pgwal /pglog /root
+  $SUDO chmod +x /root/usr/bin/run-postgresql-local
+  $SUDO mkdir -p /root/usr/local/bin
 
   echo "Setting up env variables"
   export PG_DATABASE=${PG_DATABASE}
@@ -238,7 +248,11 @@ start_postgresql() {
   export PG_REPL_USER_NAME=${PG_REPL_USER_NAME}
   export PG_REPL_PASSWORD=${PG_REPL_PASSWORD}
 
-  sudo -E -u postgres /root/usr/bin/run-postgresql-local
+  if [ "$(id -u)" -eq 0 ]; then
+    runuser -m -u postgres -- /root/usr/bin/run-postgresql-local
+  else
+    sudo -E -u postgres /root/usr/bin/run-postgresql-local
+  fi
   set -e
 }
 
@@ -357,11 +371,11 @@ need_build() {
 
 do_setup() {
   local always_build="${1:-}"
-  echo "Building PostgreSQL $PG_VERSION image if necessary"
-  if $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
-    echo "Image $IMAGE_NAME exists, skip building"
-  else
-    if [[ $MODE != "ci" ]]; then
+  if [[ $MODE != "ci" ]]; then
+    echo "Building PostgreSQL $PG_VERSION image if necessary"
+    if $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+      echo "Image $IMAGE_NAME exists, skip building"
+    else
       build_postgresql_image
     fi
   fi
@@ -555,12 +569,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$SUBCOMMAND" == "build" ]]; then
+   detect_container_engine
    do_setup force
    exit 0
 fi
 if [[ "$SUBCOMMAND" == "setup" ]]; then
+   detect_container_engine
    build_postgresql_image
-   sudo dnf install -y \
+   $SUDO dnf install -y \
       clang \
       clang-analyzer \
       cmake \
@@ -583,6 +599,7 @@ if [[ "$SUBCOMMAND" == "setup" ]]; then
    exit 0
 fi
 if [[ "$SUBCOMMAND" == "clean" ]]; then
+   detect_container_engine
    rm -Rf $COVERAGE_DIR
    cleanup
    cleanup_postgresql_image
@@ -597,6 +614,7 @@ if [[ "$SUBCOMMAND" == "ci" ]]; then
    exit 0
 fi
 # Default: run tests (full suite or with -t/-m filter)
+detect_container_engine
 trap cleanup EXIT SIGINT
 run_tests
 

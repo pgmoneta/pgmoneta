@@ -41,14 +41,14 @@ jobs:
   build-linux:
     needs: [format-check]
     runs-on: ubuntu-latest
+    container:
+      image: rockylinux/rockylinux:10
 
     strategy:
-      # Define all possible variables
       matrix:
         compiler: [gcc, clang]
         build_type: [Debug, Release]
         pg_version: [14, 15, 17]
-        # Exclude the unwanted v14 combinations
         exclude:
           - pg_version: 14
             compiler: gcc
@@ -75,27 +75,34 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt update -y
-          sudo apt install -y \
-          git gcc clang clang-tools cmake make \
-          libev4 libev-dev libssl-dev libsystemd-dev \
-          zlib1g zlib1g-dev libzstd-dev liblz4-dev \
-          libssh-dev libatomic1 \
-          python3-docutils libbz2-dev libarchive-dev \
-          bzip2 net-tools check libyaml-dev llvm
+          dnf -y install dnf-plugins-core
+          dnf config-manager --set-enabled crb
+          dnf -y install epel-release
+          dnf -y install \
+            git gcc clang clang-tools-extra cmake make \
+            libev libev-devel openssl openssl-devel \
+            systemd systemd-devel zlib zlib-devel \
+            libzstd libzstd-devel lz4 lz4-devel \
+            libssh libssh-devel libatomic \
+            python3-docutils bzip2 bzip2-devel \
+            libarchive libarchive-devel libyaml-devel \
+            check check-devel llvm \
+            libasan libubsan \
+            net-tools procps-ng ncurses-devel \
+            util-linux sudo which zstd
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Install PostgreSQL v${{ matrix.pg_version }}
         run: |
-          sudo apt install curl ca-certificates
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          sudo apt update
-          sudo apt install -y postgresql-${{ matrix.pg_version }} postgresql-server-dev-${{ matrix.pg_version }}
+          dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+          dnf -qy module disable postgresql 2>/dev/null || true
+          dnf install -y postgresql${{ matrix.pg_version }} postgresql${{ matrix.pg_version }}-server postgresql${{ matrix.pg_version }}-contrib postgresql${{ matrix.pg_version }}-libs postgresql${{ matrix.pg_version }}-devel
 
       - name: Set Env Path Variable
         run: |
-          echo "PATH=/usr/lib/postgresql/${{ matrix.pg_version }}/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=/usr/pgsql-${{ matrix.pg_version }}/bin:$PATH" >> $GITHUB_ENV
           echo $PATH
 
       - name: Install pgmoneta_ext
@@ -108,7 +115,7 @@ jobs:
           cd /tmp/pgmoneta_ext/build/
           cmake -DDOCS=false ..
           make
-          sudo make install
+          make install
 
       - name: Build Project
         run: |
@@ -121,15 +128,19 @@ jobs:
           fi
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DDOCS=FALSE ..
           make -j$(nproc)
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/
+
+      - name: Create test user
+        run: |
+          useradd -m -s /bin/bash runner
+          echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+          chown -R runner:runner $GITHUB_WORKSPACE
 
       - name: Run Tests
         run: |
           export TEST_PG_VERSION=${{ matrix.pg_version }}
           if [ "${{ matrix.compiler }}" = "clang" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
-            $(which bash) ./test/check.sh ci
+            su - runner -c "cd $GITHUB_WORKSPACE && export TEST_PG_VERSION=${{ matrix.pg_version }} && export PATH=/usr/pgsql-${{ matrix.pg_version }}/bin:\$PATH && bash ./test/check.sh ci"
           fi
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/
 
       - name: Report coverage summary
         if: matrix.compiler == 'clang' && matrix.build_type == 'Debug'

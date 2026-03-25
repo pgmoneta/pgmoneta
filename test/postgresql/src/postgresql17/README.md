@@ -20,7 +20,7 @@ podman run -p 5432:5432 --name pgmoneta-test-postgresql17 -d \
 -e PG_REPL_USER_NAME=repl \
 -e PG_REPL_PASSWORD=replpass \
 -e PG_LOG_LEVEL=debug5 \
-pgmoneta-test-postgresql17-rocky9
+pgmoneta-test-postgresql17-rocky10
 
 # psql to pgmoneta-test-postgresql17
 psql -h localhost -p 5432 -U myuser mydb
