@@ -2,29 +2,17 @@
 
 ### Descripción general
 
-AES Cipher Block Chaining (CBC) mode y AES Counter (CTR) mode son soportados en [**pgmoneta**][pgmoneta]. La configuración predeterminada es sin cifrado.
-
-CBC es el modo más común y considerado seguro. Sus principales desventajas son que el cifrado es secuencial (la decriptación puede paralelizarse).
-
-Junto con CBC, CTR mode es uno de dos modos de cifrado de bloques recomendados por Niels Ferguson y Bruce Schneier. Tanto el cifrado como la decriptación son paralelizables.
-
-Cuanto más larga sea la longitud de la clave, más seguro será el cifrado. Sin embargo, con 20% (192 bit) y 40% (256 bit) de carga de trabajo adicional en comparación con 128 bit.
+AES-GCM (Galois/Counter Mode) es el modo de cifrado recomendado en [**pgmoneta**][pgmoneta]. Proporciona tanto confidencialidad (cifrado) como integridad/autenticidad (verificación), asegurando que los datos cifrados no hayan sido manipulados.
 
 ### Configuración de cifrado
 
 `none`: Sin cifrado (valor predeterminado)
 
-`aes | aes-256 | aes-256-cbc`: AES CBC (Cipher Block Chaining) mode con longitud de clave de 256 bit
+`aes | aes-256 | aes-256-gcm`: AES-256 GCM mode con longitud de clave de 256 bit (Recomendado)
 
-`aes-192 | aes-192-cbc`: AES CBC mode con longitud de clave de 192 bit
+`aes-192 | aes-192-gcm`: AES-192 GCM mode con longitud de clave de 192 bit
 
-`aes-128 | aes-128-cbc`: AES CBC mode con longitud de clave de 128 bit
-
-`aes-256-ctr`: AES CTR (Counter) mode con longitud de clave de 256 bit
-
-`aes-192-ctr`: AES CTR mode con longitud de clave de 192 bit
-
-`aes-128-ctr`: AES CTR mode con longitud de clave de 128 bit
+`aes-128 | aes-128-gcm`: AES-128 GCM mode con longitud de clave de 128 bit
 
 ### Comandos CLI de cifrado/descifrado
 
@@ -52,22 +40,26 @@ pgmoneta-cli encrypt <file>
 
 #### Formato de archivo (desde 0.21.0)
 
-Cada archivo cifrado comienza con un encabezado de 32 bytes:
+Cada archivo cifrado comienza con un encabezado unificado de 28 bytes:
 
 | Desplazamiento | Longitud | Descripción |
 |--------|--------|-------------|
 | 0      | 16     | Salt utilizado para derivación de clave PBKDF2 |
-| 16     | 16     | Vector de inicialización (IV) |
+| 16     | 12     | Campo del Vector de Inicialización (IV) |
 
-Los datos cifrados reales siguen inmediatamente después del encabezado.
+Se genera un IV aleatorio único de 12 bytes para cada operación de cifrado y se almacena directamente después del salt. La **Etiqueta de Autenticación (16 bytes)** se agrega al **final del archivo** (después del texto cifrado).
+
+Los datos cifrados reales siguen después del encabezado y (para GCM) antes de la etiqueta.
 
 #### Derivación de clave y almacenamiento en caché
 
-La clave maestra se deriva de la contraseña proporcionada por el usuario y la salt por archivo usando `PKCS5_PBKDF2_HMAC` (SHA-256).
+Para cifrar muchos archivos eficientemente sin pagar el costo computacional de miles de iteraciones por cada archivo, `pgmoneta` utiliza un proceso de derivación de clave en dos pasos:
 
-Para desempeño de copia de seguridad, pgmoneta genera una salt global al iniciar. La clave derivada se almacena en caché en memoria volátil y se reutiliza en todos los archivos en una secuencia de copia de seguridad que comparten la misma salt, eliminando la sobrecarga computacional de PBKDF2 para cada archivo. Este caché persiste durante la duración de la secuencia de copia de seguridad y se borra de forma segura una vez que se completa el procesamiento. Un IV aleatorio único todavía se genera para cada archivo para garantizar la seguridad criptográfica.
+1. **Derivación de Clave Maestra (Lenta):** La clave maestra se deriva de la contraseña proporcionada por el usuario y una **salt generada aleatoriamente** (almacenada en `master.key`) usando `PKCS5_PBKDF2_HMAC` (SHA-256) con un alto número de iteraciones (600,000). Esto proporciona una fuerte resistencia contra ataques de fuerza bruta. La presencia de un salt aleatorio en el archivo `master.key` es **obligatoria**. Los archivos de clave heredados que contienen solo una contraseña ya no son compatibles y deben regenerarse usando `pgmoneta-admin user master-key`.
+2. **Almacenamiento en Caché de Clave:** Esta clave maestra se almacena en caché en memoria volátil durante la duración de la secuencia de copia de seguridad o restauración, eliminando la sobrecarga de repetir la costosa operación PBKDF2.
+3. **Derivación de Clave de Archivo (Rápida):** Para cada archivo individual, se genera un salt aleatorio único y un Vector de Inicialización (IV). A continuación, se deriva una clave específica de archivo a partir de la clave maestra en caché y el salt de archivo aleatorio usando `PKCS5_PBKDF2_HMAC` con 1 iteración. Esto garantiza que cada archivo esté criptográficamente aislado.
 
-Durante la decriptación, pgmoneta lee la salt del encabezado del archivo. Si coincide con la salt en caché, la clave en caché se reutiliza; de lo contrario, se deriva una nueva clave y se almacena en caché.
+Durante la decriptación, `pgmoneta` lee el salt y el IV del encabezado del archivo. Si la clave maestra aún no ha sido almacenada en caché, realiza la derivación lenta. Luego, utiliza la clave maestra en caché, el salt del encabezado del archivo y 1 iteración para derivar rápidamente la clave de archivo correcta.
 
 ### Evaluación comparativa
 

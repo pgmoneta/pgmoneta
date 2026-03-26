@@ -56,6 +56,8 @@ Zeyad Daowd <zeyaddaowd@yahoo.com>
 Sakshi Aggarwal <sakshiaggarwal2706@gmail.com>
 Chen Shen <scisbeloved23@gmail.com>
 Jozef Hernández <jozefhdez2@gmail.com>
+Tarun Wadhwa <tarunwadhwa85@gmail.com>
+Pranav Prajapati <pranavprajapati586@gmail.com>
 ```
 
 ## Committers

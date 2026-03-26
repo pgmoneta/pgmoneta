@@ -39,11 +39,12 @@ Cuando cargas por primera vez la consola, ves la página de inicio con:
 
 - Encabezado de servicio mostrando el estado del servicio pgmoneta (En ejecución o No disponible)
 - Versión de pgmoneta
+- Barra de búsqueda para encontrar métricas en todas las categorías
 - Desplegable selector de categoría para elegir qué grupo de métricas ver
 - Selector de vista (modo Simple o Avanzado)
 - Desplegable filtro de servidor para elegir qué servidores PostgreSQL mostrar
 - Tabla de métricas mostrando la categoría seleccionada
-- Botón Actualizar para recargar métricas y estado
+- Control de actualización (botón dividido) para actualización manual y selección de intervalo de actualización automática
 - Botón alternar de tema (Oscuro/Claro)
 
 ### 2. Página de inicio vista simple
@@ -88,10 +89,36 @@ El desplegable Filtro de servidor:
 
 ![Página de inicio de consola web con filtro de servidor](../images/console_home_server_filter.png)
 
-### 6. Botón Actualizar
+### 6. Búsqueda en todas las categorías
 
-Haz clic en Actualizar en el encabezado (junto a la marca de tiempo Actualizado) para recargar todas
-las métricas y el estado del servicio.
+La barra de **Búsqueda** aparece encima de todos los demás filtros.
+
+- Ingresa al menos **3 caracteres** para activar el filtrado de búsqueda.
+- La búsqueda coincide con texto en las filas de métricas (nombre, tipo, valor y etiquetas) y categorías.
+- Las coincidencias se muestran en **todas las categorías**, no solo en la actualmente seleccionada.
+- El filtrado de servidor sigue aplicándose mientras la búsqueda está activa.
+- Si se ingresan menos de 3 caracteres, la página vuelve a la vista normal de la categoría seleccionada.
+
+![Barra de búsqueda de la página de inicio de consola web](../images/console_home_search_bar.png)
+
+### 7. Control de actualización
+
+El encabezado incluye un **Control de actualización** dividido (junto a la marca de tiempo **Actualizado**):
+
+- Haz clic en **Actualizar** para recargar todas las métricas y el estado del servicio inmediatamente.
+- Haz clic en la flecha de la derecha para abrir el menú de actualización automática.
+- Selecciona `5 min` para habilitar la actualización automática cada 5 minutos.
+- Selecciona `10 min` para habilitar la actualización automática cada 10 minutos.
+- Selecciona `15 min` para habilitar la actualización automática cada 15 minutos.
+- Selecciona `20 min` para habilitar la actualización automática cada 20 minutos.
+- Selecciona **Limpiar** para deshabilitar la actualización automática.
+
+Cuando la actualización automática está habilitada y haces clic en **Actualizar** manualmente, el temporizador se
+reinicia. La siguiente actualización automática se ejecuta después del intervalo completo seleccionado desde
+esa actualización manual.
+
+El intervalo de actualización automática seleccionado se almacena en el almacenamiento local del navegador y se
+restaura cuando la página se abre nuevamente.
 
 ## Endpoints de API
 
