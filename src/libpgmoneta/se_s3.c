@@ -28,7 +28,6 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <csv.h>
 #include <deque.h>
 #include <extraction.h>
 #include <http.h>
@@ -55,7 +54,7 @@ static int s3_storage_list(char*, struct art*);
 static int s3_storage_teardown(char*, struct art*);
 static int s3_storage_noop_teardown(char*, struct art*);
 static int s3_storage_cleanup(char*, struct art*);
-static int s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server);
+static int s3_upload_files(char* local_root, char* s3_root, int server, int compression, int encryption);
 static int s3_bootstrap(char* s3_root, int server, char* local_root);
 static int s3_download_files(char* s3_root, char* local_root, int server, int compression, int encryption);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int server);
@@ -76,6 +75,7 @@ static int xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** con
 static int xml_parse_s3_list(char* xml, struct deque** keys);
 
 static void do_download_file(struct worker_common* wc);
+static void do_upload_file(struct worker_common* wc);
 
 struct workflow*
 pgmoneta_storage_create_s3(int workflow_type)
@@ -340,7 +340,13 @@ s3_storage_execute(char* name __attribute__((unused)), struct art* nodes)
    base_dir = pgmoneta_get_server_backup(server);
    s3_root = s3_get_basepath(server, label);
 
-   if (s3_upload_files(local_root, s3_root, "", server))
+   if (pgmoneta_load_info(base_dir, label, &temp_backup))
+   {
+      pgmoneta_log_error("S3 storage: unable to load backup info for %s/%s", base_dir, label);
+      goto error;
+   }
+
+   if (s3_upload_files(local_root, s3_root, server, temp_backup->compression, temp_backup->encryption))
    {
       goto error;
    }
@@ -353,10 +359,6 @@ s3_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 
    remote_s3_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
-   if (pgmoneta_load_info(base_dir, label, &temp_backup))
-   {
-      goto error;
-   }
    temp_backup->remote_s3_elapsed_time = remote_s3_elapsed_time;
    if (pgmoneta_save_info(base_dir, temp_backup))
    {
@@ -756,15 +758,15 @@ error:
 static int
 s3_download_files(char* s3_root, char* local_root, int server, int compression, int encryption)
 {
-   char** columns = NULL;
    char* s3_path = NULL;
    char* local_file_path = NULL;
    char* suffix = NULL;
    char* filename = NULL;
    char* manifest_path = NULL;
-   int number_of_columns = 0;
+   char* file_path = NULL;
    int number_of_workers = 0;
-   struct csv_reader* csv = NULL;
+   struct deque* paths = NULL;
+   struct deque_iterator* iter = NULL;
    struct workers* workers = NULL;
    struct worker_input* payload = NULL;
 
@@ -785,26 +787,24 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (pgmoneta_csv_reader_init(manifest_path, &csv))
+   if (pgmoneta_manifest_get_paths(manifest_path, &paths))
    {
-      pgmoneta_log_error("S3 download: failed to open manifest %s", manifest_path);
+      pgmoneta_log_error("S3 download: failed to read manifest %s", manifest_path);
       goto error;
    }
 
-   while (pgmoneta_csv_next_row(csv, &number_of_columns, &columns))
+   pgmoneta_deque_iterator_create(paths, &iter);
+
+   while (pgmoneta_deque_iterator_next(iter))
    {
-      if (number_of_columns != MANIFEST_COLUMN_COUNT)
-      {
-         pgmoneta_log_error("S3 download: manifest row has %d columns, expected %d", number_of_columns, MANIFEST_COLUMN_COUNT);
-         goto error;
-      }
+      file_path = iter->tag;
 
       filename = NULL;
-      filename = pgmoneta_append(filename, columns[MANIFEST_PATH_INDEX]);
+      filename = pgmoneta_append(filename, file_path);
 
       if (suffix != NULL &&
-          !pgmoneta_ends_with(columns[MANIFEST_PATH_INDEX], "backup_label") &&
-          !pgmoneta_ends_with(columns[MANIFEST_PATH_INDEX], "backup_manifest"))
+          !pgmoneta_ends_with(file_path, "backup_label") &&
+          !pgmoneta_ends_with(file_path, "backup_manifest"))
       {
          filename = pgmoneta_append(filename, suffix);
       }
@@ -839,8 +839,6 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
       s3_path = NULL;
       free(local_file_path);
       local_file_path = NULL;
-      free(columns);
-      columns = NULL;
    }
 
    pgmoneta_workers_wait(workers);
@@ -850,7 +848,8 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
    }
    pgmoneta_workers_destroy(workers);
 
-   pgmoneta_csv_reader_destroy(csv);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
    free(manifest_path);
    free(suffix);
 
@@ -858,7 +857,8 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
 
 error:
 
-   pgmoneta_csv_reader_destroy(csv);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
    pgmoneta_workers_wait(workers);
    pgmoneta_workers_destroy(workers);
    free(manifest_path);
@@ -866,7 +866,6 @@ error:
    free(filename);
    free(s3_path);
    free(local_file_path);
-   free(columns);
 
    return 1;
 }
@@ -911,73 +910,138 @@ error:
    pgmoneta_http_response_destroy(response);
    free(wi);
 }
-static int
-s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server)
+static void
+do_upload_file(struct worker_common* wc)
 {
-   char* local_path = NULL;
-   char* relative_file;
-   DIR* dir;
-   struct dirent* entry;
+   struct worker_input* wi = (struct worker_input*)wc;
 
-   local_path = pgmoneta_append(local_path, local_root);
-   local_path = pgmoneta_append(local_path, relative_path);
-
-   if (!(dir = opendir(local_path)))
+   if (s3_send_upload_request(wi->directory, wi->from, wi->to, wi->level))
    {
+      pgmoneta_log_error("S3 upload: failed %s", wi->to);
+      if (wi->common.workers != NULL)
+      {
+         wi->common.workers->outcome = false;
+      }
+   }
+
+   free(wi);
+}
+static int
+s3_upload_files(char* local_root, char* s3_root, int server, int compression, int encryption)
+{
+   int number_of_workers = 0;
+   char* manifest_path = NULL;
+   char* file_path = NULL;
+   char* relative_file = NULL;
+   char* suffix = NULL;
+   struct deque* paths = NULL;
+   struct deque_iterator* iter = NULL;
+   struct workers* workers = NULL;
+   struct worker_input* payload = NULL;
+
+   manifest_path = pgmoneta_append(manifest_path, local_root);
+   manifest_path = pgmoneta_append(manifest_path, "backup.manifest");
+
+   if (pgmoneta_extraction_get_suffix(compression, encryption, &suffix))
+   {
+      pgmoneta_log_error("S3 upload: failed to determine file suffix");
       goto error;
    }
 
-   while ((entry = readdir(dir)) != NULL)
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
    {
-      if (entry->d_type == DT_DIR)
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   /* upload backup.info and backup.sha512 first */
+   if (s3_send_upload_request(local_root, s3_root, "backup.info", server))
+   {
+      pgmoneta_log_error("S3 upload: failed to upload backup.info");
+      goto error;
+   }
+
+   if (s3_send_upload_request(local_root, s3_root, "backup.sha512", server))
+   {
+      pgmoneta_log_error("S3 upload: failed to upload backup.sha512");
+      goto error;
+   }
+
+   if (pgmoneta_manifest_get_paths(manifest_path, &paths))
+   {
+      pgmoneta_log_error("S3 upload: failed to read manifest %s", manifest_path);
+      goto error;
+   }
+
+   pgmoneta_deque_iterator_create(paths, &iter);
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      file_path = iter->tag;
+
+      relative_file = NULL;
+      relative_file = pgmoneta_append(relative_file, "data/");
+      relative_file = pgmoneta_append(relative_file, file_path);
+
+      if (suffix != NULL &&
+          !pgmoneta_ends_with(file_path, "backup_label") &&
+          !pgmoneta_ends_with(file_path, "backup_manifest"))
       {
-         char relative_dir[1024];
+         relative_file = pgmoneta_append(relative_file, suffix);
+      }
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-         {
-            continue;
-         }
+      if (pgmoneta_create_worker_input(local_root, s3_root, relative_file, server, workers, &payload))
+      {
+         pgmoneta_log_error("S3 upload: failed to create worker input");
+         free(relative_file);
+         goto error;
+      }
 
-         if (strlen(relative_path) > 0)
-         {
-            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
-         }
-         else
-         {
-            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
-         }
-
-         s3_upload_files(local_root, s3_root, relative_dir, server);
+      if (workers != NULL && workers->outcome)
+      {
+         pgmoneta_workers_add(workers, do_upload_file, (struct worker_common*)payload);
       }
       else
       {
-         relative_file = NULL;
-
-         if (strlen(relative_path) > 0)
-         {
-            relative_file = pgmoneta_append(relative_file, relative_path);
-            relative_file = pgmoneta_append(relative_file, "/");
-         }
-         relative_file = pgmoneta_append(relative_file, entry->d_name);
-
-         if (s3_send_upload_request(local_root, s3_root, relative_file, server))
-         {
-            free(relative_file);
-            goto error;
-         }
-
-         free(relative_file);
+         do_upload_file((struct worker_common*)payload);
       }
+
+      free(relative_file);
+      relative_file = NULL;
    }
 
-   closedir(dir);
-   free(local_path);
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !workers->outcome)
+   {
+      goto error;
+   }
+   pgmoneta_workers_destroy(workers);
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   iter = NULL;
+   paths = NULL;
+
+   /* upload backup.manifest last (commit marker) */
+   if (s3_send_upload_request(local_root, s3_root, "backup.manifest", server))
+   {
+      pgmoneta_log_error("S3 upload: failed to upload backup.manifest");
+      goto error;
+   }
+
+   free(manifest_path);
+   free(suffix);
 
    return 0;
 
 error:
-   closedir(dir);
-   free(local_path);
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   pgmoneta_workers_wait(workers);
+   pgmoneta_workers_destroy(workers);
+   free(manifest_path);
+   free(suffix);
 
    return 1;
 }

@@ -36,6 +36,7 @@ extern "C" {
 #include <pgmoneta.h>
 #include <art.h>
 #include <backup.h>
+#include <deque.h>
 #include <json.h>
 
 #define MANIFEST_CHUNK_SIZE 8192
@@ -124,6 +125,15 @@ pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file);
  */
 int
 pgmoneta_generate_files_manifest(char* path, struct json* files);
+
+/**
+ * Get file paths from a manifest
+ * @param manifest_path The path to the manifest CSV file
+ * @param paths [out] The deque of file paths (key=path, value=checksum)
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_manifest_get_paths(char* manifest_path, struct deque** paths);
 
 #ifdef __cplusplus
 }

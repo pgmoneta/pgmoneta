@@ -638,3 +638,51 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
       free(entry);
    }
 }
+
+int
+pgmoneta_manifest_get_paths(char* manifest_path, struct deque** paths)
+{
+   int cols = 0;
+   char** entry = NULL;
+   struct csv_reader* reader = NULL;
+   struct deque* deque = NULL;
+
+   *paths = NULL;
+
+   if (pgmoneta_deque_create(false, &deque))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_csv_reader_init(manifest_path, &reader))
+   {
+      goto error;
+   }
+
+   while (pgmoneta_csv_next_row(reader, &cols, &entry))
+   {
+      if (cols != MANIFEST_COLUMN_COUNT)
+      {
+         pgmoneta_log_error("pgmoneta_manifest_get_paths: incorrect number of columns");
+         free(entry);
+         goto error;
+      }
+
+      pgmoneta_deque_add(deque, entry[MANIFEST_PATH_INDEX], (uintptr_t)entry[MANIFEST_CHECKSUM_INDEX], ValueString);
+      free(entry);
+      entry = NULL;
+   }
+
+   pgmoneta_csv_reader_destroy(reader);
+
+   *paths = deque;
+
+   return 0;
+
+error:
+
+   pgmoneta_csv_reader_destroy(reader);
+   pgmoneta_deque_destroy(deque);
+
+   return 1;
+}
