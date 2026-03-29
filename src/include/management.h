@@ -496,7 +496,7 @@ pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a delete s3 objects request

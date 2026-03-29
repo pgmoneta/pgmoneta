@@ -122,7 +122,7 @@ static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
 static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int list_s3_objects(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int list_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -932,7 +932,7 @@ execute:
    }
    else if (parsed.cmd->action == MANAGEMENT_S3_LS)
    {
-      exit_code = list_s3_objects(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      exit_code = list_s3_objects(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_S3_DELETE)
    {
@@ -1426,9 +1426,9 @@ error:
    return 1;
 }
 static int
-list_s3_objects(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format)
+list_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_list_s3_objects(ssl, socket, server, compression, encryption, output_format))
+   if (pgmoneta_management_request_list_s3_objects(ssl, socket, server, prefix, compression, encryption, output_format))
    {
       goto error;
    }

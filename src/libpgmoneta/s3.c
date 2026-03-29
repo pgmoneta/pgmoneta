@@ -68,6 +68,7 @@ pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t
 {
    char* elapsed = NULL;
    char* en = NULL;
+   char* prefix = NULL;
    int ec = -1;
    struct timespec start_t;
    struct timespec end_t;
@@ -79,8 +80,11 @@ pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t
    struct art* nodes = NULL;
    struct workflow* workflow = NULL;
    struct main_configuration* config;
+   struct json* request = NULL;
 
    config = (struct main_configuration*)shmem;
+   request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   prefix = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_S3_PREFIX);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -100,7 +104,7 @@ pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)"", ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)(prefix != NULL ? prefix : ""), ValueString))
    {
       ec = MANAGEMENT_ERROR_LIST_S3_WORKFLOW;
       goto error;

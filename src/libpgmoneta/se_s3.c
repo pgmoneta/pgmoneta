@@ -2321,10 +2321,13 @@ s3_get_basepath(int server, char* identifier)
       d = pgmoneta_append(d, "/");
    }
 
-   d = pgmoneta_append(d, effective_base_dir);
-   if (!pgmoneta_ends_with(effective_base_dir, "/"))
+   if (strlen(effective_base_dir) > 0)
    {
-      d = pgmoneta_append(d, "/");
+      d = pgmoneta_append(d, effective_base_dir);
+      if (!pgmoneta_ends_with(effective_base_dir, "/"))
+      {
+         d = pgmoneta_append(d, "/");
+      }
    }
 
    d = pgmoneta_append(d, config->common.servers[server].name);
