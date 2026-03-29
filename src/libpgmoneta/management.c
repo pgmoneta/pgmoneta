@@ -124,7 +124,7 @@ error:
    return 1;
 }
 int
-pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -140,6 +140,10 @@ pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, 
    }
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
+   if (prefix != NULL)
+   {
+      pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_S3_PREFIX, (uintptr_t)prefix, ValueString);
+   }
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {
