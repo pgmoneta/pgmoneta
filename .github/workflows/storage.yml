@@ -1,0 +1,335 @@
+name: Storage
+
+on:
+  pull_request:
+    branches:
+      - main
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  s3-garage:
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/ok-to-test'))
+    runs-on: ubuntu-latest
+
+    env:
+      PG_VERSION: "17"
+      PG_DATABASE: mydb
+      PG_USER_NAME: myuser
+      PG_USER_PASSWORD: mypass
+      PG_REPL_USER_NAME: repl
+      PG_REPL_PASSWORD: replpass
+      GARAGE_VERSION: "v2.2.0"
+      GARAGE_BUCKET: pgmoneta-bucket
+      GARAGE_REGION: garage
+      GARAGE_RPC_SECRET: "1799bccfd7411eddcf9ebd316bc1f5287ad12a68094e1c6ac6abde7e6feae1ec"
+      BASE_DIR: /tmp/pgmoneta-storage-test
+      LOG_DIR: /tmp/pgmoneta-storage-test/log
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            gcc cmake make \
+            libev-dev libssl-dev \
+            libsystemd-dev zlib1g-dev \
+            libzstd-dev liblz4-dev \
+            libssh-dev libbz2-dev \
+            libarchive-dev libyaml-dev \
+            libncurses-dev \
+            python3-docutils
+
+      - name: Install PostgreSQL ${{ env.PG_VERSION }}
+        run: |
+          sudo apt-get install -y curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-${{ env.PG_VERSION }} postgresql-server-dev-${{ env.PG_VERSION }}
+          echo "/usr/lib/postgresql/${{ env.PG_VERSION }}/bin" >> $GITHUB_PATH
+
+      - name: Install pgmoneta_ext
+        run: |
+          cd /tmp
+          git clone --branch main --single-branch --depth 1 https://github.com/pgmoneta/pgmoneta_ext.git
+          cd pgmoneta_ext
+          mkdir build && cd build
+          cmake -DDOCS=false ..
+          make
+          sudo make install
+
+      - name: Build pgmoneta
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
+          make -j$(nproc)
+
+      - name: Set up PostgreSQL
+        run: |
+          CONF_DIR=${{ github.workspace }}/test/postgresql/src/postgresql${{ env.PG_VERSION }}/conf
+          SCRIPT_DIR=${{ github.workspace }}/test/postgresql/src/postgresql${{ env.PG_VERSION }}/root/usr/bin
+
+          sudo mkdir -p /conf /pgconf /pgdata /pgwal /pglog
+          sudo cp "$CONF_DIR"/* /conf/
+          sudo chown -R postgres:postgres /conf /pgconf /pgdata /pgwal /pglog
+          sudo chmod -R 777 /conf /pgconf /pgdata /pgwal /pglog
+
+          sudo -u postgres bash -c "
+            export PG_MAX_CONNECTIONS=100
+            export PG_SHARED_BUFFERS=256MB
+            export PG_WORK_MEM=4MB
+            export PG_MAX_PARALLEL_WORKERS=8
+            export PG_EFFECTIVE_CACHE_SIZE=4GB
+            export PG_MAX_WAL_SIZE=1GB
+            export PG_LOG_LEVEL=debug5
+            export PG_DATABASE=${{ env.PG_DATABASE }}
+            export PG_USER_NAME=${{ env.PG_USER_NAME }}
+            export PG_USER_PASSWORD=${{ env.PG_USER_PASSWORD }}
+            export PG_REPL_USER_NAME=${{ env.PG_REPL_USER_NAME }}
+            export PG_REPL_PASSWORD=${{ env.PG_REPL_PASSWORD }}
+
+            /usr/lib/postgresql/${{ env.PG_VERSION }}/bin/initdb -k -X /pgwal/ /pgdata/
+
+            sed -i 's/PG_MAX_CONNECTIONS/100/g' /conf/postgresql.conf
+            sed -i 's/PG_SHARED_BUFFERS/256MB/g' /conf/postgresql.conf
+            sed -i 's/PG_WORK_MEM/4MB/g' /conf/postgresql.conf
+            sed -i 's/PG_MAX_PARALLEL_WORKERS/8/g' /conf/postgresql.conf
+            sed -i 's/PG_EFFECTIVE_CACHE_SIZE/4GB/g' /conf/postgresql.conf
+            sed -i 's/PG_MAX_WAL_SIZE/1GB/g' /conf/postgresql.conf
+            sed -i 's/PG_LOG_LEVEL/debug5/g' /conf/postgresql.conf
+
+            sed -i 's/PG_DATABASE/${{ env.PG_DATABASE }}/g' /conf/pg_hba.conf
+            sed -i 's/PG_USER_NAME/${{ env.PG_USER_NAME }}/g' /conf/pg_hba.conf
+            sed -i 's/PG_REPL_USER_NAME/${{ env.PG_REPL_USER_NAME }}/g' /conf/pg_hba.conf
+
+            cp /conf/postgresql.conf /pgdata/
+            cp /conf/pg_hba.conf /pgdata/
+
+            sed -i 's/PG_DATABASE/${{ env.PG_DATABASE }}/g' /conf/setup.sql
+            sed -i 's/PG_USER_NAME/${{ env.PG_USER_NAME }}/g' /conf/setup.sql
+            sed -i 's/PG_USER_PASSWORD/${{ env.PG_USER_PASSWORD }}/g' /conf/setup.sql
+            sed -i 's/PG_REPL_USER_NAME/${{ env.PG_REPL_USER_NAME }}/g' /conf/setup.sql
+            sed -i 's/PG_REPL_PASSWORD/${{ env.PG_REPL_PASSWORD }}/g' /conf/setup.sql
+
+            /usr/lib/postgresql/${{ env.PG_VERSION }}/bin/pg_ctl -D /pgdata/ start
+            sleep 3
+            /usr/lib/postgresql/${{ env.PG_VERSION }}/bin/psql -q -h /tmp -f /conf/setup.sql postgres
+          "
+
+          /usr/lib/postgresql/${{ env.PG_VERSION }}/bin/pg_isready -h localhost -p 5432
+
+      - name: Set up Garage
+        run: |
+          curl -fsSL -o /tmp/garage \
+            "https://garagehq.deuxfleurs.fr/_releases/${{ env.GARAGE_VERSION }}/x86_64-unknown-linux-musl/garage"
+          chmod +x /tmp/garage
+
+          mkdir -p /tmp/garage-data/meta /tmp/garage-data/data
+          cp contrib/garage/garage-ci.toml /tmp/garage.toml
+
+          /tmp/garage -c /tmp/garage.toml server &
+
+          echo "Waiting for Garage to be ready..."
+          for i in $(seq 1 30); do
+            if /tmp/garage -c /tmp/garage.toml status >/dev/null 2>&1; then
+              echo "Garage is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "Garage failed to start"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          NODE_ID=$(/tmp/garage -c /tmp/garage.toml status 2>&1 | awk '/^[0-9a-f]+[[:space:]]/ {print $1; exit}')
+          /tmp/garage -c /tmp/garage.toml layout assign -z dc1 -c 1G "$NODE_ID"
+          /tmp/garage -c /tmp/garage.toml layout apply --version 1
+
+          /tmp/garage -c /tmp/garage.toml bucket create ${{ env.GARAGE_BUCKET }}
+          /tmp/garage -c /tmp/garage.toml key create pgmoneta-app-key
+
+          /tmp/garage -c /tmp/garage.toml bucket allow \
+            --read --write --owner ${{ env.GARAGE_BUCKET }} --key pgmoneta-app-key
+
+          KEY_INFO=$(/tmp/garage -c /tmp/garage.toml key info pgmoneta-app-key --show-secret)
+          echo "S3_ACCESS_KEY_ID=$(echo "$KEY_INFO" | awk '/Key ID/ {print $3; exit}')" >> $GITHUB_ENV
+          echo "S3_SECRET_ACCESS_KEY=$(echo "$KEY_INFO" | awk '/Secret key/ {print $3; exit}')" >> $GITHUB_ENV
+
+      - name: Configure pgmoneta
+        run: |
+          mkdir -p ${{ env.BASE_DIR }}/{backup,log,conf}
+
+          cat > ${{ env.BASE_DIR }}/conf/pgmoneta_cli.conf <<EOF
+          unix_socket_dir = /tmp/
+          log_type = file
+          log_level = info
+          log_path = ${{ env.LOG_DIR }}/pgmoneta-cli.log
+          EOF
+
+          sed \
+            -e "s|BASE_DIR|${{ env.BASE_DIR }}|g" \
+            -e "s|LOG_DIR|${{ env.LOG_DIR }}|g" \
+            -e "s|PG_PORT|5432|g" \
+            -e "s|PG_REPL_USER_NAME|${{ env.PG_REPL_USER_NAME }}|g" \
+            -e "s|S3_BUCKET|${{ env.GARAGE_BUCKET }}|g" \
+            -e "s|S3_ACCESS_KEY_ID|${S3_ACCESS_KEY_ID}|g" \
+            -e "s|S3_SECRET_ACCESS_KEY|${S3_SECRET_ACCESS_KEY}|g" \
+            contrib/garage/pgmoneta-s3.conf.in > ${{ env.BASE_DIR }}/conf/pgmoneta.conf
+
+          ./build/src/pgmoneta-admin master-key -P ${{ env.PG_REPL_PASSWORD }}
+          ./build/src/pgmoneta-admin \
+            -f ${{ env.BASE_DIR }}/conf/pgmoneta_users.conf \
+            -U ${{ env.PG_REPL_USER_NAME }} \
+            -P ${{ env.PG_REPL_PASSWORD }} user add
+
+      - name: Start pgmoneta
+        run: |
+          ./build/src/pgmoneta \
+            -c ${{ env.BASE_DIR }}/conf/pgmoneta.conf \
+            -u ${{ env.BASE_DIR }}/conf/pgmoneta_users.conf -d
+          sleep 5
+
+          for i in $(seq 1 10); do
+            if ./build/src/pgmoneta-cli \
+              -c ${{ env.BASE_DIR }}/conf/pgmoneta_cli.conf status > /dev/null 2>&1; then
+              echo "pgmoneta is ready"
+              break
+            fi
+            if [ "$i" -eq 10 ]; then
+              echo "pgmoneta failed to start"
+              cat ${{ env.LOG_DIR }}/pgmoneta.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Test S3 backup
+        run: |
+          CLI="./build/src/pgmoneta-cli -c ${{ env.BASE_DIR }}/conf/pgmoneta_cli.conf"
+
+          echo "=== Running backup ==="
+          BACKUP_OUTPUT=$($CLI backup primary)
+          echo "$BACKUP_OUTPUT"
+          sleep 10
+
+          LABEL=$(echo "$BACKUP_OUTPUT" | awk '/Backup:/ && !/BackupSize/ && $2 != "" {print $2; exit}')
+
+          if [ -z "$LABEL" ]; then
+            echo "FAIL: no backup label found"
+            cat ${{ env.LOG_DIR }}/pgmoneta.log
+            exit 1
+          fi
+          echo "Backup label: $LABEL"
+          echo "BACKUP_LABEL=$LABEL" >> $GITHUB_ENV
+
+      - name: Test S3 list
+        run: |
+          CLI="./build/src/pgmoneta-cli -c ${{ env.BASE_DIR }}/conf/pgmoneta_cli.conf"
+
+          echo "=== Listing S3 objects ==="
+          UPLOAD_COUNT=$($CLI -F json s3 ls primary ${{ env.BACKUP_LABEL }} | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          objects = data.get('Response', {}).get('S3Objects', [])
+          print(len(objects))
+          ")
+
+          if [ "$UPLOAD_COUNT" -eq 0 ] 2>/dev/null; then
+            echo "FAIL: s3 ls returned no objects"
+            cat ${{ env.LOG_DIR }}/pgmoneta.log
+            exit 1
+          fi
+
+          HAS_MANIFEST=$($CLI -F json s3 ls primary ${{ env.BACKUP_LABEL }} | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          objects = data.get('Response', {}).get('S3Objects', [])
+          keys = [o.get('S3Key', '') for o in objects]
+          print('yes' if any('backup.manifest' in k for k in keys) else 'no')
+          ")
+
+          if [ "$HAS_MANIFEST" != "yes" ]; then
+            echo "FAIL: backup.manifest not found in S3 objects"
+            exit 1
+          fi
+
+          echo "S3 objects after backup: $UPLOAD_COUNT (manifest present)"
+          echo "UPLOAD_COUNT=$UPLOAD_COUNT" >> $GITHUB_ENV
+
+      - name: Test S3 restore
+        run: |
+          CLI="./build/src/pgmoneta-cli -c ${{ env.BASE_DIR }}/conf/pgmoneta_cli.conf"
+
+          echo "=== Restoring from S3 ==="
+          $CLI s3 restore primary ${{ env.BACKUP_LABEL }}
+          sleep 10
+
+          RESTORE_DIR="${{ env.BASE_DIR }}/backup/primary/backup/${{ env.BACKUP_LABEL }}"
+
+          if [ ! -d "$RESTORE_DIR/data" ]; then
+            echo "FAIL: restored data directory not found at $RESTORE_DIR/data"
+            cat ${{ env.LOG_DIR }}/pgmoneta.log
+            exit 1
+          fi
+
+          RESTORED_COUNT=$(find "$RESTORE_DIR" -type f | wc -l)
+
+          if [ "$RESTORED_COUNT" -ne "${{ env.UPLOAD_COUNT }}" ]; then
+            echo "FAIL: file count mismatch (uploaded: ${{ env.UPLOAD_COUNT }}, restored: $RESTORED_COUNT)"
+            echo "Restored files:"
+            find "$RESTORE_DIR" -type f
+            exit 1
+          fi
+
+          echo "Restored files: $RESTORED_COUNT (matches upload count: ${{ env.UPLOAD_COUNT }})"
+
+      - name: Test S3 delete
+        run: |
+          CLI="./build/src/pgmoneta-cli -c ${{ env.BASE_DIR }}/conf/pgmoneta_cli.conf"
+
+          echo "=== Deleting S3 objects ==="
+          $CLI s3 delete primary ${{ env.BACKUP_LABEL }}
+          sleep 5
+
+          REMAINING=$($CLI -F json s3 ls primary ${{ env.BACKUP_LABEL }} | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          objects = data.get('Response', {}).get('S3Objects', [])
+          print(len(objects))
+          ")
+
+          if [ "$REMAINING" -ne 0 ] 2>/dev/null; then
+            echo "FAIL: s3 delete did not remove all objects (remaining: $REMAINING)"
+            cat ${{ env.LOG_DIR }}/pgmoneta.log
+            exit 1
+          fi
+          echo "S3 objects after delete: 0"
+
+      - name: Shutdown pgmoneta
+        if: always()
+        run: |
+          if [ -f /tmp/pgmoneta.localhost.pid ]; then
+            ./build/src/pgmoneta-cli \
+              -c ${{ env.BASE_DIR }}/conf/pgmoneta_cli.conf shutdown || true
+            sleep 3
+          fi
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: storage-test-logs
+          path: ${{ env.LOG_DIR }}
+          retention-days: 30

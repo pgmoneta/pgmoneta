@@ -41,6 +41,9 @@
 #include <wal.h>
 #include <workflow.h>
 
+/* system */
+#include <assert.h>
+
 #define NAME "s3"
 
 static bool
@@ -86,6 +89,14 @@ pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t
    request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    prefix = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_S3_PREFIX);
 
+#ifdef DEBUG
+   assert(request != NULL);
+   if (pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_S3_PREFIX) != 0)
+   {
+      assert(prefix != NULL);
+   }
+#endif
+
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
 #else
@@ -109,6 +120,11 @@ pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t
       ec = MANAGEMENT_ERROR_LIST_S3_WORKFLOW;
       goto error;
    }
+
+#ifdef DEBUG
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(strcmp((char*)pgmoneta_art_search(nodes, NODE_LABEL), prefix != NULL ? prefix : "") == 0);
+#endif
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_S3_LIST, NULL);
 
