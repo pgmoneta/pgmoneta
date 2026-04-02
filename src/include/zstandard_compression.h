@@ -36,40 +36,8 @@ extern "C" {
 #include <pgmoneta.h>
 #include <compression.h>
 #include <json.h>
-#include <workers.h>
 
 #include <stdlib.h>
-
-/**
- * Compress a data directory with Zstandard
- * @param directory The directory
- * @param workers The optional workers
- */
-void
-pgmoneta_zstandardc_data(char* directory, struct workers* workers);
-
-/**
- * Compress tablespaces directories with Zstandard
- * @param root The root directory
- * @param workers The optional workers
- */
-void
-pgmoneta_zstandardc_tablespaces(char* root, struct workers* workers);
-
-/**
- * Compress a WAL directory with Zstandard
- * @param directory The directory
- */
-void
-pgmoneta_zstandardc_wal(char* directory);
-
-/**
- * Compress a WAL file with Zstandard
- * @param directory The directory
- * @param file The file
- */
-void
-pgmoneta_zstandardc_wal_file(char* directory, char* file);
 
 /**
  * ZSTD decompress a single file, also remove the original file
@@ -90,14 +58,6 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
  */
 int
 pgmoneta_zstandardd_file(char* from, char* to);
-
-/**
- * Decompress a Zstandard directory
- * @param directory The directory
- * @param workers The optional workers
- */
-void
-pgmoneta_zstandardd_directory(char* directory, struct workers* workers);
 
 /**
  * ZSTD compress a single file, also remove the original file

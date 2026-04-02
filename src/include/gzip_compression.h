@@ -36,41 +36,8 @@ extern "C" {
 #include <pgmoneta.h>
 #include <compression.h>
 #include <json.h>
-#include <workers.h>
 
 #include <stdlib.h>
-
-/**
- * GZip a data directory
- * @param directory The directory
- * @param workers The optional workers
- * @return 0 upon success, otherwise 1.
- */
-int
-pgmoneta_gzip_data(char* directory, struct workers* workers);
-
-/**
- * GZip tablespace directories
- * @param root The root directory
- * @param workers The optional workers
- */
-void
-pgmoneta_gzip_tablespaces(char* root, struct workers* workers);
-
-/**
- * GZip a WAL directory
- * @param directory The directory
- */
-void
-pgmoneta_gzip_wal(char* directory);
-
-/**
- * GZip a WAL file
- * @param directory The directory
- * @param file The file
- */
-void
-pgmoneta_gzip_wal_file(char* directory, char* file);
 
 /**
  * GZip a single file, also remove the original file
@@ -110,15 +77,6 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
  */
 int
 pgmoneta_gunzip_file(char* from, char* to);
-
-/**
- * GUNZip a directory
- * @param directory The directory
- * @param workers The optional workers
- * @return 0 upon success, otherwise 1.
- */
-int
-pgmoneta_gunzip_data(char* directory, struct workers* workers);
 
 /**
  * GZip a string

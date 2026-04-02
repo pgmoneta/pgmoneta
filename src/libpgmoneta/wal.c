@@ -1759,61 +1759,53 @@ retry:
       {
          d = pgmoneta_get_server_wal(srv);
 
-         switch (COMPRESSION_ALGORITHM(config->compression_type))
+         struct deque* excludes = NULL;
+         pgmoneta_deque_create(true, &excludes);
+         pgmoneta_deque_add(excludes, ".partial", 0, ValueString);
+         pgmoneta_deque_add(excludes, ".history", 0, ValueString);
+         pgmoneta_deque_add(excludes, ".aes", 0, ValueString);
+         pgmoneta_deque_add(excludes, "backup_label", 0, ValueString);
+
+         if (scan)
          {
-            case COMPRESSION_ALG_GZIP:
-               if (scan)
-               {
-                  pgmoneta_gzip_wal(d);
-               }
-               else
-               {
-                  pgmoneta_gzip_wal_file(d, wal_file);
-               }
-               break;
-            case COMPRESSION_ALG_ZSTD:
-               if (scan)
-               {
-                  pgmoneta_zstandardc_wal(d);
-               }
-               else
-               {
-                  pgmoneta_zstandardc_wal_file(d, wal_file);
-               }
-               break;
-            case COMPRESSION_ALG_LZ4:
-               if (scan)
-               {
-                  pgmoneta_lz4c_wal(d);
-               }
-               else
-               {
-                  pgmoneta_lz4c_wal_file(d, wal_file);
-               }
-               break;
-            case COMPRESSION_ALG_BZIP2:
-               if (scan)
-               {
-                  pgmoneta_bzip2_wal(d);
-               }
-               else
-               {
-                  pgmoneta_bzip2_wal_file(d, wal_file);
-               }
-               break;
+            pgmoneta_compress_directory(d, config->compression_type, NULL, excludes);
+         }
+         else
+         {
+            char from[MAX_PATH];
+            char to[MAX_PATH];
+            const char* suffix = NULL;
+
+            pgmoneta_compression_get_suffix(config->compression_type, &suffix);
+
+            pgmoneta_snprintf(from, sizeof(from), "%s/%s", d, wal_file);
+            pgmoneta_snprintf(to, sizeof(to), "%s/%s%s", d, wal_file, suffix != NULL ? suffix : "");
+
+            pgmoneta_compress_file(from, to, config->compression_type, NULL);
          }
 
          if (config->encryption != ENCRYPTION_NONE)
          {
             if (scan)
             {
-               pgmoneta_encrypt_wal(d);
+               pgmoneta_encrypt_directory(d, NULL, excludes);
             }
             else
             {
-               pgmoneta_encrypt_wal_file(d, wal_file);
+               char from[MAX_PATH];
+               char to[MAX_PATH];
+               const char* suffix = NULL;
+
+               pgmoneta_compression_get_suffix(config->compression_type, &suffix);
+
+               pgmoneta_snprintf(from, sizeof(from), "%s/%s%s", d, wal_file, suffix != NULL ? suffix : "");
+               pgmoneta_snprintf(to, sizeof(to), "%s/%s%s.aes", d, wal_file, suffix != NULL ? suffix : "");
+
+               pgmoneta_encrypt_file(from, to, NULL);
             }
          }
+
+         pgmoneta_deque_destroy(excludes);
 
          free(d);
 

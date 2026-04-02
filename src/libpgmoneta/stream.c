@@ -389,7 +389,7 @@ get_restore_file_name_cb(struct streamer* this, char* file_name, char** dest_fil
       goto error;
    }
    dest = pgmoneta_append(dest, file_name);
-   file_type = pgmoneta_get_file_type(file_name);
+   file_type = pgmoneta_extraction_get_file_type(file_name);
    if (file_type & PGMONETA_FILE_TYPE_ENCRYPTED)
    {
       if (pgmoneta_strip_extension(dest, &current))

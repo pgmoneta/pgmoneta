@@ -29,15 +29,16 @@
 /* pgmoneta */
 #include <aes.h>
 #include <achv.h>
+#include <aes.h>
 #include <cmd.h>
 #include <compression.h>
 #include <configuration.h>
 #include <deque.h>
+#include <extraction.h>
 #include <info.h>
 #include <logging.h>
 #include <pgmoneta.h>
 #include <shmem.h>
-#include <extraction.h>
 #include <utils.h>
 #include <walfile.h>
 #include <walfile/pg_control.h>
@@ -705,7 +706,7 @@ main(int argc, char* argv[])
    while (pgmoneta_deque_iterator_next(file_iter))
    {
       char* current_file = (char*)file_iter->value->data;
-      uint32_t file_type = pgmoneta_get_file_type(current_file);
+      uint32_t file_type = pgmoneta_extraction_get_file_type(current_file);
 
       /* Handle TAR files - extract and process WAL files inside */
       if (file_type & PGMONETA_FILE_TYPE_TAR)
@@ -843,7 +844,7 @@ main(int argc, char* argv[])
       wal_path = NULL;
       wal_path = pgmoneta_append(wal_path, file_path);
 
-      if (pgmoneta_is_encrypted(wal_path) || pgmoneta_compression_is_compressed(wal_path))
+      if (pgmoneta_is_encrypted(wal_path) || pgmoneta_is_compressed(wal_path))
       {
          free(tmp_wal);
          tmp_wal = NULL;

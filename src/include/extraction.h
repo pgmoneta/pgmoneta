@@ -36,6 +36,41 @@
 extern "C" {
 #endif
 
+/* File type bitmask constants */
+#define PGMONETA_FILE_TYPE_UNKNOWN    0x0000 /* Unknown file type */
+#define PGMONETA_FILE_TYPE_WAL        0x0001 /* WAL file (24-char hex name) */
+#define PGMONETA_FILE_TYPE_COMPRESSED 0x0002 /* Compressed (any type) */
+#define PGMONETA_FILE_TYPE_GZIP       0x0004 /* Compressed with gzip (.gz) */
+#define PGMONETA_FILE_TYPE_LZ4        0x0008 /* Compressed with lz4 (.lz4) */
+#define PGMONETA_FILE_TYPE_ZSTD       0x0010 /* Compressed with zstd (.zstd) */
+#define PGMONETA_FILE_TYPE_BZ2        0x0020 /* Compressed with bzip2 (.bz2) */
+#define PGMONETA_FILE_TYPE_ENCRYPTED  0x0040 /* Encrypted (.aes) */
+#define PGMONETA_FILE_TYPE_TAR        0x0080 /* TAR archive (.tar) */
+#define PGMONETA_FILE_TYPE_PARTIAL    0x0100 /* Partial file (.partial) */
+#define PGMONETA_FILE_TYPE_ALL        0xFFFF /* Match all file types */
+#define PGMONETA_FILE_TYPE_COMPRESSION_MASK \
+   (PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_GZIP | PGMONETA_FILE_TYPE_LZ4 | PGMONETA_FILE_TYPE_ZSTD | PGMONETA_FILE_TYPE_BZ2)
+#define PGMONETA_FILE_TYPE_EXTRACTION_MASK \
+   (PGMONETA_FILE_TYPE_ENCRYPTED | PGMONETA_FILE_TYPE_TAR | PGMONETA_FILE_TYPE_COMPRESSION_MASK)
+
+/**
+ * Get the file type bitmask for a given file path.
+ * The bitmask can include combinations of:
+ * - PGMONETA_FILE_TYPE_WAL (24-char hex WAL file)
+ * - PGMONETA_FILE_TYPE_COMPRESSED (any compression)
+ * - PGMONETA_FILE_TYPE_GZIP (.gz)
+ * - PGMONETA_FILE_TYPE_LZ4 (.lz4)
+ * - PGMONETA_FILE_TYPE_ZSTD (.zstd)
+ * - PGMONETA_FILE_TYPE_BZ2 (.bz2)
+ * - PGMONETA_FILE_TYPE_ENCRYPTED (.aes)
+ * - PGMONETA_FILE_TYPE_TAR (.tar)
+ * - PGMONETA_FILE_TYPE_PARTIAL (.partial)
+ * @param file_path The file path to check
+ * @return Bitmask of file type flags
+ */
+uint32_t
+pgmoneta_extraction_get_file_type(char* file_path);
+
 /**
  * Remove extraction-related suffixes from a file path.
  * For example, "001.tar.zstd.aes" becomes "001" when the bitmask includes TAR, ZSTD, and ENCRYPTED.

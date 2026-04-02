@@ -30,6 +30,9 @@
 #define PGMONETA_COMPRESSION_H
 
 #include <pgmoneta.h>
+#include <workers.h>
+
+struct workers;
 
 typedef int (*compression_func)(char*, char*);
 
@@ -112,14 +115,6 @@ int
 pgmoneta_compression_get_suffix(int type, const char** suffix);
 
 /**
- * Is the file compressed
- * @param f The file
- * @return True if compressed, or false
- */
-bool
-pgmoneta_compression_is_compressed(char* f);
-
-/**
  * Clamp a compression level according to the compression algorithm.
  *
  * Updates *level in-place to fall within the supported range for the
@@ -134,39 +129,55 @@ int
 pgmoneta_compression_get_level(int type, int* level);
 
 /**
- * Remove compression and optional encryption suffixes from a file name.
- *
- * This helper uses the configured compression type and encryption mode to
- * strip any matching algorithm suffix (e.g. ".gz", ".zstd") and a trailing
- * ".aes" encryption suffix, if present.
- *
- * The returned string must be freed by the caller.
- *
- * @param str The original file name
- * @param compression_type The configured compression type
- * @param encryption The configured encryption type
- * @param result [out] Pointer that will receive the trimmed file name
- * @return 0 on success, 1 on error
+ * Compress a file using the selected compression method.
+ * @param from The source file path
+ * @param to The destination file path
+ * @param type The compression type
+ * @param workers Optional worker pool. If NULL, runs synchronously.
+ * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_compression_trim_suffix(char* str, int compression_type, int encryption, char** result);
+pgmoneta_compress_file(char* from, char* to, int type, struct workers* workers);
+
+/**
+ * Compress a directory recursively using the selected compression method.
+ * @param directory The directory path
+ * @param type The compression type
+ * @param workers Optional worker pool. If NULL, runs synchronously.
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_compress_directory(char* directory, int type, struct workers* workers, struct deque* excludes);
 
 /**
  * Decompress a file using the appropriate decompression method.
- * @param from    The source file path, expected to be a compressed file.
- * @param to      The destination file path where the decompressed output will be saved.
- *
- * @return 0 if decompression succeeds, 1 if no matching decompression callback is found or decompression fails.
+ * @param from The source file path, expected to be a compressed file
+ * @param to The destination file path where the decompressed output will be saved
+ * @param type The compression type. If algorithm is
+ *             COMPRESSION_ALG_NONE, decompression is auto-detected from file suffix.
+ * @param workers Optional worker pool. If NULL, runs synchronously.
+ * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_decompress_file(char* from, char* to);
+pgmoneta_decompress_file(char* from, char* to, int type, struct workers* workers);
 
 /**
  * Decompress a directory using the appropriate decompression method.
  * @param directory The directory
- * @return 0 if decompression succeeds, 1 if no matching decompression callback is found or decompression fails.
+ * @param type The compression type. If algorithm is
+ *             COMPRESSION_ALG_NONE, decompression is auto-detected per file suffix.
+ * @param workers Optional worker pool. If NULL, runs synchronously.
+ * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_decompress_directory(char* directory);
+pgmoneta_decompress_directory(char* directory, int type, struct workers* workers, struct deque* excludes);
+
+/**
+ * Is the file compressed
+ * @param file_path The file path
+ * @return True if compressed, otherwise false
+ */
+bool
+pgmoneta_is_compressed(char* file_path);
 
 #endif //PGMONETA_COMPRESSION_H

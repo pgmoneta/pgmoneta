@@ -29,14 +29,13 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
-#include <bzip2_compression.h>
 #include <cmd.h>
+#include <compression.h>
 #include <configuration.h>
-#include <gzip_compression.h>
+#include <extraction.h>
 #include <info.h>
 #include <json.h>
 #include <logging.h>
-#include <lz4_compression.h>
 #include <management.h>
 #include <network.h>
 #include <security.h>
@@ -46,7 +45,6 @@
 #include <utf8.h>
 #include <value.h>
 #include <verify.h>
-#include <zstandard_compression.h>
 
 /* system */
 #include <err.h>
@@ -1736,7 +1734,7 @@ decrypt_data_client(char* from)
 
    to = pgmoneta_remove_suffix(from, ".aes");
 
-   if (pgmoneta_decrypt_file(from, to))
+   if (pgmoneta_decrypt_file(from, to, NULL))
    {
       pgmoneta_log_error("Decryption: File encryption failed: %s", from);
       goto error;
@@ -1766,7 +1764,7 @@ encrypt_data_client(char* from)
    to = pgmoneta_append(to, from);
    to = pgmoneta_append(to, ".aes");
 
-   if (pgmoneta_encrypt_file(from, to))
+   if (pgmoneta_encrypt_file(from, to, NULL))
    {
       pgmoneta_log_error("Encryption: File encryption failed: %s", from);
       goto error;
@@ -1793,45 +1791,15 @@ decompress_data_client(char* from)
       goto error;
    }
 
-   if (pgmoneta_ends_with(from, ".gz"))
-   {
-      to = pgmoneta_remove_suffix(from, ".gz");
-      if (pgmoneta_gunzip_file(from, to))
-      {
-         pgmoneta_log_error("Decompress: GZIP decompression failed");
-         goto error;
-      }
-   }
-   else if (pgmoneta_ends_with(from, ".zstd"))
-   {
-      to = pgmoneta_remove_suffix(from, ".zstd");
-      if (pgmoneta_zstandardd_file(from, to))
-      {
-         pgmoneta_log_error("Decompress: ZSTD decompression failed");
-         goto error;
-      }
-   }
-   else if (pgmoneta_ends_with(from, ".lz4"))
-   {
-      to = pgmoneta_remove_suffix(from, ".lz4");
-      if (pgmoneta_lz4d_file(from, to))
-      {
-         pgmoneta_log_error("Decompress: LZ4 decompression failed");
-         goto error;
-      }
-   }
-   else if (pgmoneta_ends_with(from, ".bz2"))
-   {
-      to = pgmoneta_remove_suffix(from, ".bz2");
-      if (pgmoneta_bunzip2_file(from, to))
-      {
-         pgmoneta_log_error("Decompress: BZIP2 decompression failed");
-         goto error;
-      }
-   }
-   else
+   if (pgmoneta_extraction_strip_suffix(from, PGMONETA_FILE_TYPE_UNKNOWN, &to))
    {
       pgmoneta_log_error("Decompress: Unknown file type");
+      goto error;
+   }
+
+   if (pgmoneta_decompress_file(from, to, COMPRESSION_NONE, NULL))
+   {
+      pgmoneta_log_error("Decompress: File decompression failed");
       goto error;
    }
 
@@ -1846,6 +1814,7 @@ error:
 static int
 compress_data_client(char* from, uint8_t compression)
 {
+   const char* suffix = NULL;
    char* to = NULL;
 
    if (!pgmoneta_exists(from))
@@ -1854,45 +1823,19 @@ compress_data_client(char* from, uint8_t compression)
       goto error;
    }
 
-   to = pgmoneta_append(to, from);
-
-   switch (COMPRESSION_ALGORITHM(compression))
+   if (pgmoneta_compression_get_suffix(compression, &suffix) || suffix == NULL)
    {
-      case COMPRESSION_ALG_GZIP:
-         to = pgmoneta_append(to, ".gz");
-         if (pgmoneta_gzip_file(from, to))
-         {
-            pgmoneta_log_error("Compress: GZIP compression failed");
-            goto error;
-         }
-         break;
-      case COMPRESSION_ALG_ZSTD:
-         to = pgmoneta_append(to, ".zstd");
-         if (pgmoneta_zstandardc_file(from, to))
-         {
-            pgmoneta_log_error("Compress: ZSTD compression failed");
-            goto error;
-         }
-         break;
-      case COMPRESSION_ALG_LZ4:
-         to = pgmoneta_append(to, ".lz4");
-         if (pgmoneta_lz4c_file(from, to))
-         {
-            pgmoneta_log_error("Compress: LZ4 compression failed");
-            goto error;
-         }
-         break;
-      case COMPRESSION_ALG_BZIP2:
-         to = pgmoneta_append(to, ".bz2");
-         if (pgmoneta_bzip2_file(from, to))
-         {
-            pgmoneta_log_error("Compress: BZIP2 compression failed");
-            goto error;
-         }
-         break;
-      default:
-         pgmoneta_log_error("Compress: Unknown compression type: %d", compression);
-         goto error;
+      pgmoneta_log_error("Compress: Unknown compression type: %d", compression);
+      goto error;
+   }
+
+   to = pgmoneta_append(to, from);
+   to = pgmoneta_append(to, suffix);
+
+   if (pgmoneta_compress_file(from, to, compression, NULL))
+   {
+      pgmoneta_log_error("Compress: File compression failed");
+      goto error;
    }
 
    free(to);

@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <aes.h>
 #include <compression.h>
+#include <deque.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -90,7 +91,6 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
    char* enc_file = NULL;
    char* backup_base = NULL;
    char* server_backup = NULL;
-   char* backup_data = NULL;
    char* compress_suffix = NULL;
    char* tarfile = NULL;
    int hours;
@@ -99,6 +99,7 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
+   struct deque* excludes = NULL;
    struct main_configuration* config;
    struct backup* backup = NULL;
 
@@ -125,7 +126,6 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
    backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
    server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
-   backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
    tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
@@ -139,21 +139,33 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      if (pgmoneta_encrypt_data(backup_data, workers))
+      if (pgmoneta_deque_create(true, &excludes))
       {
          goto error;
       }
-      if (pgmoneta_encrypt_tablespaces(backup_base, workers))
+      pgmoneta_deque_add(excludes, "backup.info", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.manifest", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha512", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
+
+      if (pgmoneta_encrypt_directory(backup_base, workers, excludes))
       {
          goto error;
       }
 
-      pgmoneta_workers_wait(workers);
-      if (workers != NULL && !workers->outcome)
+      if (workers != NULL)
       {
-         goto error;
+         pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
       }
       pgmoneta_workers_destroy(workers);
+
+      pgmoneta_deque_destroy(excludes);
+      excludes = NULL;
    }
    else
    {
@@ -183,7 +195,7 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
 
       enc_file = pgmoneta_append(enc_file, tarfile);
       enc_file = pgmoneta_append(enc_file, compress_suffix);
-      if (pgmoneta_encrypt_file(enc_file, d))
+      if (pgmoneta_encrypt_file(enc_file, d, NULL))
       {
          goto error;
       }
@@ -220,6 +232,11 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
 
 error:
 
+   if (excludes != NULL)
+   {
+      pgmoneta_deque_destroy(excludes);
+   }
+
    if (number_of_workers > 0)
    {
       pgmoneta_workers_destroy(workers);
@@ -236,6 +253,7 @@ static int
 decryption_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
+   int ret = 0;
    char* label = NULL;
    char* base = NULL;
    time_t decrypt_time;
@@ -280,9 +298,17 @@ decryption_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_decrypt_directory(base, workers);
+   pgmoneta_decrypt_directory(base, workers, NULL);
 
-   pgmoneta_workers_wait(workers);
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         ret = 1;
+         goto error;
+      }
+   }
    pgmoneta_workers_destroy(workers);
 
    total_seconds = (int)difftime(time(NULL), decrypt_time);
@@ -297,4 +323,14 @@ decryption_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_clear_aes_cache();
    return 0;
+
+error:
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   pgmoneta_clear_aes_cache();
+   return ret;
 }

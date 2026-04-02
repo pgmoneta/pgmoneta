@@ -28,7 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <compression.h>
+#include <extraction.h>
 #include <link.h>
 #include <logging.h>
 #include <restore.h>
@@ -485,6 +485,8 @@ static char*
 trim_suffix(char* str)
 {
    struct main_configuration* config;
+   char* res = NULL;
+   char* suffix = NULL;
 
    if (str == NULL)
    {
@@ -500,12 +502,21 @@ trim_suffix(char* str)
       return pgmoneta_append(NULL, str);
    }
 
-   char* res = NULL;
-
-   if (pgmoneta_compression_trim_suffix(str, config->compression_type, config->encryption, &res))
+   if (pgmoneta_extraction_get_suffix(config->compression_type, config->encryption, &suffix))
    {
-      return NULL;
+      return pgmoneta_append(NULL, str);
    }
+
+   if (suffix != NULL && strlen(suffix) > 0)
+   {
+      res = pgmoneta_remove_suffix(str, suffix);
+   }
+   else
+   {
+      res = pgmoneta_append(NULL, str);
+   }
+
+   free(suffix);
 
    return res;
 }

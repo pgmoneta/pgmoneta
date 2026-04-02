@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <art.h>
+#include <compression.h>
 #include <hot_standby.h>
 #include <logging.h>
 #include <management.h>
@@ -40,6 +41,7 @@
 
 /* system */
 #include <assert.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 

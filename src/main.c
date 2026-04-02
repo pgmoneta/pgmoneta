@@ -924,19 +924,27 @@ main(int argc, char** argv)
    pgmoneta_log_debug("Configuration size: %lu", shmem_size);
    pgmoneta_log_debug("Known users: %d", config->common.number_of_users);
    pgmoneta_log_debug("Known admins: %d", config->common.number_of_admins);
+   pgmoneta_log_debug("Workers: %d", config->workers);
 
    pgmoneta_os_kernel_version(&os, &kernel_major, &kernel_minor, &kernel_patch);
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
+      char* vault_path = pgmoneta_get_server_backup(i);
+      unsigned long vault_size = pgmoneta_directory_size(vault_path);
+      int server_workers = config->common.servers[i].workers > 0 ? config->common.servers[i].workers : config->workers;
+
       if (config->common.servers[i].online)
       {
-         pgmoneta_log_info("Server %s is online", config->common.servers[i].name);
+         pgmoneta_log_info("Server %s is online (Vault size: %lu bytes, Workers: %d)",
+                           config->common.servers[i].name, vault_size, server_workers);
       }
       else
       {
-         pgmoneta_log_info("Server %s is offline", config->common.servers[i].name);
+         pgmoneta_log_info("Server %s is offline (Vault size: %lu bytes, Workers: %d)",
+                           config->common.servers[i].name, vault_size, server_workers);
       }
+      free(vault_path);
    }
 
    free(os);

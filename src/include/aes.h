@@ -133,13 +133,14 @@ int
 pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, size_t password_length, char** plaintext, int mode);
 
 /**
- * Encrypt the files under the directory in place recursively, also remove unencrypted files.
- * @param d The data directory
+ * Encrypt a directory
+ * @param d The directory
  * @param workers The optional workers
+ * @param excludes The optional excludes
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt_data(char* d, struct workers* workers);
+pgmoneta_encrypt_directory(char* d, struct workers* workers, struct deque* excludes);
 
 /**
  * Clear the thread-local AES cache securely
@@ -155,30 +156,14 @@ void
 pgmoneta_set_master_salt(unsigned char* salt);
 
 /**
- * Encrypt the files under the tablespace directories in place recursively, also remove unencrypted files.
- * @param root The root directory
+ * Decrypt a directory
+ * @param d The directory
  * @param workers The optional workers
+ * @param excludes The optional excludes
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt_tablespaces(char* root, struct workers* workers);
-
-/**
- * Encrypt the files under the directory in place, also remove unencrypted files.
- * @param d The wal directory
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_encrypt_wal(char* d);
-
-/**
- * Encrypt the file under the directory
- * @param d The wal directory
- * @param f The wal file
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_encrypt_wal_file(char* d, char* f);
+pgmoneta_decrypt_directory(char* d, struct workers* workers, struct deque* excludes);
 
 /**
  * Encrypt a single file, also remove the original file
@@ -198,7 +183,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt_file(char* from, char* to);
+pgmoneta_encrypt_file(char* from, char* to, struct workers* workers);
 
 /**
  * Decrypt a single file, also remove the original file
@@ -207,16 +192,7 @@ pgmoneta_encrypt_file(char* from, char* to);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt_file(char* from, char* to);
-
-/**
- * Decrypt the files under the directory in place, also remove encrypted files.
- * @param d wal directory
- * @param workers The optional workers
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_decrypt_directory(char* d, struct workers* workers);
+pgmoneta_decrypt_file(char* from, char* to, struct workers* workers);
 
 /**
  * Decrypt a single file, also remove encrypted file
@@ -256,12 +232,12 @@ int
 pgmoneta_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** dec_buffer, size_t* dec_size, int mode);
 
 /**
- * Check if a file is encrypted
- * @param f The file name
+ * Is the file encrypted
+ * @param file_path The file path
  * @return True if encrypted, otherwise false
  */
 bool
-pgmoneta_is_encrypted(char* f);
+pgmoneta_is_encrypted(char* file_path);
 
 #ifdef __cplusplus
 }

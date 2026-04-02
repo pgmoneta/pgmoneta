@@ -31,13 +31,13 @@
 #include <cmd.h>
 #include <configuration.h>
 #include <deque.h>
+#include <extraction.h>
 #include <logging.h>
 #include <management.h>
 #include <pgmoneta.h>
 #include <security.h>
 #include <shmem.h>
 #include <stddef.h>
-#include <extraction.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
@@ -3756,7 +3756,7 @@ is_tar_archive_input(char* path)
       return false;
    }
 
-   file_type = pgmoneta_get_file_type(path);
+   file_type = pgmoneta_extraction_get_file_type(path);
    if (file_type & PGMONETA_FILE_TYPE_TAR)
    {
       return true;

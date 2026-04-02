@@ -28,9 +28,10 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <compression.h>
+#include <deque.h>
 #include <logging.h>
 #include <utils.h>
-#include <lz4_compression.h>
 #include <workflow.h>
 
 /* system */
@@ -88,7 +89,6 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    char* d = NULL;
    char* backup_base = NULL;
    char* server_backup = NULL;
-   char* backup_data = NULL;
    char* tarfile = NULL;
    int hours;
    int minutes;
@@ -96,6 +96,7 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
+   struct deque* excludes = NULL;
    struct main_configuration* config;
    struct backup* backup = NULL;
 
@@ -116,7 +117,6 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
    backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
-   backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
    tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
@@ -136,15 +136,33 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      pgmoneta_lz4c_data(backup_data, workers);
-      pgmoneta_lz4c_tablespaces(backup_base, workers);
-
-      pgmoneta_workers_wait(workers);
-      if (workers != NULL && !workers->outcome)
+      if (pgmoneta_deque_create(true, &excludes))
       {
          goto error;
       }
+      pgmoneta_deque_add(excludes, "backup.info", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.manifest", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha512", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
+
+      if (pgmoneta_compress_directory(backup_base, COMPRESSION_SERVER_LZ4, workers, excludes))
+      {
+         goto error;
+      }
+
+      if (workers != NULL)
+      {
+         pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
+      }
       pgmoneta_workers_destroy(workers);
+
+      pgmoneta_deque_destroy(excludes);
+      excludes = NULL;
    }
    else
    {
@@ -160,7 +178,7 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_debug("%s doesn't exists", d);
       }
 
-      if (pgmoneta_lz4c_file(tarfile, d))
+      if (pgmoneta_compress_file(tarfile, d, COMPRESSION_SERVER_LZ4, NULL))
       {
          goto error;
       }
@@ -195,6 +213,11 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    return 0;
 
 error:
+
+   if (excludes != NULL)
+   {
+      pgmoneta_deque_destroy(excludes);
+   }
 
    if (number_of_workers > 0)
    {
@@ -254,9 +277,19 @@ lz4_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_lz4d_data(base, workers);
+   if (pgmoneta_decompress_directory(base, COMPRESSION_SERVER_LZ4, workers, NULL))
+   {
+      goto error;
+   }
 
-   pgmoneta_workers_wait(workers);
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         goto error;
+      }
+   }
    pgmoneta_workers_destroy(workers);
 
    total_seconds = (int)difftime(time(NULL), decompress_time);
@@ -270,4 +303,13 @@ lz4_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
    return 0;
+
+error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   return 1;
 }

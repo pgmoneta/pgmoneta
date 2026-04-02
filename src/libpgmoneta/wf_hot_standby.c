@@ -323,26 +323,37 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
          if (config->encryption != ENCRYPTION_NONE)
          {
-            if (pgmoneta_decrypt_directory(destination, workers))
+            if (pgmoneta_decrypt_directory(destination, workers, NULL))
             {
                error = true;
                goto cleanup;
             }
-            pgmoneta_workers_wait(workers);
-            if (workers != NULL && !workers->outcome)
+            if (workers != NULL)
             {
-               error = true;
-               goto cleanup;
+               pgmoneta_workers_wait(workers);
+               if (!workers->outcome)
+               {
+                  error = true;
+                  goto cleanup;
+               }
             }
          }
 
          if (COMPRESSION_ALGORITHM(config->compression_type) != COMPRESSION_ALG_NONE)
          {
-            /* TODO: Workers */
-            if (pgmoneta_decompress_directory(destination))
+            if (pgmoneta_decompress_directory(destination, config->compression_type, workers, NULL))
             {
                error = true;
                goto cleanup;
+            }
+            if (workers != NULL)
+            {
+               pgmoneta_workers_wait(workers);
+               if (!workers->outcome)
+               {
+                  error = true;
+                  goto cleanup;
+               }
             }
          }
 

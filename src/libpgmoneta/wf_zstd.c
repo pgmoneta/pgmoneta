@@ -28,9 +28,10 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <compression.h>
+#include <deque.h>
 #include <logging.h>
 #include <utils.h>
-#include <zstandard_compression.h>
 #include <workflow.h>
 
 /* system */
@@ -89,7 +90,6 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    char* d = NULL;
    char* backup_base = NULL;
    char* server_backup = NULL;
-   char* backup_data = NULL;
    char* tarfile = NULL;
    int hours;
    int minutes;
@@ -97,6 +97,7 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
+   struct deque* excludes = NULL;
    struct main_configuration* config;
    struct backup* backup = NULL;
 
@@ -124,7 +125,6 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
    backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
    server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
-   backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
 
    pgmoneta_log_debug("ZSTD (compress): %s/%s", config->common.servers[server].name, label);
 
@@ -138,16 +138,34 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      pgmoneta_zstandardc_data(backup_data, workers);
-      pgmoneta_zstandardc_tablespaces(backup_base, workers);
-
-      pgmoneta_workers_wait(workers);
-      if (workers != NULL && !workers->outcome)
+      if (pgmoneta_deque_create(true, &excludes))
       {
          goto error;
       }
+      pgmoneta_deque_add(excludes, "backup.info", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.manifest", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha512", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
+
+      if (pgmoneta_compress_directory(backup_base, COMPRESSION_SERVER_ZSTD, workers, excludes))
+      {
+         goto error;
+      }
+
+      if (workers != NULL)
+      {
+         pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
+      }
       pgmoneta_workers_destroy(workers);
       workers = NULL;
+
+      pgmoneta_deque_destroy(excludes);
+      excludes = NULL;
    }
    else
    {
@@ -163,7 +181,10 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_debug("%s doesn't exists", d);
       }
 
-      pgmoneta_zstandardc_file(tarfile, d);
+      if (pgmoneta_compress_file(tarfile, d, COMPRESSION_SERVER_ZSTD, NULL))
+      {
+         goto error;
+      }
    }
 
 #ifdef HAVE_FREEBSD
@@ -194,6 +215,11 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    return 0;
 
 error:
+
+   if (excludes != NULL)
+   {
+      pgmoneta_deque_destroy(excludes);
+   }
 
    if (number_of_workers > 0)
    {
@@ -252,12 +278,18 @@ zstd_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_zstandardd_directory(base, workers);
-
-   pgmoneta_workers_wait(workers);
-   if (workers != NULL && !workers->outcome)
+   if (pgmoneta_decompress_directory(base, COMPRESSION_SERVER_ZSTD, workers, NULL))
    {
       goto error;
+   }
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         goto error;
+      }
    }
    pgmoneta_workers_destroy(workers);
 

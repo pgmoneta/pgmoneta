@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include <compression.h>
 #include <extraction.h>
 #include <logging.h>
 #include <pgmoneta.h>
@@ -40,6 +41,130 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static uint32_t
+normalize_file_type(uint32_t type)
+{
+   uint32_t normalized = type;
+
+   if ((normalized & (PGMONETA_FILE_TYPE_GZIP |
+                      PGMONETA_FILE_TYPE_LZ4 |
+                      PGMONETA_FILE_TYPE_ZSTD |
+                      PGMONETA_FILE_TYPE_BZ2)) != 0)
+   {
+      normalized |= PGMONETA_FILE_TYPE_COMPRESSED;
+   }
+
+   return normalized;
+}
+
+uint32_t
+pgmoneta_extraction_get_file_type(char* file_path)
+{
+   uint32_t type = PGMONETA_FILE_TYPE_UNKNOWN;
+   char* file_path_copy = NULL;
+   char* basename_copy = NULL;
+   char* current = NULL;
+   char* dot = NULL;
+
+   if (file_path == NULL)
+   {
+      return type;
+   }
+
+   file_path_copy = pgmoneta_append(file_path_copy, file_path);
+   if (file_path_copy == NULL)
+   {
+      return type;
+   }
+
+   basename_copy = pgmoneta_append(basename_copy, basename(file_path_copy));
+   free(file_path_copy);
+   file_path_copy = NULL;
+   if (basename_copy == NULL)
+   {
+      return type;
+   }
+
+   current = basename_copy;
+
+   /* Check for encryption suffix first (.aes) */
+   if (pgmoneta_ends_with(current, ".aes"))
+   {
+      type |= PGMONETA_FILE_TYPE_ENCRYPTED;
+      current[strlen(current) - 4] = '\0';
+   }
+
+   /* Check for compression suffixes - set both generic and specific flags */
+   if (pgmoneta_ends_with(current, ".gz"))
+   {
+      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_GZIP;
+      dot = strrchr(current, '.');
+      if (dot != NULL)
+      {
+         *dot = '\0';
+      }
+   }
+   else if (pgmoneta_ends_with(current, ".lz4"))
+   {
+      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_LZ4;
+      dot = strrchr(current, '.');
+      if (dot != NULL)
+      {
+         *dot = '\0';
+      }
+   }
+   else if (pgmoneta_ends_with(current, ".zstd"))
+   {
+      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_ZSTD;
+      dot = strrchr(current, '.');
+      if (dot != NULL)
+      {
+         *dot = '\0';
+      }
+   }
+   else if (pgmoneta_ends_with(current, ".bz2"))
+   {
+      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_BZ2;
+      dot = strrchr(current, '.');
+      if (dot != NULL)
+      {
+         *dot = '\0';
+      }
+   }
+
+   /* Check for TAR archive after stripping compression */
+   if (pgmoneta_ends_with(current, ".tar"))
+   {
+      type |= PGMONETA_FILE_TYPE_TAR;
+      current[strlen(current) - 4] = '\0';
+   }
+
+   /* Check for .tgz (tar.gz shorthand) */
+   if (pgmoneta_ends_with(current, ".tgz"))
+   {
+      type |= PGMONETA_FILE_TYPE_TAR;
+      type |= PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_GZIP;
+      current[strlen(current) - 4] = '\0';
+   }
+
+   /* Check for partial suffix */
+   if (pgmoneta_ends_with(current, ".partial"))
+   {
+      type |= PGMONETA_FILE_TYPE_PARTIAL;
+      current[strlen(current) - 8] = '\0';
+   }
+
+   /* Check for WAL file pattern (24-char hex) */
+   if (strlen(current) == 24 && pgmoneta_is_wal_file(current))
+   {
+      type |= PGMONETA_FILE_TYPE_WAL;
+   }
+
+   free(basename_copy);
+
+   return type;
+}
 
 int
 pgmoneta_extraction_strip_suffix(char* file_path, uint32_t type, char** base_name)
@@ -68,9 +193,9 @@ pgmoneta_extraction_strip_suffix(char* file_path, uint32_t type, char** base_nam
 
    if (effective_type == PGMONETA_FILE_TYPE_UNKNOWN)
    {
-      effective_type = pgmoneta_get_file_type(current);
+      effective_type = pgmoneta_extraction_get_file_type(current);
    }
-   effective_type = pgmoneta_normalize_file_type(effective_type);
+   effective_type = normalize_file_type(effective_type);
 
    if (effective_type & PGMONETA_FILE_TYPE_ENCRYPTED)
    {
@@ -120,7 +245,8 @@ error:
 int
 pgmoneta_extraction_get_suffix(int compression, int encryption, char** suffix)
 {
-   uint32_t type = PGMONETA_FILE_TYPE_UNKNOWN;
+   const char* compression_suffix = NULL;
+   char* result = NULL;
 
    if (suffix == NULL)
    {
@@ -129,27 +255,14 @@ pgmoneta_extraction_get_suffix(int compression, int encryption, char** suffix)
 
    *suffix = NULL;
 
-   switch (compression)
+   if (pgmoneta_compression_get_suffix(compression, &compression_suffix))
    {
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
-         type |= PGMONETA_FILE_TYPE_GZIP;
-         break;
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
-         type |= PGMONETA_FILE_TYPE_ZSTD;
-         break;
-      case COMPRESSION_CLIENT_LZ4:
-      case COMPRESSION_SERVER_LZ4:
-         type |= PGMONETA_FILE_TYPE_LZ4;
-         break;
-      case COMPRESSION_CLIENT_BZIP2:
-         type |= PGMONETA_FILE_TYPE_BZ2;
-         break;
-      case COMPRESSION_NONE:
-         break;
-      default:
-         break;
+      goto error;
+   }
+
+   if (compression_suffix != NULL)
+   {
+      result = pgmoneta_append(result, compression_suffix);
    }
 
    switch (encryption)
@@ -157,7 +270,7 @@ pgmoneta_extraction_get_suffix(int compression, int encryption, char** suffix)
       case ENCRYPTION_AES_256_GCM:
       case ENCRYPTION_AES_192_GCM:
       case ENCRYPTION_AES_128_GCM:
-         type |= PGMONETA_FILE_TYPE_ENCRYPTED;
+         result = pgmoneta_append(result, ".aes");
          break;
       case ENCRYPTION_NONE:
          break;
@@ -165,19 +278,11 @@ pgmoneta_extraction_get_suffix(int compression, int encryption, char** suffix)
          break;
    }
 
-   if (type == PGMONETA_FILE_TYPE_UNKNOWN)
-   {
-      return 0;
-   }
-
-   if (pgmoneta_get_type_suffix(type, suffix))
-   {
-      goto error;
-   }
-
+   *suffix = result;
    return 0;
 
 error:
+   free(result);
    return 1;
 }
 
@@ -360,9 +465,9 @@ extract_file_to_path(char* file_path, uint32_t type, char** destination)
 
    if (file_type == PGMONETA_FILE_TYPE_UNKNOWN)
    {
-      file_type = pgmoneta_get_file_type(file_path);
+      file_type = pgmoneta_extraction_get_file_type(file_path);
    }
-   file_type = pgmoneta_normalize_file_type(file_type);
+   file_type = normalize_file_type(file_type);
 
    if ((file_type & (PGMONETA_FILE_TYPE_ENCRYPTED | PGMONETA_FILE_TYPE_COMPRESSION_MASK)) == 0)
    {
@@ -432,9 +537,9 @@ extract_archive_to_directory(char* file_path, uint32_t type, char* destination)
 
    if (file_type == PGMONETA_FILE_TYPE_UNKNOWN)
    {
-      file_type = pgmoneta_get_file_type(file_path);
+      file_type = pgmoneta_extraction_get_file_type(file_path);
    }
-   file_type = pgmoneta_normalize_file_type(file_type);
+   file_type = normalize_file_type(file_type);
 
    if ((file_type & (PGMONETA_FILE_TYPE_ENCRYPTED | PGMONETA_FILE_TYPE_COMPRESSION_MASK)) != 0)
    {
@@ -472,7 +577,7 @@ extract_archive_to_directory(char* file_path, uint32_t type, char* destination)
    }
 
    /* Verify it's a tar and extract */
-   final_type = pgmoneta_normalize_file_type(pgmoneta_get_file_type(archive_path));
+   final_type = normalize_file_type(pgmoneta_extraction_get_file_type(archive_path));
    if (!(final_type & PGMONETA_FILE_TYPE_TAR))
    {
       pgmoneta_log_error("pgmoneta_extract_file: file is not a TAR archive: %s", file_path);

@@ -31,9 +31,9 @@
 #include <aes.h>
 #include <brt.h>
 #include <compression.h>
+#include <extraction.h>
 #include <json.h>
 #include <logging.h>
-#include <extraction.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
@@ -209,9 +209,10 @@ pgmoneta_validate_wal_filename(char* path, char** base_filename, xlog_seg_no* se
       wal_filename = temp;
    }
 
-   if (pgmoneta_is_encrypted(wal_filename) || pgmoneta_compression_is_compressed(wal_filename))
+   uint32_t file_type = pgmoneta_extraction_get_file_type(wal_filename);
+   if (file_type & (PGMONETA_FILE_TYPE_ENCRYPTED | PGMONETA_FILE_TYPE_COMPRESSED))
    {
-      if (pgmoneta_extraction_strip_suffix(wal_filename, pgmoneta_get_file_type(wal_filename), &temp))
+      if (pgmoneta_extraction_strip_suffix(wal_filename, file_type, &temp))
       {
          free(wal_filename);
          return 1;

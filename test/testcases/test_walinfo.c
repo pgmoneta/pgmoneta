@@ -127,14 +127,14 @@ create_master_key_and_encrypted_wal(const char* master_key_path, struct walfile*
       {
          goto error;
       }
-      if (pgmoneta_encrypt_file(zstd_path, aes_wal_path) != 0)
+      if (pgmoneta_encrypt_file(zstd_path, aes_wal_path, NULL) != 0)
       {
          goto error;
       }
    }
    else
    {
-      if (pgmoneta_encrypt_file(plain_wal_path, aes_wal_path) != 0)
+      if (pgmoneta_encrypt_file(plain_wal_path, aes_wal_path, NULL) != 0)
       {
          goto error;
       }

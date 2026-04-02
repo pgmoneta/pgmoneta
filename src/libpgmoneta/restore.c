@@ -2978,7 +2978,7 @@ create_copy_backup_file_input(
 static int
 file_base_name(char* file, char** basename)
 {
-   return pgmoneta_extraction_strip_suffix(file, pgmoneta_get_file_type(file), basename);
+   return pgmoneta_extraction_strip_suffix(file, pgmoneta_extraction_get_file_type(file), basename);
 }
 
 static int

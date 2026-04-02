@@ -28,7 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <bzip2_compression.h>
+#include <compression.h>
+#include <deque.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -83,13 +84,11 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   int ret = 0;
    struct timespec start_t;
    struct timespec end_t;
    double compression_bzip2_elapsed_time;
    char* d = NULL;
    char* backup_base = NULL;
-   char* backup_data = NULL;
    char* server_backup = NULL;
    char* tarfile = NULL;
    int hours;
@@ -98,6 +97,7 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
+   struct deque* excludes = NULL;
    struct main_configuration* config;
    struct backup* backup = NULL;
 
@@ -133,17 +133,34 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 
       backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
       server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
-      backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
 
-      pgmoneta_bzip2_data(backup_data, workers);
-      pgmoneta_bzip2_tablespaces(backup_base, workers);
-
-      pgmoneta_workers_wait(workers);
-      if (workers != NULL && !workers->outcome)
+      if (pgmoneta_deque_create(true, &excludes))
       {
-         ret = 1;
+         goto error;
+      }
+      pgmoneta_deque_add(excludes, "backup.info", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.manifest", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha512", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
+      pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
+
+      if (pgmoneta_compress_directory(backup_base, COMPRESSION_CLIENT_BZIP2, workers, excludes))
+      {
+         goto error;
+      }
+
+      if (workers != NULL)
+      {
+         pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
       }
       pgmoneta_workers_destroy(workers);
+
+      pgmoneta_deque_destroy(excludes);
+      excludes = NULL;
    }
    else
    {
@@ -162,7 +179,10 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          }
       }
 
-      ret = pgmoneta_bzip2_file(tarfile, d);
+      if (pgmoneta_compress_file(tarfile, d, COMPRESSION_CLIENT_BZIP2, NULL))
+      {
+         goto error;
+      }
    }
 
 #ifdef HAVE_FREEBSD
@@ -187,12 +207,28 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    if (pgmoneta_save_info(server_backup, backup))
    {
       pgmoneta_log_error("Backup: %s/%s not found", config->common.servers[server].name, label);
-      return 1;
+      goto error;
    }
 
    free(d);
 
-   return ret;
+   return 0;
+
+error:
+
+   if (excludes != NULL)
+   {
+      pgmoneta_deque_destroy(excludes);
+   }
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(d);
+
+   return 1;
 }
 
 static int
@@ -200,7 +236,6 @@ bzip2_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   int ret = 0;
    char* base = NULL;
    struct timespec start_t;
    struct timespec end_t;
@@ -249,12 +284,18 @@ bzip2_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   ret = pgmoneta_bunzip2_data(base, workers);
-
-   pgmoneta_workers_wait(workers);
-   if (workers != NULL && !workers->outcome)
+   if (pgmoneta_decompress_directory(base, COMPRESSION_CLIENT_BZIP2, workers, NULL))
    {
-      ret = 1;
+      goto error;
+   }
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         goto error;
+      }
    }
    pgmoneta_workers_destroy(workers);
 
@@ -275,5 +316,14 @@ bzip2_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   return ret;
+   return 0;
+
+error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   return 1;
 }

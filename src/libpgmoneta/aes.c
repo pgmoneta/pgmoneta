@@ -28,7 +28,6 @@
 
 #include <pgmoneta.h>
 #include <aes.h>
-#include <compression.h>
 #include <logging.h>
 #include <management.h>
 #include <security.h>
@@ -61,6 +60,9 @@ static const EVP_CIPHER* (*get_cipher(int mode))(void);
 static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 static int get_key_length(int mode);
 static int encrypt_file(char* from, char* to, int enc);
+static int decrypt_data(char* d, struct workers* workers, struct deque* excludes);
+static int dispatch_aes_operation(char* from, char* to, int enc, struct workers* workers);
+static void do_aes_operation(struct worker_common* wc);
 
 static int encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode);
 
@@ -100,6 +102,14 @@ struct noop_encryptor
    struct encryptor super;
    unsigned char* out_buf; /**< reusable output buffer */
    size_t out_capacity;    /**< allocated capacity of out_buf */
+};
+
+struct aes_operation_task
+{
+   struct worker_common common;
+   int enc;
+   char from[MAX_PATH];
+   char to[MAX_PATH];
 };
 
 static int
@@ -154,8 +164,8 @@ ensure_capacity(unsigned char** buf, size_t* capacity, size_t required)
    return 0;
 }
 
-int
-pgmoneta_encrypt_data(char* d, struct workers* workers)
+static int
+pgmoneta_encrypt_data(char* d, struct workers* workers, struct deque* excludes)
 {
    char* from = NULL;
    char* to = NULL;
@@ -179,7 +189,7 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
          }
 
          pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-         pgmoneta_encrypt_data(path, workers);
+         pgmoneta_encrypt_data(path, workers, excludes);
       }
       else
       {
@@ -189,6 +199,16 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
              !pgmoneta_ends_with(entry->d_name, "backup_label") &&
              !pgmoneta_ends_with(entry->d_name, "backup_manifest"))
          {
+            if (excludes != NULL)
+            {
+               char* ext = strrchr(entry->d_name, '.');
+
+               if (pgmoneta_deque_exists(excludes, entry->d_name) || (ext != NULL && pgmoneta_deque_exists(excludes, ext)))
+               {
+                  continue;
+               }
+            }
+
             from = pgmoneta_append(from, d);
             from = pgmoneta_append(from, "/");
             from = pgmoneta_append(from, entry->d_name);
@@ -278,158 +298,11 @@ do_encrypt_file(struct worker_common* wc)
 }
 
 int
-pgmoneta_encrypt_tablespaces(char* root, struct workers* workers)
+pgmoneta_encrypt_directory(char* d, struct workers* workers, struct deque* excludes)
 {
-   DIR* dir;
-   struct dirent* entry;
+   int ret = pgmoneta_encrypt_data(d, workers, excludes);
 
-   if (!(dir = opendir(root)))
-   {
-      return 1;
-   }
-
-   while ((entry = readdir(dir)) != NULL)
-   {
-      if (entry->d_type == DT_DIR)
-      {
-         char path[1024];
-
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, "data") == 0)
-         {
-            continue;
-         }
-
-         pgmoneta_snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
-         pgmoneta_encrypt_data(path, workers);
-      }
-   }
-
-   closedir(dir);
-   return 0;
-}
-
-int
-pgmoneta_encrypt_wal(char* d)
-{
-   char* from = NULL;
-   char* to = NULL;
-   DIR* dir;
-   struct dirent* entry;
-   char* compress_suffix = NULL;
-   struct main_configuration* config;
-   const char* alg_suffix = NULL;
-
-   config = (struct main_configuration*)shmem;
-
-   pgmoneta_compression_get_suffix(config->compression_type, &alg_suffix);
-   if (alg_suffix != NULL)
-   {
-      compress_suffix = (char*)alg_suffix;
-   }
-   else
-   {
-      compress_suffix = "";
-   }
-
-   if (!(dir = opendir(d)))
-   {
-      return 1;
-   }
-   while ((entry = readdir(dir)) != NULL)
-   {
-      if (entry->d_type == DT_REG)
-      {
-         if (!pgmoneta_ends_with(entry->d_name, compress_suffix))
-         {
-            continue;
-         }
-
-         from = NULL;
-
-         from = pgmoneta_append(from, d);
-         from = pgmoneta_append(from, "/");
-         from = pgmoneta_append(from, entry->d_name);
-
-         to = NULL;
-
-         to = pgmoneta_append(to, d);
-         to = pgmoneta_append(to, "/");
-         to = pgmoneta_append(to, entry->d_name);
-         to = pgmoneta_append(to, ".aes");
-
-         if (pgmoneta_exists(from))
-         {
-            if (!encrypt_file(from, to, 1))
-            {
-               pgmoneta_delete_file(from, NULL);
-               pgmoneta_permission(to, 6, 0, 0);
-            }
-         }
-         else
-         {
-            pgmoneta_log_debug("%s doesn't exists", from);
-         }
-
-         free(from);
-         free(to);
-      }
-   }
-
-   closedir(dir);
-   return 0;
-}
-
-int
-pgmoneta_encrypt_wal_file(char* d, char* f)
-{
-   char* from = NULL;
-   char* to = NULL;
-   char* compress_suffix = NULL;
-   struct main_configuration* config;
-   const char* alg_suffix = NULL;
-
-   config = (struct main_configuration*)shmem;
-
-   pgmoneta_compression_get_suffix(config->compression_type, &alg_suffix);
-   if (alg_suffix != NULL)
-   {
-      compress_suffix = (char*)alg_suffix;
-   }
-   else
-   {
-      compress_suffix = "";
-   }
-
-   from = NULL;
-   from = pgmoneta_append(from, d);
-   from = pgmoneta_append(from, "/");
-   from = pgmoneta_append(from, f);
-   from = pgmoneta_append(from, compress_suffix);
-
-   to = NULL;
-   to = pgmoneta_append(to, d);
-   to = pgmoneta_append(to, "/");
-   to = pgmoneta_append(to, f);
-   to = pgmoneta_append(to, compress_suffix);
-   to = pgmoneta_append(to, ".aes");
-
-   if (pgmoneta_exists(from))
-   {
-      if (!encrypt_file(from, to, 1))
-      {
-         pgmoneta_delete_file(from, NULL);
-         pgmoneta_permission(to, 6, 0, 0);
-      }
-   }
-   else
-   {
-      pgmoneta_log_debug("%s doesn't exists", from);
-   }
-
-   free(from);
-   free(to);
-
-   return 0;
+   return ret;
 }
 
 void
@@ -525,9 +398,11 @@ error:
 }
 
 int
-pgmoneta_encrypt_file(char* from, char* to)
+pgmoneta_encrypt_file(char* from, char* to, struct workers* workers)
 {
    int flag = 0;
+   int ret = 0;
+
    if (!pgmoneta_exists(from))
    {
       pgmoneta_log_error("pgmoneta_encrypt_file: file not exist: %s", from);
@@ -539,6 +414,16 @@ pgmoneta_encrypt_file(char* from, char* to)
       to = pgmoneta_append(to, from);
       to = pgmoneta_append(to, ".aes");
       flag = 1;
+   }
+
+   if (workers != NULL)
+   {
+      ret = dispatch_aes_operation(from, to, 1, workers);
+      if (flag)
+      {
+         free(to);
+      }
+      return ret;
    }
 
    if (encrypt_file(from, to, 1) != 0)
@@ -567,9 +452,10 @@ pgmoneta_encrypt_file(char* from, char* to)
 }
 
 int
-pgmoneta_decrypt_file(char* from, char* to)
+pgmoneta_decrypt_file(char* from, char* to, struct workers* workers)
 {
    int flag = 0;
+   int ret = 0;
 
    if (!pgmoneta_exists(from))
    {
@@ -584,6 +470,16 @@ pgmoneta_decrypt_file(char* from, char* to)
          return 1;
       }
       flag = 1;
+   }
+
+   if (workers != NULL)
+   {
+      ret = dispatch_aes_operation(from, to, 0, workers);
+      if (flag)
+      {
+         free(to);
+      }
+      return ret;
    }
 
    if (encrypt_file(from, to, 0) != 0)
@@ -610,8 +506,8 @@ pgmoneta_decrypt_file(char* from, char* to)
    return 0;
 }
 
-int
-pgmoneta_decrypt_directory(char* d, struct workers* workers)
+static int
+decrypt_data(char* d, struct workers* workers, struct deque* excludes)
 {
    char* from = NULL;
    char* to = NULL;
@@ -621,7 +517,7 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
 
    if (!(dir = opendir(d)))
    {
-      pgmoneta_log_error("pgmoneta_decrypt_directory: Could not open directory %s", d);
+      pgmoneta_log_error("decrypt_data: Could not open directory %s", d);
       goto error;
    }
 
@@ -637,7 +533,7 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
          }
 
          pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-         pgmoneta_decrypt_directory(path, workers);
+         decrypt_data(path, workers, excludes);
       }
       else
       {
@@ -708,6 +604,14 @@ error:
    }
 
    return 1;
+}
+
+int
+pgmoneta_decrypt_directory(char* d, struct workers* workers, struct deque* excludes)
+{
+   int ret = decrypt_data(d, workers, excludes);
+
+   return ret;
 }
 
 void
@@ -2431,19 +2335,78 @@ get_key_length(int mode)
 }
 
 bool
-pgmoneta_is_encrypted(char* f)
+pgmoneta_is_encrypted(char* file_path)
 {
-   if (f == NULL)
-   {
-      return false;
-   }
-
-   if (pgmoneta_ends_with(f, ".aes"))
+   if (pgmoneta_ends_with(file_path, ".aes"))
    {
       return true;
    }
 
    return false;
+}
+
+static int
+dispatch_aes_operation(char* from, char* to, int enc, struct workers* workers)
+{
+   struct aes_operation_task* task = NULL;
+
+   task = (struct aes_operation_task*)malloc(sizeof(struct aes_operation_task));
+   if (task == NULL)
+   {
+      return 1;
+   }
+
+   memset(task, 0, sizeof(struct aes_operation_task));
+
+   memcpy(task->from, from, strlen(from));
+   memcpy(task->to, to, strlen(to));
+   task->enc = enc;
+   task->common.workers = workers;
+
+   if (workers != NULL)
+   {
+      if (workers->outcome)
+      {
+         if (pgmoneta_workers_add(workers, do_aes_operation, (struct worker_common*)task))
+         {
+            free(task);
+            return 1;
+         }
+      }
+      else
+      {
+         do_aes_operation((struct worker_common*)task);
+      }
+   }
+   else
+   {
+      do_aes_operation((struct worker_common*)task);
+   }
+
+   return 0;
+}
+
+static void
+do_aes_operation(struct worker_common* wc)
+{
+   struct aes_operation_task* task = (struct aes_operation_task*)wc;
+   int result;
+
+   if (task->enc)
+   {
+      result = pgmoneta_encrypt_file(task->from, task->to, NULL);
+   }
+   else
+   {
+      result = pgmoneta_decrypt_file(task->from, task->to, NULL);
+   }
+
+   if (result != 0 && task->common.workers != NULL)
+   {
+      task->common.workers->outcome = false;
+   }
+
+   free(task);
 }
 
 /**

@@ -35,6 +35,7 @@ extern "C" {
 
 #include <pgmoneta.h>
 #include <art.h>
+#include <extraction.h>
 #include <message.h>
 #include <workers.h>
 
@@ -73,23 +74,6 @@ extern "C" {
 #define COLOR_CYAN         "\033[36m"
 #define COLOR_WHITE        "\033[97m"
 #define COLOR_RESET        "\033[0m" /* Reset to default color */
-
-/* File type bitmask constants */
-#define PGMONETA_FILE_TYPE_UNKNOWN    0x0000 /* Unknown file type */
-#define PGMONETA_FILE_TYPE_WAL        0x0001 /* WAL file (24-char hex name) */
-#define PGMONETA_FILE_TYPE_COMPRESSED 0x0002 /* Compressed (any type) */
-#define PGMONETA_FILE_TYPE_GZIP       0x0004 /* Compressed with gzip (.gz) */
-#define PGMONETA_FILE_TYPE_LZ4        0x0008 /* Compressed with lz4 (.lz4) */
-#define PGMONETA_FILE_TYPE_ZSTD       0x0010 /* Compressed with zstd (.zstd) */
-#define PGMONETA_FILE_TYPE_BZ2        0x0020 /* Compressed with bzip2 (.bz2) */
-#define PGMONETA_FILE_TYPE_ENCRYPTED  0x0040 /* Encrypted (.aes) */
-#define PGMONETA_FILE_TYPE_TAR        0x0080 /* TAR archive (.tar) */
-#define PGMONETA_FILE_TYPE_PARTIAL    0x0100 /* Partial file (.partial) */
-#define PGMONETA_FILE_TYPE_ALL        0xFFFF /* Match all file types */
-#define PGMONETA_FILE_TYPE_COMPRESSION_MASK \
-   (PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_GZIP | PGMONETA_FILE_TYPE_LZ4 | PGMONETA_FILE_TYPE_ZSTD | PGMONETA_FILE_TYPE_BZ2)
-#define PGMONETA_FILE_TYPE_EXTRACTION_MASK \
-   (PGMONETA_FILE_TYPE_ENCRYPTED | PGMONETA_FILE_TYPE_TAR | PGMONETA_FILE_TYPE_COMPRESSION_MASK)
 
 /** @struct signal_info
  * Defines the signal structure
@@ -1282,45 +1266,6 @@ pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length, unsigne
  */
 size_t
 pgmoneta_get_file_size(char* file_path);
-
-/**
- * Get the file type bitmask for a given file path
- * The bitmask can include combinations of:
- * - PGMONETA_FILE_TYPE_WAL (24-char hex WAL file)
- * - PGMONETA_FILE_TYPE_COMPRESSED (any compression)
- * - PGMONETA_FILE_TYPE_GZIP (.gz)
- * - PGMONETA_FILE_TYPE_LZ4 (.lz4)
- * - PGMONETA_FILE_TYPE_ZSTD (.zstd)
- * - PGMONETA_FILE_TYPE_BZ2 (.bz2)
- * - PGMONETA_FILE_TYPE_ENCRYPTED (.aes)
- * - PGMONETA_FILE_TYPE_TAR (.tar)
- * - PGMONETA_FILE_TYPE_PARTIAL (.partial)
- * @param file_path The file path to check
- * @return Bitmask of file type flags
- */
-uint32_t
-pgmoneta_get_file_type(char* file_path);
-
-/**
- * Normalize a file type bitmask.
- * This ensures specific compression bits imply PGMONETA_FILE_TYPE_COMPRESSED.
- *
- * @param type The file type bitmask
- * @return Normalized file type bitmask
- */
-uint32_t
-pgmoneta_normalize_file_type(uint32_t type);
-
-/**
- * Build the compound suffix string for a file type bitmask.
- * For example, TAR | ZSTD | ENCRYPTED produces ".tar.zstd.aes".
- *
- * @param type The file type bitmask (PGMONETA_FILE_TYPE_*)
- * @param suffix The resulting suffix string (caller must free)
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_get_type_suffix(uint32_t type, char** suffix);
 
 /**
  * Format a string and append it to the original string

@@ -28,6 +28,7 @@
  */
 
 #include <pgmoneta.h>
+#include <compression.h>
 #include <configuration.h>
 #include <tsclient.h>
 #include <tscommon.h>
@@ -181,5 +182,18 @@ MCTF_TEST(test_pgmoneta_server_zstd_backup_restore)
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_compression_is_compressed)
+{
+   MCTF_ASSERT(pgmoneta_is_compressed("file.zstd"), cleanup, "is_compressed zstd failed");
+   MCTF_ASSERT(pgmoneta_is_compressed("file.lz4"), cleanup, "is_compressed lz4 failed");
+   MCTF_ASSERT(pgmoneta_is_compressed("file.bz2"), cleanup, "is_compressed bz2 failed");
+   MCTF_ASSERT(pgmoneta_is_compressed("file.gz"), cleanup, "is_compressed gz failed");
+   MCTF_ASSERT(!pgmoneta_is_compressed("file.txt"), cleanup, "is_compressed negative failed");
+   MCTF_ASSERT(!pgmoneta_is_compressed(NULL), cleanup, "is_compressed NULL failed");
+
+cleanup:
    MCTF_FINISH();
 }

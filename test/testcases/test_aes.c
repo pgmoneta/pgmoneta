@@ -360,11 +360,11 @@ MCTF_TEST(test_aes_file_gcm_roundtrip)
    f = NULL;
 
    /* Encrypt */
-   MCTF_ASSERT(pgmoneta_encrypt_file(from, encrypted) == 0, cleanup, "pgmoneta_encrypt_file failed");
+   MCTF_ASSERT(pgmoneta_encrypt_file(from, encrypted, NULL) == 0, cleanup, "pgmoneta_encrypt_file failed");
    MCTF_ASSERT(pgmoneta_exists(encrypted), cleanup, "Encrypted file does not exist");
 
    /* Decrypt */
-   MCTF_ASSERT(pgmoneta_decrypt_file(encrypted, decrypted) == 0, cleanup, "pgmoneta_decrypt_file failed");
+   MCTF_ASSERT(pgmoneta_decrypt_file(encrypted, decrypted, NULL) == 0, cleanup, "pgmoneta_decrypt_file failed");
    MCTF_ASSERT(pgmoneta_exists(decrypted), cleanup, "Decrypted file does not exist");
 
    /* Verify */
@@ -527,5 +527,15 @@ MCTF_TEST(test_aes_decrypt_truncated_ciphertext_fails)
 cleanup:
    free(ciphertext);
    free(decrypted);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_aes_is_encrypted)
+{
+   MCTF_ASSERT(pgmoneta_is_encrypted("file.aes"), cleanup, "is_encrypted positive failed");
+   MCTF_ASSERT(!pgmoneta_is_encrypted("file.txt"), cleanup, "is_encrypted negative failed");
+   MCTF_ASSERT(!pgmoneta_is_encrypted(NULL), cleanup, "is_encrypted NULL failed");
+
+cleanup:
    MCTF_FINISH();
 }

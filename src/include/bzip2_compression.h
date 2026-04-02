@@ -36,50 +36,8 @@ extern "C" {
 #include <pgmoneta.h>
 #include <compression.h>
 #include <json.h>
-#include <workers.h>
 
 #include <stdlib.h>
-
-/**
- * BZip a data directory
- * @param directory The directory
- * @param workers The optional workers
- * @return 0 upon success, otherwise 1.
- */
-int
-pgmoneta_bzip2_data(char* directory, struct workers* workers);
-
-/**
- * Compress tablespace directories
- * @param root The root directory
- * @param workers The optional workers
- */
-void
-pgmoneta_bzip2_tablespaces(char* root, struct workers* workers);
-
-/**
- * BZip a WAL directory
- * @param directory The directory
- */
-void
-pgmoneta_bzip2_wal(char* directory);
-
-/**
- * BZip a WAL file
- * @param directory The directory
- * @param file The file
- */
-void
-pgmoneta_bzip2_wal_file(char* directory, char* file);
-
-/**
- * BUNZip a directory
- * @param directory The directory
- * @param workers The optional workers
- * @return 0 upon success, otherwise 1.
- */
-int
-pgmoneta_bunzip2_data(char* directory, struct workers* workers);
 
 /**
  * BZip compress a single file, also remove the original file
