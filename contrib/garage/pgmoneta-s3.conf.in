@@ -1,0 +1,24 @@
+[pgmoneta]
+host = localhost
+base_dir = BASE_DIR/backup
+compression = zstd
+retention = 7
+log_type = file
+log_level = debug5
+log_path = LOG_DIR/pgmoneta.log
+unix_socket_dir = /tmp/
+storage_engine = s3
+
+[primary]
+host = localhost
+port = PG_PORT
+user = PG_REPL_USER_NAME
+wal_slot = repl
+create_slot = yes
+s3_endpoint = localhost
+s3_port = 3900
+s3_region = garage
+s3_use_tls = off
+s3_bucket = S3_BUCKET
+s3_access_key_id = S3_ACCESS_KEY_ID
+s3_secret_access_key = S3_SECRET_ACCESS_KEY
