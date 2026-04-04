@@ -204,6 +204,8 @@ Command
 pgmoneta-cli verify <server> <directory> [failed|all]
 ```
 
+
+> **Note:** When using S3 as the storage engine, run `pgmoneta-cli s3 restore` first to download the backup locally before running `pgmoneta-cli verify`.
 Example
 
 ``` sh
