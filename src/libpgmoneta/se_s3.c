@@ -32,10 +32,13 @@
 #include <extraction.h>
 #include <http.h>
 #include <info.h>
+#include <json.h>
 #include <logging.h>
+#include <management.h>
 #include <manifest.h>
 #include <security.h>
 #include <utils.h>
+#include <value.h>
 #include <workflow.h>
 
 /* system */
@@ -57,13 +60,20 @@ static int s3_storage_cleanup(char*, struct art*);
 static int s3_upload_files(char* local_root, char* s3_root, int server, int compression, int encryption);
 static int s3_bootstrap(char* s3_root, int server, char* local_root);
 static int s3_download_files(char* s3_root, char* local_root, int server, int compression, int encryption);
-static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int server);
+static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, char* file_sha512, int server);
 static int s3_list_objects(char* relative_path, char* s3_list, int server, struct deque** objects);
 static int s3_delete_all_objects(char* relative_path, char* s3_list, int server, struct art*) __attribute__((unused));
 static int s3_send_list_request(char* relative_path, char* s3_list, int server, char* continuationToken, struct http_response** response);
 static int s3_send_delete_request(char* relative_path, char* s3_list, int server, char* xml_body, struct http_response** response);
-static int s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class);
 static int s3_send_get_request(char* relative_path, char* s3_root, int server, long range_start, long range_end, struct http_response** response);
+
+static int s3_build_signing_key(char* secret_access_key, char* short_date, char* region,
+                                unsigned char** signing_key, int* signing_key_length);
+static int s3_sign_request(char* method, char* canonical_uri, char* query_string,
+                           struct deque* headers, char* payload_hash,
+                           char* access_key_id, char* secret_access_key, char* region,
+                           char* short_date, char* long_date, char** auth_value);
+static int s3_apply_signed_headers(struct http_request* request, struct deque* headers, char* auth_value);
 
 static char* s3_get_host(int server);
 static char* s3_get_basepath(int server, char* identifier);
@@ -981,8 +991,9 @@ static void
 do_upload_file(struct worker_common* wc)
 {
    struct worker_input* wi = (struct worker_input*)wc;
+   char* file_sha512 = (char*)pgmoneta_json_get(wi->data, MANAGEMENT_ARGUMENT_ORIGINAL);
 
-   if (s3_send_upload_request(wi->directory, wi->from, wi->to, wi->level))
+   if (s3_send_upload_request(wi->directory, wi->from, wi->to, file_sha512, wi->level))
    {
       pgmoneta_log_error("S3 upload: failed %s", wi->to);
       if (wi->common.workers != NULL)
@@ -991,8 +1002,14 @@ do_upload_file(struct worker_common* wc)
       }
    }
 
+   if (wi->data != NULL)
+   {
+      pgmoneta_json_destroy(wi->data);
+   }
+
    free(wi);
 }
+
 static int
 s3_upload_files(char* local_root, char* s3_root, int server, int compression, int encryption)
 {
@@ -1050,6 +1067,18 @@ s3_upload_files(char* local_root, char* s3_root, int server, int compression, in
          free(relative_file);
          goto error;
       }
+      if (pgmoneta_json_create(&payload->data))
+      {
+         pgmoneta_log_error("S3 upload: failed to create json");
+         free(relative_file);
+         goto error;
+      }
+      if (pgmoneta_json_put(payload->data, MANAGEMENT_ARGUMENT_ORIGINAL, (uintptr_t)iter->cur->data, ValueString))
+      {
+         pgmoneta_log_error("S3 upload: failed to put sha512 in the json payload->data");
+         free(relative_file);
+         goto error;
+      }
 
       if (workers != NULL && workers->outcome)
       {
@@ -1077,17 +1106,18 @@ s3_upload_files(char* local_root, char* s3_root, int server, int compression, in
    paths = NULL;
 
    /* upload metadata file last (commit marker) */
-   if (s3_send_upload_request(local_root, s3_root, "backup.manifest", server))
+   // no needs to compute the sha512 for metadata files
+   if (s3_send_upload_request(local_root, s3_root, "backup.manifest", NULL, server))
    {
       pgmoneta_log_error("S3 upload: failed to upload backup.manifest");
       goto error;
    }
-   if (s3_send_upload_request(local_root, s3_root, "backup.sha512", server))
+   if (s3_send_upload_request(local_root, s3_root, "backup.sha512", NULL, server))
    {
       pgmoneta_log_error("S3 upload: failed to upload backup.sha512");
       goto error;
    }
-   if (s3_send_upload_request(local_root, s3_root, "backup.info", server))
+   if (s3_send_upload_request(local_root, s3_root, "backup.info", NULL, server))
    {
       pgmoneta_log_error("S3 upload: failed to upload backup.info");
       goto error;
@@ -1222,30 +1252,214 @@ error:
    return 1;
 }
 static int
+s3_build_signing_key(char* secret_access_key, char* short_date, char* region,
+                     unsigned char** signing_key, int* signing_key_length)
+{
+   char* key = NULL;
+   unsigned char* date_key_hmac = NULL;
+   unsigned char* date_region_key_hmac = NULL;
+   unsigned char* date_region_service_key_hmac = NULL;
+   int hmac_length = 0;
+
+   *signing_key = NULL;
+   *signing_key_length = 0;
+
+   key = pgmoneta_append(key, "AWS4");
+   key = pgmoneta_append(key, secret_access_key);
+
+   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, region, strlen(region), &date_region_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length, "s3", strlen("s3"), &date_region_service_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length, "aws4_request", strlen("aws4_request"), signing_key, signing_key_length))
+   {
+      goto error;
+   }
+
+   free(key);
+   free(date_key_hmac);
+   free(date_region_key_hmac);
+   free(date_region_service_key_hmac);
+
+   return 0;
+
+error:
+
+   free(key);
+   free(date_key_hmac);
+   free(date_region_key_hmac);
+   free(date_region_service_key_hmac);
+
+   return 1;
+}
+
+static int
+s3_sign_request(char* method, char* canonical_uri, char* query_string,
+                struct deque* headers, char* payload_hash,
+                char* access_key_id, char* secret_access_key, char* region,
+                char* short_date, char* long_date, char** auth_value)
+{
+   char* canonical_request = NULL;
+   char* canonical_headers = NULL;
+   char* signed_headers = NULL;
+   char* canonical_request_sha256 = NULL;
+   char* string_to_sign = NULL;
+   unsigned char* signing_key = NULL;
+   unsigned char* signature_hmac = NULL;
+   unsigned char* signature_hex = NULL;
+   int signing_key_length = 0;
+   int hmac_length = 0;
+   bool first = true;
+   struct deque_iterator* iter = NULL;
+
+   *auth_value = NULL;
+
+   pgmoneta_deque_sort(headers);
+
+   pgmoneta_deque_iterator_create(headers, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      canonical_headers = pgmoneta_append(canonical_headers, iter->tag);
+      canonical_headers = pgmoneta_append(canonical_headers, ":");
+      canonical_headers = pgmoneta_append(canonical_headers, (char*)iter->value->data);
+      canonical_headers = pgmoneta_append(canonical_headers, "\n");
+
+      if (!first)
+      {
+         signed_headers = pgmoneta_append(signed_headers, ";");
+      }
+      signed_headers = pgmoneta_append(signed_headers, iter->tag);
+      first = false;
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+
+   /* Build canonical request */
+   canonical_request = pgmoneta_append(canonical_request, method);
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, canonical_uri);
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, query_string != NULL ? query_string : "");
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, canonical_headers);
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, signed_headers);
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, payload_hash);
+
+   pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
+
+   /* Build string to sign */
+   string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
+   string_to_sign = pgmoneta_append(string_to_sign, long_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "\n");
+   string_to_sign = pgmoneta_append(string_to_sign, short_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, region);
+   string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
+   string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
+
+   /* Derive signing key and compute signature */
+   if (s3_build_signing_key(secret_access_key, short_date, region, &signing_key, &signing_key_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key, signing_key_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
+
+   /* Build authorization header */
+   *auth_value = pgmoneta_append(*auth_value, "AWS4-HMAC-SHA256 Credential=");
+   *auth_value = pgmoneta_append(*auth_value, access_key_id);
+   *auth_value = pgmoneta_append(*auth_value, "/");
+   *auth_value = pgmoneta_append(*auth_value, short_date);
+   *auth_value = pgmoneta_append(*auth_value, "/");
+   *auth_value = pgmoneta_append(*auth_value, region);
+   *auth_value = pgmoneta_append(*auth_value, "/s3/aws4_request,SignedHeaders=");
+   *auth_value = pgmoneta_append(*auth_value, signed_headers);
+   *auth_value = pgmoneta_append(*auth_value, ",Signature=");
+   *auth_value = pgmoneta_append(*auth_value, (char*)signature_hex);
+
+   free(canonical_request);
+   free(canonical_headers);
+   free(signed_headers);
+   free(canonical_request_sha256);
+   free(string_to_sign);
+   free(signing_key);
+   free(signature_hmac);
+   free(signature_hex);
+
+   return 0;
+
+error:
+
+   free(canonical_request);
+   free(canonical_headers);
+   free(signed_headers);
+   free(canonical_request_sha256);
+   free(string_to_sign);
+   free(signing_key);
+   free(signature_hmac);
+   free(signature_hex);
+   free(*auth_value);
+   *auth_value = NULL;
+
+   return 1;
+}
+
+static int
+s3_apply_signed_headers(struct http_request* request, struct deque* headers, char* auth_value)
+{
+   struct deque_iterator* iter = NULL;
+
+   if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
+   {
+      return 1;
+   }
+
+   pgmoneta_deque_iterator_create(headers, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      if (pgmoneta_http_request_add_header(request, iter->tag, (char*)iter->value->data))
+      {
+         pgmoneta_deque_iterator_destroy(iter);
+         return 1;
+      }
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+
+   return 0;
+}
+
+static int
 s3_send_list_request(char* relative_path, char* s3_root, int server, char* continuationToken, struct http_response** response)
 {
    char short_date[SHORT_TIME_LENGTH];
    char long_date[LONG_TIME_LENGTH];
-   char* canonical_request = NULL;
    char* auth_value = NULL;
-   char* string_to_sign = NULL;
    char* s3_host = NULL;
    char* s3_path = NULL;
    char* request_path = NULL;
-   char* canonical_request_sha256 = NULL;
-   char* key = NULL;
    char* query_string = NULL;
-   unsigned char* date_key_hmac = NULL;
-   unsigned char* date_region_key_hmac = NULL;
-   unsigned char* date_region_service_key_hmac = NULL;
-   unsigned char* signing_key_hmac = NULL;
-   unsigned char* signature_hmac = NULL;
-   unsigned char* signature_hex = NULL;
-   int hmac_length = 0;
+   char* canonical_uri = NULL;
+   struct deque* sign_headers = NULL;
    struct http* connection = NULL;
    struct http_request* request = NULL;
 
-   char* effective_storage_class = s3_get_effective_storage_class(server);
    char* effective_endpoint = s3_get_effective_endpoint(server);
    char* effective_region = s3_get_effective_region(server);
    char* effective_access_key_id = s3_get_effective_access_key_id(server);
@@ -1298,73 +1512,31 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
    query_string = pgmoneta_append(query_string, encoded_prefix);
    free(encoded_prefix);
 
-   canonical_request = pgmoneta_append(canonical_request, "GET\n/");
+   /* Build canonical URI */
+   canonical_uri = pgmoneta_append(canonical_uri, "/");
    if (path_style)
    {
-      canonical_request = pgmoneta_append(canonical_request, effective_bucket);
+      canonical_uri = pgmoneta_append(canonical_uri, effective_bucket);
    }
-   canonical_request = pgmoneta_append(canonical_request, "\n");
-   canonical_request = pgmoneta_append(canonical_request, query_string);
-   canonical_request = pgmoneta_append(canonical_request, "\n");
-   canonical_request = pgmoneta_append(canonical_request, "host:");
-   canonical_request = pgmoneta_append(canonical_request, s3_host);
-   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-content-sha256:UNSIGNED-PAYLOAD");
-   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-date:");
-   canonical_request = pgmoneta_append(canonical_request, long_date);
-   canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date\n");
-   canonical_request = pgmoneta_append(canonical_request, "UNSIGNED-PAYLOAD");
 
-   pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
+   /* Build headers deque for signing */
+   if (pgmoneta_deque_create(false, &sign_headers))
+   {
+      goto error;
+   }
+   pgmoneta_deque_add(sign_headers, "host", (uintptr_t)s3_host, ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-content-sha256", (uintptr_t)"UNSIGNED-PAYLOAD", ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-date", (uintptr_t)long_date, ValueStringRef);
 
-   string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
-   string_to_sign = pgmoneta_append(string_to_sign, long_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "\n");
-   string_to_sign = pgmoneta_append(string_to_sign, short_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "/");
-   string_to_sign = pgmoneta_append(string_to_sign, effective_region);
-   string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
-   string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
-
-   key = pgmoneta_append(key, "AWS4");
-   key = pgmoneta_append(key, effective_secret_access_key);
-
-   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
+   if (s3_sign_request("GET", canonical_uri, query_string,
+                       sign_headers, "UNSIGNED-PAYLOAD",
+                       effective_access_key_id, effective_secret_access_key, effective_region,
+                       short_date, long_date, &auth_value))
    {
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, effective_region, strlen(effective_region), &date_region_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length, "s3", strlen("s3"), &date_region_service_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length, "aws4_request", strlen("aws4_request"), &signing_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
-
-   // Build authorization header with matching signed headers
-   auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
-   auth_value = pgmoneta_append(auth_value, effective_access_key_id);
-   auth_value = pgmoneta_append(auth_value, "/");
-   auth_value = pgmoneta_append(auth_value, short_date);
-   auth_value = pgmoneta_append(auth_value, "/");
-   auth_value = pgmoneta_append(auth_value, effective_region);
-   auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=");
-   auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
-
+   /* Build connection */
    int s3_port;
 
    if (effective_port != 0)
@@ -1404,7 +1576,7 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
       goto error;
    }
 
-   if (s3_add_request_headers(request, auth_value, "UNSIGNED-PAYLOAD", long_date, effective_storage_class))
+   if (s3_apply_signed_headers(request, sign_headers, auth_value))
    {
       goto error;
    }
@@ -1427,20 +1599,11 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
 
    free(s3_host);
    free(request_path);
-   free(signature_hex);
-   free(signature_hmac);
-   free(signing_key_hmac);
-   free(date_region_service_key_hmac);
-   free(date_region_key_hmac);
-   free(date_key_hmac);
-   free(key);
    free(s3_path);
-   free(canonical_request_sha256);
-   free(canonical_request);
-   free(string_to_sign);
    free(auth_value);
    free(query_string);
-
+   free(canonical_uri);
+   pgmoneta_deque_destroy(sign_headers);
    pgmoneta_http_request_destroy(request);
    pgmoneta_http_destroy(connection);
 
@@ -1450,20 +1613,11 @@ error:
 
    free(s3_host);
    free(request_path);
-   free(signature_hex);
-   free(signature_hmac);
-
-   free(signing_key_hmac);
-   free(date_region_service_key_hmac);
-   free(date_region_key_hmac);
-   free(date_key_hmac);
-   free(key);
    free(s3_path);
-   free(canonical_request_sha256);
-   free(canonical_request);
-   free(string_to_sign);
    free(auth_value);
    free(query_string);
+   free(canonical_uri);
+   pgmoneta_deque_destroy(sign_headers);
 
    if (connection != NULL)
    {
@@ -1483,23 +1637,14 @@ s3_send_delete_request(char* relative_path, char* s3_root, int server, char* xml
 {
    char short_date[SHORT_TIME_LENGTH];
    char long_date[LONG_TIME_LENGTH];
-   char* canonical_request = NULL;
    char* auth_value = NULL;
-   char* string_to_sign = NULL;
    char* s3_host = NULL;
    char* s3_path = NULL;
    char* request_path = NULL;
-   char* canonical_request_sha256 = NULL;
-   char* key = NULL;
    char* query_string = NULL;
    char* body_hash = NULL;
-   unsigned char* date_key_hmac = NULL;
-   unsigned char* date_region_key_hmac = NULL;
-   unsigned char* date_region_service_key_hmac = NULL;
-   unsigned char* signing_key_hmac = NULL;
-   unsigned char* signature_hmac = NULL;
-   unsigned char* signature_hex = NULL;
-   int hmac_length = 0;
+   char* canonical_uri = NULL;
+   struct deque* sign_headers = NULL;
    struct http* connection = NULL;
    struct http_request* request = NULL;
 
@@ -1545,74 +1690,31 @@ s3_send_delete_request(char* relative_path, char* s3_root, int server, char* xml
 
    s3_host = s3_get_host(server);
 
-   canonical_request = pgmoneta_append(canonical_request, "POST\n/");
+   /* Build canonical URI */
+   canonical_uri = pgmoneta_append(canonical_uri, "/");
    if (path_style)
    {
-      canonical_request = pgmoneta_append(canonical_request, effective_bucket);
+      canonical_uri = pgmoneta_append(canonical_uri, effective_bucket);
    }
-   canonical_request = pgmoneta_append(canonical_request, "\n");
-   canonical_request = pgmoneta_append(canonical_request, query_string);
-   canonical_request = pgmoneta_append(canonical_request, "\n");
-   canonical_request = pgmoneta_append(canonical_request, "host:");
-   canonical_request = pgmoneta_append(canonical_request, s3_host);
-   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-content-sha256:");
-   canonical_request = pgmoneta_append(canonical_request, body_hash);
-   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-date:");
-   canonical_request = pgmoneta_append(canonical_request, long_date);
-   canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date\n");
-   canonical_request = pgmoneta_append(canonical_request, body_hash);
 
-   pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
+   /* Build headers deque for signing */
+   if (pgmoneta_deque_create(false, &sign_headers))
+   {
+      goto error;
+   }
+   pgmoneta_deque_add(sign_headers, "host", (uintptr_t)s3_host, ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-content-sha256", (uintptr_t)body_hash, ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-date", (uintptr_t)long_date, ValueStringRef);
 
-   string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
-   string_to_sign = pgmoneta_append(string_to_sign, long_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "\n");
-   string_to_sign = pgmoneta_append(string_to_sign, short_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "/");
-   string_to_sign = pgmoneta_append(string_to_sign, effective_region);
-   string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
-   string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
-
-   key = pgmoneta_append(key, "AWS4");
-   key = pgmoneta_append(key, effective_secret_access_key);
-
-   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
+   if (s3_sign_request("POST", canonical_uri, query_string,
+                       sign_headers, body_hash,
+                       effective_access_key_id, effective_secret_access_key, effective_region,
+                       short_date, long_date, &auth_value))
    {
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, effective_region, strlen(effective_region), &date_region_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length, "s3", strlen("s3"), &date_region_service_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length, "aws4_request", strlen("aws4_request"), &signing_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
-
-   // Build authorization header with matching signed headers
-   auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
-   auth_value = pgmoneta_append(auth_value, effective_access_key_id);
-   auth_value = pgmoneta_append(auth_value, "/");
-   auth_value = pgmoneta_append(auth_value, short_date);
-   auth_value = pgmoneta_append(auth_value, "/");
-   auth_value = pgmoneta_append(auth_value, effective_region);
-   auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=");
-   auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
-
+   /* Build connection */
    int s3_port;
 
    if (effective_port != 0)
@@ -1652,7 +1754,7 @@ s3_send_delete_request(char* relative_path, char* s3_root, int server, char* xml
       goto error;
    }
 
-   if (s3_add_request_headers(request, auth_value, body_hash, long_date, ""))
+   if (s3_apply_signed_headers(request, sign_headers, auth_value))
    {
       goto error;
    }
@@ -1698,21 +1800,12 @@ s3_send_delete_request(char* relative_path, char* s3_root, int server, char* xml
 
    free(s3_host);
    free(request_path);
-   free(signature_hex);
-   free(signature_hmac);
-   free(signing_key_hmac);
-   free(date_region_service_key_hmac);
-   free(date_region_key_hmac);
-   free(date_key_hmac);
-   free(key);
    free(s3_path);
    free(body_hash);
-   free(canonical_request_sha256);
-   free(canonical_request);
-   free(string_to_sign);
    free(auth_value);
    free(query_string);
-
+   free(canonical_uri);
+   pgmoneta_deque_destroy(sign_headers);
    pgmoneta_http_request_destroy(request);
    pgmoneta_http_destroy(connection);
 
@@ -1722,21 +1815,12 @@ error:
 
    free(s3_host);
    free(request_path);
-   free(signature_hex);
-   free(signature_hmac);
-
-   free(signing_key_hmac);
-   free(date_region_service_key_hmac);
-   free(date_region_key_hmac);
-   free(date_key_hmac);
-   free(key);
    free(s3_path);
    free(body_hash);
-   free(canonical_request_sha256);
-   free(canonical_request);
-   free(string_to_sign);
    free(auth_value);
    free(query_string);
+   free(canonical_uri);
+   pgmoneta_deque_destroy(sign_headers);
 
    if (connection != NULL)
    {
@@ -1757,33 +1841,21 @@ s3_send_get_request(char* relative_path, char* s3_root, int server,
 {
    char short_date[SHORT_TIME_LENGTH];
    char long_date[LONG_TIME_LENGTH];
-   char* canonical_request = NULL;
    char* auth_value = NULL;
-   char* string_to_sign = NULL;
    char* s3_host = NULL;
    char* s3_path = NULL;
    char* request_path = NULL;
-   char* canonical_request_sha256 = NULL;
-   char* key = NULL;
    char* body_hash = NULL;
-   char* range_header = NULL;
-   unsigned char* date_key_hmac = NULL;
-   unsigned char* date_region_key_hmac = NULL;
-   unsigned char* date_region_service_key_hmac = NULL;
-   unsigned char* signing_key_hmac = NULL;
-   unsigned char* signature_hmac = NULL;
-   unsigned char* signature_hex = NULL;
-   int hmac_length = 0;
+   char* canonical_uri = NULL;
+   struct deque* sign_headers = NULL;
    struct http* connection = NULL;
    struct http_request* request = NULL;
 
-   char* effective_endpoint = s3_get_effective_endpoint(server);
    char* effective_region = s3_get_effective_region(server);
    char* effective_access_key_id = s3_get_effective_access_key_id(server);
    char* effective_secret_access_key = s3_get_effective_secret_access_key(server);
    int effective_port = s3_get_effective_port(server);
    bool effective_use_tls = s3_get_effective_use_tls(server);
-   bool path_style = (strlen(effective_endpoint) > 0);
 
    s3_path = pgmoneta_append(s3_path, s3_root);
    if (relative_path != NULL && strlen(relative_path) > 0)
@@ -1803,117 +1875,38 @@ s3_send_get_request(char* relative_path, char* s3_root, int server,
       goto error;
    }
 
+   s3_host = s3_get_host(server);
+
    if (pgmoneta_generate_string_sha256_hash("", &body_hash))
    {
       goto error;
    }
 
-   s3_host = s3_get_host(server);
+   /* Build canonical URI */
+   canonical_uri = pgmoneta_append(canonical_uri, "/");
+   canonical_uri = pgmoneta_append(canonical_uri, s3_path);
 
+   /* Build headers deque for signing */
+   if (pgmoneta_deque_create(false, &sign_headers))
+   {
+      goto error;
+   }
+   pgmoneta_deque_add(sign_headers, "host", (uintptr_t)s3_host, ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-content-sha256", (uintptr_t)body_hash, ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-date", (uintptr_t)long_date, ValueStringRef);
    if (range_start >= 0 && range_end > range_start)
    {
-      char range_buf[64];
-      range_header = pgmoneta_append(range_header, "bytes=");
-      pgmoneta_snprintf(range_buf, sizeof(range_buf), "%ld-%ld", range_start, range_end);
-      range_header = pgmoneta_append(range_header, range_buf);
+      char range_buf[128];
+      pgmoneta_snprintf(range_buf, sizeof(range_buf), "bytes=%ld-%ld", range_start, range_end);
+      pgmoneta_deque_add(sign_headers, "range", (uintptr_t)range_buf, ValueString);
    }
 
-   canonical_request = pgmoneta_append(canonical_request, "GET\n/");
-   canonical_request = pgmoneta_append(canonical_request, s3_path);
-   canonical_request = pgmoneta_append(canonical_request, "\n\n");
-
-   canonical_request = pgmoneta_append(canonical_request, "host:");
-   canonical_request = pgmoneta_append(canonical_request, s3_host);
-   canonical_request = pgmoneta_append(canonical_request, "\n");
-
-   if (range_header != NULL)
-   {
-      canonical_request = pgmoneta_append(canonical_request, "range:");
-      canonical_request = pgmoneta_append(canonical_request, range_header);
-      canonical_request = pgmoneta_append(canonical_request, "\n");
-   }
-
-   canonical_request = pgmoneta_append(canonical_request, "x-amz-content-sha256:");
-   canonical_request = pgmoneta_append(canonical_request, body_hash);
-   canonical_request = pgmoneta_append(canonical_request, "\n");
-
-   canonical_request = pgmoneta_append(canonical_request, "x-amz-date:");
-   canonical_request = pgmoneta_append(canonical_request, long_date);
-   canonical_request = pgmoneta_append(canonical_request, "\n\n");
-
-   if (range_header != NULL)
-   {
-      canonical_request = pgmoneta_append(canonical_request, "host;range;x-amz-content-sha256;x-amz-date\n");
-   }
-   else
-   {
-      canonical_request = pgmoneta_append(canonical_request, "host;x-amz-content-sha256;x-amz-date\n");
-   }
-
-   canonical_request = pgmoneta_append(canonical_request, body_hash);
-
-   pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
-
-   string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
-   string_to_sign = pgmoneta_append(string_to_sign, long_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "\n");
-   string_to_sign = pgmoneta_append(string_to_sign, short_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "/");
-   string_to_sign = pgmoneta_append(string_to_sign, effective_region);
-   string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
-   string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
-
-   key = pgmoneta_append(key, "AWS4");
-   key = pgmoneta_append(key, effective_secret_access_key);
-
-   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
+   if (s3_sign_request("GET", canonical_uri, NULL,
+                       sign_headers, body_hash,
+                       effective_access_key_id, effective_secret_access_key, effective_region,
+                       short_date, long_date, &auth_value))
    {
       goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, effective_region, strlen(effective_region), &date_region_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length, "s3", strlen("s3"), &date_region_service_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length, "aws4_request", strlen("aws4_request"), &signing_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
-
-   if (range_start >= 0 && range_end > range_start)
-   {
-      auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
-      auth_value = pgmoneta_append(auth_value, effective_access_key_id);
-      auth_value = pgmoneta_append(auth_value, "/");
-      auth_value = pgmoneta_append(auth_value, short_date);
-      auth_value = pgmoneta_append(auth_value, "/");
-      auth_value = pgmoneta_append(auth_value, effective_region);
-      auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;range;x-amz-content-sha256;x-amz-date,Signature=");
-      auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
-   }
-   else
-   {
-      auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
-      auth_value = pgmoneta_append(auth_value, effective_access_key_id);
-      auth_value = pgmoneta_append(auth_value, "/");
-      auth_value = pgmoneta_append(auth_value, short_date);
-      auth_value = pgmoneta_append(auth_value, "/");
-      auth_value = pgmoneta_append(auth_value, effective_region);
-      auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=");
-      auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
    }
 
    int s3_port;
@@ -1937,7 +1930,6 @@ s3_send_get_request(char* relative_path, char* s3_root, int server,
       goto error;
    }
 
-   (void)path_style;
    request_path = pgmoneta_append(request_path, "/");
    request_path = pgmoneta_append(request_path, s3_path);
 
@@ -1946,17 +1938,9 @@ s3_send_get_request(char* relative_path, char* s3_root, int server,
       goto error;
    }
 
-   if (s3_add_request_headers(request, auth_value, body_hash, long_date, ""))
+   if (s3_apply_signed_headers(request, sign_headers, auth_value))
    {
       goto error;
-   }
-
-   if (range_header != NULL)
-   {
-      if (pgmoneta_http_request_add_header(request, "Range", range_header))
-      {
-         goto error;
-      }
    }
 
    if (pgmoneta_http_invoke(connection, request, response))
@@ -1966,21 +1950,11 @@ s3_send_get_request(char* relative_path, char* s3_root, int server,
 
    free(s3_host);
    free(request_path);
-   free(range_header);
-   free(signature_hex);
-   free(signature_hmac);
-   free(signing_key_hmac);
-   free(date_region_service_key_hmac);
-   free(date_region_key_hmac);
-   free(date_key_hmac);
-   free(key);
    free(s3_path);
    free(body_hash);
-   free(canonical_request_sha256);
-   free(canonical_request);
-   free(string_to_sign);
    free(auth_value);
-
+   free(canonical_uri);
+   pgmoneta_deque_destroy(sign_headers);
    pgmoneta_http_request_destroy(request);
    pgmoneta_http_destroy(connection);
 
@@ -1990,20 +1964,11 @@ error:
 
    free(s3_host);
    free(request_path);
-   free(range_header);
-   free(signature_hex);
-   free(signature_hmac);
-   free(signing_key_hmac);
-   free(date_region_service_key_hmac);
-   free(date_region_key_hmac);
-   free(date_key_hmac);
-   free(key);
    free(s3_path);
    free(body_hash);
-   free(canonical_request_sha256);
-   free(canonical_request);
-   free(string_to_sign);
    free(auth_value);
+   free(canonical_uri);
+   pgmoneta_deque_destroy(sign_headers);
 
    if (connection != NULL)
    {
@@ -2017,48 +1982,36 @@ error:
 
    return 1;
 }
+
 static int
-s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int server)
+s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, char* file_sha512, int server)
 {
    char short_date[SHORT_TIME_LENGTH];
    char long_date[LONG_TIME_LENGTH];
-   char* canonical_request = NULL;
    char* auth_value = NULL;
-   char* string_to_sign = NULL;
    char* s3_host = NULL;
    char* s3_path = NULL;
+   char* local_path = NULL;
    char* request_path = NULL;
    char* file_sha256 = NULL;
-   char* canonical_request_sha256 = NULL;
-   char* key = NULL;
-   char* local_path = NULL;
-   unsigned char* date_key_hmac = NULL;
-   unsigned char* date_region_key_hmac = NULL;
-   unsigned char* date_region_service_key_hmac = NULL;
-   unsigned char* signing_key_hmac = NULL;
-   unsigned char* signature_hmac = NULL;
-   unsigned char* signature_hex = NULL;
-   int hmac_length = 0;
    FILE* file = NULL;
    struct stat file_info;
    void* file_data = NULL;
+   char* canonical_uri = NULL;
+   struct deque* sign_headers = NULL;
    struct http* connection = NULL;
    struct http_request* request = NULL;
    struct http_response* response = NULL;
-   bool use_storage_class = false;
 
-   char* effective_storage_class = s3_get_effective_storage_class(server);
    char* effective_endpoint = s3_get_effective_endpoint(server);
    char* effective_region = s3_get_effective_region(server);
    char* effective_access_key_id = s3_get_effective_access_key_id(server);
    char* effective_secret_access_key = s3_get_effective_secret_access_key(server);
    int effective_port = s3_get_effective_port(server);
    bool effective_use_tls = s3_get_effective_use_tls(server);
+   char* effective_storage_class = s3_get_effective_storage_class(server);
 
-   if (strlen(effective_storage_class) > 0 && strlen(effective_endpoint) == 0)
-   {
-      use_storage_class = true;
-   }
+   bool use_storage_class = strlen(effective_storage_class) > 0 && strlen(effective_endpoint) == 0;
 
    local_path = pgmoneta_append(local_path, local_root);
    if (strlen(relative_path) > 0)
@@ -2088,93 +2041,43 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int
       goto error;
    }
 
-   pgmoneta_create_sha256_file(local_path, &file_sha256);
-
    s3_host = s3_get_host(server);
 
-   // Build canonical request
-   canonical_request = pgmoneta_append(canonical_request, "PUT\n/");
-   canonical_request = pgmoneta_append(canonical_request, s3_path);
-   canonical_request = pgmoneta_append(canonical_request, "\n\nhost:");
-   canonical_request = pgmoneta_append(canonical_request, s3_host);
-   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-content-sha256:");
-   canonical_request = pgmoneta_append(canonical_request, file_sha256);
-   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-date:");
-   canonical_request = pgmoneta_append(canonical_request, long_date);
+   pgmoneta_create_sha256_file(local_path, &file_sha256);
+
+   /* Build canonical URI */
+   canonical_uri = pgmoneta_append(canonical_uri, "/");
+   canonical_uri = pgmoneta_append(canonical_uri, s3_path);
+
+   /* Build headers deque for signing */
+   if (pgmoneta_deque_create(false, &sign_headers))
+   {
+      goto error;
+   }
+   pgmoneta_deque_add(sign_headers, "host", (uintptr_t)s3_host, ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-content-sha256", (uintptr_t)file_sha256, ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-date", (uintptr_t)long_date, ValueStringRef);
+
+   if (file_sha512 != NULL && strlen(file_sha512) == 128)
+   {
+      pgmoneta_deque_add(sign_headers, "x-amz-meta-sha512", (uintptr_t)file_sha512, ValueStringRef);
+   }
 
    if (use_storage_class)
    {
-      canonical_request = pgmoneta_append(canonical_request, "\nx-amz-storage-class:");
-      canonical_request = pgmoneta_append(canonical_request, effective_storage_class);
-      canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date;x-amz-storage-class\n");
-   }
-   else
-   {
-      canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date\n");
+      pgmoneta_deque_add(sign_headers, "x-amz-storage-class", (uintptr_t)effective_storage_class, ValueStringRef);
    }
 
-   canonical_request = pgmoneta_append(canonical_request, file_sha256);
-
-   pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
-
-   string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
-   string_to_sign = pgmoneta_append(string_to_sign, long_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "\n");
-   string_to_sign = pgmoneta_append(string_to_sign, short_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "/");
-   string_to_sign = pgmoneta_append(string_to_sign, effective_region);
-   string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
-   string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
-
-   key = pgmoneta_append(key, "AWS4");
-   key = pgmoneta_append(key, effective_secret_access_key);
-
-   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
+   if (s3_sign_request("PUT", canonical_uri, NULL,
+                       sign_headers, file_sha256,
+                       effective_access_key_id, effective_secret_access_key, effective_region,
+                       short_date, long_date, &auth_value))
    {
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, effective_region, strlen(effective_region), &date_region_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length, "s3", strlen("s3"), &date_region_service_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length, "aws4_request", strlen("aws4_request"), &signing_key_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
-   {
-      goto error;
-   }
-
-   pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
-
-   // Build authorization header with matching signed headers
-   auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
-   auth_value = pgmoneta_append(auth_value, effective_access_key_id);
-   auth_value = pgmoneta_append(auth_value, "/");
-   auth_value = pgmoneta_append(auth_value, short_date);
-   auth_value = pgmoneta_append(auth_value, "/");
-   auth_value = pgmoneta_append(auth_value, effective_region);
-
-   if (use_storage_class)
-   {
-      auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=");
-   }
-   else
-   {
-      auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=");
-   }
-
-   auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
    file = fopen(local_path, "rb");
+
    if (file == NULL)
    {
       goto error;
@@ -2229,10 +2132,11 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int
       goto error;
    }
 
-   if (s3_add_request_headers(request, auth_value, file_sha256, long_date, effective_storage_class))
+   if (s3_apply_signed_headers(request, sign_headers, auth_value))
    {
       goto error;
    }
+
    if (pgmoneta_http_request_add_header(request, "Content-Type", "application/octet-stream"))
    {
       goto error;
@@ -2262,21 +2166,12 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int
    free(s3_host);
    free(request_path);
    free(file_sha256);
-   free(signature_hex);
-   free(signature_hmac);
-   free(signing_key_hmac);
-   free(date_region_service_key_hmac);
-   free(date_region_key_hmac);
-   free(date_key_hmac);
-   free(key);
    free(local_path);
    free(s3_path);
-   free(canonical_request_sha256);
-   free(canonical_request);
-   free(string_to_sign);
    free(auth_value);
    free(file_data);
-
+   free(canonical_uri);
+   pgmoneta_deque_destroy(sign_headers);
    pgmoneta_http_request_destroy(request);
    pgmoneta_http_response_destroy(response);
    pgmoneta_http_destroy(connection);
@@ -2287,22 +2182,13 @@ error:
 
    free(s3_host);
    free(request_path);
-   free(signature_hex);
-   free(signature_hmac);
-
-   free(signing_key_hmac);
-   free(date_region_service_key_hmac);
-   free(date_region_key_hmac);
-   free(date_key_hmac);
-   free(key);
    free(local_path);
    free(s3_path);
-   free(canonical_request_sha256);
    free(file_sha256);
-   free(canonical_request);
-   free(string_to_sign);
    free(auth_value);
    free(file_data);
+   free(canonical_uri);
+   pgmoneta_deque_destroy(sign_headers);
 
    if (connection != NULL)
    {
@@ -2400,31 +2286,6 @@ s3_get_basepath(int server, char* identifier)
    return d;
 }
 
-static int
-s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class)
-{
-   if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
-   {
-      return 1;
-   }
-
-   if (pgmoneta_http_request_add_header(request, "x-amz-content-sha256", file_sha256))
-   {
-      return 1;
-   }
-
-   if (pgmoneta_http_request_add_header(request, "x-amz-date", long_date))
-   {
-      return 1;
-   }
-
-   if (strlen(storage_class) && pgmoneta_http_request_add_header(request, "x-amz-storage-class", storage_class))
-   {
-      return 1;
-   }
-
-   return 0;
-}
 static char*
 s3_url_encode(char* str)
 {
