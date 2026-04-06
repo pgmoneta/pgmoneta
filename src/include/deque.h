@@ -50,6 +50,15 @@ struct deque_node
    struct deque_node* prev; /**< The previous pointer */
 };
 
+/**
+ * Compare two values in a deque
+ * @param a The first value
+ * @param b The second value
+ * @return Less than 0 if a should be before b, 0 if equal, otherwise greater than 0
+ */
+
+typedef int (*compare_cb)(struct value* a, struct value* b);
+
 /** @struct deque
  * Defines a deque
  */
@@ -258,9 +267,10 @@ pgmoneta_deque_list(struct deque* deque);
 /**
  * Sort the deque
  * @param deque The deque
+ * @param compare [Optional] The compare function pointer, if NULL then tag comparison is used
  */
 void
-pgmoneta_deque_sort(struct deque* deque);
+pgmoneta_deque_sort(struct deque* deque, compare_cb compare);
 
 /**
  * Convert what's inside deque to string

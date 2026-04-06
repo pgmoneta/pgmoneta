@@ -2148,7 +2148,7 @@ pgmoneta_get_files(uint32_t file_type_mask, char* base, bool recursive, struct d
       }
    }
 
-   pgmoneta_deque_sort(array);
+   pgmoneta_deque_sort(array, NULL);
 
    *files = array;
 
@@ -2313,7 +2313,7 @@ pgmoneta_get_wal_files(char* base, struct deque** files)
       }
    }
 
-   pgmoneta_deque_sort(array);
+   pgmoneta_deque_sort(array, NULL);
 
    *files = array;
 

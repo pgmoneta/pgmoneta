@@ -417,8 +417,9 @@ mctf_get_results(size_t* count);
  * When no arguments: selects MCTF_SKIP_IMPL_0 which passes NULL as format.
  * When arguments provided: selects MCTF_SKIP_IMPL_1 which uses first arg as format.
  */
-#define MCTF_SKIP(...) \
-   MCTF_SKIP_GET_HELPER(, ##__VA_ARGS__, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_0, dummy)(__VA_ARGS__)
+#define MCTF_SKIP(...)                                                                                                  \
+   MCTF_SKIP_GET_HELPER(, ##__VA_ARGS__, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_0, dummy) \
+   (__VA_ARGS__)
 
 /**
  * Finish a test function - returns mctf_errno

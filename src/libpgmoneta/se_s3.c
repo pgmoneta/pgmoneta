@@ -1325,7 +1325,7 @@ s3_sign_request(char* method, char* canonical_uri, char* query_string,
 
    *auth_value = NULL;
 
-   pgmoneta_deque_sort(headers);
+   pgmoneta_deque_sort(headers, NULL);
 
    pgmoneta_deque_iterator_create(headers, &iter);
    while (pgmoneta_deque_iterator_next(iter))
