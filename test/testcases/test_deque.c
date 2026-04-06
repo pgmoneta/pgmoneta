@@ -355,7 +355,7 @@ MCTF_TEST(test_deque_sort)
       MCTF_ASSERT(!pgmoneta_deque_add(dq, tag, index[i], ValueInt32), cleanup, "add failed");
    }
 
-   pgmoneta_deque_sort(dq);
+   pgmoneta_deque_sort(dq, NULL);
 
    MCTF_ASSERT(!pgmoneta_deque_iterator_create(dq, &iter), cleanup, "iterator creation failed");
 
@@ -366,6 +366,82 @@ MCTF_TEST(test_deque_sort)
       MCTF_ASSERT_STR_EQ(iter->tag, tag, cleanup, "sorted tag mismatch");
       cnt++;
    }
+
+cleanup:
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(dq);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_deque_custom_sort_values)
+{
+   struct deque* dq = NULL;
+   struct deque_iterator* iter = NULL;
+   int cnt = 0;
+
+   int index[6] = {2, 1, 3, 5, 4, 0};
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(!pgmoneta_deque_create(false, &dq), cleanup, "custom deque creation failed");
+
+   for (int i = 0; i < 6; i++)
+   {
+      MCTF_ASSERT(!pgmoneta_deque_add(dq, NULL, index[i], ValueInt32), cleanup, "add failed");
+   }
+
+   pgmoneta_deque_sort(dq, pgmoneta_value_compare);
+
+   MCTF_ASSERT(!pgmoneta_deque_iterator_create(dq, &iter), cleanup, "iterator creation failed");
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      MCTF_ASSERT_INT_EQ(pgmoneta_value_data(iter->value), cnt, cleanup, "sorted value mismatch");
+      cnt++;
+   }
+
+cleanup:
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(dq);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_deque_sort_mixed_and_edge_cases)
+{
+   struct deque* dq = NULL;
+   struct deque_iterator* iter = NULL;
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(!pgmoneta_deque_create(false, &dq), cleanup, "custom deque creation failed");
+
+   pgmoneta_deque_add(dq, "tag1", (uintptr_t)100, ValueInt32);
+   pgmoneta_deque_add(dq, "tag2", (uintptr_t)"zebra", ValueString);
+   pgmoneta_deque_add(dq, "tag3", (uintptr_t)5, ValueInt32);
+   pgmoneta_deque_add(dq, "tag4", (uintptr_t)"apple", ValueString);
+
+   pgmoneta_deque_add(dq, NULL, (uintptr_t)50, ValueInt32);
+
+   pgmoneta_deque_sort(dq, pgmoneta_value_compare);
+
+   MCTF_ASSERT(!pgmoneta_deque_iterator_create(dq, &iter), cleanup, "iterator creation failed");
+
+   pgmoneta_deque_iterator_next(iter);
+   MCTF_ASSERT_INT_EQ(pgmoneta_value_data(iter->value), 5, cleanup, "Mixed sort failed: expected 5");
+
+   pgmoneta_deque_iterator_next(iter);
+   MCTF_ASSERT_INT_EQ(pgmoneta_value_data(iter->value), 50, cleanup, "Mixed sort failed: expected 50");
+
+   pgmoneta_deque_iterator_next(iter);
+   MCTF_ASSERT_INT_EQ(pgmoneta_value_data(iter->value), 100, cleanup, "Mixed sort failed: expected 100");
+
+   pgmoneta_deque_iterator_next(iter);
+   MCTF_ASSERT_STR_EQ((char*)pgmoneta_value_data(iter->value), "apple", cleanup, "Mixed sort failed: expected apple");
+
+   pgmoneta_deque_iterator_next(iter);
+   MCTF_ASSERT_STR_EQ((char*)pgmoneta_value_data(iter->value), "zebra", cleanup, "Mixed sort failed: expected zebra");
 
 cleanup:
    pgmoneta_deque_iterator_destroy(iter);

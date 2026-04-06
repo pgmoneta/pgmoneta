@@ -828,7 +828,7 @@ wal_interactive_get_first_wal_path(const char* dir, char** first_wal_path)
       goto error;
    }
 
-   pgmoneta_deque_sort(files);
+   pgmoneta_deque_sort(files, NULL);
 
    if (pgmoneta_deque_iterator_create(files, &iter) != 0)
    {
@@ -4158,7 +4158,7 @@ show_previous_wal_file(struct ui_state* state)
       return;
    }
 
-   pgmoneta_deque_sort(files);
+   pgmoneta_deque_sort(files, NULL);
 
    int num_files = pgmoneta_deque_size(files);
    char** file_list = malloc(num_files * sizeof(char*));
@@ -4271,7 +4271,7 @@ show_next_wal_file(struct ui_state* state)
       return;
    }
 
-   pgmoneta_deque_sort(files);
+   pgmoneta_deque_sort(files, NULL);
 
    int num_files = pgmoneta_deque_size(files);
    char** file_list = malloc(num_files * sizeof(char*));
