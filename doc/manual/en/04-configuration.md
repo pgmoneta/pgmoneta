@@ -110,6 +110,10 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | s3_secret_access_key | | String | Yes | The IAM secret access key |
 | s3_bucket | | String | Yes | The  S3 bucket name |
 | s3_base_dir | | String | Yes | The base directory for the S3 bucket |
+| s3_storage_class | REDUCED_REDUNDANCY | String | No | The S3 storage class |
+| s3_port | | Int | No | The port number for the S3 endpoint |
+| s3_use_tls | `off` | Bool | No | Use TLS for S3 connections |
+| s3_endpoint | | String | No | The S3 endpoint URL |
 
 **Azure**
 
@@ -239,6 +243,21 @@ have access to the `postgres` database in order to get the necessary configurati
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | -1 | Int | No | The maximum backup transfer rate in bytes per second. Use 0 to disable, -1 means use the global setting |
 | progress | -1 | Int | No | Enable backup progress tracking. Use 1 to enable, 0 to disable, -1 means use the global setting |
+
+
+**S3**
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| s3_storage_class | REDUCED_REDUNDANCY | String | No | The S3 storage class. Overrides global setting. |
+| s3_port | | Int | No | The port number for the S3 endpoint. Overrides global setting. |
+| s3_use_tls | | Bool | No | Use TLS for S3 connections. Overrides global setting. |
+| s3_endpoint | | String | No | S3 endpoint URL. Overrides global setting. |
+| s3_region | | String | No | The AWS region. Overrides global setting. |
+| s3_access_key_id | | String | No | The IAM access key ID. Overrides global setting. |
+| s3_secret_access_key | | String | No | The IAM secret access key. Overrides global setting. |
+| s3_bucket | | String | No | The AWS S3 bucket name. Overrides global setting. |
+| s3_base_dir | | String | No | The base directory for the S3 bucket. Overrides global setting. |
 
 **Extra**
 
