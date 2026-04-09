@@ -29,6 +29,7 @@
 #include <pgmoneta.h>
 #include <aes.h>
 #include <configuration.h>
+#include <management.h>
 #include <mctf.h>
 #include <shmem.h>
 #include <stdio.h>
@@ -36,6 +37,7 @@
 #include <string.h>
 #include <utils.h>
 #include <unistd.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <openssl/evp.h>
 
@@ -152,6 +154,27 @@ teardown_mock_master_key(struct test_env* env)
       pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
       shmem = NULL;
    }
+}
+
+static int
+write_all(int fd, const void* buf, size_t size)
+{
+   const unsigned char* ptr = (const unsigned char*)buf;
+   size_t written = 0;
+
+   while (written < size)
+   {
+      ssize_t bytes = write(fd, ptr + written, size - written);
+
+      if (bytes <= 0)
+      {
+         return 1;
+      }
+
+      written += (size_t)bytes;
+   }
+
+   return 0;
 }
 
 /**
@@ -300,6 +323,174 @@ cleanup:
    free(ciphertext);
    free(decrypted);
    teardown_mock_master_key(&env);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: Management wire protocol rejects tampered encrypted payloads.
+ */
+MCTF_TEST_NEGATIVE(test_management_read_json_tampered_payload_fails)
+{
+   struct test_env env;
+   char* plaintext = "{\"request\":\"ping\"}";
+   unsigned char* ciphertext = NULL;
+   size_t ciphertext_len = 0;
+   char* encoded = NULL;
+   size_t encoded_len = 0;
+   struct json* json = NULL;
+   int sockets[2] = {-1, -1};
+   char header[4] = {0};
+   uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
+   uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
+
+   MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
+   MCTF_ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0, cleanup, "socketpair should succeed");
+
+   MCTF_ASSERT(pgmoneta_encrypt_buffer((unsigned char*)plaintext, strlen(plaintext), &ciphertext, &ciphertext_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt_buffer should succeed");
+   MCTF_ASSERT_PTR_NONNULL(ciphertext, cleanup, "ciphertext should not be NULL");
+
+   ciphertext[ciphertext_len - 1] ^= 0x24;
+
+   MCTF_ASSERT(pgmoneta_base64_encode(ciphertext, ciphertext_len, &encoded, &encoded_len) == 0, cleanup, "pgmoneta_base64_encode should succeed");
+   MCTF_ASSERT_PTR_NONNULL(encoded, cleanup, "encoded payload should not be NULL");
+
+   MCTF_ASSERT(write_all(sockets[0], &(uint8_t){MANAGEMENT_COMPRESSION_NONE}, sizeof(uint8_t)) == 0, cleanup, "write compression should succeed");
+   MCTF_ASSERT(write_all(sockets[0], &(uint8_t){MANAGEMENT_ENCRYPTION_AES256_GCM}, sizeof(uint8_t)) == 0, cleanup, "write encryption should succeed");
+
+   pgmoneta_write_uint32(&header, (uint32_t)encoded_len);
+   MCTF_ASSERT(write_all(sockets[0], &header, sizeof(header)) == 0, cleanup, "write encoded length should succeed");
+   MCTF_ASSERT(write_all(sockets[0], encoded, encoded_len) == 0, cleanup, "write encoded payload should succeed");
+
+   MCTF_ASSERT(pgmoneta_management_read_json(NULL, sockets[1], &compression, &encryption, &json) != 0, cleanup, "pgmoneta_management_read_json should fail for tampered encrypted payload");
+   MCTF_ASSERT_PTR_NULL(json, cleanup, "json should remain NULL on malformed payload");
+   MCTF_ASSERT(compression == MANAGEMENT_COMPRESSION_NONE, cleanup, "compression should be parsed before payload failure");
+   MCTF_ASSERT(encryption == MANAGEMENT_ENCRYPTION_AES256_GCM, cleanup, "encryption should be parsed before payload failure");
+
+cleanup:
+   if (sockets[0] != -1)
+   {
+      close(sockets[0]);
+   }
+   if (sockets[1] != -1)
+   {
+      close(sockets[1]);
+   }
+   free(ciphertext);
+   free(encoded);
+   pgmoneta_json_destroy(json);
+   teardown_mock_master_key(&env);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: Error responses can be emitted without an existing payload.
+ */
+MCTF_TEST(test_management_response_error_without_payload)
+{
+   int sockets[2] = {-1, -1};
+   struct json* json = NULL;
+   struct json* outcome = NULL;
+   struct json* response = NULL;
+   int32_t error = 0;
+
+   MCTF_ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0, cleanup, "socketpair should succeed");
+   MCTF_ASSERT(pgmoneta_management_response_error(NULL, sockets[0], NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, "remote",
+                                                  MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, NULL) == 0,
+               cleanup, "pgmoneta_management_response_error should succeed without payload");
+   MCTF_ASSERT(pgmoneta_management_read_json(NULL, sockets[1], NULL, NULL, &json) == 0, cleanup,
+               "pgmoneta_management_read_json should parse error response");
+   MCTF_ASSERT(pgmoneta_json_contains_key(json, MANAGEMENT_CATEGORY_OUTCOME), cleanup,
+               "error response should include outcome");
+   MCTF_ASSERT(pgmoneta_json_contains_key(json, MANAGEMENT_CATEGORY_RESPONSE), cleanup,
+               "error response should include response");
+
+   outcome = (struct json*)pgmoneta_json_get(json, MANAGEMENT_CATEGORY_OUTCOME);
+   response = (struct json*)pgmoneta_json_get(json, MANAGEMENT_CATEGORY_RESPONSE);
+
+   MCTF_ASSERT(outcome != NULL, cleanup, "outcome should not be NULL");
+   MCTF_ASSERT(response != NULL, cleanup, "response should not be NULL");
+
+   error = (int32_t)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_ERROR);
+   MCTF_ASSERT(error == MANAGEMENT_ERROR_BAD_PAYLOAD, cleanup,
+               "error response should preserve MANAGEMENT_ERROR_BAD_PAYLOAD");
+
+cleanup:
+   if (sockets[0] != -1)
+   {
+      close(sockets[0]);
+   }
+   if (sockets[1] != -1)
+   {
+      close(sockets[1]);
+   }
+   pgmoneta_json_destroy(json);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: Error responses without payload can still use encrypted management framing.
+ */
+MCTF_TEST(test_management_response_error_without_payload_encrypted)
+{
+   struct test_env env;
+   int sockets[2] = {-1, -1};
+   struct json* json = NULL;
+   struct json* outcome = NULL;
+   int32_t error = 0;
+
+   MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
+   MCTF_ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0, cleanup, "socketpair should succeed");
+   MCTF_ASSERT(pgmoneta_management_response_error(NULL, sockets[0], NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, "remote",
+                                                  MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_AES256_GCM, NULL) == 0,
+               cleanup, "encrypted pgmoneta_management_response_error should succeed without payload");
+   MCTF_ASSERT(pgmoneta_management_read_json(NULL, sockets[1], NULL, NULL, &json) == 0, cleanup,
+               "pgmoneta_management_read_json should parse encrypted error response");
+
+   outcome = (struct json*)pgmoneta_json_get(json, MANAGEMENT_CATEGORY_OUTCOME);
+   MCTF_ASSERT(outcome != NULL, cleanup, "outcome should not be NULL");
+
+   error = (int32_t)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_ERROR);
+   MCTF_ASSERT(error == MANAGEMENT_ERROR_BAD_PAYLOAD, cleanup,
+               "encrypted error response should preserve MANAGEMENT_ERROR_BAD_PAYLOAD");
+
+cleanup:
+   if (sockets[0] != -1)
+   {
+      close(sockets[0]);
+   }
+   if (sockets[1] != -1)
+   {
+      close(sockets[1]);
+   }
+   pgmoneta_json_destroy(json);
+   teardown_mock_master_key(&env);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: Writing a management error to a closed peer fails without terminating the process.
+ */
+MCTF_TEST(test_management_response_error_closed_socket_fails)
+{
+   int sockets[2] = {-1, -1};
+
+   MCTF_ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0, cleanup, "socketpair should succeed");
+   close(sockets[1]);
+   sockets[1] = -1;
+
+   MCTF_ASSERT(pgmoneta_management_response_error(NULL, sockets[0], NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, "remote",
+                                                  MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, NULL) != 0,
+               cleanup, "pgmoneta_management_response_error should fail cleanly on a closed peer");
+
+cleanup:
+   if (sockets[0] != -1)
+   {
+      close(sockets[0]);
+   }
+   if (sockets[1] != -1)
+   {
+      close(sockets[1]);
+   }
    MCTF_FINISH();
 }
 

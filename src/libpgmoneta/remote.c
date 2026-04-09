@@ -35,11 +35,17 @@
 #include <utils.h>
 
 /* system */
+#include <errno.h>
 #include <ev.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <sys/types.h>
+
+#define NAME "remote"
+
+static void drain_client_socket(int fd);
 
 void
 pgmoneta_remote_management(int client_fd, char* address)
@@ -47,11 +53,12 @@ pgmoneta_remote_management(int client_fd, char* address)
    int server_fd = -1;
    int exit_code;
    int auth_status;
-   uint8_t compression;
-   uint8_t encryption;
+   uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
+   uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
    SSL* client_ssl = NULL;
    struct json* payload = NULL;
    struct main_configuration* config;
+   bool drain_client = false;
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
@@ -65,12 +72,31 @@ pgmoneta_remote_management(int client_fd, char* address)
    auth_status = pgmoneta_remote_management_auth(client_fd, address, &client_ssl);
    if (auth_status == AUTH_SUCCESS)
    {
-      if (pgmoneta_connect_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &server_fd))
+      if (pgmoneta_management_read_json(client_ssl, client_fd, &compression, &encryption, &payload))
       {
+         int primary_rc;
+         int fallback_rc = 1;
+
+         primary_rc = pgmoneta_management_response_error(client_ssl, client_fd, NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, NAME,
+                                                         compression, encryption, NULL);
+         if (primary_rc == 0)
+         {
+            drain_client = true;
+         }
+         if (primary_rc)
+         {
+            fallback_rc = pgmoneta_management_response_error(client_ssl, client_fd, NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, NAME,
+                                                             MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, NULL);
+            if (fallback_rc == 0)
+            {
+               drain_client = true;
+            }
+         }
+         pgmoneta_log_error("Remote management: Bad payload (%d)", MANAGEMENT_ERROR_BAD_PAYLOAD);
          goto done;
       }
 
-      if (pgmoneta_management_read_json(client_ssl, client_fd, &compression, &encryption, &payload))
+      if (pgmoneta_connect_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &server_fd))
       {
          goto done;
       }
@@ -110,13 +136,17 @@ done:
       res = SSL_shutdown(client_ssl);
       if (res == 0)
       {
-         SSL_shutdown(client_ssl);
+         res = SSL_shutdown(client_ssl);
       }
       SSL_free(client_ssl);
       SSL_CTX_free(ctx);
    }
 
-   pgmoneta_log_debug("pgmoneta_remote_management: disconnect %d", client_fd);
+   if (drain_client)
+   {
+      drain_client_socket(client_fd);
+   }
+
    pgmoneta_disconnect(client_fd);
    pgmoneta_disconnect(server_fd);
 
@@ -126,4 +156,51 @@ done:
    pgmoneta_stop_logging();
 
    exit(exit_code);
+}
+
+static void
+drain_client_socket(int fd)
+{
+   char buffer[1024];
+   ssize_t bytes = 0;
+   bool was_nonblocking = false;
+
+   if (fd == -1)
+   {
+      return;
+   }
+
+   was_nonblocking = pgmoneta_socket_is_nonblocking(fd);
+
+   if (shutdown(fd, SHUT_WR) != 0)
+   {
+      errno = 0;
+   }
+
+   pgmoneta_socket_nonblocking(fd, true);
+
+   for (;;)
+   {
+      bytes = read(fd, buffer, sizeof(buffer));
+      if (bytes > 0)
+      {
+         continue;
+      }
+
+      if (bytes == 0)
+      {
+         break;
+      }
+
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+      {
+         errno = 0;
+         break;
+      }
+
+      errno = 0;
+      break;
+   }
+
+   pgmoneta_socket_nonblocking(fd, was_nonblocking);
 }

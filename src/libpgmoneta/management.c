@@ -40,6 +40,7 @@
 /* system */
 #include <lz4.h>
 #include <unistd.h>
+#include <sys/socket.h>
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -1085,13 +1086,25 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
                                    uint8_t compression, uint8_t encryption, struct json* payload)
 {
    int srv = -1;
+   bool own_payload = false;
+   struct json* root = payload;
    struct json* response = NULL;
    struct json* outcome = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
 
-   if (pgmoneta_management_create_outcome_failure(payload, error, workflow, &outcome))
+   if (root == NULL)
+   {
+      if (pgmoneta_json_create(&root))
+      {
+         goto error;
+      }
+
+      own_payload = true;
+   }
+
+   if (pgmoneta_management_create_outcome_failure(root, error, workflow, &outcome))
    {
       goto error;
    }
@@ -1107,14 +1120,14 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
       }
    }
 
-   if (pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_RESPONSE) != 0)
+   if (pgmoneta_json_get(root, MANAGEMENT_CATEGORY_RESPONSE) != 0)
    {
-      response = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_RESPONSE);
+      response = (struct json*)pgmoneta_json_get(root, MANAGEMENT_CATEGORY_RESPONSE);
    }
 
    if (response == NULL)
    {
-      if (pgmoneta_management_create_response(payload, srv, &response))
+      if (pgmoneta_management_create_response(root, srv, &response))
       {
          goto error;
       }
@@ -1125,14 +1138,24 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER_VERSION, (uintptr_t)VERSION, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, compression, encryption, payload))
+   if (pgmoneta_management_write_json(ssl, socket, compression, encryption, root))
    {
       goto error;
+   }
+
+   if (own_payload)
+   {
+      pgmoneta_json_destroy(root);
    }
 
    return 0;
 
 error:
+
+   if (own_payload)
+   {
+      pgmoneta_json_destroy(root);
+   }
 
    return 1;
 }
@@ -1494,6 +1517,7 @@ pgmoneta_management_write_json(SSL* ssl, int socket, uint8_t compression, uint8_
    return 0;
 
 error:
+
    if (s != NULL)
    {
       free(s);
@@ -1612,8 +1636,9 @@ static int
 write_string(char* prefix, SSL* ssl, int socket, char* str)
 {
    char buf4[4] = {0};
+   uint32_t size = str != NULL ? strlen(str) : 0;
 
-   pgmoneta_write_uint32(&buf4, str != NULL ? strlen(str) : 0);
+   pgmoneta_write_uint32(&buf4, size);
    if (write_complete(ssl, socket, &buf4, sizeof(buf4)))
    {
       pgmoneta_log_warn("%s: write_string: %p %d %s", prefix, ssl, socket, strerror(errno));
@@ -1623,7 +1648,7 @@ write_string(char* prefix, SSL* ssl, int socket, char* str)
 
    if (str != NULL)
    {
-      if (write_complete(ssl, socket, str, strlen(str)))
+      if (write_complete(ssl, socket, str, size))
       {
          pgmoneta_log_warn("%s: write_string: %p %d %s", prefix, ssl, socket, strerror(errno));
          errno = 0;
@@ -1668,6 +1693,11 @@ read:
          goto read;
       }
 
+      goto error;
+   }
+   else if (r == 0)
+   {
+      errno = ECONNRESET;
       goto error;
    }
    else if (r < (ssize_t)needs)
@@ -1723,7 +1753,15 @@ write_socket(int socket, void* buf, size_t size)
 
    do
    {
-      numbytes = write(socket, buf + offset, remaining);
+      numbytes = send(socket,
+                      (char*)buf + offset,
+                      remaining,
+#if defined(MSG_NOSIGNAL)
+                      MSG_NOSIGNAL
+#else
+                      0
+#endif
+      );
 
       if (likely(numbytes == (ssize_t)size))
       {
@@ -1740,7 +1778,6 @@ write_socket(int socket, void* buf, size_t size)
             return 0;
          }
 
-         pgmoneta_log_trace("Write %d - %zd/%zd vs %zd", socket, numbytes, totalbytes, size);
          keep_write = true;
          errno = 0;
       }

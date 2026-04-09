@@ -47,12 +47,14 @@
 #include <err.h>
 #include <errno.h>
 #include <ev.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <libssh/libssh.h>
 #include <libssh/sftp.h>
@@ -73,6 +75,8 @@ static int wal_find_streaming_start(char* basedir, int segsize, uint32_t* timeli
 static int wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, int segsize, uint32_t* high32, uint32_t* low32, uint32_t* timeline);
 static int wal_shipping_setup(int srv, char** wal_shipping);
 static void update_wal_lsn(int srv, size_t xlogptr);
+static void reap_wal_children(int sig);
+static void install_wal_sigchld_handler(void);
 
 void
 pgmoneta_wal(int srv, char** argv)
@@ -119,6 +123,7 @@ pgmoneta_wal(int srv, char** argv)
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
+   install_wal_sigchld_handler();
 
    pgmoneta_set_proc_title(1, argv, "wal", config->common.servers[srv].name);
 
@@ -719,6 +724,34 @@ error:
    free(filename);
    free(xlogpos);
    exit(1);
+}
+
+static void
+reap_wal_children(int sig)
+{
+   int status = 0;
+
+   (void)sig;
+
+   while (waitpid(-1, &status, WNOHANG) > 0)
+   {
+   }
+}
+
+static void
+install_wal_sigchld_handler(void)
+{
+   struct sigaction action;
+
+   memset(&action, 0, sizeof(struct sigaction));
+   action.sa_handler = reap_wal_children;
+   action.sa_flags = SA_NOCLDSTOP | SA_RESTART;
+   sigemptyset(&action.sa_mask);
+
+   if (sigaction(SIGCHLD, &action, NULL) != 0)
+   {
+      pgmoneta_log_warn("WAL: Could not install SIGCHLD handler");
+   }
 }
 
 static int
