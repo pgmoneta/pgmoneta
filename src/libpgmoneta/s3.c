@@ -326,10 +326,12 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
    struct timespec start_t;
    struct timespec end_t;
    double total_seconds;
-   // struct json* response = NULL;
+   char* base_dir = NULL;
    struct art* nodes = NULL;
    struct workflow* workflow = NULL;
    struct main_configuration* config;
+   struct backup* backup = NULL;
+   char* local_root = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -378,6 +380,31 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
       pgmoneta_log_error("S3 restore: workflow failed for %s", config->common.servers[server].name);
       goto error;
    }
+   pgmoneta_workflow_destroy(workflow);
+   base_dir = pgmoneta_get_server_backup(server);
+   local_root = pgmoneta_get_server_backup_identifier(server, prefix);
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)local_root, ValueString))
+   {
+      pgmoneta_log_error("S3 restore: could not add backup dir to art");
+      goto error;
+   }
+   if (pgmoneta_art_insert(nodes, USER_FILES, (uintptr_t)NODE_ALL, ValueString))
+   {
+      pgmoneta_log_error("S3 restore: could not add base dir to art");
+      goto error;
+   }
+
+   if (pgmoneta_load_info(base_dir, prefix, &backup))
+   {
+      pgmoneta_log_error("S3 restore: could not load info for %s", config->common.servers[server].name);
+      goto error;
+   }
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_VERIFY, backup);
+   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
+   {
+      pgmoneta_log_error("S3 restore: workflow failed for %s", config->common.servers[server].name);
+      goto error;
+   }
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
@@ -402,6 +429,9 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
 
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
+   free(backup);
+   free(base_dir);
+   free(local_root);
    exit(0);
 
 error:
@@ -414,8 +444,14 @@ error:
    pgmoneta_art_destroy(nodes);
    pgmoneta_workflow_destroy(workflow);
    free(elapsed);
-
+   free(base_dir);
+   free(backup);
+   if (local_root != NULL)
+   {
+      pgmoneta_delete_directory(local_root);
+   }
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
+   free(local_root);
    exit(1);
 }
