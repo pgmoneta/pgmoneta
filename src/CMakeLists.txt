@@ -510,3 +510,16 @@ else()
 endif()
 target_link_libraries(pgmoneta-walfilter-bin pgmoneta)
 install(TARGETS pgmoneta-walfilter-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+#
+# Build pgmoneta-config
+#
+add_executable(pgmoneta-config-bin config.c)
+if (CMAKE_C_LINK_PIE_SUPPORTED)
+  set_target_properties(pgmoneta-config-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-config POSITION_INDEPENDENT_CODE TRUE)
+else()
+  set_target_properties(pgmoneta-config-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-config POSITION_INDEPENDENT_CODE FALSE)
+endif()
+target_link_libraries(pgmoneta-config-bin pgmoneta)
+
+install(TARGETS pgmoneta-config-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
