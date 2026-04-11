@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <achv.h>
+#include <art.h>
 #include <cmd.h>
 #include <configuration.h>
 #include <deque.h>
@@ -263,6 +264,8 @@ struct ui_state
    size_t current_match_index;
    size_t total_matches_in_field;
    enum wal_search_field current_search_field;
+
+   struct art* lsn_art;
    char current_search_query[256];
 };
 
@@ -283,9 +286,10 @@ static int wal_interactive_load_file(struct ui_state* state, const char* path);
 static int wal_interactive_load_records(struct ui_state* state, char* wal_filename);
 static void wal_set_window_theme(WINDOW* win, int color_pair, bool border);
 static void wal_reset_completion_cycle(bool* active, int* cycle_index, char cycle_seed[][128], int fields);
-static bool wal_input_has_letter(const char* input);
-static const char* const* wal_get_known_values_for_field(int field);
+static bool wal_input_has_content(const char* input);
+static const char* const* wal_get_known_values_for_field(struct ui_state* state, int field, const char* partial, char*** dynamic_array_out, char** field_inputs);
 static const char* wal_get_known_value_completion(const char* const* values, const char* partial, int cycle_index);
+static void wal_handle_tab_completion(struct ui_state* state, int current_field, char** field_inputs, size_t* field_input_sizes, bool* completion_active, int* completion_cycle, char completion_seed[][128]);
 
 static void
 wal_interactive_endwin(void)
@@ -376,7 +380,7 @@ wal_reset_completion_cycle(bool* active, int* cycle_index, char cycle_seed[][128
 }
 
 static bool
-wal_input_has_letter(const char* input)
+wal_input_has_content(const char* input)
 {
    if (input == NULL)
    {
@@ -385,7 +389,7 @@ wal_input_has_letter(const char* input)
 
    for (size_t i = 0; input[i] != '\0'; i++)
    {
-      if (isalpha((unsigned char)input[i]))
+      if (!isspace((unsigned char)input[i]))
       {
          return true;
       }
@@ -395,15 +399,151 @@ wal_input_has_letter(const char* input)
 }
 
 static const char* const*
-wal_get_known_values_for_field(int field)
+wal_get_known_values_for_field(struct ui_state* state, int field, const char* partial, char*** dynamic_array_out, char** field_inputs)
 {
+   if (dynamic_array_out)
+   {
+      *dynamic_array_out = NULL;
+   }
+
    switch (field)
    {
       case 0:
          return wal_search_rmgr_values;
+      case 1:
+      case 2:
+      {
+         if (state != NULL && state->lsn_art != NULL && dynamic_array_out != NULL)
+         {
+            char upper_prefix[256] = {0};
+            if (partial != NULL && strlen(partial) > 0)
+            {
+               for (size_t j = 0; j < strlen(partial) && j < 255; j++)
+               {
+                  upper_prefix[j] = toupper((unsigned char)partial[j]);
+               }
+            }
+            pgmoneta_art_prefix_search(state->lsn_art, upper_prefix, dynamic_array_out, 64);
+
+            // Apply bound filtering for End LSN (field 2)
+            if (field == 2 && field_inputs != NULL && wal_input_has_content(field_inputs[1]))
+            {
+               uint64_t start_lsn_val = pgmoneta_string_to_lsn(field_inputs[1]);
+               if (start_lsn_val != 0 && *dynamic_array_out != NULL)
+               {
+                  char** results = *dynamic_array_out;
+                  int valid_count = 0;
+
+                  for (int i = 0; results[i] != NULL; i++)
+                  {
+                     uint64_t cand_lsn = pgmoneta_string_to_lsn(results[i]);
+                     if (cand_lsn > start_lsn_val)
+                     {
+                        if (valid_count != i)
+                        {
+                           results[valid_count] = results[i];
+                        }
+                        valid_count++;
+                     }
+                     else
+                     {
+                        free(results[i]);
+                     }
+                  }
+                  results[valid_count] = NULL;
+               }
+            }
+
+            // Apply reciprocal bound filtering for Start LSN (field 1)
+            if (field == 1 && field_inputs != NULL && wal_input_has_content(field_inputs[2]))
+            {
+               uint64_t end_lsn_val = pgmoneta_string_to_lsn(field_inputs[2]);
+               if (end_lsn_val != 0 && *dynamic_array_out != NULL)
+               {
+                  char** results = *dynamic_array_out;
+                  int valid_count = 0;
+
+                  for (int i = 0; results[i] != NULL; i++)
+                  {
+                     uint64_t cand_lsn = pgmoneta_string_to_lsn(results[i]);
+                     if (cand_lsn < end_lsn_val)
+                     {
+                        if (valid_count != i)
+                        {
+                           results[valid_count] = results[i];
+                        }
+                        valid_count++;
+                     }
+                     else
+                     {
+                        free(results[i]);
+                     }
+                  }
+                  results[valid_count] = NULL;
+               }
+            }
+
+            return (const char* const*)*dynamic_array_out;
+         }
+         return NULL;
+      }
       default:
          return NULL;
    }
+}
+static char*
+wal_get_longest_common_prefix(const char* const* values, const char* partial)
+{
+   if (values == NULL || values[0] == NULL)
+   {
+      return NULL;
+   }
+
+   char* lcp = NULL;
+   size_t partial_len = partial ? strlen(partial) : 0;
+   int first_match_idx = -1;
+
+   for (int i = 0; values[i] != NULL; i++)
+   {
+      if (partial_len == 0 || strncasecmp(values[i], partial, partial_len) == 0)
+      {
+         first_match_idx = i;
+         break;
+      }
+   }
+
+   if (first_match_idx == -1)
+   {
+      return NULL;
+   }
+
+   lcp = malloc(strlen(values[first_match_idx]) + 1);
+   if (lcp == NULL)
+   {
+      return NULL;
+   }
+   strcpy(lcp, values[first_match_idx]);
+
+   for (int i = first_match_idx + 1; values[i] != NULL; i++)
+   {
+      if (partial_len == 0 || strncasecmp(values[i], partial, partial_len) == 0)
+      {
+         size_t j = 0;
+         while (lcp[j] != '\0' && values[i][j] != '\0' &&
+                tolower((unsigned char)lcp[j]) == tolower((unsigned char)values[i][j]))
+         {
+            j++;
+         }
+         lcp[j] = '\0';
+
+         if (strlen(lcp) == 0)
+         {
+            break;
+         }
+      }
+   }
+
+   return lcp;
 }
 
 static const char*
@@ -436,6 +576,112 @@ wal_get_known_value_completion(const char* const* values, const char* partial, i
    }
 
    return NULL;
+}
+
+static int
+wal_count_matching_values(const char* const* values, const char* partial)
+{
+   int count = 0;
+   size_t partial_length = 0;
+
+   if (values == NULL)
+   {
+      return 0;
+   }
+
+   if (partial != NULL)
+   {
+      partial_length = strlen(partial);
+   }
+
+   for (int i = 0; values[i] != NULL; i++)
+   {
+      if (partial_length == 0 || strncasecmp(values[i], partial, partial_length) == 0)
+      {
+         count++;
+         if (count >= 64)
+         {
+            break;
+         }
+      }
+   }
+
+   return count;
+}
+
+static void
+wal_handle_tab_completion(struct ui_state* state, int current_field, char** field_inputs, size_t* field_input_sizes, bool* completion_active, int* completion_cycle, char completion_seed[][128])
+{
+   char* current_input = field_inputs[current_field];
+   char* search_partial = completion_active[current_field] ? completion_seed[current_field] : current_input;
+   char** dynamic_values = NULL;
+   const char* const* known_values = wal_get_known_values_for_field(state, current_field, search_partial, &dynamic_values, field_inputs);
+   size_t input_size = field_input_sizes[current_field];
+   const char* completion = NULL;
+
+   if (known_values == NULL || current_input == NULL)
+   {
+      if (dynamic_values != NULL)
+      {
+         for (int i = 0; dynamic_values[i]; i++)
+         {
+            free(dynamic_values[i]);
+         }
+         free(dynamic_values);
+      }
+      return;
+   }
+
+   if (!completion_active[current_field])
+   {
+      char* lcp = wal_get_longest_common_prefix(known_values, current_input);
+      if (lcp != NULL)
+      {
+         size_t lcp_len = strlen(lcp);
+         if (lcp_len > strlen(current_input))
+         {
+            pgmoneta_snprintf(current_input, input_size, "%s", lcp);
+            free(lcp);
+
+            if (dynamic_values != NULL)
+            {
+               for (int i = 0; dynamic_values[i]; i++)
+               {
+                  free(dynamic_values[i]);
+               }
+               free(dynamic_values);
+            }
+            return;
+         }
+         free(lcp);
+      }
+
+      completion_active[current_field] = true;
+      completion_cycle[current_field] = 0;
+      pgmoneta_snprintf(completion_seed[current_field], 128, "%s", current_input);
+   }
+
+   completion = wal_get_known_value_completion(known_values, completion_seed[current_field], completion_cycle[current_field]);
+   if (completion == NULL)
+   {
+      completion_cycle[current_field] = 0;
+      completion = wal_get_known_value_completion(known_values, completion_seed[current_field], completion_cycle[current_field]);
+   }
+
+   if (completion != NULL)
+   {
+      pgmoneta_snprintf(current_input, input_size, "%s", completion);
+      completion_cycle[current_field]++;
+   }
+
+   if (dynamic_values != NULL)
+   {
+      for (int i = 0; dynamic_values[i] != NULL; i++)
+      {
+         free(dynamic_values[i]);
+      }
+      free(dynamic_values);
+   }
 }
 
 /**
@@ -957,6 +1203,29 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
 
    state->record_count_unfiltered = state->record_count;
 
+   if (state->lsn_art != NULL)
+   {
+      pgmoneta_art_destroy(state->lsn_art);
+      state->lsn_art = NULL;
+   }
+   pgmoneta_art_create(&state->lsn_art);
+
+   for (size_t i = 0; i < state->record_count; i++)
+   {
+      char* sl = pgmoneta_lsn_to_string(state->records[i].start_lsn);
+      char* el = pgmoneta_lsn_to_string(state->records[i].end_lsn);
+      if (sl != NULL)
+      {
+         pgmoneta_art_insert(state->lsn_art, sl, 0, ValueInt32);
+         free(sl);
+      }
+      if (el != NULL)
+      {
+         pgmoneta_art_insert(state->lsn_art, el, 0, ValueInt32);
+         free(el);
+      }
+   }
+
    return 0;
 }
 
@@ -1259,6 +1528,29 @@ wal_apply_filters(struct ui_state* state)
    }
 
    state->record_count = new_count;
+
+   if (state->lsn_art != NULL)
+   {
+      pgmoneta_art_destroy(state->lsn_art);
+      state->lsn_art = NULL;
+   }
+   pgmoneta_art_create(&state->lsn_art);
+
+   for (size_t i = 0; i < state->record_count; i++)
+   {
+      char* sl = pgmoneta_lsn_to_string(state->records[i].start_lsn);
+      char* el = pgmoneta_lsn_to_string(state->records[i].end_lsn);
+      if (sl != NULL)
+      {
+         pgmoneta_art_insert(state->lsn_art, sl, 0, ValueInt32);
+         free(sl);
+      }
+      if (el != NULL)
+      {
+         pgmoneta_art_insert(state->lsn_art, el, 0, ValueInt32);
+         free(el);
+      }
+   }
 }
 
 /**
@@ -1652,7 +1944,7 @@ wal_search(struct ui_state* state, struct wal_search_criteria* criteria)
          /* Check End LSN (as range maximum) */
          if (matches_all && criteria->has_end_lsn)
          {
-            if (record->lsn > criteria->end_lsn)
+            if (record->next_lsn > criteria->end_lsn)
             {
                matches_all = false;
             }
@@ -2831,9 +3123,10 @@ show_help(void)
 
 /**
  * Show known values for a field and highlight the current completion.
+ * Values are never truncated: only entries that fit fully are displayed.
  */
 static void
-show_known_values_autocomplete(WINDOW* win, const char* const* values, const char* partial, const char* selected, int y, int x, int max_rows)
+show_known_values_autocomplete(WINDOW* win, const char* const* values, const char* partial, const char* selected, int highlight_index, int y, int x, int max_rows)
 {
    if (win == NULL || values == NULL || max_rows <= 0)
    {
@@ -2859,9 +3152,9 @@ show_known_values_autocomplete(WINDOW* win, const char* const* values, const cha
    for (int i = 0; values[i] != NULL; i++)
    {
       bool matches = true;
-      int entry_width = (int)strlen(values[i]) + 4;
+      int entry_width = (int)strlen(values[i]) + 4; /* "  " prefix + value + padding */
 
-      if (wal_input_has_letter(partial))
+      if (wal_input_has_content(partial))
       {
          matches = strncasecmp(values[i], partial, strlen(partial)) == 0;
       }
@@ -2873,6 +3166,11 @@ show_known_values_autocomplete(WINDOW* win, const char* const* values, const cha
 
       filtered_values[value_count] = values[i];
       value_count++;
+
+      if (value_count >= 64)
+      {
+         break;
+      }
 
       if (entry_width > column_width)
       {
@@ -2890,254 +3188,413 @@ show_known_values_autocomplete(WINDOW* win, const char* const* values, const cha
       column_width = 4;
    }
 
-   columns = available_width / column_width;
-   if (columns <= 0)
+   int max_cols = available_width / column_width;
+   if (max_cols <= 0)
    {
-      columns = 1;
+      max_cols = 1;
+   }
+
+   columns = (value_count + max_rows - 1) / max_rows;
+   if (columns > max_cols)
+   {
+      columns = max_cols;
    }
 
    rows_per_column = (value_count + columns - 1) / columns;
-   while (columns > 1 && rows_per_column > max_rows)
-   {
-      columns--;
-      rows_per_column = (value_count + columns - 1) / columns;
-   }
-
    if (rows_per_column > max_rows)
    {
       rows_per_column = max_rows;
    }
 
+   /* Clear the suggestion area */
    for (int row = 1; row <= max_rows; row++)
    {
       mvwprintw(win, y + row, x, "%-*s", available_width, "");
    }
 
-   for (int i = 0; i < value_count; i++)
+   /* Total items we can actually display = rows_per_column * columns */
+   int max_displayable = rows_per_column * columns;
+   if (max_displayable <= 0)
    {
+      max_displayable = 1;
+   }
+
+   int start_index = 0;
+   if (highlight_index >= 0 && highlight_index >= max_displayable)
+   {
+      start_index = (highlight_index / max_displayable) * max_displayable;
+   }
+
+   int display_count = max_displayable;
+   if (start_index + display_count > value_count)
+   {
+      display_count = value_count - start_index;
+   }
+
+   for (int i = 0; i < display_count; i++)
+   {
+      int actual_index = start_index + i;
       int row = i % rows_per_column;
       int column = i / rows_per_column;
       int draw_x = x + (column * column_width);
-      const char* value = filtered_values[i];
+      const char* value = filtered_values[actual_index];
+      int remaining_width = max_x - draw_x - 1;
 
-      if (draw_x >= x + available_width)
+      if (column >= columns)
       {
          break;
       }
 
-      if (selected != NULL && strcasecmp(value, selected) == 0)
+      /* Skip if the full value does not fit — never truncate */
+      int needed = (int)strlen(value) + 2; /* "  " or "> " prefix */
+      if (needed > remaining_width)
+      {
+         continue;
+      }
+
+      int pad_width = column_width - 4;
+      if (pad_width < (int)strlen(value))
+      {
+         pad_width = (int)strlen(value);
+      }
+      /* Clamp pad_width so we never write past the window edge */
+      if (pad_width > remaining_width - 2)
+      {
+         pad_width = remaining_width - 2;
+      }
+      if (pad_width < 1)
+      {
+         pad_width = 1;
+      }
+
+      bool is_highlighted = false;
+      if (highlight_index >= 0)
+      {
+         is_highlighted = (actual_index == highlight_index);
+      }
+      else if (selected != NULL)
+      {
+         is_highlighted = (strcasecmp(value, selected) == 0);
+      }
+
+      if (is_highlighted)
       {
          wattron(win, COLOR_PAIR(3) | A_BOLD);
-         mvwprintw(win, y + row + 1, draw_x, "> %s", value);
+         mvwprintw(win, y + row + 1, draw_x, "> %-*s", pad_width, value);
          wattroff(win, COLOR_PAIR(3) | A_BOLD);
       }
       else
       {
          wattron(win, COLOR_PAIR(6) | A_DIM);
-         mvwprintw(win, y + row + 1, draw_x, "  %s", value);
+         mvwprintw(win, y + row + 1, draw_x, "  %-*s", pad_width, value);
          wattroff(win, COLOR_PAIR(6) | A_DIM);
       }
    }
 }
 
-static void
-handle_search_input(struct ui_state* state)
+/**
+ * Shared generic handler for the Search and Filter dialog windows.
+ * @return true if the user pressed Enter (submit), false if Esc (cancel)
+ */
+static bool
+wal_handle_dialog_input(struct ui_state* state, bool is_search,
+                        char* rmgr_input, size_t rmgr_size,
+                        char* start_lsn_input, size_t start_lsn_size,
+                        char* end_lsn_input, size_t end_lsn_size,
+                        char* xid_input, size_t xid_size,
+                        char* final_col_input, size_t final_col_size)
 {
    int height = 28;
    int width = 80;
    int starty = (LINES - height) / 2;
    int startx = (COLS - width) / 2;
 
-   WINDOW* search_win = newwin(height, width, starty, startx);
-   wal_set_window_theme(search_win, 1, true);
+   if (starty < 0)
+      starty = 0;
+   if (startx < 0)
+      startx = 0;
+   if (height > LINES)
+      height = LINES;
+   if (width > COLS)
+      width = COLS;
 
-   wattron(search_win, A_BOLD);
-   mvwprintw(search_win, 1, 2, "Search WAL Records");
-   wattroff(search_win, A_BOLD);
-   mvwhline(search_win, 2, 1, ACS_HLINE, width - 2);
+   WINDOW* dialog_win = newwin(height, width, starty, startx);
+   if (dialog_win == NULL)
+   {
+      return false;
+   }
+   wal_set_window_theme(dialog_win, 1, true);
+   keypad(dialog_win, TRUE);
+
+   wattron(dialog_win, A_BOLD);
+   if (is_search)
+   {
+      mvwprintw(dialog_win, 1, 2, "Search WAL Records");
+   }
+   else
+   {
+      mvwprintw(dialog_win, 1, 2, "Filter WAL Records");
+   }
+   wattroff(dialog_win, A_BOLD);
+   mvwhline(dialog_win, 2, 1, ACS_HLINE, width - 2);
 
    /* Draw Table */
    int table_start_row = 4;
-   mvwprintw(search_win, table_start_row, 2, "Field");
-   mvwprintw(search_win, table_start_row, 20, "| Value");
-   mvwhline(search_win, table_start_row + 1, 2, ACS_HLINE, width - 4);
+   mvwprintw(dialog_win, table_start_row, 2, "Field");
+   mvwprintw(dialog_win, table_start_row, 20, "| Value");
+   mvwhline(dialog_win, table_start_row + 1, 2, ACS_HLINE, width - 4);
 
-   mvwprintw(search_win, table_start_row + 2, 2, "RMGR");
-   mvwprintw(search_win, table_start_row + 2, 20, "|");
+   mvwprintw(dialog_win, table_start_row + 2, 2, "RMGR");
+   mvwprintw(dialog_win, table_start_row + 2, 20, "|");
 
-   mvwprintw(search_win, table_start_row + 3, 2, "Start LSN");
-   mvwprintw(search_win, table_start_row + 3, 20, "|");
+   mvwprintw(dialog_win, table_start_row + 3, 2, "Start LSN");
+   mvwprintw(dialog_win, table_start_row + 3, 20, "|");
 
-   mvwprintw(search_win, table_start_row + 4, 2, "End LSN");
-   mvwprintw(search_win, table_start_row + 4, 20, "|");
+   mvwprintw(dialog_win, table_start_row + 4, 2, "End LSN");
+   mvwprintw(dialog_win, table_start_row + 4, 20, "|");
 
-   mvwprintw(search_win, table_start_row + 5, 2, "XID");
-   mvwprintw(search_win, table_start_row + 5, 20, "|");
+   mvwprintw(dialog_win, table_start_row + 5, 2, "XID");
+   mvwprintw(dialog_win, table_start_row + 5, 20, "|");
 
-   mvwprintw(search_win, table_start_row + 6, 2, "Description");
-   mvwprintw(search_win, table_start_row + 6, 20, "|");
+   if (is_search)
+   {
+      mvwprintw(dialog_win, table_start_row + 6, 2, "Description");
+   }
+   else
+   {
+      mvwprintw(dialog_win, table_start_row + 6, 2, "Relation");
+   }
+   mvwprintw(dialog_win, table_start_row + 6, 20, "|");
 
-   mvwprintw(search_win, height - 3, 2, "Up/Down=Navigate | Tab=Complete | Enter=Search | Esc=Cancel");
-   mvwprintw(search_win, height - 2, 2, "Leave any fields you don't want to use in your search blank to ignore");
+   if (is_search)
+   {
+      mvwprintw(dialog_win, height - 3, 2, "Up/Down=Navigate | Left/Right=Browse | Tab=Complete | Enter=Select/Search");
+      mvwprintw(dialog_win, height - 2, 2, "Leave any fields you don't want to use in your search blank to ignore");
+   }
+   else
+   {
+      mvwprintw(dialog_win, height - 5, 2, "Logic: fields AND; RMGR/XID/Relation accept comma-separated OR");
+      mvwprintw(dialog_win, height - 4, 2, "Start LSN: record start >= min (if set)");
+      mvwprintw(dialog_win, height - 3, 2, "End LSN:   record end   <= max (if set)");
+      mvwprintw(dialog_win, height - 2, 2, "Up/Down=Nav | Left/Right=Browse | Tab=Complete | Ctrl+U=Clear | Enter=Filter");
+   }
 
-   /* Input buffers */
-   char rmgr_input[64] = {0};
-   char start_lsn_input[32] = {0};
-   char end_lsn_input[32] = {0};
-   char xid_input[16] = {0};
-   char description_input[128] = {0};
-   char* field_inputs[] = {rmgr_input, start_lsn_input, end_lsn_input, xid_input, description_input};
-   size_t field_input_sizes[] = {sizeof(rmgr_input), sizeof(start_lsn_input), sizeof(end_lsn_input), sizeof(xid_input), sizeof(description_input)};
+   char* field_inputs[] = {rmgr_input, start_lsn_input, end_lsn_input, xid_input, final_col_input};
+   size_t field_input_sizes[] = {rmgr_size, start_lsn_size, end_lsn_size, xid_size, final_col_size};
    bool completion_active[5] = {false};
    int completion_cycle[5] = {0};
    char completion_seed[5][128] = {{0}};
 
-   int current_field = 0; //0=RMGR, 1=Start LSN, 2=End LSN, 3=XID, 4=Description
+   int current_field = 0; //0=RMGR, 1=Start LSN, 2=End LSN, 3=XID, 4=Desc/Rel
    int num_fields = 5;
    int autocomplete_row = table_start_row + 8;
+   int footer_row = is_search ? height - 3 : height - 5;
+   int suggestion_index = -1; /* -1 = no arrow highlight active */
 
-   wrefresh(search_win);
+   wrefresh(dialog_win);
 
+   bool submit = false;
    while (1)
    {
-      mvwprintw(search_win, table_start_row + 2, 2, "RMGR");
-      mvwprintw(search_win, table_start_row + 2, 20, "|");
-      mvwprintw(search_win, table_start_row + 3, 2, "Start LSN");
-      mvwprintw(search_win, table_start_row + 3, 20, "|");
-      mvwprintw(search_win, table_start_row + 4, 2, "End LSN");
-      mvwprintw(search_win, table_start_row + 4, 20, "|");
-      mvwprintw(search_win, table_start_row + 5, 2, "XID");
-      mvwprintw(search_win, table_start_row + 5, 20, "|");
-      mvwprintw(search_win, table_start_row + 6, 2, "Description");
-      mvwprintw(search_win, table_start_row + 6, 20, "|");
+      mvwprintw(dialog_win, table_start_row + 2, 2, "RMGR");
+      mvwprintw(dialog_win, table_start_row + 2, 20, "|");
+      mvwprintw(dialog_win, table_start_row + 3, 2, "Start LSN");
+      mvwprintw(dialog_win, table_start_row + 3, 20, "|");
+      mvwprintw(dialog_win, table_start_row + 4, 2, "End LSN");
+      mvwprintw(dialog_win, table_start_row + 4, 20, "|");
+      mvwprintw(dialog_win, table_start_row + 5, 2, "XID");
+      mvwprintw(dialog_win, table_start_row + 5, 20, "|");
+      if (is_search)
+      {
+         mvwprintw(dialog_win, table_start_row + 6, 2, "Description");
+      }
+      else
+      {
+         mvwprintw(dialog_win, table_start_row + 6, 2, "Relation");
+      }
+      mvwprintw(dialog_win, table_start_row + 6, 20, "|");
 
-      /* Highlight current field */
       for (int i = 0; i < num_fields; i++)
       {
          int row = table_start_row + 2 + i;
-         char* field_value = NULL;
-
-         switch (i)
-         {
-            case 0:
-               field_value = rmgr_input;
-               break;
-            case 1:
-               field_value = start_lsn_input;
-               break;
-            case 2:
-               field_value = end_lsn_input;
-               break;
-            case 3:
-               field_value = xid_input;
-               break;
-            case 4:
-               field_value = description_input;
-               break;
-         }
+         char* field_value = field_inputs[i];
 
          if (i == current_field)
          {
-            wattron(search_win, A_BOLD | COLOR_PAIR(12));
+            wattron(dialog_win, A_BOLD | COLOR_PAIR(12));
          }
 
-         mvwprintw(search_win, row, 22, "%-50s", field_value ? field_value : "");
+         mvwprintw(dialog_win, row, 22, "%-50s", field_value ? field_value : "");
 
          if (i == current_field)
          {
-            wattroff(search_win, A_BOLD | COLOR_PAIR(12));
+            wattroff(dialog_win, A_BOLD | COLOR_PAIR(12));
          }
       }
 
-      /* Clear autocomplete area first */
-      for (int i = 0; i < height - autocomplete_row - 3; i++)
+      /* Clear suggestions area (do not overwrite footer lines) */
+      int max_suggest_rows = footer_row - autocomplete_row - 1;
+      if (max_suggest_rows < 0)
       {
-         mvwprintw(search_win, autocomplete_row + i, 2, "%-76s", "");
+         max_suggest_rows = 0;
+      }
+
+      for (int i = 0; i < max_suggest_rows; i++)
+      {
+         mvwprintw(dialog_win, autocomplete_row + i, 2, "%-*s", width - 3, "");
       }
 
       {
-         const char* const* known_values = wal_get_known_values_for_field(current_field);
+         char* suggestion_prefix = completion_active[current_field] ? completion_seed[current_field] : field_inputs[current_field];
+         char** dynamic_values = NULL;
+         const char* const* known_values = wal_get_known_values_for_field(state, current_field, suggestion_prefix, &dynamic_values, field_inputs);
 
-         if (known_values != NULL)
+         if (known_values != NULL && max_suggest_rows > 2)
          {
-            mvwprintw(search_win, autocomplete_row, 2, "Suggestions:");
-            show_known_values_autocomplete(search_win,
+            mvwprintw(dialog_win, autocomplete_row, 2, "Suggestions:");
+            show_known_values_autocomplete(dialog_win,
                                            known_values,
+                                           suggestion_prefix,
                                            field_inputs[current_field],
-                                           field_inputs[current_field],
+                                           suggestion_index,
                                            autocomplete_row,
                                            4,
-                                           height - autocomplete_row - 4);
+                                           max_suggest_rows - 1);
+         }
+
+         if (dynamic_values != NULL)
+         {
+            for (int i = 0; dynamic_values[i]; i++)
+               free(dynamic_values[i]);
+            free(dynamic_values);
          }
       }
 
-      wrefresh(search_win);
+      wrefresh(dialog_win);
 
-      int ch = getch();
+      int ch = wgetch(dialog_win);
 
       if (ch == 27)
       {
-         delwin(search_win);
-         return;
+         submit = false;
+         break;
+      }
+      else if (ch == 21) /* Ctrl+U: clear all fields */
+      {
+         for (int i = 0; i < num_fields; i++)
+         {
+            memset(field_inputs[i], 0, field_input_sizes[i]);
+         }
+         suggestion_index = -1;
+         wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
       }
       else if (ch == KEY_DOWN)
       {
          wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
+         suggestion_index = -1;
          current_field = (current_field + 1) % num_fields;
       }
       else if (ch == KEY_UP)
       {
          wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
+         suggestion_index = -1;
          current_field = (current_field + num_fields - 1) % num_fields;
+      }
+      else if (ch == KEY_RIGHT)
+      {
+         char* prefix = completion_active[current_field] ? completion_seed[current_field] : field_inputs[current_field];
+         char** dv = NULL;
+         const char* const* kv = wal_get_known_values_for_field(state, current_field, prefix, &dv, field_inputs);
+         if (kv != NULL)
+         {
+            int total = wal_count_matching_values(kv, prefix);
+            if (total > 0)
+            {
+               suggestion_index = (suggestion_index + 1) % total;
+            }
+         }
+         if (dv != NULL)
+         {
+            for (int i = 0; dv[i]; i++)
+            {
+               free(dv[i]);
+            }
+            free(dv);
+         }
+      }
+      else if (ch == KEY_LEFT)
+      {
+         char* prefix = completion_active[current_field] ? completion_seed[current_field] : field_inputs[current_field];
+         char** dv = NULL;
+         const char* const* kv = wal_get_known_values_for_field(state, current_field, prefix, &dv, field_inputs);
+         if (kv != NULL)
+         {
+            int total = wal_count_matching_values(kv, prefix);
+            if (total > 0)
+            {
+               if (suggestion_index < 0)
+               {
+                  suggestion_index = total - 1;
+               }
+               else
+               {
+                  suggestion_index = (suggestion_index - 1 + total) % total;
+               }
+            }
+         }
+         if (dv != NULL)
+         {
+            for (int i = 0; dv[i]; i++)
+            {
+               free(dv[i]);
+            }
+            free(dv);
+         }
       }
       else if (ch == '\t')
       {
-         const char* const* known_values = wal_get_known_values_for_field(current_field);
-         char* current_input = field_inputs[current_field];
-         size_t input_size = field_input_sizes[current_field];
-         const char* completion = NULL;
-
-         if (known_values == NULL || current_input == NULL)
-         {
-            continue;
-         }
-
-         if (!completion_active[current_field] && !wal_input_has_letter(current_input))
-         {
-            continue;
-         }
-
-         if (!completion_active[current_field])
-         {
-            completion_active[current_field] = true;
-            completion_cycle[current_field] = 0;
-            pgmoneta_snprintf(completion_seed[current_field], sizeof(completion_seed[current_field]), "%s", current_input);
-         }
-
-         completion = wal_get_known_value_completion(known_values, completion_seed[current_field], completion_cycle[current_field]);
-         if (completion == NULL)
-         {
-            completion_cycle[current_field] = 0;
-            completion = wal_get_known_value_completion(known_values, completion_seed[current_field], completion_cycle[current_field]);
-         }
-
-         if (completion != NULL)
-         {
-            pgmoneta_snprintf(current_input, input_size, "%s", completion);
-            completion_cycle[current_field]++;
-         }
+         suggestion_index = -1;
+         wal_handle_tab_completion(state, current_field, field_inputs, field_input_sizes, completion_active, completion_cycle, completion_seed);
       }
       else if (ch == '\n')
       {
-         break;
+         if (suggestion_index >= 0)
+         {
+            char* prefix = completion_active[current_field] ? completion_seed[current_field] : field_inputs[current_field];
+            char** dv = NULL;
+            const char* const* kv = wal_get_known_values_for_field(state, current_field, prefix, &dv, field_inputs);
+            if (kv != NULL)
+            {
+               const char* selected_val = wal_get_known_value_completion(kv, prefix, suggestion_index);
+               if (selected_val != NULL)
+               {
+                  pgmoneta_snprintf(field_inputs[current_field], field_input_sizes[current_field], "%s", selected_val);
+               }
+            }
+            if (dv != NULL)
+            {
+               for (int i = 0; dv[i]; i++)
+               {
+                  free(dv[i]);
+               }
+               free(dv);
+            }
+            suggestion_index = -1;
+            wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
+         }
+         else
+         {
+            submit = true;
+            break;
+         }
       }
       else if (ch == KEY_BACKSPACE || ch == 127)
       {
          char* current_input = field_inputs[current_field];
-
          if (current_input != NULL && strlen(current_input) > 0)
          {
             current_input[strlen(current_input) - 1] = '\0';
+            suggestion_index = -1;
             wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
          }
       }
@@ -3151,15 +3608,35 @@ handle_search_input(struct ui_state* state)
             size_t len = strlen(current_input);
             current_input[len] = (char)ch;
             current_input[len + 1] = '\0';
+            suggestion_index = -1;
             wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
          }
       }
    }
 
-   /* Clear autocomplete area */
-   for (int i = 0; i < 6; i++)
+   delwin(dialog_win);
+   return submit;
+}
+
+static void
+handle_search_input(struct ui_state* state)
+{
+   char rmgr_input[64] = {0};
+   char start_lsn_input[32] = {0};
+   char end_lsn_input[32] = {0};
+   char xid_input[16] = {0};
+   char description_input[128] = {0};
+
+   bool submitted = wal_handle_dialog_input(state, true,
+                                            rmgr_input, sizeof(rmgr_input),
+                                            start_lsn_input, sizeof(start_lsn_input),
+                                            end_lsn_input, sizeof(end_lsn_input),
+                                            xid_input, sizeof(xid_input),
+                                            description_input, sizeof(description_input));
+
+   if (!submitted)
    {
-      mvwprintw(search_win, autocomplete_row + i, 2, "%-76s", "");
+      return;
    }
 
    /* Build search criteria */
@@ -3198,24 +3675,43 @@ handle_search_input(struct ui_state* state)
    /* Perform search */
    wal_search(state, &criteria);
 
-   /* Show results */
-   wal_set_window_theme(search_win, 1, true);
+   /* Show results in a temporary window */
+   int height = 28;
+   int width = 80;
+   int starty = (LINES - height) / 2;
+   int startx = (COLS - width) / 2;
 
-   if (state->directory_result_count > 0)
-   {
-      wattron(search_win, A_BOLD | COLOR_PAIR(3));
-      mvwprintw(search_win, height / 2, 5, "Found %zu matches across directory! Press any key...", state->directory_result_count);
-      wattroff(search_win, A_BOLD | COLOR_PAIR(3));
-   }
-   else
-   {
-      wattron(search_win, A_BOLD | COLOR_PAIR(4));
-      mvwprintw(search_win, height / 2, 10, "No matches found! Press any key to return...");
-      wattroff(search_win, A_BOLD | COLOR_PAIR(4));
-   }
+   if (starty < 0)
+      starty = 0;
+   if (startx < 0)
+      startx = 0;
+   if (height > LINES)
+      height = LINES;
+   if (width > COLS)
+      width = COLS;
 
-   wrefresh(search_win);
-   getch();
+   WINDOW* result_win = newwin(height, width, starty, startx);
+   if (result_win != NULL)
+   {
+      wal_set_window_theme(result_win, 1, true);
+
+      if (state->directory_result_count > 0)
+      {
+         wattron(result_win, A_BOLD | COLOR_PAIR(3));
+         mvwprintw(result_win, height / 2, 5, "Found %zu matches across directory! Press any key...", state->directory_result_count);
+         wattroff(result_win, A_BOLD | COLOR_PAIR(3));
+      }
+      else
+      {
+         wattron(result_win, A_BOLD | COLOR_PAIR(4));
+         mvwprintw(result_win, height / 2, 10, "No matches found! Press any key to return...");
+         wattroff(result_win, A_BOLD | COLOR_PAIR(4));
+      }
+
+      wrefresh(result_win);
+      getch();
+      delwin(result_win);
+   }
 
    /* Clean up */
    if (criteria.has_rmgr)
@@ -3226,8 +3722,6 @@ handle_search_input(struct ui_state* state)
    {
       free(criteria.description);
    }
-
-   delwin(search_win);
 }
 
 static void
@@ -3245,52 +3739,13 @@ wal_clear_filters(struct ui_state* state)
 static void
 handle_filter_input(struct ui_state* state)
 {
-   int height = 30;
-   int width = 80;
-   int starty = (LINES - height) / 2;
-   int startx = (COLS - width) / 2;
-
-   WINDOW* search_win = newwin(height, width, starty, startx);
-   wal_set_window_theme(search_win, 1, true);
-   keypad(search_win, TRUE);
-
-   wattron(search_win, A_BOLD);
-   mvwprintw(search_win, 1, 2, "Filter WAL Records");
-   wattroff(search_win, A_BOLD);
-   mvwhline(search_win, 2, 1, ACS_HLINE, width - 2);
-
-   /* Draw Table */
-   int table_start_row = 4;
-   mvwprintw(search_win, table_start_row, 2, "Field");
-   mvwprintw(search_win, table_start_row, 20, "| Value");
-   mvwhline(search_win, table_start_row + 1, 2, ACS_HLINE, width - 4);
-
-   mvwprintw(search_win, table_start_row + 2, 2, "RMGR");
-   mvwprintw(search_win, table_start_row + 2, 20, "|");
-
-   mvwprintw(search_win, table_start_row + 3, 2, "Start LSN");
-   mvwprintw(search_win, table_start_row + 3, 20, "|");
-
-   mvwprintw(search_win, table_start_row + 4, 2, "End LSN");
-   mvwprintw(search_win, table_start_row + 4, 20, "|");
-
-   mvwprintw(search_win, table_start_row + 5, 2, "XID");
-   mvwprintw(search_win, table_start_row + 5, 20, "|");
-
-   mvwprintw(search_win, table_start_row + 6, 2, "Relation");
-   mvwprintw(search_win, table_start_row + 6, 20, "|");
-
-   mvwprintw(search_win, height - 5, 2, "Logic: fields AND; RMGR/XID/Relation accept comma-separated OR");
-   mvwprintw(search_win, height - 4, 2, "Start LSN: record start >= min (if set)");
-   mvwprintw(search_win, height - 3, 2, "End LSN:   record end   <= max (if set)");
-
-   /* Input buffers */
    char rmgr_input[256] = {0};
    char start_lsn_input[64] = {0};
    char end_lsn_input[64] = {0};
    char xid_input[256] = {0};
    char relation_input[256] = {0};
 
+   /* Pre-fill buffers with existing filter values */
    if (wal_filters_active(state))
    {
       if (state->filters.has_rmgr)
@@ -3325,196 +3780,19 @@ handle_filter_input(struct ui_state* state)
       }
    }
 
-   char* field_inputs[] = {rmgr_input, start_lsn_input, end_lsn_input, xid_input, relation_input};
-   size_t field_input_sizes[] = {sizeof(rmgr_input), sizeof(start_lsn_input), sizeof(end_lsn_input), sizeof(xid_input), sizeof(relation_input)};
-   bool completion_active[5] = {false};
-   int completion_cycle[5] = {0};
-   char completion_seed[5][128] = {{0}};
+   bool submitted = wal_handle_dialog_input(state, false,
+                                            rmgr_input, sizeof(rmgr_input),
+                                            start_lsn_input, sizeof(start_lsn_input),
+                                            end_lsn_input, sizeof(end_lsn_input),
+                                            xid_input, sizeof(xid_input),
+                                            relation_input, sizeof(relation_input));
 
-   int current_field = 0; //0=RMGR, 1=Start LSN, 2=End LSN, 3=XID, 4=Relation
-   int num_fields = 5;
-   int autocomplete_row = table_start_row + 8;
-   int footer_row = height - 5;
-
-   wrefresh(search_win);
-
-   while (1)
+   if (!submitted)
    {
-      mvwprintw(search_win, table_start_row + 2, 2, "RMGR");
-      mvwprintw(search_win, table_start_row + 2, 20, "|");
-      mvwprintw(search_win, table_start_row + 3, 2, "Start LSN");
-      mvwprintw(search_win, table_start_row + 3, 20, "|");
-      mvwprintw(search_win, table_start_row + 4, 2, "End LSN");
-      mvwprintw(search_win, table_start_row + 4, 20, "|");
-      mvwprintw(search_win, table_start_row + 5, 2, "XID");
-      mvwprintw(search_win, table_start_row + 5, 20, "|");
-      mvwprintw(search_win, table_start_row + 6, 2, "Relation");
-      mvwprintw(search_win, table_start_row + 6, 20, "|");
-
-      for (int i = 0; i < num_fields; i++)
-      {
-         int row = table_start_row + 2 + i;
-         char* field_value = NULL;
-
-         switch (i)
-         {
-            case 0:
-               field_value = rmgr_input;
-               break;
-            case 1:
-               field_value = start_lsn_input;
-               break;
-            case 2:
-               field_value = end_lsn_input;
-               break;
-            case 3:
-               field_value = xid_input;
-               break;
-            case 4:
-               field_value = relation_input;
-               break;
-         }
-
-         if (i == current_field)
-         {
-            wattron(search_win, A_BOLD | COLOR_PAIR(12));
-         }
-
-         mvwprintw(search_win, row, 22, "%-50s", field_value ? field_value : "");
-
-         if (i == current_field)
-         {
-            wattroff(search_win, A_BOLD | COLOR_PAIR(12));
-         }
-      }
-
-      /* Clear suggestions area (do not overwrite footer lines) */
-      int max_suggest_rows = footer_row - autocomplete_row - 1;
-      if (max_suggest_rows < 0)
-      {
-         max_suggest_rows = 0;
-      }
-
-      for (int i = 0; i < max_suggest_rows; i++)
-      {
-         mvwprintw(search_win, autocomplete_row + i, 2, "%-76s", "");
-      }
-
-      {
-         const char* const* known_values = wal_get_known_values_for_field(current_field);
-
-         if (known_values != NULL && max_suggest_rows > 2)
-         {
-            mvwprintw(search_win, autocomplete_row, 2, "Suggestions:");
-            show_known_values_autocomplete(search_win,
-                                           known_values,
-                                           field_inputs[current_field],
-                                           field_inputs[current_field],
-                                           autocomplete_row,
-                                           4,
-                                           max_suggest_rows - 1);
-         }
-      }
-
-      wrefresh(search_win);
-
-      int ch = wgetch(search_win);
-
-      if (ch == 27)
-      {
-         delwin(search_win);
-         return;
-      }
-      else if (ch == 21) /* Ctrl+U: clear all fields */
-      {
-         memset(rmgr_input, 0, sizeof(rmgr_input));
-         memset(start_lsn_input, 0, sizeof(start_lsn_input));
-         memset(end_lsn_input, 0, sizeof(end_lsn_input));
-         memset(xid_input, 0, sizeof(xid_input));
-         memset(relation_input, 0, sizeof(relation_input));
-         wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
-      }
-      else if (ch == KEY_DOWN)
-      {
-         wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
-         current_field = (current_field + 1) % num_fields;
-      }
-      else if (ch == KEY_UP)
-      {
-         wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
-         current_field = (current_field + num_fields - 1) % num_fields;
-      }
-      else if (ch == '\t')
-      {
-         const char* const* known_values = wal_get_known_values_for_field(current_field);
-         char* current_input = field_inputs[current_field];
-         size_t input_size = field_input_sizes[current_field];
-         const char* completion = NULL;
-
-         if (known_values == NULL || current_input == NULL)
-         {
-            continue;
-         }
-
-         if (!completion_active[current_field] && !wal_input_has_letter(current_input))
-         {
-            continue;
-         }
-
-         if (!completion_active[current_field])
-         {
-            completion_active[current_field] = true;
-            completion_cycle[current_field] = 0;
-            pgmoneta_snprintf(completion_seed[current_field], sizeof(completion_seed[current_field]), "%s", current_input);
-         }
-
-         completion = wal_get_known_value_completion(known_values, completion_seed[current_field], completion_cycle[current_field]);
-         if (completion == NULL)
-         {
-            completion_cycle[current_field] = 0;
-            completion = wal_get_known_value_completion(known_values, completion_seed[current_field], completion_cycle[current_field]);
-         }
-
-         if (completion != NULL)
-         {
-            pgmoneta_snprintf(current_input, input_size, "%s", completion);
-            completion_cycle[current_field]++;
-         }
-      }
-      else if (ch == '\n')
-      {
-         break;
-      }
-      else if (ch == KEY_BACKSPACE || ch == 127)
-      {
-         char* current_input = field_inputs[current_field];
-
-         if (current_input != NULL && strlen(current_input) > 0)
-         {
-            current_input[strlen(current_input) - 1] = '\0';
-            wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
-         }
-      }
-      else if (isprint(ch))
-      {
-         char* current_input = field_inputs[current_field];
-         int max_len = (int)field_input_sizes[current_field] - 1;
-
-         if (current_input != NULL && strlen(current_input) < (size_t)max_len)
-         {
-            size_t len = strlen(current_input);
-            current_input[len] = (char)ch;
-            current_input[len + 1] = '\0';
-            wal_reset_completion_cycle(completion_active, completion_cycle, completion_seed, num_fields);
-         }
-      }
+      return;
    }
 
-   for (int i = 0; i < 6; i++)
-   {
-      mvwprintw(search_win, autocomplete_row + i, 2, "%-76s", "");
-   }
-
+   /* Apply filter criteria */
    memset(&state->filters, 0, sizeof(state->filters));
 
    if (strlen(rmgr_input) > 0)
@@ -3551,8 +3829,6 @@ handle_filter_input(struct ui_state* state)
    {
       wal_apply_filters(state);
    }
-
-   delwin(search_win);
 }
 
 static int
@@ -4080,7 +4356,6 @@ show_next_wal_file(struct ui_state* state)
    state->current_row = 0;
    state->scroll_offset = 0;
 }
-
 static void
 wal_interactive_run(struct ui_state* state)
 {
@@ -4387,6 +4662,12 @@ wal_interactive_cleanup(struct ui_state* state)
    {
       free(state->wal_filename);
       state->wal_filename = NULL;
+   }
+
+   if (state->lsn_art)
+   {
+      pgmoneta_art_destroy(state->lsn_art);
+      state->lsn_art = NULL;
    }
 
    if (state->main_win)

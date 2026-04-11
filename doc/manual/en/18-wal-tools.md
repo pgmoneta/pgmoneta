@@ -63,8 +63,8 @@ The `-I` or `--interactive` flag launches an interactive ncurses-based user inte
 
 - **File browser**: Navigate directories to select WAL files
 - **Record display**: View WAL records in a table; **t** / **b** switches text vs binary (hex) view
-- **Search**: **s** opens search by resource manager, LSN fields, XID, or description; **n** / **p** move between matches; **Esc** clears search (not filters)
-- **Filtering**: **f** opens a filter dialog. Criteria restrict which rows remain. **u** clears all filters and reloads the full file. Active filters are summarized in the header; the status line shows *showing N of M records* when filtered
+- **Search**: **s** opens search by resource manager, LSN fields, XID, or description; **Tab** cycles through known values for RMGR, Start LSN, and End LSN fields; **n** / **p** move between matches; **Esc** clears search (not filters)
+- **Filtering**: **f** opens a filter dialog. **Tab** cycles through known values for RMGR, Start LSN, and End LSN fields. Criteria restrict which rows remain. **u** clears all filters and reloads the full file. Active filters are summarized in the header; the status line shows *showing N of M records* when filtered
 - **Marks & YAML**: **m** marks or unmarks rows; **g** writes a **pgmoneta-walfilter** YAML from XIDs of marked rows
 - **Color-coded display**: Different colors for record types and columns
 - **WAL navigation**: At file boundaries, **Up** / **Down** can move to the previous/next WAL file in the same directory when applicable; **Home** / **End** jump to first/last record
@@ -105,6 +105,7 @@ pgmoneta-walinfo -I /path/to/000000010000000000000001
 | l | Load different WAL file / browse |
 | ? | Help overlay |
 | Esc | Clear search highlights |
+| Tab | Cycle through known values (RMGR, Start LSN, End LSN) in search/filter dialogs |
 | q | Quit |
 
 See **doc/man/pgmoneta-walinfo.1.rst** for the full **INTERACTIVE MODE** section.

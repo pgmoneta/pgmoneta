@@ -114,6 +114,17 @@ uintptr_t
 pgmoneta_art_search(struct art* t, char* key);
 
 /**
+ * Searches for prefix matches in the ART tree
+ * @param t The tree
+ * @param prefix The prefix to search for
+ * @param matches [out] A newly allocated array of matching keys
+ * @param max_matches The maximum number of matches to search for
+ * @return the number of matches found, or -1 on error
+ */
+int
+pgmoneta_art_prefix_search(struct art* t, char* prefix, char*** matches, int max_matches);
+
+/**
  * Searches for a value in the ART tree, and also returns its type
  * @param t The tree
  * @param key The key
