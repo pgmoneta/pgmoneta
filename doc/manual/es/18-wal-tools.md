@@ -62,11 +62,19 @@ La bandera `-I` o `--interactive` inicia una interfaz de usuario basada en ncurs
 **Características:**
 
 - **Navegador de archivos**: Navega directorios para seleccionar archivos WAL
-- **Visualización de registros**: Ver registros WAL detalles en formato de tabla
-- **Funcionalidad de búsqueda**: Buscar registros por gestor de recursos, rango de LSN, XID o descripción
-- **Visualización codificada por colores**: Colores diferentes para diferentes tipos de registros y componentes
-- **Navegación por teclado**: Usa teclas de flecha para navegar, Enter para seleccionar, `?` para ayuda
-- **Navegación WAL limitada**: Navega registros WAL usando Inicio para saltar al primer registro, flecha arriba para el registro anterior, y flecha abajo para el siguiente, a través de todos los archivos WAL en el directorio actual.
+- **Visualización de registros**: Ver registros WAL en formato de tabla; **t** / **b** cambia entre vista de texto y binaria (hex)
+- **Búsqueda**: **s** abre búsqueda por gestor de recursos, campos LSN, XID o descripción; **n** / **p** se desplazan entre coincidencias; **Esc** limpia la búsqueda (no los filtros)
+- **Filtrado**: **f** abre un diálogo de filtro. Los criterios restringen qué filas permanecen. **u** limpia todos los filtros y recarga el archivo completo. Los filtros activos se resumen en el encabezado; la barra de estado muestra *mostrando N de M registros* cuando está filtrado
+- **Marcas y YAML**: **m** marca o desmarca filas; **g** escribe un YAML de **pgmoneta-walfilter** con los XIDs de las filas marcadas
+- **Visualización codificada por colores**: Colores diferentes para tipos de registros y columnas
+- **Navegación WAL**: En los límites de archivo, **Arriba** / **Abajo** pueden moverse al archivo WAL anterior/siguiente en el mismo directorio cuando corresponda; **Inicio** / **Fin** saltan al primer/último registro
+
+**Semántica de filtros (diálogo interactivo)**
+
+- **AND entre campos**: Cada campo no vacío que establezcas debe coincidir (RMGR, LSN de inicio, LSN de fin, XID, Relación).
+- **OR dentro de un campo**: Para **RMGR**, **XID** y **Relación**, ingresa valores **separados por comas**; una fila coincide si coincide con **cualquier** token en ese campo.
+- **LSN de inicio** / **LSN de fin**: Juntos definen un rango: el inicio del registro mayor que el filtro de inicio (si se establece) y el fin del registro menor que el filtro de fin (si se establece). Puedes establecer solo un límite.
+- El diálogo se **rellena previamente** cuando vuelves a abrir **f**. **Ctrl+U** en el diálogo limpia todos los campos.
 
 **Uso:**
 
@@ -80,16 +88,26 @@ pgmoneta-walinfo -I /path/to/000000010000000000000001
 
 **Atajos de teclado:**
 
-- `Teclas de flecha`: Navegar registros y menús
-- `Enter`: Seleccionar archivo u opción
-- `?`: Mostrar ayuda
-- `q`: Salir de la aplicación
-- `s`: Iniciar búsqueda
-- `n`: Siguiente resultado de búsqueda
-- `p`: Resultado de búsqueda anterior
-- `l`: Cargar archivo diferente del directorio actual
-- `home`: Ir al primer registro en el archivo WAL
-- `end`: Ir al último registro en el archivo WAL
+| Tecla | Acción |
+|-------|--------|
+| Teclas de flecha | Desplazarse entre registros |
+| AvPág / RePág | Desplazamiento por página |
+| Inicio / Fin | Primer / último registro |
+| Enter | Vista de detalle del registro actual |
+| t / b | Modo texto / Modo binario (hex) |
+| s | Abrir búsqueda |
+| n / p | Siguiente / anterior coincidencia de búsqueda (cuando búsqueda activa) |
+| f | Abrir diálogo de filtro |
+| u | Limpiar todos los filtros y recargar lista completa |
+| m | Marcar / desmarcar fila para exportar |
+| g | Escribir YAML de walfilter con los XIDs marcados |
+| v | Verificar registros |
+| l | Cargar archivo WAL diferente / explorar |
+| ? | Superposición de ayuda |
+| Esc | Limpiar resaltados de búsqueda |
+| q | Salir |
+
+Consulta **doc/man/pgmoneta-walinfo.1.rst** para la sección completa de **MODO INTERACTIVO**.
 
 #### Formato de salida sin procesar
 

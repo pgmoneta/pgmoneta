@@ -109,6 +109,10 @@ Nota: Si `host` comienza con un `/`, representa una ruta y `pgmoneta` se conecta
 | s3_secret_access_key | | String | Sí | La clave de acceso secreta IAM |
 | s3_bucket | | String | Sí | El nombre del bucket S3 |
 | s3_base_dir | | String | Sí | El directorio base para el bucket S3 |
+| s3_storage_class | REDUCED_REDUNDANCY | String | No | La clase de almacenamiento S3 |
+| s3_port | | Int | No | El número de puerto para el endpoint S3 |
+| s3_use_tls | `off` | Bool | No | Usar TLS para conexiones S3 |
+| s3_endpoint | | String | No | La URL del endpoint S3 |
 
 **Azure**
 
@@ -238,6 +242,21 @@ tener acceso a la base de datos `postgres` para obtener los parámetros de confi
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | -1 | Int | No | La velocidad máxima de transferencia de backup en bytes por segundo. Usa 0 para desactivar, -1 significa usar la configuración global |
 | progress | -1 | Int | No | Habilitar seguimiento del progreso de backup. Usa 1 para habilitar, 0 para desactivar, -1 significa usar la configuración global |
+
+
+**S3**
+
+| Propiedad | Predeterminado | Unidad | Requerido | Descripción |
+| :------- | :------ | :--- | :------- | :---------- |
+| s3_storage_class | REDUCED_REDUNDANCY | String | No | La clase de almacenamiento S3. Anula la configuración global. |
+| s3_port | | Int | No | El número de puerto para el endpoint S3. Anula la configuración global. |
+| s3_use_tls | | Bool | No | Usar TLS para conexiones S3. Anula la configuración global. |
+| s3_endpoint | | String | No | URL del endpoint S3. Anula la configuración global. |
+| s3_region | | String | No | La región de AWS. Anula la configuración global. |
+| s3_access_key_id | | String | No | El ID de clave de acceso IAM. Anula la configuración global. |
+| s3_secret_access_key | | String | No | La clave de acceso secreta IAM. Anula la configuración global. |
+| s3_bucket | | String | No | El nombre del bucket S3. Anula la configuración global. |
+| s3_base_dir | | String | No | El directorio base para el bucket S3. Anula la configuración global. |
 
 **Extra**
 
