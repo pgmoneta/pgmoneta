@@ -31,6 +31,7 @@
 #include <compression.h>
 #include <deque.h>
 #include <logging.h>
+#include <progress.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -76,7 +77,7 @@ pgmoneta_create_zstd(bool compress)
 static char*
 zstd_name(void)
 {
-   return "ZSTD";
+   return PHASE_NAME_ZSTD;
 }
 
 static int
@@ -148,7 +149,13 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
       pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
 
-      if (pgmoneta_compress_directory(backup_base, COMPRESSION_SERVER_ZSTD, workers, excludes))
+      if (pgmoneta_is_progress_enabled(server))
+      {
+         int file_count = pgmoneta_count_files(backup_base);
+         pgmoneta_progress_set_total(server, file_count);
+      }
+
+      if (pgmoneta_compress_directory(server, backup_base, COMPRESSION_SERVER_ZSTD, workers, excludes))
       {
          goto error;
       }

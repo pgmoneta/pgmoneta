@@ -31,6 +31,7 @@
 #include <compression.h>
 #include <deque.h>
 #include <logging.h>
+#include <progress.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -76,7 +77,7 @@ pgmoneta_create_bzip2(bool compress)
 static char*
 bzip2_name(void)
 {
-   return "BZip2";
+   return PHASE_NAME_BZIP2;
 }
 
 static int
@@ -144,7 +145,13 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
       pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
 
-      if (pgmoneta_compress_directory(backup_base, COMPRESSION_CLIENT_BZIP2, workers, excludes))
+      if (pgmoneta_is_progress_enabled(server))
+      {
+         int file_count = pgmoneta_count_files(backup_base);
+         pgmoneta_progress_set_total(server, file_count);
+      }
+
+      if (pgmoneta_compress_directory(server, backup_base, COMPRESSION_CLIENT_BZIP2, workers, excludes))
       {
          goto error;
       }

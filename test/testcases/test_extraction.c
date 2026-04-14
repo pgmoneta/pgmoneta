@@ -236,28 +236,23 @@ cleanup:
 MCTF_TEST(test_extraction_layered_archive)
 {
    struct main_configuration* config = NULL;
+   struct test_encryption_env enc_env;
    FILE* f = NULL;
-   bool own_shmem = false;
    const char* wal_name = "000000010000000000000001";
    uint32_t file_type = 0;
    char root[MAX_PATH];
    char src_dir[MAX_PATH];
    char out_dir[MAX_PATH];
-   char home_dir[MAX_PATH];
-   char hidden_dir[MAX_PATH];
-   char master_key_path[MAX_PATH];
    char wal_src_path[MAX_PATH];
    char tar_path[MAX_PATH];
    char zstd_path[MAX_PATH];
    char encrypted_path[MAX_PATH];
    char extracted_path[MAX_PATH];
+   bool enc_env_ready = false;
 
    memset(root, 0, sizeof(root));
    memset(src_dir, 0, sizeof(src_dir));
    memset(out_dir, 0, sizeof(out_dir));
-   memset(home_dir, 0, sizeof(home_dir));
-   memset(hidden_dir, 0, sizeof(hidden_dir));
-   memset(master_key_path, 0, sizeof(master_key_path));
    memset(wal_src_path, 0, sizeof(wal_src_path));
    memset(tar_path, 0, sizeof(tar_path));
    memset(zstd_path, 0, sizeof(zstd_path));
@@ -267,9 +262,6 @@ MCTF_TEST(test_extraction_layered_archive)
    pgmoneta_snprintf(root, sizeof(root), "test_extract_layered_archive");
    pgmoneta_snprintf(src_dir, sizeof(src_dir), "%s/src", root);
    pgmoneta_snprintf(out_dir, sizeof(out_dir), "%s/out", root);
-   pgmoneta_snprintf(home_dir, sizeof(home_dir), "%s/home", root);
-   pgmoneta_snprintf(hidden_dir, sizeof(hidden_dir), "%s/.pgmoneta", home_dir);
-   pgmoneta_snprintf(master_key_path, sizeof(master_key_path), "%s/master.key", hidden_dir);
    pgmoneta_snprintf(wal_src_path, sizeof(wal_src_path), "%s/%s", src_dir, wal_name);
    pgmoneta_snprintf(tar_path, sizeof(tar_path), "%s/wal.tar", root);
    pgmoneta_snprintf(zstd_path, sizeof(zstd_path), "%s/wal.tar.zstd", root);
@@ -281,17 +273,6 @@ MCTF_TEST(test_extraction_layered_archive)
    MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(root), 0, cleanup, "mkdir root failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(src_dir), 0, cleanup, "mkdir src failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(out_dir), 0, cleanup, "mkdir out failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(home_dir), 0, cleanup, "mkdir home failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(hidden_dir), 0, cleanup, "mkdir .pgmoneta failed");
-   MCTF_ASSERT_INT_EQ(chmod(hidden_dir, 0700), 0, cleanup, "chmod .pgmoneta failed");
-
-   f = fopen(master_key_path, "w");
-   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "fopen master.key failed");
-   fprintf(f, "dGVzdF9tYXN0ZXJfa2V5");
-   fflush(f);
-   fclose(f);
-   f = NULL;
-   MCTF_ASSERT_INT_EQ(chmod(master_key_path, 0600), 0, cleanup, "chmod master.key failed");
 
    f = fopen(wal_src_path, "w");
    MCTF_ASSERT_PTR_NONNULL(f, cleanup, "fopen WAL source failed");
@@ -300,21 +281,13 @@ MCTF_TEST(test_extraction_layered_archive)
    fclose(f);
    f = NULL;
 
-   if (shmem == NULL)
-   {
-      shmem = calloc(1, sizeof(struct main_configuration));
-      MCTF_ASSERT_PTR_NONNULL(shmem, cleanup, "calloc shmem failed");
-      own_shmem = true;
-   }
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_setup_encryption_env(&enc_env), 0, cleanup, "encryption env setup failed");
+   enc_env_ready = true;
 
    config = (struct main_configuration*)shmem;
    MCTF_ASSERT_PTR_NONNULL(config, cleanup, "config is null");
-
-   memset(config->common.home_dir, 0, sizeof(config->common.home_dir));
-   pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", home_dir);
    config->compression_level = 1;
    config->workers = 1;
-   config->common.encryption = ENCRYPTION_AES_256_GCM;
 
    MCTF_ASSERT_INT_EQ(pgmoneta_tar(src_dir, tar_path), 0, cleanup, "tar failed");
    MCTF_ASSERT(pgmoneta_exists(tar_path), cleanup, "tar file missing");
@@ -338,11 +311,9 @@ cleanup:
       fclose(f);
       f = NULL;
    }
-   if (own_shmem)
+   if (enc_env_ready)
    {
-      free(shmem);
-      shmem = NULL;
-      own_shmem = false;
+      pgmoneta_test_teardown_encryption_env(&enc_env);
    }
 
    pgmoneta_delete_directory(root);

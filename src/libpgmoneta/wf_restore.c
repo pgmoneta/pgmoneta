@@ -168,7 +168,7 @@ pgmoneta_restore_excluded_files(void)
 static char*
 restore_name(void)
 {
-   return "Restore";
+   return WORKFLOW_NAME_RESTORE;
 }
 
 static int

@@ -27,6 +27,7 @@
  *
  */
 #include <pgmoneta.h>
+#include <aes.h>
 #include <configuration.h>
 #include <logging.h>
 #include <message.h>
@@ -43,6 +44,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -467,4 +469,117 @@ pgmoneta_test_exec_command(const char* command, char** output, int* exit_code)
    }
 
    return 0;
+}
+
+int
+pgmoneta_test_load_conf(char* conf_path)
+{
+   memset(shmem, 0, sizeof(struct main_configuration));
+   pgmoneta_init_main_configuration(shmem);
+   return pgmoneta_read_main_configuration(shmem, conf_path);
+}
+
+int
+pgmoneta_test_setup_encryption_env(struct test_encryption_env* env)
+{
+   char pgmoneta_dir[MAX_PATH] = {0};
+   char master_key_file[MAX_PATH] = {0};
+   FILE* f = NULL;
+   struct main_configuration* config = NULL;
+
+   memset(env, 0, sizeof(struct test_encryption_env));
+   env->original_home = getenv("HOME") ? strdup(getenv("HOME")) : NULL;
+
+   if (shmem == NULL)
+   {
+      size_t shmem_size = sizeof(struct main_configuration);
+      if (pgmoneta_create_shared_memory(shmem_size, HUGEPAGE_OFF, &shmem))
+      {
+         return 1;
+      }
+      pgmoneta_init_main_configuration(shmem);
+      env->shmem_locally_allocated = true;
+   }
+
+   config = (struct main_configuration*)shmem;
+   env->original_encryption = config->common.encryption;
+   config->common.encryption = ENCRYPTION_AES_256_GCM;
+
+   pgmoneta_snprintf(env->test_home, MAX_PATH, "%s/test_aes_home_XXXXXX", "/tmp");
+   if (mkdtemp(env->test_home) == NULL)
+   {
+      return 1;
+   }
+
+   pgmoneta_snprintf(env->original_config_home, sizeof(env->original_config_home), "%s", config->common.home_dir);
+   memset(config->common.home_dir, 0, sizeof(config->common.home_dir));
+   pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", env->test_home);
+
+   pgmoneta_snprintf(pgmoneta_dir, MAX_PATH, "%s/.pgmoneta", env->test_home);
+   if (mkdir(pgmoneta_dir, 0700))
+   {
+      return 1;
+   }
+
+   pgmoneta_snprintf(master_key_file, MAX_PATH, "%s/master.key", pgmoneta_dir);
+   f = fopen(master_key_file, "wb");
+   if (f == NULL)
+   {
+      return 1;
+   }
+   /* Base64 encoded "pgmoneta-test-password" */
+   fprintf(f, "cGdtb25ldGEtdGVzdC1wYXNzd29yZA==\n");
+   /* Base64 encoded 16-byte zero salt */
+   fprintf(f, "AAAAAAAAAAAAAAAAAAAAAA==\n");
+   fclose(f);
+   chmod(master_key_file, 0600);
+
+   setenv("HOME", env->test_home, 1);
+
+   unsigned char salt[PBKDF2_SALT_LENGTH] = {0};
+   pgmoneta_set_master_salt(salt);
+
+   return 0;
+}
+
+void
+pgmoneta_test_teardown_encryption_env(struct test_encryption_env* env)
+{
+   char pgmoneta_dir[MAX_PATH] = {0};
+   char master_key_file[MAX_PATH] = {0};
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   if (env->original_home)
+   {
+      setenv("HOME", env->original_home, 1);
+      free(env->original_home);
+   }
+   else
+   {
+      unsetenv("HOME");
+   }
+
+   if (config != NULL)
+   {
+      config->common.encryption = env->original_encryption;
+      memset(config->common.home_dir, 0, sizeof(config->common.home_dir));
+      pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", env->original_config_home);
+   }
+
+   if (env->test_home[0] != '\0')
+   {
+      pgmoneta_snprintf(pgmoneta_dir, MAX_PATH, "%s/.pgmoneta", env->test_home);
+      pgmoneta_snprintf(master_key_file, MAX_PATH, "%s/master.key", pgmoneta_dir);
+      remove(master_key_file);
+      rmdir(pgmoneta_dir);
+      rmdir(env->test_home);
+   }
+
+   if (env->shmem_locally_allocated && shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+      shmem = NULL;
+   }
+
+   pgmoneta_clear_aes_cache();
 }

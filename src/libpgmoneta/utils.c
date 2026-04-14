@@ -34,6 +34,7 @@
 #include <extraction.h>
 #include <info.h>
 #include <logging.h>
+#include <manifest.h>
 #include <shmem.h>
 #include <utils.h>
 
@@ -1774,16 +1775,17 @@ pgmoneta_directory_size(char* directory)
 
          memset(&st, 0, sizeof(struct stat));
 
-         stat(p, &st);
-
-         l = st.st_size / st.st_blksize;
-
-         if (st.st_size % st.st_blksize != 0)
+         if (stat(p, &st) == 0 && st.st_blksize > 0)
          {
-            l += 1;
-         }
+            l = st.st_size / st.st_blksize;
 
-         total_size += (l * st.st_blksize);
+            if (st.st_size % st.st_blksize != 0)
+            {
+               l += 1;
+            }
+
+            total_size += (l * st.st_blksize);
+         }
 
          free(p);
       }
@@ -1808,6 +1810,43 @@ pgmoneta_directory_size(char* directory)
    closedir(dir);
 
    return total_size;
+}
+
+int
+pgmoneta_count_files(char* directory)
+{
+   char manifest_path[MAX_PATH];
+   struct deque* paths = NULL;
+   int num = 0;
+
+   if (directory == NULL || strlen(directory) == 0)
+   {
+      goto cleanup;
+   }
+
+   memset(manifest_path, 0, MAX_PATH);
+   pgmoneta_snprintf(manifest_path, MAX_PATH, "%s/backup.manifest", directory);
+
+   if (pgmoneta_exists(manifest_path))
+   {
+      if (!pgmoneta_manifest_get_paths(manifest_path, &paths))
+      {
+         goto cleanup;
+      }
+   }
+
+   /* fallback */
+   pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, directory, true, &paths);
+
+cleanup:
+
+   if (paths != NULL)
+   {
+      num = pgmoneta_deque_size(paths);
+      pgmoneta_deque_destroy(paths);
+   }
+
+   return num;
 }
 
 unsigned long
@@ -3497,20 +3536,21 @@ pgmoneta_biggest_file(char* directory)
 
          memset(&st, 0, sizeof(struct stat));
 
-         stat(p, &st);
-
-         l = st.st_size / st.st_blksize;
-
-         if (st.st_size % st.st_blksize != 0)
+         if (stat(p, &st) == 0 && st.st_blksize > 0)
          {
-            l += 1;
-         }
+            l = st.st_size / st.st_blksize;
 
-         size = (l * st.st_blksize);
+            if (st.st_size % st.st_blksize != 0)
+            {
+               l += 1;
+            }
 
-         if (size > biggest_size)
-         {
-            biggest_size = size;
+            size = (l * st.st_blksize);
+
+            if (size > biggest_size)
+            {
+               biggest_size = size;
+            }
          }
 
          free(p);

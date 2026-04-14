@@ -780,6 +780,46 @@ Indica si una operación de limpieza de retención está actualmente en progreso
 | :-------- | :---------- | :----- |
 | name | El nombre/identificador configurado para el servidor PostgreSQL. | 1: Limpieza de retención está en ejecución, 0: Ninguna limpieza de retención está en ejecución |
 
+**pgmoneta_progress_percentage**
+
+El porcentaje de progreso del flujo de trabajo (0-100) para un servidor.
+
+| Atributo | Descripción |
+| :-------- | :---------- |
+| name | El nombre/identificador configurado para el servidor PostgreSQL. |
+| workflow | El tipo de flujo de trabajo actual (p. ej. Backup, Restore, Archive). |
+| phase | El nombre de la fase del flujo de trabajo actual. |
+
+**pgmoneta_progress_elapsed_time**
+
+Los segundos transcurridos desde el inicio del flujo de trabajo actual.
+
+| Atributo | Descripción |
+| :-------- | :---------- |
+| name | El nombre/identificador configurado para el servidor PostgreSQL. |
+| workflow | El tipo de flujo de trabajo actual (p. ej. Backup, Restore, Archive). |
+| phase | El nombre de la fase del flujo de trabajo actual. |
+
+**pgmoneta_progress_total**
+
+Las unidades de trabajo totales en la fase actual del flujo de trabajo.
+
+| Atributo | Descripción |
+| :-------- | :---------- |
+| name | El nombre/identificador configurado para el servidor PostgreSQL. |
+| workflow | El tipo de flujo de trabajo actual (p. ej. Backup, Restore, Archive). |
+| phase | El nombre de la fase del flujo de trabajo actual. |
+
+**pgmoneta_progress_done**
+
+Las unidades de trabajo completadas en la fase actual del flujo de trabajo.
+
+| Atributo | Descripción |
+| :-------- | :---------- |
+| name | El nombre/identificador configurado para el servidor PostgreSQL. |
+| workflow | El tipo de flujo de trabajo actual (p. ej. Backup, Restore, Archive). |
+| phase | El nombre de la fase del flujo de trabajo actual. |
+
 **pgmoneta_current_wal_file**
 
 Muestra el nombre de archivo WAL actual siendo transmitido o procesado para un servidor.

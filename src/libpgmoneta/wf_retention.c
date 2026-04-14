@@ -35,9 +35,11 @@
 
 /* system */
 #include <assert.h>
+#include <errno.h>
 #include <stdatomic.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 static char* retention_name(void);
@@ -71,7 +73,7 @@ pgmoneta_create_retention(void)
 static char*
 retention_name(void)
 {
-   return "Retention";
+   return WORKFLOW_NAME_RETENTION;
 }
 
 static int

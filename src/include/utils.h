@@ -686,6 +686,14 @@ unsigned long
 pgmoneta_directory_size(char* directory);
 
 /**
+ * Count regular files in a directory recursively
+ * @param directory The directory
+ * @return The number of regular files
+ */
+int
+pgmoneta_count_files(char* directory);
+
+/**
  * Calculate the size of WAL files starting from a specific WAL segment
  * @param directory The directory containing WAL files
  * @param start The starting WAL segment

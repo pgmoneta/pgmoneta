@@ -336,7 +336,7 @@ pgmoneta-cli ping
 
 ## progress
 
-Get progress for a command.
+Get progress for a command. Requires `progress = on` in the configuration.
 
 Command
 

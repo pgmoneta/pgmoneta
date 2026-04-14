@@ -137,10 +137,11 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, size_t
  * @param d The directory
  * @param workers The optional workers
  * @param excludes The optional excludes
+ * @param server The server index for progress tracking, or -1 to disable
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt_directory(char* d, struct workers* workers, struct deque* excludes);
+pgmoneta_encrypt_directory(int server, char* d, struct workers* workers, struct deque* excludes);
 
 /**
  * Clear the thread-local AES cache securely

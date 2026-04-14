@@ -36,12 +36,11 @@
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <progress.h>
 #include <security.h>
 #include <utils.h>
 #include <wal.h>
 #include <workflow.h>
-
-#define NAME "backup"
 
 void
 pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
@@ -221,9 +220,17 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    pgmoneta_mkdir(root);
 
+   pgmoneta_progress_setup(server, workflow, nodes,
+                           backup_incremental ? WORKFLOW_TYPE_INCREMENTAL_BACKUP : WORKFLOW_TYPE_BACKUP);
+
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
    }
 
    backup->backup_size = pgmoneta_directory_size(backup_data);
@@ -312,12 +319,17 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
 error:
 
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
+   }
+
    config->common.servers[server].active_backup = false;
    atomic_store(&config->common.servers[server].repository, false);
 
    pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                       ec != -1 ? ec : MANAGEMENT_ERROR_BACKUP_ERROR,
-                                      en != NULL ? en : NAME, compression, encryption, payload);
+                                      en != NULL ? en : WORKFLOW_NAME_BACKUP, compression, encryption, payload);
 
    if (pgmoneta_exists(root))
    {
@@ -622,7 +634,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 error:
 
    pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                      ec != -1 ? ec : MANAGEMENT_ERROR_LIST_BACKUP_ERROR, en != NULL ? en : NAME,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_LIST_BACKUP_ERROR, en != NULL ? en : WORKFLOW_NAME_BACKUP,
                                       compression, encryption, payload);
 
    pgmoneta_json_destroy(payload);
@@ -735,7 +747,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 error:
 
    pgmoneta_management_response_error(NULL, client_fd, config->common.servers[srv].name,
-                                      ec != -1 ? ec : MANAGEMENT_ERROR_DELETE_BACKUP_ERROR, en != NULL ? en : NAME,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_DELETE_BACKUP_ERROR, en != NULL ? en : WORKFLOW_NAME_DELETE_BACKUP,
                                       compression, encryption, payload);
 
    pgmoneta_art_destroy(nodes);
@@ -764,25 +776,6 @@ pgmoneta_get_max_rate(int server)
    }
 
    return config->max_rate;
-}
-
-bool
-pgmoneta_is_progress_enabled(int server)
-{
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   if (config->common.servers[server].progress == 1)
-   {
-      return true;
-   }
-   else if (config->common.servers[server].progress == 0)
-   {
-      return false;
-   }
-
-   return config->progress;
 }
 
 bool

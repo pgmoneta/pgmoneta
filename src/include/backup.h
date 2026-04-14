@@ -82,14 +82,6 @@ int
 pgmoneta_get_max_rate(int server);
 
 /**
- * Is progress enabled for a server
- * @param server The server
- * @return True if enabled, otherwise false
- */
-bool
-pgmoneta_is_progress_enabled(int server);
-
-/**
  * Is the backup valid ?
  * @param server The server
  * @param identifier The identifier

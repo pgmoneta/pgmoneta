@@ -32,10 +32,12 @@
 #include <management.h>
 #include <mctf.h>
 #include <shmem.h>
+#include <tscommon.h>
+#include <utils.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <utils.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -46,114 +48,6 @@ setup_test_salt(void)
 {
    unsigned char salt[PBKDF2_SALT_LENGTH] = {0};
    pgmoneta_set_master_salt(salt);
-}
-
-struct test_env
-{
-   char test_home[MAX_PATH];
-   char* original_home;
-   char original_config_home[MAX_PATH];
-   int original_encryption;
-   bool shmem_locally_allocated;
-};
-
-static int
-setup_mock_master_key(struct test_env* env)
-{
-   char pgmoneta_dir[MAX_PATH] = {0};
-   char master_key_file[MAX_PATH] = {0};
-   FILE* f = NULL;
-   struct main_configuration* config = NULL;
-
-   memset(env, 0, sizeof(struct test_env));
-   env->original_home = getenv("HOME") ? strdup(getenv("HOME")) : NULL;
-
-   if (shmem == NULL)
-   {
-      size_t shmem_size = sizeof(struct main_configuration);
-      if (pgmoneta_create_shared_memory(shmem_size, HUGEPAGE_OFF, &shmem))
-      {
-         return 1;
-      }
-      pgmoneta_init_main_configuration(shmem);
-      env->shmem_locally_allocated = true;
-   }
-
-   config = (struct main_configuration*)shmem;
-   env->original_encryption = config->common.encryption;
-   config->common.encryption = ENCRYPTION_AES_256_GCM;
-
-   pgmoneta_snprintf(env->test_home, MAX_PATH, "%s/test_aes_home_XXXXXX", "/tmp");
-   if (mkdtemp(env->test_home) == NULL)
-   {
-      return 1;
-   }
-
-   pgmoneta_snprintf(env->original_config_home, sizeof(env->original_config_home), "%s", config->common.home_dir);
-   memset(config->common.home_dir, 0, sizeof(config->common.home_dir));
-   pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", env->test_home);
-
-   pgmoneta_snprintf(pgmoneta_dir, MAX_PATH, "%s/.pgmoneta", env->test_home);
-   if (mkdir(pgmoneta_dir, 0700))
-   {
-      return 1;
-   }
-
-   pgmoneta_snprintf(master_key_file, MAX_PATH, "%s/master.key", pgmoneta_dir);
-   f = fopen(master_key_file, "wb");
-   if (f == NULL)
-   {
-      return 1;
-   }
-   /* Base64 encoded "pgmoneta-test-password" is "cGdtb25ldGEtdGVzdC1wYXNzd29yZA==" */
-   fprintf(f, "cGdtb25ldGEtdGVzdC1wYXNzd29yZA==\n");
-   /* Base64 encoded 16-byte zero salt */
-   fprintf(f, "AAAAAAAAAAAAAAAAAAAAAA==\n");
-   fclose(f);
-   chmod(master_key_file, 0600);
-
-   setenv("HOME", env->test_home, 1);
-   return 0;
-}
-
-static void
-teardown_mock_master_key(struct test_env* env)
-{
-   char pgmoneta_dir[MAX_PATH] = {0};
-   char master_key_file[MAX_PATH] = {0};
-   struct main_configuration* config = (struct main_configuration*)shmem;
-
-   if (env->original_home)
-   {
-      setenv("HOME", env->original_home, 1);
-      free(env->original_home);
-   }
-   else
-   {
-      unsetenv("HOME");
-   }
-
-   if (config != NULL)
-   {
-      config->common.encryption = env->original_encryption;
-      memset(config->common.home_dir, 0, sizeof(config->common.home_dir));
-      pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", env->original_config_home);
-   }
-
-   if (env->test_home[0] != '\0')
-   {
-      pgmoneta_snprintf(pgmoneta_dir, MAX_PATH, "%s/.pgmoneta", env->test_home);
-      pgmoneta_snprintf(master_key_file, MAX_PATH, "%s/master.key", pgmoneta_dir);
-      remove(master_key_file);
-      rmdir(pgmoneta_dir);
-      rmdir(env->test_home);
-   }
-
-   if (env->shmem_locally_allocated && shmem != NULL)
-   {
-      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
-      shmem = NULL;
-   }
 }
 
 static int
@@ -266,7 +160,7 @@ cleanup:
  */
 MCTF_TEST(test_aes_buffer_roundtrip)
 {
-   struct test_env env;
+   struct test_encryption_env env;
    char* plaintext = "wire-protocol-buffer-test";
    size_t plaintext_len = strlen(plaintext);
    unsigned char* ciphertext = NULL;
@@ -274,7 +168,7 @@ MCTF_TEST(test_aes_buffer_roundtrip)
    unsigned char* decrypted = NULL;
    size_t decrypted_len = 0;
 
-   MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
+   MCTF_ASSERT(pgmoneta_test_setup_encryption_env(&env) == 0, cleanup, "Failed to setup mock environment");
 
    /* Test AES-256-GCM (default for management) */
    MCTF_ASSERT(pgmoneta_encrypt_buffer((unsigned char*)plaintext, plaintext_len, &ciphertext, &ciphertext_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt_buffer should succeed");
@@ -289,7 +183,7 @@ MCTF_TEST(test_aes_buffer_roundtrip)
 cleanup:
    free(ciphertext);
    free(decrypted);
-   teardown_mock_master_key(&env);
+   pgmoneta_test_teardown_encryption_env(&env);
    MCTF_FINISH();
 }
 
@@ -298,7 +192,7 @@ cleanup:
  */
 MCTF_TEST_NEGATIVE(test_aes_buffer_tamper_fails)
 {
-   struct test_env env;
+   struct test_encryption_env env;
    char* plaintext = "tamper-test-data";
    size_t plaintext_len = strlen(plaintext);
    unsigned char* ciphertext = NULL;
@@ -306,7 +200,7 @@ MCTF_TEST_NEGATIVE(test_aes_buffer_tamper_fails)
    unsigned char* decrypted = NULL;
    size_t decrypted_len = 0;
 
-   MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
+   MCTF_ASSERT(pgmoneta_test_setup_encryption_env(&env) == 0, cleanup, "Failed to setup mock environment");
 
    MCTF_ASSERT(pgmoneta_encrypt_buffer((unsigned char*)plaintext, plaintext_len, &ciphertext, &ciphertext_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt_buffer should succeed");
    MCTF_ASSERT_PTR_NONNULL(ciphertext, cleanup, "ciphertext should not be NULL");
@@ -322,7 +216,7 @@ MCTF_TEST_NEGATIVE(test_aes_buffer_tamper_fails)
 cleanup:
    free(ciphertext);
    free(decrypted);
-   teardown_mock_master_key(&env);
+   pgmoneta_test_teardown_encryption_env(&env);
    MCTF_FINISH();
 }
 
@@ -331,7 +225,7 @@ cleanup:
  */
 MCTF_TEST_NEGATIVE(test_management_read_json_tampered_payload_fails)
 {
-   struct test_env env;
+   struct test_encryption_env env;
    char* plaintext = "{\"request\":\"ping\"}";
    unsigned char* ciphertext = NULL;
    size_t ciphertext_len = 0;
@@ -343,7 +237,7 @@ MCTF_TEST_NEGATIVE(test_management_read_json_tampered_payload_fails)
    uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
    uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
 
-   MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
+   MCTF_ASSERT(pgmoneta_test_setup_encryption_env(&env) == 0, cleanup, "Failed to setup mock environment");
    MCTF_ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0, cleanup, "socketpair should succeed");
 
    MCTF_ASSERT(pgmoneta_encrypt_buffer((unsigned char*)plaintext, strlen(plaintext), &ciphertext, &ciphertext_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt_buffer should succeed");
@@ -378,7 +272,7 @@ cleanup:
    free(ciphertext);
    free(encoded);
    pgmoneta_json_destroy(json);
-   teardown_mock_master_key(&env);
+   pgmoneta_test_teardown_encryption_env(&env);
    MCTF_FINISH();
 }
 
@@ -432,13 +326,13 @@ cleanup:
  */
 MCTF_TEST(test_management_response_error_without_payload_encrypted)
 {
-   struct test_env env;
+   struct test_encryption_env env;
    int sockets[2] = {-1, -1};
    struct json* json = NULL;
    struct json* outcome = NULL;
    int32_t error = 0;
 
-   MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
+   MCTF_ASSERT(pgmoneta_test_setup_encryption_env(&env) == 0, cleanup, "Failed to setup mock environment");
    MCTF_ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0, cleanup, "socketpair should succeed");
    MCTF_ASSERT(pgmoneta_management_response_error(NULL, sockets[0], NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, "remote",
                                                   MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_AES256_GCM, NULL) == 0,
@@ -463,7 +357,7 @@ cleanup:
       close(sockets[1]);
    }
    pgmoneta_json_destroy(json);
-   teardown_mock_master_key(&env);
+   pgmoneta_test_teardown_encryption_env(&env);
    MCTF_FINISH();
 }
 
@@ -499,7 +393,7 @@ cleanup:
  */
 MCTF_TEST(test_aes_buffer_empty_payload)
 {
-   struct test_env env;
+   struct test_encryption_env env;
    char* plaintext = "";
    size_t plaintext_len = 0;
    unsigned char* ciphertext = NULL;
@@ -507,7 +401,7 @@ MCTF_TEST(test_aes_buffer_empty_payload)
    unsigned char* decrypted = NULL;
    size_t decrypted_len = 0;
 
-   MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
+   MCTF_ASSERT(pgmoneta_test_setup_encryption_env(&env) == 0, cleanup, "Failed to setup mock environment");
 
    MCTF_ASSERT(pgmoneta_encrypt_buffer((unsigned char*)plaintext, plaintext_len, &ciphertext, &ciphertext_len, ENCRYPTION_AES_256_GCM) == 0, cleanup, "pgmoneta_encrypt_buffer should succeed for empty payload");
    MCTF_ASSERT(ciphertext_len == PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH + GCM_TAG_LENGTH, cleanup, "ciphertext_len should be exactly salt + IV + tag");
@@ -518,7 +412,7 @@ MCTF_TEST(test_aes_buffer_empty_payload)
 cleanup:
    free(ciphertext);
    free(decrypted);
-   teardown_mock_master_key(&env);
+   pgmoneta_test_teardown_encryption_env(&env);
    MCTF_FINISH();
 }
 
@@ -528,7 +422,7 @@ cleanup:
  */
 MCTF_TEST(test_aes_file_gcm_roundtrip)
 {
-   struct test_env env;
+   struct test_encryption_env env;
    char* plaintext = "This is a comprehensive test for file-based encryption and decryption in GCM mode. It ensures that the trailing authentication tag is correctly handled and not included in the decryption stream.";
    char from[MAX_PATH] = {0};
    char encrypted[MAX_PATH] = {0};
@@ -537,7 +431,7 @@ MCTF_TEST(test_aes_file_gcm_roundtrip)
    char* decrypted_content = NULL;
    size_t size = 0;
 
-   MCTF_ASSERT(setup_mock_master_key(&env) == 0, cleanup, "Failed to setup mock environment");
+   MCTF_ASSERT(pgmoneta_test_setup_encryption_env(&env) == 0, cleanup, "Failed to setup mock environment");
 
    /* Setup test files */
    pgmoneta_snprintf(from, MAX_PATH, "%s/plaintext.txt", env.test_home);
@@ -590,7 +484,7 @@ cleanup:
    if (decrypted[0] != '\0')
       remove(decrypted);
 
-   teardown_mock_master_key(&env);
+   pgmoneta_test_teardown_encryption_env(&env);
    free(decrypted_content);
    MCTF_FINISH();
 }

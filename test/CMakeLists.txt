@@ -128,6 +128,9 @@ if (check)
     ${LZ4_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS})
 
+  target_compile_definitions(pgmoneta-test PRIVATE
+    TEST_CONF_DIR="${CMAKE_SOURCE_DIR}/test/conf")
+
   if(EXISTS "/etc/debian_version")
     target_link_libraries(pgmoneta-test pthread rt m pgmoneta)
   elseif(APPLE)

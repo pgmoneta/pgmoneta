@@ -28,18 +28,20 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <backup.h>
 #include <extension.h>
 #include <fips.h>
 #include <info.h>
 #include <logging.h>
 #include <network.h>
+#include <progress.h>
 #include <prometheus.h>
 #include <security.h>
 #include <shmem.h>
 #include <utils.h>
 #include <wal.h>
-#include <art.h>
+#include <workflow.h>
 
 /* system */
 #include <ev.h>
@@ -2708,43 +2710,95 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_extension_pgmoneta_ext", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_progress The backup progress for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_progress gauge\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_progress_percentage The workflow progress percentage (0-100) for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_progress_percentage gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      int64_t state = atomic_load(&config->common.servers[i].backup_progress.state);
-      int64_t bytes_done = atomic_load(&config->common.servers[i].backup_progress.bytes_done);
-      int64_t bytes_total = atomic_load(&config->common.servers[i].backup_progress.bytes_total);
-      int64_t elapsed = atomic_load(&config->common.servers[i].backup_progress.elapsed);
-      int64_t percentage = (bytes_total > 0) ? (bytes_done * 100 / bytes_total) : 0;
-      int64_t remaining = (bytes_done > 0 && bytes_total > 0)
-                             ? (int64_t)((double)elapsed * ((double)(bytes_total - bytes_done) / (double)bytes_done))
-                             : 0;
+      int wt = atomic_load(&config->common.servers[i].progress.workflow_type);
+      int ph = atomic_load(&config->common.servers[i].progress.current_phase);
 
-      data = pgmoneta_append(data, "pgmoneta_backup_progress{");
-      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, "pgmoneta_progress_percentage{name=\"");
       data = pgmoneta_append(data, config->common.servers[i].name);
-      data = pgmoneta_append(data, "\", type=\"state\"} ");
-      data = pgmoneta_append_int(data, (int)state);
-      data = pgmoneta_append(data, "\n");
-
-      data = pgmoneta_append(data, "pgmoneta_backup_progress{");
-      data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->common.servers[i].name);
-      data = pgmoneta_append(data, "\", type=\"percentage\"} ");
-      data = pgmoneta_append_int(data, (int)percentage);
-      data = pgmoneta_append(data, "\n");
-
-      data = pgmoneta_append(data, "pgmoneta_backup_progress{");
-      data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->common.servers[i].name);
-      data = pgmoneta_append(data, "\", type=\"remaining\"} ");
-      data = pgmoneta_append_int(data, (int)remaining);
+      data = pgmoneta_append(data, "\", workflow=\"");
+      data = pgmoneta_append(data, (char*)pgmoneta_workflow_name(wt));
+      data = pgmoneta_append(data, "\", phase=\"");
+      data = pgmoneta_append(data, (char*)pgmoneta_phase_name(ph));
+      data = pgmoneta_append(data, "\"} ");
+      data = pgmoneta_append_int(data, atomic_load(&config->common.servers[i].progress.percentage));
       data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");
 
-   add_metric_to_art(container->general_metrics, "pgmoneta_backup_progress", data, NULL, NULL, 0);
+   add_metric_to_art(container->general_metrics, "pgmoneta_progress_percentage", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_progress_elapsed_time The elapsed seconds since the current workflow started\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_progress_elapsed_time gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      int wt = atomic_load(&config->common.servers[i].progress.workflow_type);
+      int ph = atomic_load(&config->common.servers[i].progress.current_phase);
+
+      data = pgmoneta_append(data, "pgmoneta_progress_elapsed_time{name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\", workflow=\"");
+      data = pgmoneta_append(data, (char*)pgmoneta_workflow_name(wt));
+      data = pgmoneta_append(data, "\", phase=\"");
+      data = pgmoneta_append(data, (char*)pgmoneta_phase_name(ph));
+      data = pgmoneta_append(data, "\"} ");
+      data = pgmoneta_append_ulong(data, (unsigned long)atomic_load(&config->common.servers[i].progress.elapsed));
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   add_metric_to_art(container->general_metrics, "pgmoneta_progress_elapsed_time", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_progress_total The total units of work in the current workflow phase\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_progress_total gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      int wt = atomic_load(&config->common.servers[i].progress.workflow_type);
+      int ph = atomic_load(&config->common.servers[i].progress.current_phase);
+
+      data = pgmoneta_append(data, "pgmoneta_progress_total{name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\", workflow=\"");
+      data = pgmoneta_append(data, (char*)pgmoneta_workflow_name(wt));
+      data = pgmoneta_append(data, "\", phase=\"");
+      data = pgmoneta_append(data, (char*)pgmoneta_phase_name(ph));
+      data = pgmoneta_append(data, "\"} ");
+      data = pgmoneta_append_ulong(data, (unsigned long)atomic_load(&config->common.servers[i].progress.total));
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   add_metric_to_art(container->general_metrics, "pgmoneta_progress_total", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_progress_done The units of work completed in the current workflow phase\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_progress_done gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      int wt = atomic_load(&config->common.servers[i].progress.workflow_type);
+      int ph = atomic_load(&config->common.servers[i].progress.current_phase);
+
+      data = pgmoneta_append(data, "pgmoneta_progress_done{name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\", workflow=\"");
+      data = pgmoneta_append(data, (char*)pgmoneta_workflow_name(wt));
+      data = pgmoneta_append(data, "\", phase=\"");
+      data = pgmoneta_append(data, (char*)pgmoneta_phase_name(ph));
+      data = pgmoneta_append(data, "\"} ");
+      data = pgmoneta_append_ulong(data, (unsigned long)atomic_load(&config->common.servers[i].progress.done));
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   add_metric_to_art(container->general_metrics, "pgmoneta_progress_done", data, NULL, NULL, 0);
    free(data);
    data = NULL;
 }

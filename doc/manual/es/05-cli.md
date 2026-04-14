@@ -342,7 +342,7 @@ pgmoneta-cli ping
 
 ## progress
 
-Obtener progreso para un comando.
+Obtener progreso para un comando de respaldo. Requiere `progress = on` en la configuración.
 
 Comando
 

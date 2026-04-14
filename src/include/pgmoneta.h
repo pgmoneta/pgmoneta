@@ -33,6 +33,10 @@
 extern "C" {
 #endif
 
+/* pgmoneta */
+#include <progress.h>
+
+/* system */
 #include <ev.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -156,9 +160,6 @@ extern "C" {
 #define VALID_SLOT                   0
 #define SLOT_NOT_FOUND               1
 #define INCORRECT_SLOT_TYPE          2
-
-#define BACKUP_PROGRESS_NONE         0
-#define BACKUP_PROGRESS_RUNNING      1
 
 #define INDENT_PER_LEVEL             2
 #define FORMAT_JSON                  0
@@ -294,18 +295,6 @@ struct s3_configuration
    char base_dir[MAX_PATH];             /**< The S3 base directory */
 } __attribute__((aligned(64)));
 
-/** @struct backup_progress
- * The backup_progress of a server
- */
-struct backup_progress
-{
-   atomic_int state;         /**< The progress state */
-   atomic_llong bytes_done;  /**< The bytes transferred so far */
-   atomic_llong bytes_total; /**< The total bytes to transfer */
-   atomic_llong start_time;  /**< The start time */
-   atomic_llong elapsed;     /**< The elapsed time */
-};
-
 /** @struct server
  * Defines a server
  */
@@ -362,13 +351,13 @@ struct server
    int workers;                                                   /**< The number of workers */
    int max_rate;                                                  /**< Maximum backup rate in bytes per second. */
    int number_of_extra;                                           /**< The number of source directory*/
-   int progress;                                                  /**< The Backup progress status */
+   int progress_enabled;                                          /**< The progress status */
    char extra[MAX_EXTRA][MAX_EXTRA_PATH];                         /**< Source directory*/
    bool has_extension;                                            /**< Does this have pgmoneta_ext */
    char ext_version[MISC_LENGTH];                                 /**< The major version of the extension*/
    struct extension_info extensions[NUMBER_OF_EXTENSIONS];        /**< The extensions */
    struct s3_configuration s3;                                    /**< The S3 configuration */
-   struct backup_progress backup_progress;                        /**< The backup progress */
+   struct progress progress;                                      /**< The progress */
 } __attribute__((aligned(64)));
 
 /** @struct user

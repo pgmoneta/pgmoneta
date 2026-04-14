@@ -41,6 +41,7 @@
 #include <grp.h>
 #include <libgen.h>
 #include <pwd.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,7 +77,7 @@ pgmoneta_create_archive(void)
 static char*
 archive_name(void)
 {
-   return "Archive";
+   return WORKFLOW_NAME_ARCHIVE;
 }
 
 static int

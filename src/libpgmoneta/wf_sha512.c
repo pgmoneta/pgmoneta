@@ -29,8 +29,8 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <progress.h>
 #include <security.h>
-#include <string.h>
 #include <utils.h>
 #include <verify.h>
 #include <workflow.h>
@@ -39,12 +39,14 @@
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
+#include <string.h>
 #include <unistd.h>
 
 static char* sha512_name(void);
 static int sha512_execute(char*, struct art*);
 
-static int write_backup_sha512(char* root, char* relative_path);
+static int write_backup_sha512(int server, char* root, char* relative_path,
+                               bool progress_enabled);
 
 static FILE* sha512_file = NULL;
 
@@ -67,7 +69,7 @@ pgmoneta_create_sha512(void)
 static char*
 sha512_name(void)
 {
-   return "SHA512";
+   return PHASE_NAME_SHA512;
 }
 
 static int
@@ -128,7 +130,15 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
 
    d = pgmoneta_get_server_backup_identifier_data(server, label);
 
-   if (write_backup_sha512(root, ""))
+   bool progress_enabled = pgmoneta_is_progress_enabled(server);
+
+   if (progress_enabled)
+   {
+      int file_count = pgmoneta_count_files(root);
+      pgmoneta_progress_set_total(server, file_count);
+   }
+
+   if (write_backup_sha512(server, root, "", progress_enabled))
    {
       goto error;
    }
@@ -178,7 +188,8 @@ error:
 }
 
 static int
-write_backup_sha512(char* root, char* relative_path)
+write_backup_sha512(int server, char* root, char* relative_path,
+                    bool progress_enabled)
 {
    char* dir_path = NULL;
    char* relative_file_path;
@@ -209,7 +220,7 @@ write_backup_sha512(char* root, char* relative_path)
 
          pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
 
-         write_backup_sha512(root, relative_dir);
+         write_backup_sha512(server, root, relative_dir, progress_enabled);
       }
       else if (strcmp(entry->d_name, "backup.sha512"))
       {
@@ -235,6 +246,11 @@ write_backup_sha512(char* root, char* relative_path)
 
          fputs(buffer, sha512_file);
          fflush(sha512_file);
+
+         if (progress_enabled)
+         {
+            pgmoneta_progress_increment(server, 1);
+         }
 
          free(buffer);
          free(sha512);

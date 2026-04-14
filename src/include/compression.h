@@ -144,10 +144,12 @@ pgmoneta_compress_file(char* from, char* to, int type, struct workers* workers);
  * @param directory The directory path
  * @param type The compression type
  * @param workers Optional worker pool. If NULL, runs synchronously.
+ * @param excludes Excluded file patterns
+ * @param server The server index for progress tracking, or -1 to disable
  * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_compress_directory(char* directory, int type, struct workers* workers, struct deque* excludes);
+pgmoneta_compress_directory(int server, char* directory, int type, struct workers* workers, struct deque* excludes);
 
 /**
  * Decompress a file using the appropriate decompression method.

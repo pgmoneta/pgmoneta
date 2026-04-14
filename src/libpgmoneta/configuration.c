@@ -311,7 +311,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   memset(srv.wal_shipping, 0, MAX_PATH);
                   srv.workers = -1;
                   srv.max_rate = -1;
-                  srv.progress = -1;
+                  srv.progress_enabled = -1;
 
                   idx_server++;
                }
@@ -664,11 +664,11 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   {
                      if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
                      {
-                        srv.progress = 1;
+                        srv.progress_enabled = 1;
                      }
                      else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
                      {
-                        srv.progress = 0;
+                        srv.progress_enabled = 0;
                      }
                   }
                   else
@@ -3784,7 +3784,7 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES, (uintptr_t)config->common.servers[i].hot_standby_tablespaces, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MAX_RATE, (uintptr_t)config->common.servers[i].max_rate, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PROGRESS, (uintptr_t)config->common.servers[i].progress, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PROGRESS, pgmoneta_is_progress_enabled(i), ValueBool);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)"SHA512", ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->common.servers[i].tls_cert_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->common.servers[i].tls_ca_file, ValueString);
@@ -4399,11 +4399,11 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
       {
          if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
          {
-            srv->progress = 1;
+            srv->progress_enabled = 1;
          }
          else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
          {
-            srv->progress = 0;
+            srv->progress_enabled = 0;
          }
       }
       else
@@ -4731,7 +4731,7 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
                }
                else if (!strcmp(key_info.key, "progress"))
                {
-                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->progress == 1 ? "on" : (srv->progress == 0 ? "off" : "inherit"));
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->progress_enabled == 1 ? "on" : (srv->progress_enabled == 0 ? "off" : "inherit"));
                }
                else
                {

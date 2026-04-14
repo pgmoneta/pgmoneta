@@ -71,7 +71,7 @@ pgmoneta_create_verify(void)
 static char*
 verify_name(void)
 {
-   return "Verify";
+   return WORKFLOW_NAME_VERIFY;
 }
 
 static int

@@ -1850,7 +1850,7 @@ retry:
 
          if (scan)
          {
-            pgmoneta_compress_directory(d, config->compression_type, NULL, excludes);
+            pgmoneta_compress_directory(-1, d, config->compression_type, NULL, excludes);
          }
          else
          {
@@ -1870,7 +1870,7 @@ retry:
          {
             if (scan)
             {
-               pgmoneta_encrypt_directory(d, NULL, excludes);
+               pgmoneta_encrypt_directory(-1, d, NULL, excludes);
             }
             else
             {

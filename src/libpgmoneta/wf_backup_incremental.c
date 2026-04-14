@@ -154,7 +154,7 @@ pgmoneta_create_incremental_backup(void)
 static char*
 incr_backup_name(void)
 {
-   return "Incremental backup";
+   return WORKFLOW_NAME_INCREMENTAL_BACKUP;
 }
 
 static int

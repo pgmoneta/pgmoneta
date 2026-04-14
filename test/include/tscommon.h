@@ -36,6 +36,9 @@ extern "C" {
 #include <pgmoneta.h>
 #include <message.h>
 
+#include <stdbool.h>
+#include <openssl/ssl.h>
+
 #define PRIMARY_SERVER   0
 #define ENV_VAR_BASE_DIR "PGMONETA_TEST_BASE_DIR"
 
@@ -145,6 +148,48 @@ pgmoneta_test_resolve_binary_path(const char* binary_name, char* out);
  */
 int
 pgmoneta_test_exec_command(const char* command, char** output, int* exit_code);
+
+/**
+ * Load a configuration file into shared memory.
+ * Resets the configuration, calls pgmoneta_init_main_configuration(),
+ * then reads the file with pgmoneta_read_main_configuration().
+ * @param conf_path Path to the .conf file
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_test_load_conf(char* conf_path);
+
+/**
+ * State saved/restored by the mock encryption environment helpers.
+ */
+struct test_encryption_env
+{
+   char test_home[MAX_PATH];            /**< The test home directory path */
+   char* original_home;                 /**< The original home environment variable value */
+   char original_config_home[MAX_PATH]; /**< The original configuration home directory path */
+   int original_encryption;             /**< The original encryption setting */
+   bool shmem_locally_allocated;        /**< Flag indicating if shared memory was allocated locally */
+};
+
+/**
+ * Set up a mock encryption environment for testing.
+ * Creates a temporary HOME directory with a .pgmoneta/master.key,
+ * sets encryption to AES-256-GCM, and initialises the master salt.
+ * Allocates shared memory if shmem is NULL.
+ * @param env [out] Environment state (caller provides storage)
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_test_setup_encryption_env(struct test_encryption_env* env);
+
+/**
+ * Tear down a mock encryption environment.
+ * Restores HOME, config home_dir, encryption mode, and removes
+ * temporary files. Frees shared memory if it was locally allocated.
+ * @param env The environment state from pgmoneta_test_setup_encryption_env()
+ */
+void
+pgmoneta_test_teardown_encryption_env(struct test_encryption_env* env);
 
 #ifdef __cplusplus
 }

@@ -30,6 +30,7 @@
 #include <aes.h>
 #include <logging.h>
 #include <management.h>
+#include <progress.h>
 #include <security.h>
 #include <utils.h>
 #include <workers.h>
@@ -60,8 +61,9 @@ static const EVP_CIPHER* (*get_cipher(int mode))(void);
 static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 static int get_key_length(int mode);
 static int encrypt_file(char* from, char* to, int enc);
+static int pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque* excludes);
 static int decrypt_data(char* d, struct workers* workers, struct deque* excludes);
-static int dispatch_aes_operation(char* from, char* to, int enc, struct workers* workers);
+static int dispatch_aes_operation(int server, char* from, char* to, int enc, struct workers* workers);
 static void do_aes_operation(struct worker_common* wc);
 
 static int encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode);
@@ -110,6 +112,8 @@ struct aes_operation_task
    int enc;
    char from[MAX_PATH];
    char to[MAX_PATH];
+   int server;
+   bool progress_enabled;
 };
 
 static int
@@ -165,8 +169,9 @@ ensure_capacity(unsigned char** buf, size_t* capacity, size_t required)
 }
 
 static int
-pgmoneta_encrypt_data(char* d, struct workers* workers, struct deque* excludes)
+pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque* excludes)
 {
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
    char* from = NULL;
    char* to = NULL;
    DIR* dir;
@@ -189,7 +194,7 @@ pgmoneta_encrypt_data(char* d, struct workers* workers, struct deque* excludes)
          }
 
          pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-         pgmoneta_encrypt_data(path, workers, excludes);
+         pgmoneta_encrypt_data(server, path, workers, excludes);
       }
       else
       {
@@ -239,6 +244,11 @@ pgmoneta_encrypt_data(char* d, struct workers* workers, struct deque* excludes)
                   else
                   {
                      do_encrypt_file((struct worker_common*)wi);
+                  }
+
+                  if (progress_enabled)
+                  {
+                     pgmoneta_progress_increment(server, 1);
                   }
                }
                else
@@ -299,11 +309,9 @@ do_encrypt_file(struct worker_common* wc)
 }
 
 int
-pgmoneta_encrypt_directory(char* d, struct workers* workers, struct deque* excludes)
+pgmoneta_encrypt_directory(int server, char* d, struct workers* workers, struct deque* excludes)
 {
-   int ret = pgmoneta_encrypt_data(d, workers, excludes);
-
-   return ret;
+   return pgmoneta_encrypt_data(server, d, workers, excludes);
 }
 
 void
@@ -419,7 +427,7 @@ pgmoneta_encrypt_file(char* from, char* to, struct workers* workers)
 
    if (workers != NULL)
    {
-      ret = dispatch_aes_operation(from, to, 1, workers);
+      ret = dispatch_aes_operation(-1, from, to, 1, workers);
       if (flag)
       {
          free(to);
@@ -475,7 +483,7 @@ pgmoneta_decrypt_file(char* from, char* to, struct workers* workers)
 
    if (workers != NULL)
    {
-      ret = dispatch_aes_operation(from, to, 0, workers);
+      ret = dispatch_aes_operation(-1, from, to, 0, workers);
       if (flag)
       {
          free(to);
@@ -2347,7 +2355,7 @@ pgmoneta_is_encrypted(char* file_path)
 }
 
 static int
-dispatch_aes_operation(char* from, char* to, int enc, struct workers* workers)
+dispatch_aes_operation(int server, char* from, char* to, int enc, struct workers* workers)
 {
    struct aes_operation_task* task = NULL;
 
@@ -2363,6 +2371,8 @@ dispatch_aes_operation(char* from, char* to, int enc, struct workers* workers)
    memcpy(task->to, to, strlen(to));
    task->enc = enc;
    task->common.workers = workers;
+   task->server = server;
+   task->progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    if (workers != NULL)
    {
@@ -2405,6 +2415,11 @@ do_aes_operation(struct worker_common* wc)
    if (result != 0 && task->common.workers != NULL)
    {
       task->common.workers->outcome = false;
+   }
+
+   if (task->progress_enabled)
+   {
+      pgmoneta_progress_increment(task->server, 1);
    }
 
    free(task);

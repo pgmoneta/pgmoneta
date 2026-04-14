@@ -67,7 +67,7 @@ pgmoneta_create_link(void)
 static char*
 link_name(void)
 {
-   return "Link";
+   return PHASE_NAME_LINK;
 }
 
 static int

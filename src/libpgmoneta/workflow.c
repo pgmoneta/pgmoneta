@@ -29,10 +29,13 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <art.h>
+#include <backup.h>
 #include <compression.h>
 #include <hot_standby.h>
+#include <info.h>
 #include <logging.h>
 #include <management.h>
+#include <progress.h>
 #include <storage.h>
 #include <utils.h>
 #include <value.h>
@@ -41,7 +44,6 @@
 
 /* system */
 #include <assert.h>
-#include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -312,7 +314,10 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
 {
    char* en = NULL;
    int ec = -1;
+   int server = -1;
+   bool progress_enabled = false;
    struct workflow* current = NULL;
+   struct main_configuration* config = (struct main_configuration*)shmem;
 
    *error_name = en;
    *error_code = ec;
@@ -329,16 +334,57 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
       current = current->next;
    }
 
+   if (pgmoneta_art_contains_key(nodes, NODE_SERVER_ID))
+   {
+      server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+      progress_enabled = pgmoneta_is_progress_enabled(server);
+   }
+
    current = workflow;
    while (current != NULL)
    {
+      if (progress_enabled)
+      {
+         int phase = pgmoneta_progress_phase_from_workflow_name(current->name());
+         if (phase > 0)
+         {
+            char* key = pgmoneta_progress_limit_node_key(phase);
+            if (key != NULL && pgmoneta_art_contains_key(nodes, key))
+            {
+               pgmoneta_progress_next_phase(server, phase, nodes);
+            }
+         }
+      }
+
       if (current->execute(current->name(), nodes))
       {
          en = current->name();
          ec = get_error_code(current->type, EXECUTE, nodes);
          goto error;
       }
+
+      if (progress_enabled)
+      {
+         int phase = pgmoneta_progress_phase_from_workflow_name(current->name());
+         if (phase > 0)
+         {
+            char* key = pgmoneta_progress_limit_node_key(phase);
+            if (key != NULL && pgmoneta_art_contains_key(nodes, key))
+            {
+               int limit = (int)(uintptr_t)pgmoneta_art_search(nodes, key);
+               atomic_store(&config->common.servers[server].progress.percentage, limit);
+               atomic_store(&config->common.servers[server].progress.current_phase, phase);
+            }
+         }
+      }
+
       current = current->next;
+   }
+
+   if (progress_enabled)
+   {
+      atomic_store(&config->common.servers[server].progress.percentage, 100);
+      atomic_store(&config->common.servers[server].progress.current_phase, PHASE_NONE);
    }
 
    current = workflow;
@@ -434,6 +480,64 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
    pgmoneta_log_debug("%s (teardown): %s/%s", name, config->common.servers[server].name, label);
 
    return 0;
+}
+
+const char*
+pgmoneta_phase_name(int phase)
+{
+   switch (phase)
+   {
+      case PHASE_BASEBACKUP:
+         return PHASE_NAME_BASEBACKUP;
+      case PHASE_MANIFEST:
+         return PHASE_NAME_MANIFEST;
+      case PHASE_SHA512:
+         return PHASE_NAME_SHA512;
+      case PHASE_LINKING:
+         return PHASE_NAME_LINKING;
+      case PHASE_COMPRESSION:
+         return PHASE_NAME_COMPRESSION;
+      case PHASE_ENCRYPTION:
+         return PHASE_NAME_ENCRYPTION;
+      default:
+         return PHASE_NAME_UNKNOWN;
+   }
+}
+
+const char*
+pgmoneta_workflow_name(int workflow_type)
+{
+   switch (workflow_type)
+   {
+      case WORKFLOW_TYPE_BACKUP:
+         return WORKFLOW_NAME_BACKUP;
+      case WORKFLOW_TYPE_INCREMENTAL_BACKUP:
+         return WORKFLOW_NAME_INCREMENTAL_BACKUP;
+      case WORKFLOW_TYPE_RESTORE:
+         return WORKFLOW_NAME_RESTORE;
+      case WORKFLOW_TYPE_ARCHIVE:
+         return WORKFLOW_NAME_ARCHIVE;
+      case WORKFLOW_TYPE_DELETE_BACKUP:
+         return WORKFLOW_NAME_DELETE_BACKUP;
+      case WORKFLOW_TYPE_RETENTION:
+         return WORKFLOW_NAME_RETENTION;
+      case WORKFLOW_TYPE_VERIFY:
+         return WORKFLOW_NAME_VERIFY;
+      case WORKFLOW_TYPE_COMBINE:
+         return WORKFLOW_NAME_COMBINE;
+      case WORKFLOW_TYPE_COMBINE_AS_IS:
+         return WORKFLOW_NAME_COMBINE_AS_IS;
+      case WORKFLOW_TYPE_POST_ROLLUP:
+         return WORKFLOW_NAME_POST_ROLLUP;
+      case WORKFLOW_TYPE_S3_LIST:
+         return WORKFLOW_NAME_S3_LIST;
+      case WORKFLOW_TYPE_S3_DELETE:
+         return WORKFLOW_NAME_S3_DELETE;
+      case WORKFLOW_TYPE_S3_RESTORE:
+         return WORKFLOW_NAME_S3_RESTORE;
+      default:
+         return WORKFLOW_NAME_UNKNOWN;
+   }
 }
 
 static struct workflow*

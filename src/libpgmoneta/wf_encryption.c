@@ -32,6 +32,7 @@
 #include <compression.h>
 #include <deque.h>
 #include <logging.h>
+#include <progress.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -76,7 +77,7 @@ pgmoneta_encryption(bool encrypt)
 static char*
 encryption_name(void)
 {
-   return "Encryption";
+   return PHASE_NAME_ENCRYPTION;
 }
 
 static int
@@ -149,7 +150,13 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
       pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
 
-      if (pgmoneta_encrypt_directory(backup_base, workers, excludes))
+      if (pgmoneta_is_progress_enabled(server))
+      {
+         int file_count = pgmoneta_count_files(backup_base);
+         pgmoneta_progress_set_total(server, file_count);
+      }
+
+      if (pgmoneta_encrypt_directory(server, backup_base, workers, excludes))
       {
          goto error;
       }

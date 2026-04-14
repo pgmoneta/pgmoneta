@@ -2120,3 +2120,50 @@ MCTF_TEST(test_parse_timestamp)
 cleanup:
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_count_files)
+{
+   char template[] = "/tmp/pgmoneta_test_count_XXXXXX";
+   char* tmpdir = mkdtemp(template);
+   char subdir[256];
+   char filepath[256];
+   int count;
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT_PTR_NONNULL(tmpdir, cleanup, "mkdtemp failed");
+
+   pgmoneta_snprintf(subdir, sizeof(subdir), "%s/sub1", tmpdir);
+   mkdir(subdir, 0700);
+
+   pgmoneta_snprintf(subdir, sizeof(subdir), "%s/sub2", tmpdir);
+   mkdir(subdir, 0700);
+
+   pgmoneta_snprintf(filepath, sizeof(filepath), "%s/file1.txt", tmpdir);
+   fclose(fopen(filepath, "w"));
+
+   pgmoneta_snprintf(filepath, sizeof(filepath), "%s/file2.txt", tmpdir);
+   fclose(fopen(filepath, "w"));
+
+   pgmoneta_snprintf(filepath, sizeof(filepath), "%s/sub1/file3.txt", tmpdir);
+   fclose(fopen(filepath, "w"));
+
+   pgmoneta_snprintf(filepath, sizeof(filepath), "%s/sub2/file4.txt", tmpdir);
+   fclose(fopen(filepath, "w"));
+
+   pgmoneta_snprintf(filepath, sizeof(filepath), "%s/sub2/file5.txt", tmpdir);
+   fclose(fopen(filepath, "w"));
+
+   count = pgmoneta_count_files(tmpdir);
+   MCTF_ASSERT_INT_EQ(count, 5, cleanup, "expected 5 files");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_count_files(NULL), 0, cleanup, "NULL should return 0");
+
+cleanup:
+   if (tmpdir != NULL)
+   {
+      pgmoneta_delete_directory(tmpdir);
+   }
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}

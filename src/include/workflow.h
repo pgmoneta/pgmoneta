@@ -37,9 +37,6 @@ extern "C" {
 #include <art.h>
 #include <info.h>
 
-#include <stdlib.h>
-#include <stdbool.h>
-
 #define WORKFLOW_TYPE_BACKUP             0
 #define WORKFLOW_TYPE_RESTORE            1
 #define WORKFLOW_TYPE_ARCHIVE            2
@@ -55,6 +52,43 @@ extern "C" {
 #define WORKFLOW_TYPE_S3_LIST            100
 #define WORKFLOW_TYPE_S3_DELETE          101
 #define WORKFLOW_TYPE_S3_RESTORE         102
+
+#define WORKFLOW_NAME_BACKUP             "Backup"             /**< The name of backup workflow */
+#define WORKFLOW_NAME_INCREMENTAL_BACKUP "Incremental backup" /**< The name of incremental backup workflow */
+#define WORKFLOW_NAME_RESTORE            "Restore"            /**< The name of restore workflow */
+#define WORKFLOW_NAME_ARCHIVE            "Archive"            /**< The name of archive workflow */
+#define WORKFLOW_NAME_DELETE_BACKUP      "Delete backup"      /**< The name of delete backup workflow */
+#define WORKFLOW_NAME_RETENTION          "Retention"          /**< The name of retention workflow */
+#define WORKFLOW_NAME_VERIFY             "Verify"             /**< The name of verify workflow */
+#define WORKFLOW_NAME_COMBINE            "Combine"            /**< The name of combine workflow */
+#define WORKFLOW_NAME_COMBINE_AS_IS      "Combine as is"      /**< The name of combine as is workflow */
+#define WORKFLOW_NAME_POST_ROLLUP        "Post rollup"        /**< The name of post rollup workflow */
+#define WORKFLOW_NAME_S3_LIST            "S3 list"            /**< The name of S3 list workflow */
+#define WORKFLOW_NAME_S3_DELETE          "S3 delete"          /**< The name of S3 delete workflow */
+#define WORKFLOW_NAME_S3_RESTORE         "S3 restore"         /**< The name of S3 restore workflow */
+#define WORKFLOW_NAME_UNKNOWN            "Unknown"            /**< The name of unknown workflow */
+
+#define PHASE_NONE                       0 /* No phase */
+#define PHASE_BASEBACKUP                 1 /* Base backup phase */
+#define PHASE_MANIFEST                   2 /* Manifest phase */
+#define PHASE_SHA512                     3 /* SHA512 phase */
+#define PHASE_LINKING                    4 /* Link phase */
+#define PHASE_COMPRESSION                5 /* Compression phase */
+#define PHASE_ENCRYPTION                 6 /* Encryption phase */
+
+#define PHASE_NAME_BASEBACKUP            "Base backup"        /**< The name of base backup phase */
+#define PHASE_NAME_INCREMENTAL_BACKUP    "Incremental backup" /**< The name of incremental backup phase */
+#define PHASE_NAME_MANIFEST              "Manifest"           /**< The name of manifest phase */
+#define PHASE_NAME_SHA512                "SHA512"             /**< The name of SHA512 phase */
+#define PHASE_NAME_LINKING               "Linking"            /**< The name of linking phase */
+#define PHASE_NAME_LINK                  "Link"               /**< The name of link phase */
+#define PHASE_NAME_COMPRESSION           "Compression"        /**< The name of compression phase */
+#define PHASE_NAME_ENCRYPTION            "Encryption"         /**< The name of encryption phase */
+#define PHASE_NAME_ZSTD                  "ZSTD"               /**< The name of ZSTD phase */
+#define PHASE_NAME_GZIP                  "GZip"               /**< The name of GZip phase */
+#define PHASE_NAME_LZ4                   "LZ4"                /**< The name of LZ4 phase */
+#define PHASE_NAME_BZIP2                 "BZip2"              /**< The name of BZip2 phase */
+#define PHASE_NAME_UNKNOWN               "Unknown"            /**< The name of unknown phase */
 
 #define PERMISSION_TYPE_BACKUP           0
 #define PERMISSION_TYPE_RESTORE          1
@@ -171,6 +205,22 @@ pgmoneta_common_setup(char* name, struct art* nodes);
  */
 int
 pgmoneta_common_teardown(char* name, struct art* nodes);
+
+/**
+ * Get display name for a phase
+ * @param phase The phase constant
+ * @return The display name
+ */
+const char*
+pgmoneta_phase_name(int phase);
+
+/**
+ * Get display name for a workflow type
+ * @param workflow_type The workflow type
+ * @return The display name
+ */
+const char*
+pgmoneta_workflow_name(int workflow_type);
 
 #ifdef __cplusplus
 }

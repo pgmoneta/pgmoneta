@@ -33,6 +33,7 @@
 #include <gzip_compression.h>
 #include <logging.h>
 #include <lz4_compression.h>
+#include <progress.h>
 #include <utils.h>
 #include <workers.h>
 #include <zlib.h>
@@ -52,6 +53,8 @@ struct compression_operation_task
    bool decompress;
    char from[MAX_PATH];
    char to[MAX_PATH];
+   int server;
+   bool progress_enabled;
 };
 
 static bool
@@ -70,17 +73,19 @@ static int
 pgmoneta_compression_file_callback(int type, compression_func* compress_cb);
 
 static int
-create_compression_operation_task(char* from, char* to, int type, bool decompress,
-                                  struct workers* workers, struct compression_operation_task** task);
+create_compression_operation_task(int server, char* from, char* to, int type, bool decompress,
+                                  struct workers* workers,
+                                  struct compression_operation_task** task);
 
 static void
 do_compression_operation(struct worker_common* wc);
 
 static int
-dispatch_compression_operation(char* from, char* to, int type, bool decompress, struct workers* workers);
+dispatch_compression_operation(int server, char* from, char* to, int type, bool decompress, struct workers* workers);
 
 static int
-process_directory_operation(char* directory, int type, struct workers* workers, struct deque* excludes, bool decompress);
+process_directory_operation(int server, char* directory, int type, struct workers* workers, struct deque* excludes,
+                            bool decompress);
 
 static int
 noop_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
@@ -175,7 +180,7 @@ pgmoneta_compress_file(char* from, char* to, int type, struct workers* workers)
 
    if (workers != NULL)
    {
-      return dispatch_compression_operation(from, to, type, false, workers);
+      return dispatch_compression_operation(-1, from, to, type, false, workers);
    }
 
    if (pgmoneta_compression_file_callback(type, &compress_cb))
@@ -191,11 +196,9 @@ error:
 }
 
 int
-pgmoneta_compress_directory(char* directory, int type, struct workers* workers, struct deque* excludes)
+pgmoneta_compress_directory(int server, char* directory, int type, struct workers* workers, struct deque* excludes)
 {
-   int ret = process_directory_operation(directory, type, workers, excludes, false);
-
-   return ret;
+   return process_directory_operation(server, directory, type, workers, excludes, false);
 }
 
 int
@@ -205,7 +208,7 @@ pgmoneta_decompress_file(char* from, char* to, int type, struct workers* workers
 
    if (workers != NULL)
    {
-      return dispatch_compression_operation(from, to, type, true, workers);
+      return dispatch_compression_operation(-1, from, to, type, true, workers);
    }
 
    if (COMPRESSION_ALGORITHM(type) == COMPRESSION_ALG_NONE)
@@ -231,9 +234,7 @@ error:
 int
 pgmoneta_decompress_directory(char* directory, int type, struct workers* workers, struct deque* excludes)
 {
-   int ret = process_directory_operation(directory, type, workers, excludes, true);
-
-   return ret;
+   return process_directory_operation(-1, directory, type, workers, excludes, true);
 }
 
 static bool
@@ -269,8 +270,9 @@ is_regular_entry(struct dirent* entry, char* path)
 }
 
 static int
-create_compression_operation_task(char* from, char* to, int type, bool decompress,
-                                  struct workers* workers, struct compression_operation_task** task)
+create_compression_operation_task(int server, char* from, char* to, int type, bool decompress,
+                                  struct workers* workers,
+                                  struct compression_operation_task** task)
 {
    struct compression_operation_task* t = NULL;
 
@@ -300,6 +302,8 @@ create_compression_operation_task(char* from, char* to, int type, bool decompres
    t->type = type;
    t->decompress = decompress;
    t->common.workers = workers;
+   t->server = server;
+   t->progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    *task = t;
 
@@ -330,15 +334,20 @@ do_compression_operation(struct worker_common* wc)
       task->common.workers->outcome = false;
    }
 
+   if (task->progress_enabled)
+   {
+      pgmoneta_progress_increment(task->server, 1);
+   }
+
    free(task);
 }
 
 static int
-dispatch_compression_operation(char* from, char* to, int type, bool decompress, struct workers* workers)
+dispatch_compression_operation(int server, char* from, char* to, int type, bool decompress, struct workers* workers)
 {
    struct compression_operation_task* task = NULL;
 
-   if (create_compression_operation_task(from, to, type, decompress, workers, &task))
+   if (create_compression_operation_task(server, from, to, type, decompress, workers, &task))
    {
       goto error;
    }
@@ -370,7 +379,8 @@ error:
 }
 
 static int
-process_directory_operation(char* directory, int type, struct workers* workers, struct deque* excludes, bool decompress)
+process_directory_operation(int server, char* directory, int type, struct workers* workers, struct deque* excludes,
+                            bool decompress)
 {
    DIR* dir = NULL;
    struct dirent* entry = NULL;
@@ -418,7 +428,7 @@ process_directory_operation(char* directory, int type, struct workers* workers, 
 
       if (is_directory_entry(entry, full_path))
       {
-         if (process_directory_operation(full_path, type, workers, excludes, decompress))
+         if (process_directory_operation(server, full_path, type, workers, excludes, decompress))
          {
             goto error;
          }
@@ -479,7 +489,7 @@ process_directory_operation(char* directory, int type, struct workers* workers, 
          to = pgmoneta_append(to, suffix);
       }
 
-      if (dispatch_compression_operation(full_path, to, type, decompress, workers))
+      if (dispatch_compression_operation(server, full_path, to, type, decompress, workers))
       {
          free(to);
          goto error;

@@ -66,7 +66,7 @@ pgmoneta_create_manifest(void)
 static char*
 manifest_name(void)
 {
-   return "Manifest";
+   return PHASE_NAME_MANIFEST;
 }
 
 static int

@@ -755,6 +755,46 @@ Is there an active archiving for a server
 | :-------- | :---------- |
 | name | The server identifier |
 
+## pgmoneta_progress_percentage
+
+The workflow progress percentage (0-100) for a server
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+| workflow | The current workflow type (e.g. Backup, Restore, Archive) |
+| phase | The current workflow phase name |
+
+## pgmoneta_progress_elapsed_time
+
+The elapsed seconds since the current workflow started
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+| workflow | The current workflow type (e.g. Backup, Restore, Archive) |
+| phase | The current workflow phase name |
+
+## pgmoneta_progress_total
+
+The total units of work in the current workflow phase
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+| workflow | The current workflow type (e.g. Backup, Restore, Archive) |
+| phase | The current workflow phase name |
+
+## pgmoneta_progress_done
+
+The units of work completed in the current workflow phase
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+| workflow | The current workflow type (e.g. Backup, Restore, Archive) |
+| phase | The current workflow phase name |
+
 ## pgmoneta_current_wal_file
 
 The current streaming WAL filename of a server
