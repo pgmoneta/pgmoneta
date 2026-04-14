@@ -31,6 +31,7 @@
 #include <aes.h>
 #include <compression.h>
 #include <configuration.h>
+#include <json.h>
 #include <logging.h>
 #include <management.h>
 #include <memory.h>
@@ -97,7 +98,19 @@ static int restart_time(char* name, pgmoneta_time_t e, pgmoneta_time_t n, bool r
 static void add_configuration_response(struct json* res);
 static void add_servers_configuration_response(struct json* res);
 
+static int to_compression(char* where, int value);
+static int to_encryption(char* where, int value);
+static int to_storage_engine(char* where, int value);
+static int to_create_slot(char* where, int value);
+static int to_hugepage(char* where, int value);
+static int to_direct_io(char* where, int value);
+static int to_log_type(char* where, int value);
+static int to_log_level(char* where, int value);
+static int to_log_mode(char* where, int value);
+static int to_update_process_title(char* where, int value);
+
 static int apply_configuration(char* config_key, char* config_value, struct config_key_info* key_info, bool* restart_required);
+
 static int apply_main_configuration(struct main_configuration* config, struct server* srv, char* section, char* key, char* value);
 static int write_config_value(char* buffer, char* config_key, size_t buffer_size);
 static bool is_valid_config_key(const char* config_key, struct config_key_info* key_info);
@@ -3343,6 +3356,283 @@ error:
    return 1;
 }
 
+static int
+to_compression(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (COMPRESSION_ALGORITHM(value))
+   {
+      case COMPRESSION_ALG_GZIP:
+         snprintf(where, MISC_LENGTH, "%s", "gzip");
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         snprintf(where, MISC_LENGTH, "%s", "zstd");
+         break;
+      case COMPRESSION_ALG_LZ4:
+         snprintf(where, MISC_LENGTH, "%s", "lz4");
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         snprintf(where, MISC_LENGTH, "%s", "bzip2");
+         break;
+      case COMPRESSION_ALG_NONE:
+         snprintf(where, MISC_LENGTH, "%s", "none");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_encryption(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case ENCRYPTION_AES_256_GCM:
+         snprintf(where, MISC_LENGTH, "%s", "aes-256-gcm");
+         break;
+      case ENCRYPTION_AES_192_GCM:
+         snprintf(where, MISC_LENGTH, "%s", "aes-192-gcm");
+         break;
+      case ENCRYPTION_AES_128_GCM:
+         snprintf(where, MISC_LENGTH, "%s", "aes-128-gcm");
+         break;
+      case ENCRYPTION_NONE:
+         snprintf(where, MISC_LENGTH, "%s", "none");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_storage_engine(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   char* result = NULL;
+   if (value & STORAGE_ENGINE_LOCAL)
+   {
+      result = pgmoneta_append(result, "local");
+   }
+   if (value & STORAGE_ENGINE_SSH)
+   {
+      if (result)
+      {
+         result = pgmoneta_append(result, "|");
+      }
+      result = pgmoneta_append(result, "ssh");
+   }
+   if (value & STORAGE_ENGINE_S3)
+   {
+      if (result)
+      {
+         result = pgmoneta_append(result, "|");
+      }
+      result = pgmoneta_append(result, "s3");
+   }
+   if (value & STORAGE_ENGINE_AZURE)
+   {
+      if (result)
+      {
+         result = pgmoneta_append(result, "|");
+      }
+      result = pgmoneta_append(result, "azure");
+   }
+   if (!result)
+   {
+      return 1;
+   }
+   snprintf(where, MISC_LENGTH, "%s", result);
+   free(result);
+   return 0;
+}
+
+static int
+to_create_slot(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case CREATE_SLOT_YES:
+         snprintf(where, MISC_LENGTH, "%s", "yes");
+         break;
+      case CREATE_SLOT_NO:
+         snprintf(where, MISC_LENGTH, "%s", "no");
+         break;
+      case CREATE_SLOT_UNDEFINED:
+         snprintf(where, MISC_LENGTH, "%s", "undefined");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_hugepage(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case HUGEPAGE_OFF:
+         snprintf(where, MISC_LENGTH, "%s", "off");
+         break;
+      case HUGEPAGE_TRY:
+         snprintf(where, MISC_LENGTH, "%s", "try");
+         break;
+      case HUGEPAGE_ON:
+         snprintf(where, MISC_LENGTH, "%s", "on");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_direct_io(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case DIRECT_IO_OFF:
+         snprintf(where, MISC_LENGTH, "%s", "off");
+         break;
+      case DIRECT_IO_AUTO:
+         snprintf(where, MISC_LENGTH, "%s", "auto");
+         break;
+      case DIRECT_IO_ON:
+         snprintf(where, MISC_LENGTH, "%s", "on");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_log_type(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case PGMONETA_LOGGING_TYPE_FILE:
+         snprintf(where, MISC_LENGTH, "%s", "file");
+         break;
+      case PGMONETA_LOGGING_TYPE_CONSOLE:
+         snprintf(where, MISC_LENGTH, "%s", "console");
+         break;
+      case PGMONETA_LOGGING_TYPE_SYSLOG:
+         snprintf(where, MISC_LENGTH, "%s", "syslog");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_log_level(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case PGMONETA_LOGGING_LEVEL_DEBUG1:
+      case PGMONETA_LOGGING_LEVEL_DEBUG2:
+         snprintf(where, MISC_LENGTH, "%s", "debug");
+         break;
+      case PGMONETA_LOGGING_LEVEL_INFO:
+         snprintf(where, MISC_LENGTH, "%s", "info");
+         break;
+      case PGMONETA_LOGGING_LEVEL_WARN:
+         snprintf(where, MISC_LENGTH, "%s", "warn");
+         break;
+      case PGMONETA_LOGGING_LEVEL_ERROR:
+         snprintf(where, MISC_LENGTH, "%s", "error");
+         break;
+      case PGMONETA_LOGGING_LEVEL_FATAL:
+         snprintf(where, MISC_LENGTH, "%s", "fatal");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_log_mode(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case PGMONETA_LOGGING_MODE_CREATE:
+         snprintf(where, MISC_LENGTH, "%s", "create");
+         break;
+      case PGMONETA_LOGGING_MODE_APPEND:
+         snprintf(where, MISC_LENGTH, "%s", "append");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_update_process_title(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case UPDATE_PROCESS_TITLE_NEVER:
+         snprintf(where, MISC_LENGTH, "%s", "never");
+         break;
+      case UPDATE_PROCESS_TITLE_STRICT:
+         snprintf(where, MISC_LENGTH, "%s", "strict");
+         break;
+      case UPDATE_PROCESS_TITLE_MINIMAL:
+         snprintf(where, MISC_LENGTH, "%s", "minimal");
+         break;
+      case UPDATE_PROCESS_TITLE_VERBOSE:
+         snprintf(where, MISC_LENGTH, "%s", "verbose");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
 static void
 add_configuration_response(struct json* res)
 {
@@ -3357,16 +3647,16 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BASE_DIR, (uintptr_t)config->base_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS, (uintptr_t)config->metrics, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_CONSOLE, (uintptr_t)config->console, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, (uintptr_t)pgmoneta_time_convert(config->metrics_cache_max_age, FORMAT_TIME_S), ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_SIZE, (uintptr_t)config->metrics_cache_max_size, ValueInt64);
+   pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, config->metrics_cache_max_age, FORMAT_TIME_S);
+   pgmoneta_json_put_size_value(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_SIZE, config->metrics_cache_max_size);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANAGEMENT, (uintptr_t)config->management, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION, (uintptr_t)config->compression_type, ValueInt32);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_COMPRESSION, config->compression_type, to_compression);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL, (uintptr_t)config->compression_level, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PROGRESS, (uintptr_t)config->progress, ValueBool);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, (uintptr_t)config->storage_engine, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)config->common.encryption, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->create_slot, ValueInt32);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, config->storage_engine, to_storage_engine);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_ENCRYPTION, config->common.encryption, to_encryption);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_CREATE_SLOT, config->create_slot, to_create_slot);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_HOSTNAME, (uintptr_t)config->ssh_hostname, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_USERNAME, (uintptr_t)config->ssh_username, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_BASE_DIR, (uintptr_t)config->ssh_base_dir, ValueString);
@@ -3388,14 +3678,14 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_SHARED_KEY, (uintptr_t)config->azure_shared_key, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKSPACE, (uintptr_t)config->workspace, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_TYPE, (uintptr_t)config->common.log_type, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LEVEL, (uintptr_t)config->common.log_level, ValueInt32);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_LOG_TYPE, config->common.log_type, to_log_type);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_LOG_LEVEL, config->common.log_level, to_log_level);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_PATH, (uintptr_t)config->common.log_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, (uintptr_t)pgmoneta_time_convert(config->common.log_rotation_age, FORMAT_TIME_S), ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_SIZE, (uintptr_t)config->common.log_rotation_size, ValueInt64);
+   pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, config->common.log_rotation_age, FORMAT_TIME_S);
+   pgmoneta_json_put_size_value(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_SIZE, config->common.log_rotation_size);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LINE_PREFIX, (uintptr_t)config->common.log_line_prefix, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_MODE, (uintptr_t)config->common.log_mode, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, (uintptr_t)pgmoneta_time_convert(config->blocking_timeout, FORMAT_TIME_S), ValueInt64);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_LOG_MODE, config->common.log_mode, to_log_mode);
+   pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, config->blocking_timeout, FORMAT_TIME_S);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS, (uintptr_t)config->tls, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->tls_cert_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->tls_ca_file, ValueString);
@@ -3410,14 +3700,14 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NODELAY, (uintptr_t)config->common.nodelay, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NON_BLOCKING, (uintptr_t)config->common.non_blocking, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKLOG, (uintptr_t)config->backlog, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HUGEPAGE, (uintptr_t)config->hugepage, ValueChar);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_DIRECT_IO, (uintptr_t)config->direct_io, ValueChar);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_HUGEPAGE, config->hugepage, to_hugepage);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_DIRECT_IO, config->direct_io, to_direct_io);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PIDFILE, (uintptr_t)config->pidfile, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UPDATE_PROCESS_TITLE, (uintptr_t)config->update_process_title, ValueUInt64);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_UPDATE_PROCESS_TITLE, config->update_process_title, to_update_process_title);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)config->common.configuration_path, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)config->common.users_path, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)config->common.admins_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_VERIFICATION, (uintptr_t)pgmoneta_time_convert(config->verification, FORMAT_TIME_S), ValueInt64);
+   pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_VERIFICATION, config->verification, FORMAT_TIME_S);
 
    free(ret);
 }

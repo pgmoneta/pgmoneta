@@ -647,6 +647,77 @@ error:
    return 1;
 }
 
+void
+pgmoneta_json_put_enum_value(struct json* res, char* key, int value, int (*to_str)(char*, int))
+{
+   struct json* obj = NULL;
+   char str_buf[MISC_LENGTH];
+
+   memset(str_buf, 0, MISC_LENGTH);
+
+   if (pgmoneta_json_create(&obj))
+   {
+      pgmoneta_json_put(res, key, (uintptr_t)value, ValueInt64);
+      return;
+   }
+
+   pgmoneta_json_put(obj, "value", (uintptr_t)value, ValueInt64);
+
+   if (!to_str(str_buf, value))
+   {
+      pgmoneta_json_put(obj, "string_value", (uintptr_t)str_buf, ValueString);
+   }
+
+   pgmoneta_json_put(res, key, (uintptr_t)obj, ValueJSON);
+}
+
+void
+pgmoneta_json_put_time_value(struct json* res, char* key, pgmoneta_time_t t, enum pgmoneta_time_format_t format)
+{
+   struct json* obj = NULL;
+   char* str = NULL;
+   int64_t converted;
+
+   converted = pgmoneta_time_convert(t, format);
+
+   if (pgmoneta_json_create(&obj))
+   {
+      pgmoneta_json_put(res, key, (uintptr_t)converted, ValueInt64);
+      return;
+   }
+
+   pgmoneta_json_put(obj, "value", (uintptr_t)converted, ValueInt64);
+
+   if (!pgmoneta_time_format(t, format, &str))
+   {
+      pgmoneta_json_put(obj, "string_value", (uintptr_t)str, ValueString);
+      free(str);
+   }
+
+   pgmoneta_json_put(res, key, (uintptr_t)obj, ValueJSON);
+}
+
+void
+pgmoneta_json_put_size_value(struct json* res, char* key, unsigned int bytes)
+{
+   struct json* obj = NULL;
+   char str_buf[MISC_LENGTH];
+
+   memset(str_buf, 0, MISC_LENGTH);
+
+   if (pgmoneta_json_create(&obj))
+   {
+      pgmoneta_json_put(res, key, (uintptr_t)bytes, ValueInt64);
+      return;
+   }
+
+   pgmoneta_json_put(obj, "value", (uintptr_t)bytes, ValueInt64);
+   snprintf(str_buf, MISC_LENGTH, "%uB", bytes);
+   pgmoneta_json_put(obj, "string_value", (uintptr_t)str_buf, ValueString);
+
+   pgmoneta_json_put(res, key, (uintptr_t)obj, ValueJSON);
+}
+
 static int
 parse_string(char* str, uint64_t* index, struct json** obj)
 {

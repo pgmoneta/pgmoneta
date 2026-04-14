@@ -2475,15 +2475,36 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
       else if (!strcmp(key, iter->key))
       {
          // Handle single or two-part keys
-         config_value = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
          if (iter->value->type == ValueJSON)
          {
-            struct json* server_data = NULL;
-            pgmoneta_json_clone((struct json*)iter->value->data, &server_data);
-            pgmoneta_json_put(filtered_response, key, (uintptr_t)server_data, iter->value->type);
+            struct json* nested_obj = (struct json*)iter->value->data;
+
+            /* Handle enriched values formatted as { "value": N, "string_value": "..." } */
+            if (pgmoneta_json_contains_key(nested_obj, "string_value"))
+            {
+               /* Extract the string value for text output */
+               config_value = strdup((char*)pgmoneta_json_get(nested_obj, "string_value"));
+
+               if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
+               {
+                  /* Emit the full nested object in JSON mode */
+                  struct json* cloned = NULL;
+                  pgmoneta_json_clone(nested_obj, &cloned);
+                  pgmoneta_json_put(filtered_response, key, (uintptr_t)cloned, ValueJSON);
+               }
+            }
+            else
+            {
+               /* Handle regular JSON objects */
+               struct json* server_data = NULL;
+               config_value = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
+               pgmoneta_json_clone(nested_obj, &server_data);
+               pgmoneta_json_put(filtered_response, key, (uintptr_t)server_data, ValueJSON);
+            }
          }
          else
          {
+            config_value = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
             pgmoneta_json_put(filtered_response, key, (uintptr_t)iter->value->data, iter->value->type);
          }
          break;
@@ -3113,45 +3134,110 @@ translate_configuration(struct json* response)
    char* translated_log_type = NULL;
    char* translated_log_level = NULL;
    char* translated_log_mode = NULL;
+   struct json* nested = NULL;
 
    if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_COMPRESSION))
    {
-      translated_compression = translate_compression((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_COMPRESSION));
+      nested = (struct json*)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_COMPRESSION);
+      if (pgmoneta_json_contains_key(nested, "string_value"))
+      {
+         translated_compression = strdup((char*)pgmoneta_json_get(nested, "string_value"));
+      }
+      else
+      {
+         translated_compression = translate_compression((int32_t)(uintptr_t)nested);
+      }
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_COMPRESSION, (uintptr_t)translated_compression, ValueString);
    }
    if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_ENCRYPTION))
    {
-      translated_encryption = translate_encryption((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_ENCRYPTION));
+      nested = (struct json*)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_ENCRYPTION);
+      if (pgmoneta_json_contains_key(nested, "string_value"))
+      {
+         translated_encryption = strdup((char*)pgmoneta_json_get(nested, "string_value"));
+      }
+      else
+      {
+         translated_encryption = translate_encryption((int32_t)(uintptr_t)nested);
+      }
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)translated_encryption, ValueString);
    }
    if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_STORAGE_ENGINE))
    {
-      translated_storage_engine = translate_storage_engine((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_STORAGE_ENGINE));
+      nested = (struct json*)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_STORAGE_ENGINE);
+      if (pgmoneta_json_contains_key(nested, "string_value"))
+      {
+         translated_storage_engine = strdup((char*)pgmoneta_json_get(nested, "string_value"));
+      }
+      else
+      {
+         translated_storage_engine = translate_storage_engine((int32_t)(uintptr_t)nested);
+      }
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, (uintptr_t)translated_storage_engine, ValueString);
    }
    if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_CREATE_SLOT))
    {
-      translated_create_slot = translate_create_slot((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_CREATE_SLOT));
+      nested = (struct json*)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_CREATE_SLOT);
+      if (pgmoneta_json_contains_key(nested, "string_value"))
+      {
+         translated_create_slot = strdup((char*)pgmoneta_json_get(nested, "string_value"));
+      }
+      else
+      {
+         translated_create_slot = translate_create_slot((int32_t)(uintptr_t)nested);
+      }
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)translated_create_slot, ValueString);
    }
    if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_HUGEPAGE))
    {
-      translated_hugepage = translate_hugepage((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_HUGEPAGE));
+      nested = (struct json*)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_HUGEPAGE);
+      if (pgmoneta_json_contains_key(nested, "string_value"))
+      {
+         translated_hugepage = strdup((char*)pgmoneta_json_get(nested, "string_value"));
+      }
+      else
+      {
+         translated_hugepage = translate_hugepage((int32_t)(uintptr_t)nested);
+      }
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_HUGEPAGE, (uintptr_t)translated_hugepage, ValueString);
    }
    if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_LOG_TYPE))
    {
-      translated_log_type = translate_log_type((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_TYPE));
+      nested = (struct json*)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_TYPE);
+      if (pgmoneta_json_contains_key(nested, "string_value"))
+      {
+         translated_log_type = strdup((char*)pgmoneta_json_get(nested, "string_value"));
+      }
+      else
+      {
+         translated_log_type = translate_log_type((int32_t)(uintptr_t)nested);
+      }
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_LOG_TYPE, (uintptr_t)translated_log_type, ValueString);
    }
    if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_LOG_LEVEL))
    {
-      translated_log_level = translate_log_level((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_LEVEL));
+      nested = (struct json*)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_LEVEL);
+      if (pgmoneta_json_contains_key(nested, "string_value"))
+      {
+         translated_log_level = strdup((char*)pgmoneta_json_get(nested, "string_value"));
+      }
+      else
+      {
+         translated_log_level = translate_log_level((int32_t)(uintptr_t)nested);
+      }
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_LOG_LEVEL, (uintptr_t)translated_log_level, ValueString);
    }
    if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_LOG_MODE))
    {
-      translated_log_mode = translate_log_mode((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_MODE));
+      nested = (struct json*)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_MODE);
+      if (pgmoneta_json_contains_key(nested, "string_value"))
+      {
+         translated_log_mode = strdup((char*)pgmoneta_json_get(nested, "string_value"));
+      }
+      else
+      {
+         translated_log_mode = translate_log_mode((int32_t)(uintptr_t)nested);
+      }
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_LOG_MODE, (uintptr_t)translated_log_mode, ValueString);
    }
 

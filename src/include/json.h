@@ -36,6 +36,7 @@ extern "C" {
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <deque.h>
+#include <utils.h>
 #include <value.h>
 
 /* System */
@@ -314,6 +315,41 @@ pgmoneta_json_read_file(char* path, struct json** obj);
  */
 int
 pgmoneta_json_write_file(char* path, struct json* obj);
+
+/**
+ * Put an enriched enum value into a JSON object.
+ * Creates a nested JSON object with "value" (int) and "string_value" (string) keys.
+ * Falls back to plain int if nested object creation fails.
+ * @param res The json object
+ * @param key The key
+ * @param value The enum integer value
+ * @param to_str A function that converts the enum value to a string. Signature: int func(char*, int)
+ */
+void
+pgmoneta_json_put_enum_value(struct json* res, char* key, int value, int (*to_str)(char*, int));
+
+/**
+ * Put an enriched time value into a JSON object.
+ * Creates a nested JSON object with "value" (converted int) and "string_value" (formatted string) keys.
+ * Falls back to plain int if nested object creation fails.
+ * @param res The json object
+ * @param key The key
+ * @param t The time value
+ * @param format The time format
+ */
+void
+pgmoneta_json_put_time_value(struct json* res, char* key, pgmoneta_time_t t, enum pgmoneta_time_format_t format);
+
+/**
+ * Put an enriched size value into a JSON object.
+ * Creates a nested JSON object with "value" (bytes as int) and "string_value" (e.g. "4096B") keys.
+ * Falls back to plain int if nested object creation fails.
+ * @param res The json object
+ * @param key The key
+ * @param bytes The size in bytes
+ */
+void
+pgmoneta_json_put_size_value(struct json* res, char* key, unsigned int bytes);
 
 #ifdef __cplusplus
 }
