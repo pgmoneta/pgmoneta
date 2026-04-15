@@ -277,6 +277,7 @@ static void wal_interactive_restore_handlers(void);
 static void wal_interactive_signal_handler(int signum);
 static void wal_interactive_run(struct ui_state* state);
 static void wal_interactive_cleanup(struct ui_state* state);
+static char* wal_interactive_get_browse_directory(const char* path);
 static void wal_set_window_theme(WINDOW* win, int color_pair, bool border);
 static void wal_reset_completion_cycle(bool* active, int* cycle_index, char cycle_seed[][128], int fields);
 static bool wal_input_has_letter(const char* input);
@@ -518,6 +519,46 @@ wal_interactive_init(struct ui_state* state, const char* wal_filename)
    scrollok(state->main_win, TRUE);
 
    return 0;
+}
+
+static char*
+wal_interactive_get_browse_directory(const char* path)
+{
+   char* path_copy = NULL;
+   char* browse_dir = NULL;
+   size_t length;
+
+   if (path == NULL)
+   {
+      return NULL;
+   }
+
+   path_copy = strdup(path);
+   if (path_copy == NULL)
+   {
+      return NULL;
+   }
+
+   if (pgmoneta_is_directory((char*)path))
+   {
+      length = strlen(path_copy);
+
+      while (length > 1 && path_copy[length - 1] == '/')
+      {
+         path_copy[length - 1] = '\0';
+         length--;
+      }
+
+      browse_dir = strdup(path_copy);
+   }
+   else
+   {
+      browse_dir = strdup(dirname(path_copy));
+   }
+
+   free(path_copy);
+
+   return browse_dir;
 }
 
 /**
@@ -3367,14 +3408,20 @@ show_wal_file_selector(struct ui_state* state)
    int width = 80;
    int starty = (LINES - height) / 2;
    int startx = (COLS - width) / 2;
+   char* browse_dir = NULL;
 
    WINDOW* load_win = newwin(height, width, starty, startx);
    wbkgd(load_win, COLOR_PAIR(1));
 
-   char* temp_path = strdup(state->wal_filename);
    char current_dir[MAX_PATH * 2];
-   pgmoneta_snprintf(current_dir, sizeof(current_dir), "%s", dirname(temp_path));
-   free(temp_path);
+   browse_dir = wal_interactive_get_browse_directory(state->wal_filename);
+   if (browse_dir == NULL)
+   {
+      delwin(load_win);
+      return;
+   }
+   pgmoneta_snprintf(current_dir, sizeof(current_dir), "%s", browse_dir);
+   free(browse_dir);
 
    while (1)
    {
