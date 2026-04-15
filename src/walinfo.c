@@ -2211,8 +2211,8 @@ draw_header(struct ui_state* state)
    width = getmaxx(state->header_win);
 
    pgmoneta_snprintf(mode_label, sizeof(mode_label), "Mode: %s",
-                     (state->mode == DISPLAY_MODE_TEXT) ? "TEXT" :
-                     (state->mode == DISPLAY_MODE_BINARY) ? "BINARY" : "UNKNOWN");
+                     (state->mode == DISPLAY_MODE_TEXT) ? "TEXT" : (state->mode == DISPLAY_MODE_BINARY) ? "BINARY"
+                                                                                                        : "UNKNOWN");
    mode_col = width - (int)strlen(mode_label) - 2;
    wal_max_width = mode_col - wal_col - 2;
 
