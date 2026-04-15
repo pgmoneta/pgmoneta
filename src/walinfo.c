@@ -278,6 +278,9 @@ static void wal_interactive_signal_handler(int signum);
 static void wal_interactive_run(struct ui_state* state);
 static void wal_interactive_cleanup(struct ui_state* state);
 static char* wal_interactive_get_browse_directory(const char* path);
+static int wal_interactive_get_first_wal_path(const char* dir, char** first_wal_path);
+static int wal_interactive_load_file(struct ui_state* state, const char* path);
+static int wal_interactive_load_records(struct ui_state* state, char* wal_filename);
 static void wal_set_window_theme(WINDOW* win, int color_pair, bool border);
 static void wal_reset_completion_cycle(bool* active, int* cycle_index, char cycle_seed[][128], int fields);
 static bool wal_input_has_letter(const char* input);
@@ -507,9 +510,9 @@ wal_interactive_init(struct ui_state* state, const char* wal_filename)
 
    /* Create windows */
    state->header_win = newwin(3, width, 0, 0);
-   state->main_win = newwin(height - 6, width, 3, 0);
-   state->status_win = newwin(1, width, height - 3, 0);
-   state->footer_win = newwin(2, width, height - 2, 0);
+   state->main_win = newwin(height - 7, width, 3, 0);
+   state->status_win = newwin(1, width, height - 4, 0);
+   state->footer_win = newwin(3, width, height - 3, 0);
 
    wal_set_window_theme(state->header_win, 1, true);
    wal_set_window_theme(state->main_win, 2, false);
@@ -559,6 +562,119 @@ wal_interactive_get_browse_directory(const char* path)
    free(path_copy);
 
    return browse_dir;
+}
+
+static int
+wal_interactive_get_first_wal_path(const char* dir, char** first_wal_path)
+{
+   struct deque* files = NULL;
+   struct deque_iterator* iter = NULL;
+
+   if (dir == NULL || first_wal_path == NULL)
+   {
+      return -1;
+   }
+
+   *first_wal_path = NULL;
+
+   if (pgmoneta_get_wal_files((char*)dir, &files) != 0 || files == NULL || pgmoneta_deque_empty(files))
+   {
+      goto error;
+   }
+
+   pgmoneta_deque_sort(files);
+
+   if (pgmoneta_deque_iterator_create(files, &iter) != 0)
+   {
+      goto error;
+   }
+
+   if (!pgmoneta_deque_iterator_next(iter) || iter->value == NULL || iter->value->type != ValueString)
+   {
+      goto error;
+   }
+
+   *first_wal_path = pgmoneta_format_and_append(NULL, "%s%s%s",
+                                                dir,
+                                                pgmoneta_ends_with((char*)dir, "/") ? "" : "/",
+                                                (char*)iter->value->data);
+   if (*first_wal_path == NULL)
+   {
+      goto error;
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(files);
+
+   return 0;
+
+error:
+   if (iter != NULL)
+   {
+      pgmoneta_deque_iterator_destroy(iter);
+   }
+   if (files != NULL)
+   {
+      pgmoneta_deque_destroy(files);
+   }
+   if (first_wal_path != NULL && *first_wal_path != NULL)
+   {
+      free(*first_wal_path);
+      *first_wal_path = NULL;
+   }
+
+   return -1;
+}
+
+static int
+wal_interactive_load_file(struct ui_state* state, const char* path)
+{
+   if (state == NULL || path == NULL)
+   {
+      return -1;
+   }
+
+   if (state->wf != NULL)
+   {
+      pgmoneta_destroy_walfile(state->wf);
+      state->wf = NULL;
+   }
+
+   if (state->records != NULL)
+   {
+      free(state->records);
+      state->records = NULL;
+   }
+
+   if (state->wal_filename != NULL)
+   {
+      free(state->wal_filename);
+      state->wal_filename = NULL;
+   }
+
+   state->record_count = 0;
+   state->record_capacity = 1000;
+   state->current_row = 0;
+   state->scroll_offset = 0;
+
+   state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
+   if (state->records == NULL)
+   {
+      return -1;
+   }
+
+   state->wal_filename = strdup(path);
+   if (state->wal_filename == NULL)
+   {
+      return -1;
+   }
+
+   if (wal_interactive_load_records(state, state->wal_filename) != 0)
+   {
+      return -1;
+   }
+
+   return 0;
 }
 
 /**
@@ -2083,29 +2199,43 @@ error:
 static void
 draw_header(struct ui_state* state)
 {
+   int width;
+   char mode_label[32];
+   char wal_label[MAX_PATH * 2];
+   int mode_col;
+   int wal_col = 2;
+   int wal_max_width;
+
    wal_set_window_theme(state->header_win, 1, true);
 
+   width = getmaxx(state->header_win);
+
+   pgmoneta_snprintf(mode_label, sizeof(mode_label), "Mode: %s",
+                     (state->mode == DISPLAY_MODE_TEXT) ? "TEXT" :
+                     (state->mode == DISPLAY_MODE_BINARY) ? "BINARY" : "UNKNOWN");
+   mode_col = width - (int)strlen(mode_label) - 2;
+   wal_max_width = mode_col - wal_col - 2;
+
+   pgmoneta_snprintf(wal_label, sizeof(wal_label), "WAL: %s",
+                     state->wal_filename != NULL ? state->wal_filename : "");
+
    wattron(state->header_win, A_BOLD | COLOR_PAIR(1));
-   mvwprintw(state->header_win, 1, 2, "WAL: %s", state->wal_filename);
-
-   int width = getmaxx(state->header_win);
-   const char* mode_str = (state->mode == DISPLAY_MODE_TEXT) ? "TEXT" : (state->mode == DISPLAY_MODE_BINARY) ? "BINARY"
-                                                                                                             : "UNKNOWN";
-   mvwprintw(state->header_win, 1, width - 12, "Mode: %s", mode_str);
+   mvwprintw(state->header_win, 1, 1, "%-*s", width - 2, "");
+   if (wal_max_width > 0)
+   {
+      if ((int)strlen(wal_label) <= wal_max_width)
+      {
+         mvwprintw(state->header_win, 1, wal_col, "%s", wal_label);
+      }
+      else if (wal_max_width > 3)
+      {
+         mvwprintw(state->header_win, 1, wal_col, "...%.*s",
+                   wal_max_width - 3,
+                   wal_label + strlen(wal_label) - (wal_max_width - 3));
+      }
+   }
+   mvwprintw(state->header_win, 1, mode_col, "%s", mode_label);
    wattroff(state->header_win, A_BOLD | COLOR_PAIR(1));
-
-   if (wal_filters_active(state))
-   {
-      char sum[512];
-      wal_format_filter_summary(state, sum, sizeof(sum));
-      wattron(state->header_win, COLOR_PAIR(3));
-      mvwprintw(state->header_win, 2, 2, "Active filters (AND across fields, comma=OR within a field): %s", sum);
-      wattroff(state->header_win, COLOR_PAIR(3));
-   }
-   else
-   {
-      mvwprintw(state->header_win, 2, 2, "%-*s", width - 4, "");
-   }
 
    wrefresh(state->header_win);
 }
@@ -2175,7 +2305,7 @@ draw_main_content(struct ui_state* state)
    wattroff(state->main_win, A_BOLD | A_UNDERLINE);
 
    /* Display records with exact pgmoneta formatting */
-   for (int i = 0; i < height - 4 && (i + (int)state->scroll_offset) < (int)state->record_count; i++)
+   for (int i = 0; i < height - 2 && (i + (int)state->scroll_offset) < (int)state->record_count; i++)
    {
       size_t idx = i + state->scroll_offset;
       struct wal_record_ui* rec_ui = &state->records[idx];
@@ -2548,6 +2678,8 @@ static void
 draw_status(struct ui_state* state)
 {
    wal_set_window_theme(state->status_win, 1, false);
+   wmove(state->status_win, 0, 0);
+   wclrtoeol(state->status_win);
 
    if (state->search_active && (state->search_result_count > 0 || state->directory_result_count > 0))
    {
@@ -2574,15 +2706,18 @@ draw_status(struct ui_state* state)
    }
    else if (wal_filters_active(state))
    {
+      int width = getmaxx(state->status_win);
+      char sum[512];
+      char status[640];
+
+      wal_format_filter_summary(state, sum, sizeof(sum));
+      pgmoneta_snprintf(status, sizeof(status),
+                        "Showing %zu of %zu records (filtered) | Row %zu | %s",
+                        state->record_count, state->record_count_unfiltered, state->current_row + 1, sum);
+
       wattron(state->status_win, A_BOLD | COLOR_PAIR(3));
-      mvwprintw(state->status_win, 0, 2, "Showing %zu of %zu records (filtered) | Row %zu",
-                state->record_count, state->record_count_unfiltered, state->current_row + 1);
+      mvwprintw(state->status_win, 0, 2, "%.*s", width - 3, status);
       wattroff(state->status_win, A_BOLD | COLOR_PAIR(3));
-   }
-   else
-   {
-      mvwprintw(state->status_win, 0, 2, "Records: %zu | Current: %zu",
-                state->record_count, state->current_row + 1);
    }
 
    wrefresh(state->status_win);
@@ -2591,20 +2726,52 @@ draw_status(struct ui_state* state)
 static void
 draw_footer(struct ui_state* state)
 {
+   int width;
+   char footer_text[256];
+   char status_text[64];
+
    wal_set_window_theme(state->footer_win, 1, true);
+   width = getmaxx(state->footer_win);
+   mvwprintw(state->footer_win, 1, 1, "%-*s", width - 2, "");
 
    if (state->search_active && (state->search_result_count > 0 || state->directory_result_count > 0))
    {
-      mvwprintw(state->footer_win, 0, 2, "Search: n=Next | p=Prev | s=New Search | Esc=Clear | q=Quit");
+      pgmoneta_snprintf(footer_text, sizeof(footer_text),
+                        "Search: n=Next | p=Prev | s=New Search | Esc=Clear | q=Quit");
    }
    else if (wal_filters_active(state))
    {
-      mvwprintw(state->footer_win, 0, 2, "Filter: m=mark | g=YAML from marks | u=Clear Filters | q=Quit");
+      pgmoneta_snprintf(footer_text, sizeof(footer_text),
+                        "Filter: m=Mark | g=YAML from marks | u=Clear filters | q=Quit");
    }
    else
    {
-      mvwprintw(state->footer_win, 0, 2, "Cmd: Up/Down=Navigate | Enter=Detail | s=Search | f=Filter | v=Verify | l=Load | ?=Help | q=Quit");
+      int status_col;
+      int left_width;
+
+      pgmoneta_snprintf(footer_text, sizeof(footer_text),
+                        "Up/Down=Navigate | Enter=Detail | s=Search | f=Filter | v=Verify | l=Load | ?=Help | q=Quit");
+      pgmoneta_snprintf(status_text, sizeof(status_text),
+                        "Records: %zu | Current: %zu",
+                        state->record_count, state->current_row + 1);
+
+      status_col = width - (int)strlen(status_text) - 2;
+      left_width = status_col - 3;
+
+      if (left_width > 0)
+      {
+         mvwprintw(state->footer_win, 1, 2, "%.*s", left_width, footer_text);
+      }
+      if (status_col > 1)
+      {
+         mvwprintw(state->footer_win, 1, status_col, "%s", status_text);
+      }
+
+      wrefresh(state->footer_win);
+      return;
    }
+
+   mvwprintw(state->footer_win, 1, 2, "%.*s", width - 4, footer_text);
 
    wrefresh(state->footer_win);
 }
@@ -2647,7 +2814,7 @@ show_help(void)
    mvwprintw(help_win, 23, 4, "Logic      - Comma separates OR within RMGR, XID, or Relation;");
    mvwprintw(help_win, 24, 4, "             different fields combine with AND. Start LSN (min) and");
    mvwprintw(help_win, 25, 4, "             End LSN (max) bound the span together (start >= min,");
-   mvwprintw(help_win, 26, 4, "             end <= max). Active filters are shown in the header.");
+   mvwprintw(help_win, 26, 4, "             end <= max). Active filters are shown in the status line.");
 
    mvwprintw(help_win, 28, 2, "Marks & export:");
    mvwprintw(help_win, 29, 4, "M          - Mark/unmark row for YAML export");
@@ -3612,26 +3779,50 @@ show_wal_file_selector(struct ui_state* state)
             {
                if (entries[selected].is_dir)
                {
+                  char target_dir[MAX_PATH * 2];
+                  char* first_wal_path = NULL;
+
                   if (strcmp(entries[selected].name, "..") == 0)
                   {
-                     char* last_slash = strrchr(current_dir, '/');
-                     if (last_slash != NULL && last_slash != current_dir)
+                     pgmoneta_snprintf(target_dir, sizeof(target_dir), "%s", current_dir);
+
+                     char* last_slash = strrchr(target_dir, '/');
+                     if (last_slash != NULL && last_slash != target_dir)
                      {
                         *last_slash = '\0';
                      }
-                     else if (last_slash == current_dir)
+                     else if (last_slash == target_dir)
                      {
-                        strcpy(current_dir, "/");
+                        strcpy(target_dir, "/");
                      }
                   }
                   else
                   {
-                     if (strcmp(current_dir, "/") != 0)
+                     pgmoneta_snprintf(target_dir, sizeof(target_dir), "%s%s%s",
+                                       current_dir,
+                                       strcmp(current_dir, "/") == 0 ? "" : "/",
+                                       entries[selected].name);
+
+                     if (wal_interactive_get_first_wal_path(target_dir, &first_wal_path) == 0)
                      {
-                        strcat(current_dir, "/");
+                        delwin(load_win);
+                        clear();
+                        refresh();
+
+                        if (wal_interactive_load_file(state, first_wal_path) != 0)
+                        {
+                           clear();
+                           mvprintw(0, 0, "Error: Failed to load: %s", first_wal_path);
+                           refresh();
+                           getch();
+                        }
+
+                        free(first_wal_path);
+                        return;
                      }
-                     strcat(current_dir, entries[selected].name);
                   }
+
+                  pgmoneta_snprintf(current_dir, sizeof(current_dir), "%s", target_dir);
                   navigate_to_dir = true;
                }
                else
@@ -3663,38 +3854,7 @@ break_inner_loop:
          clear();
          refresh();
 
-         if (state->wf != NULL)
-         {
-            pgmoneta_destroy_walfile(state->wf);
-            state->wf = NULL;
-         }
-
-         if (state->records != NULL)
-         {
-            free(state->records);
-            state->records = NULL;
-         }
-
-         if (state->wal_filename != NULL)
-         {
-            free(state->wal_filename);
-            state->wal_filename = NULL;
-         }
-
-         state->record_count = 0;
-         state->record_capacity = 1000;
-         state->current_row = 0;
-         state->scroll_offset = 0;
-
-         state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
-         if (state->records == NULL)
-         {
-            return;
-         }
-
-         state->wal_filename = strdup(new_path);
-
-         if (wal_interactive_load_records(state, new_path) != 0)
+         if (wal_interactive_load_file(state, new_path) != 0)
          {
             clear();
             mvprintw(0, 0, "Error: Failed to load: %s", new_path);
@@ -3796,38 +3956,7 @@ show_previous_wal_file(struct ui_state* state)
    pgmoneta_deque_destroy(files);
    free(dir_path);
 
-   if (state->wf != NULL)
-   {
-      pgmoneta_destroy_walfile(state->wf);
-      state->wf = NULL;
-   }
-
-   if (state->records != NULL)
-   {
-      free(state->records);
-      state->records = NULL;
-   }
-
-   if (state->wal_filename != NULL)
-   {
-      free(state->wal_filename);
-      state->wal_filename = NULL;
-   }
-
-   state->record_count = 0;
-   state->record_capacity = 1000;
-   state->current_row = 0;
-   state->scroll_offset = 0;
-
-   state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
-   if (state->records == NULL)
-   {
-      return;
-   }
-
-   state->wal_filename = strdup(new_path);
-
-   if (wal_interactive_load_records(state, new_path) != 0)
+   if (wal_interactive_load_file(state, new_path) != 0)
    {
       clear();
       mvprintw(0, 0, "Error: Failed to load: %s", new_path);
@@ -3939,38 +4068,7 @@ show_next_wal_file(struct ui_state* state)
    pgmoneta_deque_destroy(files);
    free(dir_path);
 
-   if (state->wf != NULL)
-   {
-      pgmoneta_destroy_walfile(state->wf);
-      state->wf = NULL;
-   }
-
-   if (state->records != NULL)
-   {
-      free(state->records);
-      state->records = NULL;
-   }
-
-   if (state->wal_filename != NULL)
-   {
-      free(state->wal_filename);
-      state->wal_filename = NULL;
-   }
-
-   state->record_count = 0;
-   state->record_capacity = 1000;
-   state->current_row = 0;
-   state->scroll_offset = 0;
-
-   state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
-   if (state->records == NULL)
-   {
-      return;
-   }
-
-   state->wal_filename = strdup(new_path);
-
-   if (wal_interactive_load_records(state, new_path) != 0)
+   if (wal_interactive_load_file(state, new_path) != 0)
    {
       clear();
       mvprintw(0, 0, "Error: Failed to load: %s", new_path);
@@ -5240,23 +5338,39 @@ main(int argc, char** argv)
 
          if (pgmoneta_is_directory(filepath))
          {
+            char* first_wal_path = NULL;
+
             if (wal_interactive_init(&ui_state, filepath) != 0)
             {
                fprintf(stderr, "Error: Failed to initialize UI\n");
                goto error;
             }
 
-            show_wal_file_selector(&ui_state);
-
-            if (ui_state.record_count == 0)
+            if (wal_interactive_get_first_wal_path(filepath, &first_wal_path) == 0)
             {
-               wal_interactive_cleanup(&ui_state);
-               pgmoneta_destroy_shared_memory(shmem, size);
-               if (logfile)
+               if (wal_interactive_load_file(&ui_state, first_wal_path) != 0)
                {
-                  pgmoneta_stop_logging();
+                  fprintf(stderr, "Error: Failed to load WAL records\n");
+                  free(first_wal_path);
+                  wal_interactive_cleanup(&ui_state);
+                  goto error;
                }
-               return 0;
+               free(first_wal_path);
+            }
+            else
+            {
+               show_wal_file_selector(&ui_state);
+
+               if (ui_state.record_count == 0)
+               {
+                  wal_interactive_cleanup(&ui_state);
+                  pgmoneta_destroy_shared_memory(shmem, size);
+                  if (logfile)
+                  {
+                     pgmoneta_stop_logging();
+                  }
+                  return 0;
+               }
             }
 
             wal_interactive_run(&ui_state);
