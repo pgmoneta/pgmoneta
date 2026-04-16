@@ -1903,6 +1903,7 @@ retry:
          pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name);
          retry_count++;
          scan = true;
+         active = false;
 
          if (retry_count < 10)
          {

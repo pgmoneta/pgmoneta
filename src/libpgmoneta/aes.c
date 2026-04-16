@@ -196,6 +196,7 @@ pgmoneta_encrypt_data(char* d, struct workers* workers, struct deque* excludes)
          if (!pgmoneta_ends_with(entry->d_name, ".aes") &&
              !pgmoneta_ends_with(entry->d_name, ".partial") &&
              !pgmoneta_ends_with(entry->d_name, ".history") &&
+             !pgmoneta_ends_with(entry->d_name, ".tmp") &&
              !pgmoneta_ends_with(entry->d_name, "backup_label") &&
              !pgmoneta_ends_with(entry->d_name, "backup_manifest"))
          {

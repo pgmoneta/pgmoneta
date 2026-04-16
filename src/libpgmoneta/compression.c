@@ -463,7 +463,9 @@ process_directory_operation(char* directory, int type, struct workers* workers, 
       else
       {
          if (pgmoneta_ends_with(entry->d_name, "backup_manifest") ||
-             pgmoneta_ends_with(entry->d_name, "backup_label"))
+             pgmoneta_ends_with(entry->d_name, "backup_label") ||
+             pgmoneta_ends_with(entry->d_name, ".tmp") ||
+             pgmoneta_ends_with(entry->d_name, ".partial"))
          {
             continue;
          }
