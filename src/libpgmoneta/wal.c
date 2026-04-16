@@ -1308,10 +1308,17 @@ pgmoneta_read_mappings_from_json(char* mappings_path)
    for (int i = 0; i < 3; i++)
    {
       section = (struct json*)pgmoneta_json_get(root, sections[i]);
-      if (section && section->type == JSONItem)
+      if (section)
       {
-         struct art* art_tree = (struct art*)section->elements;
-         total_entries += art_tree->size;
+         if (section->type == JSONItem)
+         {
+            struct art* art_tree = (struct art*)section->elements;
+            total_entries += art_tree->size;
+         }
+         else if (section->type == JSONArray)
+         {
+            total_entries += pgmoneta_json_array_length(section);
+         }
       }
    }
 
@@ -1326,21 +1333,63 @@ pgmoneta_read_mappings_from_json(char* mappings_path)
    {
       current_type = (object_type)i;
       section = (struct json*)pgmoneta_json_get(root, sections[i]);
-      if (section && section->type == JSONItem)
+      if (section)
       {
-         pgmoneta_json_iterator_create(section, &iter);
-         while (pgmoneta_json_iterator_next(iter))
+         if (section->type == JSONItem)
          {
-            char* name = iter->key;
-            oid_str = (char*)iter->value->data;
-            oid = (int)strtol(oid_str, NULL, 10);
+            if (pgmoneta_json_iterator_create(section, &iter))
+            {
+               goto error;
+            }
+            while (pgmoneta_json_iterator_next(iter))
+            {
+               char* oid_str = iter->key;
+               char* name = (char*)iter->value->data;
+               oid = (int)strtol(oid_str, NULL, 10);
 
-            oidMappings[index].oid = oid;
-            oidMappings[index].type = current_type;
-            oidMappings[index].name = strdup(name);
-            index++;
+               oidMappings[index].oid = oid;
+               oidMappings[index].type = current_type;
+               oidMappings[index].name = strdup(name);
+               index++;
+            }
+            pgmoneta_json_iterator_destroy(iter);
          }
-         pgmoneta_json_iterator_destroy(iter);
+         else if (section->type == JSONArray)
+         {
+            if (pgmoneta_json_iterator_create(section, &iter))
+            {
+               goto error;
+            }
+            while (pgmoneta_json_iterator_next(iter))
+            {
+               struct json* item = (struct json*)iter->value;
+               if (item == NULL || item->type != JSONItem)
+               {
+                  pgmoneta_json_iterator_destroy(iter);
+                  goto error;
+               }
+
+               struct json_iterator* inner_iter = NULL;
+               if (pgmoneta_json_iterator_create(item, &inner_iter))
+               {
+                  pgmoneta_json_iterator_destroy(iter);
+                  goto error;
+               }
+               while (pgmoneta_json_iterator_next(inner_iter))
+               {
+                  char* name = inner_iter->key;
+                  oid_str = (char*)inner_iter->value->data;
+                  oid = (int)strtol(oid_str, NULL, 10);
+
+                  oidMappings[index].oid = oid;
+                  oidMappings[index].type = current_type;
+                  oidMappings[index].name = strdup(name);
+                  index++;
+               }
+               pgmoneta_json_iterator_destroy(inner_iter);
+            }
+            pgmoneta_json_iterator_destroy(iter);
+         }
       }
    }
 

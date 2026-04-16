@@ -105,13 +105,13 @@ With **-I** (**--interactive**), pgmoneta-walinfo runs a full-screen **ncurses**
 
 **Search** (separate from filtering)
 
-- **s** -- Open the search dialog (resource manager, LSN fields, XID, description).
+- **s** -- Open the search dialog (resource manager, LSN fields, XID, description). **Tab** cycles through known values for RMGR, Start LSN, and End LSN fields.
 - **n** / **p** (or **Right** / **Left** when search is active) -- Next / previous search match; **Right** / **Left** can cycle multiple matches in a field.
 - **Esc** -- Clear **search** highlights and results (does not clear **filters**).
 
 **Filtering**
 
-- **f** -- Open the **filter** dialog. Criteria you set restrict which rows remain in the list. The dialog is **pre-filled** with the current rules so you can edit or remove them.
+- **f** -- Open the **filter** dialog. Criteria you set restrict which rows remain in the list. The dialog is **pre-filled** with the current rules so you can edit or remove them. **Tab** cycles through known values for RMGR, Start LSN, and End LSN fields.
 - **u** -- **Clear all filters** and reload the full record list from the WAL file.
 - **Ctrl+U** (in the filter dialog only) -- Clear all filter fields.
 
@@ -161,6 +161,41 @@ To display information and translate the OIDs to the corresponding object names:
     pgmoneta-walinfo -c pgmoneta_walinfo.conf -t -m /path/to/mapping.json /path/to/walfile
     or
     pgmoneta-walinfo -c pgmoneta_walinfo.conf -t -u /path/to/pgmoneta_users.conf /path/to/walfile
+
+OID TRANSLATION
+===============
+
+The `-t` flag enables translation of WAL record OIDs to object names. Use either:
+
+- `-u /path/to/pgmoneta_users.conf` to resolve names from a live PostgreSQL server
+- `-m /path/to/mapping.json` to resolve names from a local JSON mapping file
+
+The mapping JSON file must contain `tablespaces`, `databases`, and `relations` sections with object names mapped to OIDs.
+
+If both mappings and server credentials are supplied, the mapping file takes precedence.
+
+CREATING THE MAPPING FILE
+=========================
+
+The mapping file can be created manually or generated from a PostgreSQL database.
+
+Each section is an array of objects where the key is the object name and the value is the OID as a string.
+
+**Generating from PostgreSQL:**
+
+Tablespaces:
+    SELECT '{' || string_agg('"' || spcname || '": "' || oid || '"', ', ') || '}' FROM pg_tablespace;
+
+Databases:
+    SELECT '{' || string_agg('"' || datname || '": "' || oid || '"', ', ') || '}' FROM pg_database WHERE datname NOT IN ('template0', 'template1');
+
+Relations:
+    SELECT '{' || string_agg('"' || nspname || '.' || relname || '": "' || c.oid || '"', ', ') || '}'
+    FROM pg_class c
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f') AND n.nspname NOT IN ('pg_catalog', 'information_schema');
+
+Combine into a JSON file with "tablespaces", "databases", and "relations" arrays.
 
 REPORTING BUGS
 ==============

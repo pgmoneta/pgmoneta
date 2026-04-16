@@ -10,8 +10,79 @@ The configuration is loaded from either the path specified by the `-c` flag or `
 - **Command-line mode**: Raw text or JSON output with filtering options (`-r`, `-s`, `-e`, `-x`, `-l`, etc.)
 - **Interactive mode**: Full-screen ncurses UI for browsing, searching, filtering, marking rows, and exporting walfilter YAML
 - **Format support**: Plain, compressed (zstd, gz, lz4, bz2), encrypted (aes), and combined compression+encryption
-- **OID translation**: Convert OIDs to human-readable object names (`-t` with `-m` or `-u`)
+- **OID translation**: Convert OIDs to human-readable object names (`-t` with `-m` or `-u`). Use `-m /path/to/mapping.json` to translate using a local JSON mapping file with `tablespaces`, `databases`, and `relations` sections.
 - **Summary statistics**: Analyze WAL record distribution by resource manager (`-S`)
+
+## OID translation
+
+`pgmoneta-walinfo` can translate OIDs to object names using either:
+
+- `-u /path/to/pgmoneta_users.conf` to fetch object names from a live PostgreSQL server
+- `-m /path/to/mapping.json` to load object name mappings from a local JSON file
+
+Example `mapping.json` format:
+
+```json
+{
+    "tablespaces": [
+        {"pg_default": "1663"}
+    ],
+    "databases": [
+        {"postgres": "16384"}
+    ],
+    "relations": [
+        {"public.test_table": "16734"}
+    ]
+}
+```
+
+If both a mapping file and a user credentials file are provided, the mapping file takes precedence.
+
+### Creating the mapping file
+
+The mapping file can be created manually or generated from a PostgreSQL database using SQL queries. Each section (`tablespaces`, `databases`, `relations`) is an array of objects where the key is the object name and the value is the OID as a string.
+
+#### Generating from PostgreSQL
+
+Connect to your PostgreSQL database and run these queries to generate the JSON structure:
+
+**Tablespaces:**
+```sql
+SELECT '{' || string_agg('"' || spcname || '": "' || oid || '"', ', ') || '}' FROM pg_tablespace;
+```
+
+**Databases:**
+```sql
+SELECT '{' || string_agg('"' || datname || '": "' || oid || '"', ', ') || '}' FROM pg_database WHERE datname NOT IN ('template0', 'template1');
+```
+
+**Relations:**
+```sql
+SELECT '{' || string_agg('"' || nspname || '.' || relname || '": "' || c.oid || '"', ', ') || '}'
+FROM pg_class c
+JOIN pg_namespace n ON c.relnamespace = n.oid
+WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f') AND n.nspname NOT IN ('pg_catalog', 'information_schema');
+```
+
+Combine the results into a full JSON file:
+
+```json
+{
+    "tablespaces": {
+        /* paste tablespaces query result */ 
+    },
+    "databases": {
+        /* paste databases query result */ 
+    },
+    "relations": {
+        /* paste relations query result */ 
+    }
+}
+```
+
+#### Manual creation
+
+You can also create the file manually by looking up OIDs in system catalogs or using tools like `pg_dump` output. Ensure OIDs are strings and object names are fully qualified (schema.table for relations).
 
 ## Interactive mode
 
