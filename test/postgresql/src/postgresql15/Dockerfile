@@ -49,7 +49,7 @@ RUN dnf makecache
 # Install dependencies
 RUN dnf -y install git gcc cmake make postgresql15-devel
 RUN dnf -y install procps wget iputils net-tools
-RUN dnf -y install postgresql15 postgresql15-server postgresql15-contrib postgresql15-libs 
+RUN dnf -y install postgresql15 postgresql15-server postgresql15-contrib postgresql15-libs openssl-devel
 
 # Build and Install pgmoneta_ext
 WORKDIR /tmp/pg_extension

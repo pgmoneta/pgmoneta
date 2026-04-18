@@ -59,6 +59,7 @@ Jozef Hernández <jozefhdez2@gmail.com>
 Tarun Wadhwa <tarunwadhwa85@gmail.com>
 Pranav Prajapati <pranavprajapati586@gmail.com>
 Som Shegokar <akashshegokar2186@gmail.com>
+Ameen Sakr <ameensakr623@gmail.com>
 ```
 
 ## Committers

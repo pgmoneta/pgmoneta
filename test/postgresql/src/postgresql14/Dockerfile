@@ -49,7 +49,7 @@ RUN dnf makecache
 # Install dependencies
 RUN dnf -y install git gcc cmake make postgresql14-devel
 RUN dnf -y install procps wget iputils net-tools
-RUN dnf -y install postgresql14 postgresql14-server postgresql14-contrib postgresql14-libs 
+RUN dnf -y install postgresql14 postgresql14-server postgresql14-contrib postgresql14-libs openssl-devel
 
 # Build and Install pgmoneta_ext
 WORKDIR /tmp/pg_extension
