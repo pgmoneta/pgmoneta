@@ -57,24 +57,24 @@ Opciones:
 
 #### Modo interactivo
 
-La bandera `-I` o `--interactive` inicia una interfaz de usuario basada en ncurses interactiva para examinar y analizar archivos WAL.
+La opción `-I` o `--interactive` inicia una interfaz interactiva basada en ncurses para examinar y analizar archivos WAL.
 
 **Características:**
 
 - **Navegador de archivos**: Navega directorios para seleccionar archivos WAL
 - **Visualización de registros**: Ver registros WAL en formato de tabla; **t** / **b** cambia entre vista de texto y binaria (hex)
-- **Búsqueda**: **s** abre búsqueda por gestor de recursos, campos LSN, XID o descripción; **n** / **p** se desplazan entre coincidencias; **Esc** limpia la búsqueda (no los filtros)
-- **Filtrado**: **f** abre un diálogo de filtro. Los criterios restringen qué filas permanecen. **u** limpia todos los filtros y recarga el archivo completo. Los filtros activos se resumen en el encabezado; la barra de estado muestra *mostrando N de M registros* cuando está filtrado
-- **Marcas y YAML**: **m** marca o desmarca filas; **g** escribe un YAML de **pgmoneta-walfilter** con los XIDs de las filas marcadas
+- **Búsqueda**: **s** abre la búsqueda por gestor de recursos, campos LSN, XID o descripción; **n** / **p** navegan entre coincidencias; **Esc** descarta la búsqueda activa (sin afectar los filtros)
+- **Filtrado**: **f** abre el diálogo de filtros. Los criterios definidos restringen las filas visibles. **u** elimina todos los filtros y recarga el archivo completo. Los filtros activos se indican en el encabezado; la barra de estado muestra *N de M registros* cuando hay un filtro aplicado
+- **Marcas y YAML**: **m** marca o desmarca filas; **g** genera un archivo YAML para **pgmoneta-walfilter** a partir de los XIDs de las filas marcadas
 - **Visualización codificada por colores**: Colores diferentes para tipos de registros y columnas
 - **Navegación WAL**: En los límites de archivo, **Arriba** / **Abajo** pueden moverse al archivo WAL anterior/siguiente en el mismo directorio cuando corresponda; **Inicio** / **Fin** saltan al primer/último registro
 
 **Semántica de filtros (diálogo interactivo)**
 
-- **AND entre campos**: Cada campo no vacío que establezcas debe coincidir (RMGR, LSN de inicio, LSN de fin, XID, Relación).
-- **OR dentro de un campo**: Para **RMGR**, **XID** y **Relación**, ingresa valores **separados por comas**; una fila coincide si coincide con **cualquier** token en ese campo.
-- **LSN de inicio** / **LSN de fin**: Juntos definen un rango: el inicio del registro mayor que el filtro de inicio (si se establece) y el fin del registro menor que el filtro de fin (si se establece). Puedes establecer solo un límite.
-- El diálogo se **rellena previamente** cuando vuelves a abrir **f**. **Ctrl+U** en el diálogo limpia todos los campos.
+- **AND entre campos**: Todos los campos que se completen deben coincidir simultáneamente (RMGR, LSN de inicio, LSN de fin, XID, Relación).
+- **OR dentro de un campo**: Para **RMGR**, **XID** y **Relación**, introduzca valores **separados por comas**; una fila coincide si corresponde a **cualquiera** de los valores indicados.
+- **LSN de inicio** / **LSN de fin**: Definen un rango de búsqueda — el inicio del registro debe ser mayor que el LSN de inicio y el fin del registro debe ser menor que el LSN de fin (cada límite es opcional de forma independiente).
+- El diálogo **conserva los valores anteriores** al reabrirlo con **f**. **Ctrl+U** dentro del diálogo borra todos los campos.
 
 **Uso:**
 
@@ -117,7 +117,7 @@ En formato `raw`, el predeterminado, la salida está estructurada de la siguient
 Resource Manager | Start LSN | End LSN | rec len | tot len | xid | description (data and backup)
 ```
 
-- **Resource Manager**: El nombre del gestor de recursos que maneja el registro de registro.
+- **Resource Manager**: El nombre del gestor de recursos responsable de la entrada de registro.
 - **Start LSN**: El número de secuencia de registro (LSN) de inicio.
 - **End LSN**: El número de secuencia de registro (LSN) de fin.
 - **rec len**: La longitud del registro WAL.
@@ -241,6 +241,27 @@ SELECT nspname || '.' || relname, c.oid FROM pg_class c JOIN pg_namespace n ON c
 - Si se proporcionan tanto `pgmoneta_users.conf` como `mappings.json`, el archivo de asignación tiene precedencia
 - Los OIDs no encontrados en el servidor/asignación se mostrarán tal cual
 
+## pgmoneta_walinfo.conf
+
+El archivo de configuración de `pgmoneta_walinfo` define los parámetros de registro y cifrado. Se carga desde la ruta indicada mediante la opción `-c` o, en su ausencia, desde `/etc/pgmoneta/pgmoneta_walinfo.conf`.
+
+### [pgmoneta_walinfo]
+
+| Propiedad | Predeterminado | Unidad | Requerido | Descripción |
+| :------- | :------ | :--- | :------- | :---------- |
+| log_type | console | String | No | El tipo de registro (console, file, syslog) |
+| log_level | info | String | No | Nivel de registro; acepta los valores (sin distinción entre mayúsculas y minúsculas) `FATAL`, `ERROR`, `WARN`, `INFO` y `DEBUG` (con variantes específicas de `DEBUG1` a `DEBUG5`). Los niveles de depuración superiores a 5 se tratan como `DEBUG5`. Los valores no reconocidos se interpretan como `INFO` |
+| log_path | pgmoneta.log | String | No | La ubicación del archivo de registro. Puede ser una cadena compatible con strftime(3). |
+| encryption | aes-256-gcm | String | No | El modo de encriptación para encriptar WAL y datos<br/> `none`: Sin encriptación <br/> `aes \| aes-256 \| aes-256-gcm`: AES GCM (Galois/Counter Mode) modo con clave de 256 bits (Recomendado)<br/> `aes-192 \| aes-192-gcm`: AES GCM modo con clave de 192 bits<br/> `aes-128 \| aes-128-gcm`: AES GCM modo con clave de 128 bits |
+
+### Sección de servidor
+
+| Propiedad | Predeterminado | Unidad | Requerido | Descripción |
+| :------- | :------ | :--- | :------- | :---------- |
+| host | | String | Sí | La dirección de la instancia de PostgreSQL |
+| port | | Int | Sí | El puerto de la instancia de PostgreSQL |
+| user | | String | Sí | El nombre del usuario de replicación |
+
 ## pgmoneta-walfilter
 
 `pgmoneta-walfilter` es una utilidad de línea de comandos que lee archivos PostgreSQL Write-Ahead Log (WAL) de un directorio de origen, los filtra según reglas definidas por el usuario, recalcula sumas de verificación CRC y escribe los archivos WAL filtrados en un directorio de destino.
@@ -264,7 +285,7 @@ pgmoneta-walfilter <yaml_config_file>
 
 ### Configuración
 
-La herramienta usa un archivo de configuración YAML para especificar directorios de origen y destino y otras configuraciones.
+La herramienta emplea un archivo de configuración YAML para especificar los directorios de origen y destino, así como otros parámetros de operación.
 
 #### Estructura de archivo de configuración
 
@@ -349,6 +370,27 @@ pgmoneta-walfilter filter_config.yaml
 **Archivos de registro:**
 
 La herramienta usa la configuración de registro de `pgmoneta_walfilter.conf`. Consulta el archivo de registro especificado en la configuración para obtener mensajes de error detallados e información de procesamiento.
+
+## pgmoneta_walfilter.conf
+
+El archivo de configuración de `pgmoneta_walfilter` define los parámetros de registro y cifrado. Se carga desde la ruta indicada en el archivo YAML de configuración o, si no se especificó, desde `/etc/pgmoneta/pgmoneta_walfilter.conf`.
+
+### [pgmoneta_walfilter]
+
+| Propiedad | Predeterminado | Unidad | Requerido | Descripción |
+| :------- | :------ | :--- | :------- | :---------- |
+| log_type | console | String | No | El tipo de registro (console, file, syslog) |
+| log_level | info | String | No | Nivel de registro; acepta los valores (sin distinción entre mayúsculas y minúsculas) `FATAL`, `ERROR`, `WARN`, `INFO` y `DEBUG` (con variantes específicas de `DEBUG1` a `DEBUG5`). Los niveles de depuración superiores a 5 se tratan como `DEBUG5`. Los valores no reconocidos se interpretan como `INFO` |
+| log_path | pgmoneta.log | String | No | La ubicación del archivo de registro. Puede ser una cadena compatible con strftime(3). |
+| encryption | none | String | No | El modo de encriptación para encriptar WAL y datos<br/> `none`: Sin encriptación <br/> `aes \| aes-256 \| aes-256-gcm`: AES GCM (Galois/Counter Mode) modo con clave de 256 bits (Recomendado)<br/> `aes-192 \| aes-192-gcm`: AES GCM modo con clave de 192 bits<br/> `aes-128 \| aes-128-gcm`: AES GCM modo con clave de 128 bits |
+
+### Sección de servidor
+
+| Propiedad | Predeterminado | Unidad | Requerido | Descripción |
+| :------- | :------ | :--- | :------- | :---------- |
+| host | | String | Sí | La dirección de la instancia de PostgreSQL |
+| port | | Int | Sí | El puerto de la instancia de PostgreSQL |
+| user | | String | Sí | El nombre del usuario de replicación |
 
 ### Información adicional
 

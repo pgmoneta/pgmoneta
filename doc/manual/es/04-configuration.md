@@ -81,7 +81,7 @@ Nota: Si `host` comienza con un `/`, representa una ruta y `pgmoneta` se conecta
 
 | Propiedad | Predeterminado | Unidad | Requerido | Descripción |
 | :------- | :------ | :--- | :------- | :---------- |
-| encryption | none | String | No | El modo de encriptación para encriptar WAL y datos<br/> `none`: Sin encriptación <br/> `aes \| aes-256 \| aes-256-cbc`: AES CBC (Cipher Block Chaining) modo con clave de 256 bits<br/> `aes-192 \| aes-192-cbc`: AES CBC modo con clave de 192 bits<br/> `aes-128 \| aes-128-cbc`: AES CBC modo con clave de 128 bits<br/> `aes-256-ctr`: AES CTR (Counter) modo con clave de 256 bits<br/> `aes-192-ctr`: AES CTR modo con clave de 192 bits<br/> `aes-128-ctr`: AES CTR modo con clave de 128 bits |
+| encryption | none | String | No | El modo de encriptación para encriptar WAL y datos<br/> `none`: Sin encriptación <br/> `aes \| aes-256 \| aes-256-gcm`: AES GCM (Galois/Counter Mode) modo con clave de 256 bits (Recomendado)<br/> `aes-192 \| aes-192-gcm`: AES GCM modo con clave de 192 bits<br/> `aes-128 \| aes-128-gcm`: AES GCM modo con clave de 128 bits |
 
 **Gestión de slots**
 
