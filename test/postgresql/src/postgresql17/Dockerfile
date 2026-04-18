@@ -48,7 +48,7 @@ RUN dnf makecache
 # Install dependencies
 RUN dnf -y install git gcc cmake make postgresql17-devel
 RUN dnf -y install procps wget iputils net-tools
-RUN dnf -y install postgresql17 postgresql17-server postgresql17-contrib postgresql17-libs
+RUN dnf -y install postgresql17 postgresql17-server postgresql17-contrib postgresql17-libs openssl-devel
 
 # Build and Install pgmoneta_ext
 WORKDIR /tmp/pg_extension
