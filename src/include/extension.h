@@ -153,6 +153,24 @@ pgmoneta_version_to_string(struct version* version, char* buffer, size_t buffer_
 int
 pgmoneta_detect_server_extensions(int server);
 
+/**
+ * Check if a specific extension is installed on a server
+ * @param server The server index
+ * @param extension_name The extension name to check
+ * @return 1 if installed and enabled, otherwise 0
+ */
+int
+pgmoneta_extension_is_installed(int server, const char* extension_name);
+
+/**
+ * Get extension info for a specific extension on a server
+ * @param server The server index
+ * @param extension_name The extension name
+ * @return pointer to extension_info if found, NULL otherwise
+ */
+struct extension_info*
+pgmoneta_get_extension_info(int server, const char* extension_name);
+
 #ifdef __cplusplus
 }
 #endif

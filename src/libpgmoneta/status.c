@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <fips.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
@@ -321,6 +322,8 @@ pgmoneta_status_details(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS, (uintptr_t)config->common.number_of_servers, ValueInt32);
 
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_PGMONETA_FIPS, (uintptr_t)pgmoneta_fips_pgmoneta(), ValueBool);
+
    pgmoneta_json_create(&servers);
 
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -406,6 +409,8 @@ pgmoneta_status_details(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)(config->common.servers[i].workers != -1 ? config->common.servers[i].workers : config->workers), ValueInt32);
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_CHECKSUMS, (uintptr_t)config->common.servers[i].checksums, ValueBool);
+
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_FIPS, (uintptr_t)(config->common.servers[i].fips_enabled == SERVER_FIPS_ENABLED), ValueBool);
 
       free(d);
       d = NULL;

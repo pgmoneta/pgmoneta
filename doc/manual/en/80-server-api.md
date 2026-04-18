@@ -31,6 +31,7 @@ You can checkout the list of all pre-defined roles available in PostgreSQL 17 [h
 Fetch trivial information about a configured PostgreSQL server like:
 - PostgreSQL version of the server
 - status of checksums (enabled/disabled)
+- status of FIPS mode (enabled/disabled)
 - type of server (primary/non-primary)
 - configured wal level, wal size, segment size, block size
 - status of wal summarize (enabled/disabled)
