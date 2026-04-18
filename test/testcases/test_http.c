@@ -377,6 +377,34 @@ cleanup:
    MCTF_FINISH();
 }
 
+static size_t
+discard_write_cb(void* buffer, size_t size)
+{
+   (void)buffer;
+   return size;
+}
+
+MCTF_TEST(test_pgmoneta_http_set_cb_helpers)
+{
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   pgmoneta_test_setup();
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/test", &request), cleanup, "failed to create request");
+   response = (struct http_response*)calloc(1, sizeof(struct http_response));
+   MCTF_ASSERT_PTR_NONNULL(response, cleanup, "failed to alloc response");
+   MCTF_ASSERT_PTR_NULL((void*)request->read_cb, cleanup, "read_cb should be NULL initially");
+   MCTF_ASSERT_PTR_NULL((void*)response->write_cb, cleanup, "write_cb should be NULL initially");
+   pgmoneta_http_set_write_cb(response, discard_write_cb);
+   pgmoneta_http_set_read_cb(request, NULL);
+   MCTF_ASSERT_PTR_NONNULL((void*)response->write_cb, cleanup, "write_cb should be set");
+   MCTF_ASSERT_PTR_NULL((void*)request->read_cb, cleanup, "read_cb should remain NULL");
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   free(response);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
 static void*
 echo_server_thread(void* arg)
 {

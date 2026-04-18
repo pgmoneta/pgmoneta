@@ -611,15 +611,21 @@ http_read_response_header(SSL* ssl, int socket,
 
    if (extra > 0)
    {
-      http_response->payload.data = malloc(extra + 1);
-      if (!http_response->payload.data)
+      if (http_response->write_cb != NULL)
       {
-         goto error;
+         http_response->write_cb(header_str + header_len, extra);
       }
-
-      memcpy(http_response->payload.data, header_str + header_len, extra);
-      ((char*)http_response->payload.data)[extra] = '\0';
-      http_response->payload.data_size = extra;
+      else
+      {
+         http_response->payload.data = malloc(extra + 1);
+         if (!http_response->payload.data)
+         {
+            goto error;
+         }
+         memcpy(http_response->payload.data, header_str + header_len, extra);
+         ((char*)http_response->payload.data)[extra] = '\0';
+         http_response->payload.data_size = extra;
+      }
    }
 
    header_str[header_len] = '\0';
@@ -727,8 +733,15 @@ http_read_chunked_body(SSL* ssl, int socket, struct http_response* http_response
          if (bytes_read <= 0)
             goto error;
 
-         http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
-         http_response->payload.data_size += bytes_read;
+         if (http_response->write_cb != NULL)
+         {
+            http_response->write_cb(buffer, bytes_read);
+         }
+         else
+         {
+            http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
+            http_response->payload.data_size += bytes_read;
+         }
          chunk_read += bytes_read;
       }
       // the chunk size must match
@@ -785,8 +798,15 @@ http_read_content_length_body(SSL* ssl, int socket, struct http_response* http_r
       if (bytes_read <= 0)
          goto error;
 
-      http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
-      http_response->payload.data_size += bytes_read;
+      if (http_response->write_cb != NULL)
+      {
+         http_response->write_cb(buffer, bytes_read);
+      }
+      else
+      {
+         http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
+         http_response->payload.data_size += bytes_read;
+      }
       remaining -= bytes_read;
    }
 
@@ -810,8 +830,15 @@ http_read_EOF_body(SSL* ssl, int socket, struct http_response* http_response)
       if (bytes_read == 0)
          break;
 
-      http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
-      http_response->payload.data_size += bytes_read;
+      if (http_response->write_cb != NULL)
+      {
+         http_response->write_cb(buffer, bytes_read);
+      }
+      else
+      {
+         http_response->payload.data = pgmoneta_append_bytes(http_response->payload.data, buffer, bytes_read, http_response->payload.data_size);
+         http_response->payload.data_size += bytes_read;
+      }
    }
 
    return MESSAGE_STATUS_OK;
@@ -1043,5 +1070,23 @@ http_method_to_string(int method)
          return "PUT";
       default:
          return NULL;
+   }
+}
+
+void
+pgmoneta_http_set_write_cb(struct http_response* response, size_t (*write_cb)(void* buffer, size_t size))
+{
+   if (response != NULL)
+   {
+      response->write_cb = write_cb;
+   }
+}
+
+void
+pgmoneta_http_set_read_cb(struct http_request* request, size_t (*read_cb)(void* buffer, size_t size))
+{
+   if (request != NULL)
+   {
+      request->read_cb = read_cb;
    }
 }
