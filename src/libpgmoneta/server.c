@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <deque.h>
 #include <extension.h>
+#include <fips.h>
 #include <logging.h>
 #include <message.h>
 #include <network.h>
@@ -161,6 +162,17 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
                       config->common.servers[srv].name,
                       config->common.servers[srv].has_extension ? "true" : "false",
                       config->common.servers[srv].has_extension ? config->common.servers[srv].ext_version : "N/A");
+
+   bool fips = false;
+
+   if (pgmoneta_fips_server(ssl, socket, srv, &fips))
+   {
+      pgmoneta_log_warn("Unable to get FIPS mode for %s", config->common.servers[srv].name);
+      config->common.servers[srv].fips_enabled = SERVER_FIPS_DISABLED;
+   }
+   pgmoneta_log_debug("%s/fips_mode %s", config->common.servers[srv].name,
+                      config->common.servers[srv].fips_enabled == SERVER_FIPS_ENABLED ? "Yes" : "No");
+
    if (get_segment_size(ssl, socket, &segsz))
    {
       pgmoneta_log_error("Unable to get segment_size for %s", config->common.servers[srv].name);

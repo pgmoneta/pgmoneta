@@ -302,6 +302,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   srv.active_retention = false;
                   srv.wal_streaming = -1;
                   srv.valid = false;
+                  srv.fips_enabled = SERVER_FIPS_UNKNOWN;
                   srv.cur_timeline = 1;
                   atomic_init(&srv.operation_count, 0);
                   atomic_init(&srv.failed_operation_count, 0);

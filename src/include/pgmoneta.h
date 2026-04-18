@@ -91,6 +91,10 @@ extern "C" {
 #define AUTH_ERROR                   2
 #define AUTH_TIMEOUT                 3
 
+#define SERVER_FIPS_UNKNOWN         -1
+#define SERVER_FIPS_DISABLED         0
+#define SERVER_FIPS_ENABLED          1
+
 #define ENCRYPTION_NONE              0
 #define ENCRYPTION_AES_256_GCM       1
 #define ENCRYPTION_AES_192_GCM       2
@@ -336,6 +340,7 @@ struct server
    size_t relseg_size;                                            /**< The max number of blocks in a relation file segment */
    pid_t wal_streaming;                                           /**< WAL streaming process id */
    bool checksums;                                                /**< Are checksums enabled */
+   int fips_enabled;                                              /**< FIPS mode status */
    bool summarize_wal;                                            /**< Is summarize_wal enabled */
    bool valid;                                                    /**< Is the server valid */
    int version;                                                   /**< The major version of the server*/

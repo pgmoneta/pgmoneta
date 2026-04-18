@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <backup.h>
 #include <extension.h>
+#include <fips.h>
 #include <info.h>
 #include <logging.h>
 #include <network.h>
@@ -450,6 +451,9 @@ home_page(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_version</h2>\n");
    data = pgmoneta_append(data, "  The version of pgmoneta\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_fips</h2>\n");
+   data = pgmoneta_append(data, "  Is pgmoneta running in FIPS mode\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_server_extensions_detected</h2>\n");
    data = pgmoneta_append(data, "  The number of extensions detected on server\n");
    data = pgmoneta_append(data, "  <p>\n");
@@ -623,6 +627,17 @@ home_page(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_server_checksums</h2>\n");
    data = pgmoneta_append(data, "  Are checksums enabled for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_fips_mode</h2>\n");
+   data = pgmoneta_append(data, "  Is FIPS mode enabled for a server (via PostgreSQL)\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
    data = pgmoneta_append(data, "    <tbody>\n");
    data = pgmoneta_append(data, "      <tr>\n");
@@ -1601,6 +1616,14 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_version", data, NULL, NULL, 0);
    free(data);
    data = NULL;
+   data = pgmoneta_append(data, "#HELP pgmoneta_fips Is pgmoneta running in FIPS mode\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_fips gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_fips ");
+   data = pgmoneta_append_int(data, pgmoneta_fips_pgmoneta() ? 1 : 0);
+   data = pgmoneta_append(data, "\n\n");
+   add_metric_to_art(container->general_metrics, "pgmoneta_fips", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_logging_info The number of INFO logging statements\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_logging_info gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_info ");
@@ -2486,6 +2509,32 @@ general_information(prometheus_metrics_container_t* container)
    data = pgmoneta_append(data, "\n");
 
    add_metric_to_art(container->server_metrics, "pgmoneta_server_checksums", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_fips_mode Is FIPS mode enabled\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_fips_mode gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_fips_mode{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      if (config->common.servers[i].fips_enabled == SERVER_FIPS_ENABLED)
+      {
+         data = pgmoneta_append_int(data, 1);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_fips_mode", data, NULL, NULL, 0);
    free(data);
    data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_summarize_wal Is summarize_wal enabled\n");
