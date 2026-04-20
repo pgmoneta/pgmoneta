@@ -98,6 +98,14 @@ With **-I** (**--interactive**), pgmoneta-walinfo runs a full-screen **ncurses**
 - **Home / End** -- First / last record in the current list.
 - **Enter** -- Open detailed view for the current record.
 
+**File browser**
+
+- Press **l** to open the file browser.
+- **Up / Down** moves between directory entries.
+- **PgUp / PgDn** jumps by one visible page in the file browser list.
+- **Enter** opens a directory or loads the selected WAL file.
+- **q** closes the file browser without loading a file.
+
 **Display**
 
 - **t** -- Text mode (human-readable columns).

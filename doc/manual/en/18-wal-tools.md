@@ -61,7 +61,7 @@ The `-I` or `--interactive` flag launches an interactive ncurses-based user inte
 
 **Features:**
 
-- **File browser**: Navigate directories to select WAL files
+- **File browser**: Navigate directories to select WAL files; **Up** / **Down** moves between entries, **PgUp** / **PgDn** jumps by one visible page, and **Enter** opens or loads the current selection
 - **Record display**: View WAL records in a table; **t** / **b** switches text vs binary (hex) view
 - **Search**: **s** opens search by resource manager, LSN fields, XID, or description; **Tab** cycles through known values for RMGR, Start LSN, and End LSN fields; **n** / **p** move between matches; **Esc** clears search (not filters)
 - **Filtering**: **f** opens a filter dialog. **Tab** cycles through known values for RMGR, Start LSN, and End LSN fields. Criteria restrict which rows remain. **u** clears all filters and reloads the full file. Active filters are summarized in the header; the status line shows *showing N of M records* when filtered
@@ -109,6 +109,8 @@ pgmoneta-walinfo -I /path/to/000000010000000000000001
 | q | Quit |
 
 See **doc/man/pgmoneta-walinfo.1.rst** for the full **INTERACTIVE MODE** section.
+
+When the **file browser** is open via **l**, **Up / Down** moves between directory entries, **PgUp / PgDn** pages through the list, **Enter** opens a directory or loads the selected WAL file, and **q** closes the browser.
 
 #### Raw Output Format
 

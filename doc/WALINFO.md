@@ -95,7 +95,7 @@ pgmoneta-walinfo -I <directory>
 
 **Capabilities**
 
-- **File browser**: Choose WAL files from a directory
+- **File browser**: Choose WAL files from a directory; **Up** / **Down** moves between entries, **PgUp** / **PgDn** jumps by one visible page, and **Enter** opens or loads the current selection
 - **Record table**: RMGR, LSNs, lengths, XID, description; **t** / **b** toggles text vs binary (hex) view
 - **Detail view**: **Enter** opens the current record
 - **Search** (**s**): Find records by RMGR, LSN fields, XID, or description (KMP-based). **n** / **p** step results; **Esc** clears search (not filters)
@@ -129,6 +129,8 @@ pgmoneta-walinfo -I <directory>
 | **?** | Help overlay |
 | **Esc** | Clear **search** state |
 | **q** | Quit |
+
+When the **file browser** is open via **l**, **↑ / ↓** moves between entries, **PgUp / PgDn** pages through the entry list, **Enter** opens or loads the current selection, and **q** closes the browser.
 
 For the full list, see **doc/man/pgmoneta-walinfo.1.rst** (INTERACTIVE MODE) or the built-in **?** help.
 

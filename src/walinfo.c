@@ -3855,6 +3855,7 @@ show_wal_file_selector(struct ui_state* state)
 
    WINDOW* load_win = newwin(height, width, starty, startx);
    wbkgd(load_win, COLOR_PAIR(1));
+   keypad(load_win, TRUE);
 
    char current_dir[MAX_PATH * 2];
    browse_dir = wal_interactive_get_browse_directory(state->wal_filename);
@@ -4028,12 +4029,12 @@ show_wal_file_selector(struct ui_state* state)
             }
          }
 
-         mvwprintw(load_win, height - 2, 2, "Up/Down=Navigate | Enter=Open/Load | q=Cancel");
+         mvwprintw(load_win, height - 2, 2, "Up/Down=Navigate | PgUp/PgDn=Page | Enter=Open/Load | q=Cancel");
 
          box(load_win, 0, 0);
          wrefresh(load_win);
 
-         int ch = getch();
+         int ch = wgetch(load_win);
 
          switch (ch)
          {
@@ -4048,6 +4049,20 @@ show_wal_file_selector(struct ui_state* state)
                if (selected < entry_count - 1)
                {
                   selected++;
+               }
+               break;
+
+            case KEY_PPAGE:
+               if (selected > 0)
+               {
+                  selected -= MIN(selected, max_display);
+               }
+               break;
+
+            case KEY_NPAGE:
+               if (selected < entry_count - 1)
+               {
+                  selected += MIN(entry_count - 1 - selected, max_display);
                }
                break;
 
