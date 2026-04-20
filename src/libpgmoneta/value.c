@@ -661,7 +661,6 @@ pgmoneta_value_compare(struct value* a, struct value* b)
    {
       return 1;
    }
-   return 0;
 
    if (a->type != b->type)
    {
