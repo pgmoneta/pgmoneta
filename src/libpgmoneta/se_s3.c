@@ -555,9 +555,17 @@ s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
 
    s3_root = s3_get_basepath(server, label);
    local_root = pgmoneta_get_server_backup_identifier(server, label);
+   info_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+   info_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
 
    if (s3_bootstrap(s3_root, server, local_root))
    {
+      goto error;
+   }
+
+   if (rename(info_tmp, info_final))
+   {
+      pgmoneta_log_error("S3 restore: could not rename %s to %s", info_tmp, info_final);
       goto error;
    }
 
@@ -580,8 +588,6 @@ s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
    manifest_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
    sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
    sha512_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512");
-   info_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
-   info_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
 
    if (rename(manifest_tmp, manifest_final))
    {
@@ -592,12 +598,6 @@ s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
    if (rename(sha512_tmp, sha512_final))
    {
       pgmoneta_log_error("S3 restore: could not rename %s to %s", sha512_tmp, sha512_final);
-      goto error;
-   }
-
-   if (rename(info_tmp, info_final))
-   {
-      pgmoneta_log_error("S3 restore: could not rename %s to %s", info_tmp, info_final);
       goto error;
    }
 

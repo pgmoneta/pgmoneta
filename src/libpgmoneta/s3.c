@@ -36,10 +36,12 @@
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <restore.h>
 #include <security.h>
 #include <utils.h>
 #include <wal.h>
 #include <workflow.h>
+#include <workflow_funcs.h>
 
 #define NAME "s3"
 
@@ -326,12 +328,14 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
    struct timespec start_t;
    struct timespec end_t;
    double total_seconds;
-   char* base_dir = NULL;
+   char* directory = NULL;
+   char* position = NULL;
    struct art* nodes = NULL;
    struct workflow* workflow = NULL;
    struct main_configuration* config;
    struct backup* backup = NULL;
    char* local_root = NULL;
+   struct json* req = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -341,10 +345,21 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
+   directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
+
    if (!s3_is_safe_prefix(prefix))
    {
       ec = MANAGEMENT_ERROR_RESTORE_S3_ERROR;
       pgmoneta_log_error("S3 restore: invalid prefix for %s", config->common.servers[server].name);
+      goto error;
+   }
+
+   if (directory == NULL || strlen(directory) == 0)
+   {
+      ec = MANAGEMENT_ERROR_RESTORE_S3_ERROR;
+      pgmoneta_log_error("S3 restore: missing target directory for %s/%s", config->common.servers[server].name, prefix);
       goto error;
    }
 
@@ -366,6 +381,12 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
       goto error;
    }
 
+   if (pgmoneta_art_insert(nodes, USER_IDENTIFIER, (uintptr_t)prefix, ValueString))
+   {
+      ec = MANAGEMENT_ERROR_RESTORE_S3_WORKFLOW;
+      goto error;
+   }
+
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_S3_RESTORE, NULL);
 
    if (workflow == NULL)
@@ -381,30 +402,39 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
       goto error;
    }
    pgmoneta_workflow_destroy(workflow);
-   base_dir = pgmoneta_get_server_backup(server);
+   workflow = NULL;
+
    local_root = pgmoneta_get_server_backup_identifier(server, prefix);
-   if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)local_root, ValueString))
+
+   if (pgmoneta_workflow_nodes(server, prefix, nodes, &backup))
    {
-      pgmoneta_log_error("S3 restore: could not add backup dir to art");
-      goto error;
-   }
-   if (pgmoneta_art_insert(nodes, USER_FILES, (uintptr_t)NODE_ALL, ValueString))
-   {
-      pgmoneta_log_error("S3 restore: could not add base dir to art");
+      ec = MANAGEMENT_ERROR_RESTORE_S3_WORKFLOW;
+      pgmoneta_log_error("S3 restore: could not load workflow nodes for %s/%s", config->common.servers[server].name, prefix);
       goto error;
    }
 
-   if (pgmoneta_load_info(base_dir, prefix, &backup))
+   if (pgmoneta_art_insert(nodes, USER_POSITION, (uintptr_t)position, ValueString))
    {
-      pgmoneta_log_error("S3 restore: could not load info for %s", config->common.servers[server].name);
+      ec = MANAGEMENT_ERROR_RESTORE_S3_WORKFLOW;
+      pgmoneta_log_error("S3 restore: could not add restore position to art");
       goto error;
    }
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_VERIFY, backup);
-   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
+
+   if (pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)directory, ValueString))
    {
-      pgmoneta_log_error("S3 restore: workflow failed for %s", config->common.servers[server].name);
+      ec = MANAGEMENT_ERROR_RESTORE_S3_WORKFLOW;
+      pgmoneta_log_error("S3 restore: could not add target directory to art");
       goto error;
    }
+
+   if (pgmoneta_restore_backup(nodes) != 0)
+   {
+      ec = MANAGEMENT_ERROR_RESTORE_S3_WORKFLOW;
+      pgmoneta_log_error("S3 restore: restore workflow failed for %s", config->common.servers[server].name);
+      goto error;
+   }
+
+   pgmoneta_delete_directory(local_root);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
@@ -429,8 +459,6 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
 
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
-   free(backup);
-   free(base_dir);
    free(local_root);
    exit(0);
 
@@ -444,8 +472,6 @@ error:
    pgmoneta_art_destroy(nodes);
    pgmoneta_workflow_destroy(workflow);
    free(elapsed);
-   free(base_dir);
-   free(backup);
    if (local_root != NULL)
    {
       pgmoneta_delete_directory(local_root);

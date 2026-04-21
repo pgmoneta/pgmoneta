@@ -155,27 +155,26 @@ pgmoneta-cli restore primary newest timeline=2 /tmp
 
 ## s3 restore
 
-Download a backup from S3 to the local backup directory
+Restore a backup directly from S3 to a target directory.
 
-This subcommand downloads a backup from S3 storage and makes it available locally. The flow is:
+This subcommand stages a backup from S3 locally and then runs the normal restore workflow. The flow is:
 
 * Download `backup.sha512`, `backup.info`, and `backup.manifest` from S3
 * Verify `backup.info` integrity using the SHA512 checksum
 * Download all data files listed in the manifest, applying the correct compression and encryption extensions
-* Atomically move the downloaded backup into the local backup directory
-
-After `s3 restore` completes, the backup appears in `status details` and can be restored using `pgmoneta-cli restore`.
+* Restore the staged backup into the requested target directory using the standard restore workflow
+* Remove the staged local copy after a successful restore
 
 Command
 
 ```sh
-pgmoneta-cli s3 restore <server> <timestamp>
+pgmoneta-cli s3 restore <server> <timestamp> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>
 ```
 
 Example
 
 ```sh
-pgmoneta-cli s3 restore primary 20260316000957
+pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 
 ## verify
@@ -549,16 +548,17 @@ pgmoneta-cli s3 delete primary wal/
 
 ### s3 restore
 
-Download a backup from S3 to the local backup directory.
+Restore a backup directly from S3 into a target directory.
 
 - Downloads and verifies `backup.info` integrity via SHA512
 - Downloads all data files with correct compression/encryption extensions
-- The backup becomes available for `pgmoneta-cli restore`
+- Restores the staged backup into the requested directory
+- Cleans up the staged local copy after success
 
 Examples
 
 ```sh
-pgmoneta-cli s3 restore primary 20260316000957
+pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 ## clear
 
