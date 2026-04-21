@@ -245,7 +245,7 @@ error:
    free(base);
    free(manifest_file);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static void

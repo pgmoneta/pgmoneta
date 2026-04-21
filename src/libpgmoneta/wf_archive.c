@@ -146,7 +146,7 @@ error:
    free(src);
    free(dst);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int

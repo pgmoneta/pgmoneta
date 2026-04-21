@@ -38,32 +38,27 @@
 #include <network.h>
 #include <security.h>
 #include <utils.h>
-#include <wal.h>
 #include <workflow.h>
+#include <workflow_funcs.h>
 
 #define NAME "backup"
 
 void
 pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   bool active = false;
    char date_str[128];
    char* date = NULL;
-   char* elapsed = NULL;
    char* incremental = NULL;
    char* incremental_base = NULL;
    struct tm* time_info;
    struct timespec start_t;
-   struct timespec end_t;
    time_t curr_t;
-   double total_seconds;
    char* en = NULL;
    int ec = -1;
    int backup_index = -1;
    char* server_backup = NULL;
    char* root = NULL;
    char* d = NULL;
-   char* backup_data = NULL;
    bool backup_incremental = false;
    int number_of_backups = 0;
    struct backup** backups = NULL;
@@ -72,7 +67,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    struct backup* backup = NULL;
    struct backup* child = NULL;
    struct json* req = NULL;
-   struct json* response = NULL;
    struct main_configuration* config;
 
    pgmoneta_start_logging();
@@ -92,21 +86,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       pgmoneta_log_error("Backup: Server %s is not WAL streaming", config->common.servers[server].name);
       goto error;
    }
-
-   if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
-   {
-      ec = MANAGEMENT_ERROR_BACKUP_ACTIVE;
-      pgmoneta_log_info("Backup: Server %s is active", config->common.servers[server].name);
-      pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
-                         config->common.servers[server].active_backup ? "Yes" : "No",
-                         config->common.servers[server].active_restore ? "Yes" : "No",
-                         config->common.servers[server].active_archive ? "Yes" : "No",
-                         config->common.servers[server].active_delete ? "Yes" : "No",
-                         config->common.servers[server].active_retention ? "Yes" : "No");
-      goto error;
-   }
-
-   config->common.servers[server].active_backup = true;
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -129,13 +108,18 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
+   pgmoneta_art_insert(nodes, NODE_FINALIZE_TYPE, (uintptr_t)FINALIZE_TYPE_BACKUP, ValueInt32);
+   pgmoneta_art_insert(nodes, NODE_CLIENT_FD, (uintptr_t)client_fd, ValueInt32);
+   pgmoneta_art_insert(nodes, NODE_PAYLOAD, (uintptr_t)payload, ValueRef);
+   pgmoneta_art_insert(nodes, NODE_COMPRESSION, (uintptr_t)compression, ValueUInt8);
+   pgmoneta_art_insert(nodes, NODE_ENCRYPTION, (uintptr_t)encryption, ValueUInt8);
+   pgmoneta_art_insert(nodes, NODE_START_TIME, (uintptr_t)&start_t, ValueRef);
+
    if (pgmoneta_workflow_nodes(server, date, nodes, &backup))
    {
       goto error;
    }
 
-   backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
-   server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
    root = pgmoneta_get_server_backup_identifier(server, date);
 
    if (incremental != NULL)
@@ -155,6 +139,8 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    if (backup_incremental)
    {
+      server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
+
       if (pgmoneta_load_infos(server_backup, &number_of_backups, &backups))
       {
          ec = MANAGEMENT_ERROR_BACKUP_NOBACKUPS;
@@ -226,66 +212,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   backup->backup_size = pgmoneta_directory_size(backup_data);
-
-   if (pgmoneta_save_info(server_backup, backup))
-   {
-      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
-      goto error;
-   }
-
-   if (pgmoneta_management_create_response(payload, server, &response))
-   {
-      ec = MANAGEMENT_ERROR_ALLOCATION;
-      goto error;
-   }
-
-   if (pgmoneta_load_info(server_backup, date, &backup))
-   {
-      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
-      goto error;
-   }
-
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)date, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backup->backup_size, ValueUInt64);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backup->restore_size, ValueUInt64);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE, (uintptr_t)backup->biggest_file_size, ValueUInt64);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)backup->compression, ValueInt32);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)backup->encryption, ValueInt32);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)backup->valid, ValueInt8);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_INCREMENTAL, (uintptr_t)backup->type, ValueBool);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_INCREMENTAL_PARENT, (uintptr_t)backup->parent_label, ValueString);
-
-#ifdef HAVE_FREEBSD
-   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
-#else
-   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
-#endif
-
-   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
-
-   backup->total_elapsed_time = total_seconds;
-   if (pgmoneta_save_info(server_backup, backup))
-   {
-      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
-      goto error;
-   }
-
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
-   {
-      ec = MANAGEMENT_ERROR_BACKUP_NETWORK;
-      pgmoneta_log_error("Backup: Error sending response for %s", config->common.servers[server].name);
-      goto error;
-   }
-
-   pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->common.servers[server].name, date, elapsed);
-
-   pgmoneta_wal_server_compress_encrypt(server, NULL, NULL);
-
-   config->common.servers[server].active_backup = false;
-   atomic_store(&config->common.servers[server].repository, false);
-
    pgmoneta_json_destroy(payload);
 
    pgmoneta_workflow_destroy(workflow);
@@ -299,7 +225,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    }
    free(backups);
    free(child);
-   free(elapsed);
    free(root);
    free(incremental_base);
    free(d);
@@ -311,9 +236,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    exit(0);
 
 error:
-
-   config->common.servers[server].active_backup = false;
-   atomic_store(&config->common.servers[server].repository, false);
 
    pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                       ec != -1 ? ec : MANAGEMENT_ERROR_BACKUP_ERROR,
@@ -337,7 +259,6 @@ error:
 
    free(date);
    free(child);
-   free(elapsed);
    free(root);
    free(incremental_base);
    free(d);

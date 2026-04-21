@@ -214,5 +214,5 @@ error:
    free(manifest);
    free(manifest_orig);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }

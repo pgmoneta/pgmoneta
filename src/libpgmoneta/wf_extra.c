@@ -230,5 +230,5 @@ error:
    }
    pgmoneta_memory_destroy();
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }

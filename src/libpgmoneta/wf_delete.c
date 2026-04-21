@@ -244,7 +244,7 @@ error:
    atomic_store(&config->common.servers[server].repository, false);
    pgmoneta_log_trace("Delete is ready for %s", config->common.servers[server].name);
 
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
 
 static int
@@ -436,5 +436,5 @@ error:
    free(d);
    free(from);
    free(to);
-   return 1;
+   return WORKFLOW_RESULT_ERROR;
 }
