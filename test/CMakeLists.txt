@@ -118,7 +118,15 @@ if (check)
   target_include_directories(pgmoneta-test PRIVATE
     ${CMAKE_SOURCE_DIR}/src/include
     ${CMAKE_SOURCE_DIR}/test/include
-    ${CMAKE_SOURCE_DIR}/test/libpgmonetatest)
+    ${CMAKE_SOURCE_DIR}/test/libpgmonetatest
+    ${LIBEV_INCLUDE_DIRS}
+    ${OPENSSL_INCLUDE_DIR}
+    ${CURSES_INCLUDE_DIRS}
+    ${LIBYAML_INCLUDE_DIRS}
+    ${LIBSSH_INCLUDE_DIRS}
+    ${ZSTD_INCLUDE_DIRS}
+    ${LZ4_INCLUDE_DIRS}
+    ${LibArchive_INCLUDE_DIRS})
 
   if(EXISTS "/etc/debian_version")
     target_link_libraries(pgmoneta-test pthread rt m pgmoneta)
