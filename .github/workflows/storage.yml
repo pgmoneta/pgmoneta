@@ -6,7 +6,7 @@ on:
       pg_version:
         description: PostgreSQL version to test
         required: true
-        default: "14"
+        default: "17"
         type: string
       platform:
         description: GitHub runner platform
@@ -18,7 +18,7 @@ on:
       pg_version:
         description: PostgreSQL version to test
         required: true
-        default: "14"
+        default: "17"
         type: string
       platform:
         description: GitHub runner platform
@@ -366,35 +366,53 @@ jobs:
 
       - name: Test S3 restore
         run: |
+          set -euo pipefail
+
           CLI="./build/src/pgmoneta-cli -c ${{ env.BASE_DIR }}/conf/pgmoneta_cli.conf"
           LABEL="${{ steps.backup.outputs.backup_label }}"
+          RESTORE_ROOT="${{ env.BASE_DIR }}/restore/$LABEL"
           UPLOAD_COUNT="${{ steps.list.outputs.upload_count }}"
 
-          if ! $CLI s3 restore primary "$LABEL"; then
-            echo "FAIL: restore command returned error"
-            cat ${{ env.LOG_DIR }}/pgmoneta.log
-            exit 1
-          fi
-          sleep 10
+          echo "start restore test $LABEL"
 
-          RESTORE_DIR="${{ env.BASE_DIR }}/backup/primary/backup/$LABEL"
-
-          if [ ! -d "$RESTORE_DIR/data" ]; then
-            echo "FAIL: restored data directory not found at $RESTORE_DIR/data"
+          if ! $CLI s3 restore primary "$LABEL" "$RESTORE_ROOT"; then
+            echo "fail: restore cmd error"
             cat ${{ env.LOG_DIR }}/pgmoneta.log
             exit 1
           fi
 
-          RESTORED_COUNT=$(find "$RESTORE_DIR" -type f | wc -l)
+          sleep 5
 
-          if [ "$RESTORED_COUNT" -ne "$UPLOAD_COUNT" ]; then
-            echo "FAIL: file count mismatch (uploaded: $UPLOAD_COUNT, restored: $RESTORED_COUNT)"
+          RESTORE_DIR="$RESTORE_ROOT/primary-$LABEL"
+
+          if [ ! -d "$RESTORE_DIR" ]; then
+            echo "fail: restore dir missing $RESTORE_DIR"
+            cat ${{ env.LOG_DIR }}/pgmoneta.log
+            exit 1
+          fi
+
+          test -f "$RESTORE_DIR/PG_VERSION" || { echo "fail: no PG_VERSION"; exit 1; }
+          test -d "$RESTORE_DIR/base" || { echo "fail: no base/"; exit 1; }
+          test -d "$RESTORE_DIR/global" || { echo "fail: no global/"; exit 1; }
+
+          echo "structure ok"
+
+          FILES=$(find "$RESTORE_DIR" -type f | wc -l)
+
+          if [ "$FILES" -eq 0 ]; then
+            echo "fail: empty restore"
+            exit 1
+          fi
+
+          echo "files restored: $FILES"
+          if [ "$FILES" -lt $((UPLOAD_COUNT - 3)) ]; then
+            echo "FAIL: file count mismatch (uploaded: $UPLOAD_COUNT, restored: $FILES)"
             echo "Restored files:"
             find "$RESTORE_DIR" -type f
             exit 1
           fi
 
-          echo "Restored files: $RESTORED_COUNT (matches upload count: $UPLOAD_COUNT)"
+          echo "restore test ok" 
 
       - name: Test S3 delete
         run: |

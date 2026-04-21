@@ -198,7 +198,7 @@ error:
 }
 
 int
-pgmoneta_management_request_restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -215,6 +215,8 @@ pgmoneta_management_request_restore_s3_objects(SSL* ssl, int socket, char* serve
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_S3_PREFIX, (uintptr_t)prefix, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_POSITION, (uintptr_t)position, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)directory, ValueString);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {

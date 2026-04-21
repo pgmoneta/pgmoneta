@@ -517,14 +517,16 @@ pgmoneta_management_request_delete_s3_objects(SSL* ssl, int socket, char* server
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param server The server
- * @param prefix The prefix to delete under the server backup path
+ * @param prefix The prefix to restore under the server backup path
+ * @param position The recovery target parameters
+ * @param directory The restore target directory
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request

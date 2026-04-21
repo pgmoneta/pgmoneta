@@ -96,18 +96,15 @@ This command take the latest backup and all Write-Ahead Log (WAL) segments and r
 
 ## Restore from S3
 
-If your backups are stored in S3, you first need to download them to the local backup directory using `pgmoneta-cli s3 restore`, then restore normally.
+If your backups are stored in S3, you can restore them directly using `pgmoneta-cli s3 restore`.
 
-Step 1: Download the backup from S3
+Example:
 
 ```
-pgmoneta-cli s3 restore primary 20260316000957
+pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 
-This downloads the backup files from S3, verifies `backup.info` integrity via SHA512, and places the backup in the local backup directory.
-
-Step 2: Restore the backup
-
+This stages the backup files from S3, verifies `backup.info` integrity via SHA512, restores the backup into the requested target directory, and removes the staged local copy after success.
 ```
 pgmoneta-cli restore primary 20260316000957 current /tmp
 ```

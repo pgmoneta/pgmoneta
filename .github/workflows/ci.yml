@@ -167,13 +167,13 @@ jobs:
           path: /tmp/pgmoneta-test/log
           retention-days: 90
 
-  # storage:
-  #   needs: [format-check, build-linux]
-  #   strategy:
-  #     matrix:
-  #       platform: [ubuntu-latest]
-  #       pg_version: ["14"]
-  #   uses: ./.github/workflows/storage.yml
-  #   with:
-  #     platform: ${{ matrix.platform }}
-  #     pg_version: ${{ matrix.pg_version }}
+  storage:
+    needs: [format-check, build-linux]
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+        pg_version: ["17"]
+    uses: ./.github/workflows/storage.yml
+    with:
+      platform: ${{ matrix.platform }}
+      pg_version: ${{ matrix.pg_version }}
