@@ -162,6 +162,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_ONLINE                "Online"
 #define MANAGEMENT_ARGUMENT_ORIGINAL              "Original"
 #define MANAGEMENT_ARGUMENT_OUTPUT                "Output"
+#define MANAGEMENT_ARGUMENT_PLAN                  "Plan"
 #define MANAGEMENT_ARGUMENT_PERCENTAGE            "Percentage"
 #define MANAGEMENT_ARGUMENT_POSITION              "Position"
 #define MANAGEMENT_ARGUMENT_PGMONETA_FIPS         "PgmonetaFips"
@@ -266,6 +267,7 @@ extern "C" {
 #define MANAGEMENT_ERROR_RESTORE_NOFORK                     607
 #define MANAGEMENT_ERROR_RESTORE_NETWORK                    608
 #define MANAGEMENT_ERROR_RESTORE_ERROR                      609
+#define MANAGEMENT_ERROR_RESTORE_VALIDATION                 610
 
 #define MANAGEMENT_ERROR_COMBINE_SETUP                      700
 #define MANAGEMENT_ERROR_COMBINE_EXECUTE                    701
@@ -540,13 +542,14 @@ pgmoneta_management_request_restore_s3_objects(SSL* ssl, int socket, char* serve
  * @param backup_id The backup
  * @param position The position parameters
  * @param directory The directory
+ * @param plan Only perform validation (plan mode)
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, bool plan, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a verify request

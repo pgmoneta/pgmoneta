@@ -132,7 +132,7 @@ pgmoneta_tsclient_restore(char* server, char* backup_id, char* position, int exp
       backup_id = "newest";
    }
 
-   if (pgmoneta_management_request_restore(NULL, socket, server, backup_id, position, TEST_RESTORE_DIR, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   if (pgmoneta_management_request_restore(NULL, socket, server, backup_id, position, TEST_RESTORE_DIR, false, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
