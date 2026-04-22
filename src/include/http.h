@@ -47,6 +47,7 @@ extern "C" {
 #define PGMONETA_HTTP_GET  0
 #define PGMONETA_HTTP_POST 1
 #define PGMONETA_HTTP_PUT  2
+#define PGMONETA_HTTP_DELETE 3
 
 /* HTTP status codes */
 #define PGMONETA_HTTP_STATUS_OK    0

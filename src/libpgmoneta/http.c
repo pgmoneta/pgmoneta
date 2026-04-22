@@ -1041,6 +1041,8 @@ http_method_to_string(int method)
          return "POST";
       case PGMONETA_HTTP_PUT:
          return "PUT";
+      case PGMONETA_HTTP_DELETE:
+         return "DELETE";   
       default:
          return NULL;
    }
