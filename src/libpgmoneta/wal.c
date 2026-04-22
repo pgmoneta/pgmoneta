@@ -917,6 +917,69 @@ pgmoneta_free_timeline_history(struct timeline_history* history)
    }
 }
 
+int
+pgmoneta_parse_wal_filename(char* filename, struct wal_segment* segment, int segsize)
+{
+   int items_scanned;
+   uint64_t segments_per_xlogid;
+
+   if (filename == NULL || segment == NULL || segsize <= 0)
+   {
+      return 1;
+   }
+
+   memset(segment, 0, sizeof(struct wal_segment));
+
+   items_scanned = sscanf(filename, "%08X%08X%08X",
+                          &segment->timeline, &segment->log, &segment->seg);
+
+   if (items_scanned != 3)
+   {
+      pgmoneta_log_trace("Failed to parse WAL filename: %s (scanned %d items)",
+                         filename, items_scanned);
+      return 1;
+   }
+
+   snprintf(segment->filename, sizeof(segment->filename), "%s", filename);
+
+   // Calculate combined segment number for easy sequential comparison
+   // segment_no = log * (0x100000000 / segsize) + seg
+   segments_per_xlogid = 0x100000000ULL / segsize;
+   segment->segment_no = ((uint64_t)segment->log * segments_per_xlogid) + segment->seg;
+
+   pgmoneta_log_trace("Parsed WAL: %s -> TLI=%u, log=%u, seg=%u, segment_no=%lu (segsize=%d)",
+                      filename, segment->timeline, segment->log, segment->seg, segment->segment_no, segsize);
+
+   return 0;
+}
+
+int
+pgmoneta_compare_wal_segments(const void* a, const void* b)
+{
+   const struct wal_segment* seg_a = (const struct wal_segment*)a;
+   const struct wal_segment* seg_b = (const struct wal_segment*)b;
+
+   if (seg_a->timeline < seg_b->timeline)
+   {
+      return -1;
+   }
+   if (seg_a->timeline > seg_b->timeline)
+   {
+      return 1;
+   }
+
+   if (seg_a->segment_no < seg_b->segment_no)
+   {
+      return -1;
+   }
+   if (seg_a->segment_no > seg_b->segment_no)
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
 static int
 wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
 {
