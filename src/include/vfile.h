@@ -33,11 +33,16 @@
 extern "C" {
 #endif
 
+#include <pgmoneta.h>
+
 /** @struct vfile
  * Defines a virtual file
  */
 struct vfile
 {
+   char type[MISC_LENGTH]; /**< The vfile type (e.g. "local", "s3") */
+   char name[MAX_PATH];    /**< The vfile name/path */
+
    /**
     * The read callback
     * @param vfile The vfile
@@ -82,6 +87,15 @@ struct vfile
  */
 int
 pgmoneta_vfile_create_local(char* file_path, char* mode, struct vfile** vfile);
+
+/**
+ * Set vfile metadata (type and name)
+ * @param vfile The vfile
+ * @param type The vfile type
+ * @param name The vfile name
+ */
+void
+pgmoneta_vfile_set_metadata(struct vfile* vfile, const char* type, const char* name);
 
 /**
  * Close and destroy current vfile

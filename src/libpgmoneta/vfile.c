@@ -29,6 +29,29 @@
 #include <vfile.h>
 
 #include <stdlib.h>
+#include <string.h>
+
+void
+pgmoneta_vfile_set_metadata(struct vfile* vfile, const char* type, const char* name)
+{
+   if (vfile == NULL)
+   {
+      return;
+   }
+
+   memset(vfile->type, 0, MISC_LENGTH);
+   memset(vfile->name, 0, MAX_PATH);
+
+   if (type != NULL)
+   {
+      strncpy(vfile->type, type, MISC_LENGTH - 1);
+   }
+
+   if (name != NULL)
+   {
+      strncpy(vfile->name, name, MAX_PATH - 1);
+   }
+}
 
 void
 pgmoneta_vfile_destroy(struct vfile* vfile)

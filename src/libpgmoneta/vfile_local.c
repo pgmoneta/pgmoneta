@@ -68,6 +68,7 @@ pgmoneta_vfile_create_local(char* file_path, char* mode, struct vfile** vfile)
       goto error;
    }
    memcpy(file->file_path, file_path, strlen(file_path));
+   pgmoneta_vfile_set_metadata((struct vfile*)file, VFILE_TYPE_LOCAL, file_path);
 
    *vfile = (struct vfile*)file;
    return 0;
