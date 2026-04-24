@@ -37,8 +37,7 @@ extern "C" {
 #include <deque.h>
 
 #include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdatomic.h>
 
 struct worker_common;
 
@@ -58,6 +57,7 @@ struct semaphore
 struct worker_task
 {
    void (*function)(struct worker_common*); /**< The task function */
+   void (*destroy)(struct worker_common*);  /**< The task destroy function */
    struct worker_common* wc;                /**< Pointer to the common data */
 };
 
@@ -80,7 +80,9 @@ struct workers
    volatile int number_of_working; /**< The number of workers */
    pthread_mutex_t worker_lock;    /**< The worker lock */
    pthread_cond_t worker_all_idle; /**< Are workers idle */
-   bool outcome;                   /**< Outcome of the workers */
+   atomic_bool fast_fail;          /**< fast fail to the workers*/
+   atomic_bool outcome;            /**< Outcome of the workers*/
+   atomic_bool queue_drained;      /**< Queued tasks have been canceled */
    struct deque* queue;            /**< The task queue using deque */
    struct semaphore* has_tasks;    /**< Semaphore for tasks dispatching*/
 };
@@ -128,6 +130,17 @@ int
 pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_common*), struct worker_common* wc);
 
 /**
+ * Add work to the queue 
+ * @param workers The workers
+ * @param function The function pointer
+ * @param wc The argument
+ * @param destroy The destroy function pointer
+ * @return 0 upon success, otherwise 1.
+ */
+int
+pgmoneta_workers_add_with_destroy(struct workers* workers, void (*function)(struct worker_common*), struct worker_common* wc, void (*destroy)(struct worker_common*));
+
+/**
  * Wait for all queued work units to finish
  * @param workers The workers
  */
@@ -161,6 +174,35 @@ pgmoneta_get_number_of_workers(int server);
 int
 pgmoneta_create_worker_input(char* directory, char* from, char* to, int level,
                              struct workers* workers, struct worker_input** wi);
+
+/**
+ * Enable fast fail for workers
+ * When enabled, workers stop processing new tasks after outcome is set to false
+ * @param workers The workers
+ */
+void
+pgmoneta_set_fast_fail(struct workers* workers);
+
+/**
+ * mark the task as a failure
+ * @param workers The workers
+ */
+void
+pgmoneta_workers_mark_failure(struct workers* workers);
+
+/**
+ * get the workers outcome 
+ * @param workers The workers
+ */
+bool
+pgmoneta_workers_outcome(struct workers* workers);
+
+/**
+ * check if the worker can accpet or not new tasks 
+ * @param workers The workers
+ */
+bool
+pgmoneta_workers_should_accept(struct workers* workers);
 
 #ifdef __cplusplus
 }

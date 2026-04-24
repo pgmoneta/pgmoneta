@@ -27,6 +27,7 @@
  */
 
 #include <pgmoneta.h>
+#include <pthread.h>
 #include <security.h>
 #include <utils.h>
 #include <deque.h>
@@ -35,15 +36,13 @@
 #include <value.h>
 #include <aes.h>
 
-#include <errno.h>
-#include <signal.h>
 #include <time.h>
 #include <unistd.h>
 #ifdef HAVE_LINUX
 #include <sys/sysinfo.h>
 #endif
 
-static volatile int worker_keepalive;
+static atomic_int worker_keepalive;
 
 static int worker_init(struct workers* workers, struct worker** worker);
 static void* worker_do(struct worker* worker);
@@ -54,6 +53,7 @@ static void semaphore_post(struct semaphore* semaphore);
 static void semaphore_post_all(struct semaphore* semaphore);
 static void semaphore_wait(struct semaphore* semaphore);
 static void destroy_task_wrapper(uintptr_t data);
+static void drain_pending_tasks(struct workers* workers);
 
 int
 pgmoneta_workers_initialize(int num, struct workers** workers)
@@ -62,7 +62,7 @@ pgmoneta_workers_initialize(int num, struct workers** workers)
 
    *workers = NULL;
 
-   worker_keepalive = 1;
+   atomic_init(&worker_keepalive, 1);
 
    if (num < 1)
    {
@@ -78,7 +78,10 @@ pgmoneta_workers_initialize(int num, struct workers** workers)
 
    w->number_of_alive = 0;
    w->number_of_working = 0;
-   w->outcome = true;
+
+   atomic_init(&w->outcome, true);
+   atomic_init(&w->fast_fail, false);
+   atomic_init(&w->queue_drained, false);
 
    if (pgmoneta_deque_create(true, &w->queue))
    {
@@ -152,6 +155,40 @@ pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_com
 
       task->function = function;
       task->wc = wc;
+      task->destroy = NULL;
+
+      config.destroy_data = destroy_task_wrapper;
+
+      pgmoneta_deque_add_with_config(workers->queue, NULL, (uintptr_t)task, &config);
+
+      semaphore_post(workers->has_tasks);
+
+      return 0;
+   }
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_workers_add_with_destroy(struct workers* workers, void (*function)(struct worker_common*), struct worker_common* wc, void (*destroy)(struct worker_common* wc))
+{
+   struct worker_task* task = NULL;
+   struct value_config config = {0};
+
+   if (workers != NULL)
+   {
+      task = (struct worker_task*)malloc(sizeof(struct worker_task));
+      if (task == NULL)
+      {
+         pgmoneta_log_error("Could not allocate memory for task");
+         goto error;
+      }
+
+      task->function = function;
+      task->wc = wc;
+      task->destroy = destroy;
 
       config.destroy_data = destroy_task_wrapper;
 
@@ -196,7 +233,7 @@ pgmoneta_workers_destroy(struct workers* workers)
    if (workers != NULL)
    {
       worker_total = workers->number_of_alive;
-      worker_keepalive = 0;
+      atomic_store(&worker_keepalive, 0);
 
       time(&start);
       while (tpassed < timeout && workers->number_of_alive)
@@ -346,39 +383,52 @@ error:
 static void*
 worker_do(struct worker* worker)
 {
-   struct worker_task* task;
+   struct worker_task* task = NULL;
    struct workers* workers = worker->workers;
 
    pthread_mutex_lock(&workers->worker_lock);
    workers->number_of_alive += 1;
    pthread_mutex_unlock(&workers->worker_lock);
-
-   while (worker_keepalive)
+   while (atomic_load(&worker_keepalive))
    {
       semaphore_wait(workers->has_tasks);
 
-      if (worker_keepalive)
+      pthread_mutex_lock(&workers->worker_lock);
+      if (!atomic_load(&worker_keepalive))
       {
-         pthread_mutex_lock(&workers->worker_lock);
-         workers->number_of_working++;
          pthread_mutex_unlock(&workers->worker_lock);
-
-         task = (struct worker_task*)pgmoneta_deque_poll(workers->queue, NULL);
-
-         if (task)
-         {
-            task->function(task->wc);
-            free(task);
-         }
-
-         pthread_mutex_lock(&workers->worker_lock);
-         workers->number_of_working--;
-         if (!workers->number_of_working)
-         {
-            pthread_cond_signal(&workers->worker_all_idle);
-         }
-         pthread_mutex_unlock(&workers->worker_lock);
+         continue;
       }
+      if (!pgmoneta_workers_should_accept(workers))
+      {
+         drain_pending_tasks(workers);
+         pthread_mutex_unlock(&workers->worker_lock);
+         continue;
+      }
+
+      task = (struct worker_task*)pgmoneta_deque_poll(workers->queue, NULL);
+      if (task != NULL)
+      {
+         workers->number_of_working++;
+      }
+      pthread_mutex_unlock(&workers->worker_lock);
+
+      if (task == NULL)
+      {
+         continue;
+      }
+
+      task->function(task->wc);
+      free(task);
+      task = NULL;
+
+      pthread_mutex_lock(&workers->worker_lock);
+      workers->number_of_working--;
+      if (!workers->number_of_working)
+      {
+         pthread_cond_signal(&workers->worker_all_idle);
+      }
+      pthread_mutex_unlock(&workers->worker_lock);
    }
    pthread_mutex_lock(&workers->worker_lock);
    workers->number_of_alive--;
@@ -450,4 +500,77 @@ destroy_task_wrapper(uintptr_t data)
 {
    struct worker_task* task = (struct worker_task*)data;
    free(task);
+}
+
+static void
+drain_pending_tasks(struct workers* workers)
+{
+   struct worker_task* task = NULL;
+
+   if (workers == NULL || atomic_exchange(&workers->queue_drained, true))
+   {
+      return;
+   }
+
+   while (pgmoneta_deque_size(workers->queue) > 0)
+   {
+      task = (struct worker_task*)pgmoneta_deque_poll(workers->queue, NULL);
+      if (task != NULL)
+      {
+         if (task->destroy != NULL)
+         {
+            task->destroy(task->wc);
+         }
+      }
+      free(task);
+   }
+
+   if (!workers->number_of_working)
+   {
+      pthread_cond_signal(&workers->worker_all_idle);
+   }
+}
+
+void
+pgmoneta_set_fast_fail(struct workers* workers)
+{
+   atomic_store(&workers->fast_fail, true);
+}
+
+void
+pgmoneta_workers_mark_failure(struct workers* workers)
+{
+   if (workers == NULL)
+   {
+      return;
+   }
+
+   atomic_store(&workers->outcome, false);
+}
+
+bool
+pgmoneta_workers_outcome(struct workers* workers)
+{
+   if (workers == NULL)
+   {
+      return true;
+   }
+
+   return atomic_load(&workers->outcome);
+}
+
+bool
+pgmoneta_workers_should_accept(struct workers* workers)
+{
+   if (workers == NULL)
+   {
+      return false;
+   }
+
+   if (!atomic_load(&workers->fast_fail))
+   {
+      return true;
+   }
+
+   return atomic_load(&workers->outcome);
 }
