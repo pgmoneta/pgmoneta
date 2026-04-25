@@ -69,9 +69,10 @@ struct http_payload
  */
 struct http_request
 {
-   struct http_payload payload; /**< Request payload */
-   int method;                  /**< HTTP method */
-   char* path;                  /**< Request path */
+   struct http_payload payload;                  /**< Request payload */
+   int method;                                   /**< HTTP method */
+   char* path;                                   /**< Request path */
+   size_t (*read_cb)(void* buffer, size_t size); /**< Read callback for streaming upload */
 };
 
 /** @struct http_response
@@ -79,8 +80,9 @@ struct http_request
  */
 struct http_response
 {
-   struct http_payload payload; /**< Response payload */
-   int status_code;             /**< HTTP status code */
+   struct http_payload payload;                   /**< Response payload */
+   int status_code;                               /**< HTTP status code */
+   size_t (*write_cb)(void* buffer, size_t size); /**< Write callback for streaming download */
 };
 
 /** @struct http
@@ -206,6 +208,22 @@ pgmoneta_http_response_destroy(struct http_response* response);
  */
 int
 pgmoneta_http_destroy(struct http* connection);
+
+/**
+ * Set the write callback for streaming download
+ * @param response The HTTP response
+ * @param write_cb The write callback
+ */
+void
+pgmoneta_http_set_write_cb(struct http_response* response, size_t (*write_cb)(void* buffer, size_t size));
+
+/**
+ * Set the read callback for streaming upload
+ * @param request The HTTP request
+ * @param read_cb The read callback
+ */
+void
+pgmoneta_http_set_read_cb(struct http_request* request, size_t (*read_cb)(void* buffer, size_t size));
 
 #ifdef __cplusplus
 }
