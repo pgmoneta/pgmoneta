@@ -61,10 +61,10 @@ La opción `-I` o `--interactive` inicia una interfaz interactiva basada en ncur
 
 **Características:**
 
-- **Navegador de archivos**: Navega directorios para seleccionar archivos WAL
+- **Navegador de archivos**: Navega directorios para seleccionar archivos WAL; **Arriba** / **Abajo** se desplaza entre entradas, **AvPág** / **RePág** salta una página visible, y **Enter** abre o carga la selección actual
 - **Visualización de registros**: Ver registros WAL en formato de tabla; **t** / **b** cambia entre vista de texto y binaria (hex)
-- **Búsqueda**: **s** abre la búsqueda por gestor de recursos, campos LSN, XID o descripción; **n** / **p** navegan entre coincidencias; **Esc** descarta la búsqueda activa (sin afectar los filtros)
-- **Filtrado**: **f** abre el diálogo de filtros. Los criterios definidos restringen las filas visibles. **u** elimina todos los filtros y recarga el archivo completo. Los filtros activos se indican en el encabezado; la barra de estado muestra *N de M registros* cuando hay un filtro aplicado
+- **Búsqueda**: **s** abre la búsqueda por gestor de recursos, campos LSN, XID o descripción; **Tab** recorre los valores conocidos de RMGR, LSN de inicio y LSN de fin; **n** / **p** navegan entre coincidencias; **Esc** descarta la búsqueda activa (sin afectar los filtros)
+- **Filtrado**: **f** abre el diálogo de filtros; **Tab** recorre los valores conocidos de RMGR, LSN de inicio y LSN de fin. Los criterios definidos restringen las filas visibles. **u** elimina todos los filtros y recarga el archivo completo. Los filtros activos se indican en el encabezado; la barra de estado muestra *N de M registros* cuando hay un filtro aplicado
 - **Marcas y YAML**: **m** marca o desmarca filas; **g** genera un archivo YAML para **pgmoneta-walfilter** a partir de los XIDs de las filas marcadas
 - **Visualización codificada por colores**: Colores diferentes para tipos de registros y columnas
 - **Navegación WAL**: En los límites de archivo, **Arriba** / **Abajo** pueden moverse al archivo WAL anterior/siguiente en el mismo directorio cuando corresponda; **Inicio** / **Fin** saltan al primer/último registro
@@ -105,9 +105,12 @@ pgmoneta-walinfo -I /path/to/000000010000000000000001
 | l | Cargar archivo WAL diferente / explorar |
 | ? | Superposición de ayuda |
 | Esc | Limpiar resaltados de búsqueda |
+| Tab | Recorrer valores conocidos (RMGR, LSN de inicio, LSN de fin) en los diálogos de búsqueda/filtro |
 | q | Salir |
 
 Consulta **doc/man/pgmoneta-walinfo.1.rst** para la sección completa de **MODO INTERACTIVO**.
+
+Cuando el **navegador de archivos** está abierto mediante **l**, **Arriba / Abajo** se desplaza entre las entradas del directorio, **AvPág / RePág** pagina la lista, **Enter** abre un directorio o carga el archivo WAL seleccionado, y **q** cierra el navegador.
 
 #### Formato de salida sin procesar
 

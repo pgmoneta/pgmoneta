@@ -171,27 +171,26 @@ pgmoneta-cli restore primary newest timeline=2 /tmp
 
 ## s3 restore
 
-Descarga un backup desde S3 al directorio de backup local
+Restaura un backup directamente desde S3 al directorio de destino indicado
 
-Este subcomando descarga un backup desde un almacenamiento S3 y lo hace disponible localmente. El flujo es:
+Este subcomando prepara un backup desde S3 de forma local y luego ejecuta el flujo de restauración estándar. El proceso es el siguiente:
 
 * Descarga `backup.sha512`, `backup.info`, y `backup.manifest` desde S3
-* Verifica la integridad de `backup.info` usando el checksum SHA512
-* Descarga todos los archivos de datos listados en el manifiesto, aplicando las extensiones correctas de compresión y encriptación
-* Mueve atómicamente el backup descargado al directorio de backup local
-
-Después de que `s3 restore` se complete, el backup aparece en `status details` y puede ser restaurado usando `pgmoneta-cli restore`.
+* Verifica la integridad de `backup.info` mediante el checksum SHA512
+* Descarga todos los archivos de datos listados en el manifiesto, aplicando las extensiones correctas de compresión y cifrado
+* Restaura el backup preparado en el directorio de destino solicitado mediante el flujo de restauración estándar
+* Elimina la copia local temporal tras una restauración exitosa
 
 Comando
 
 ``` sh
-pgmoneta-cli s3 restore <server> <timestamp>
+pgmoneta-cli s3 restore <server> <timestamp> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>
 ```
 
 Ejemplo
 
 ``` sh
-pgmoneta-cli s3 restore primary 20260316000957
+pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 
 ## verify
@@ -549,14 +548,14 @@ Subcomando
 
 - `ls` : Listar todos los archivos en s3
 - `delete` : Eliminar todos los archivos bajo un prefijo remoto en s3
-- `restore` : Descargar un backup desde s3 al directorio de backup local
+- `restore` : Restaurar un backup directamente desde S3 al directorio de destino indicado
 
 Ejemplo
 
 ```sh
 pgmoneta-cli s3 ls primary
 pgmoneta-cli s3 delete primary 20260302163357
-pgmoneta-cli s3 restore primary 20260316000957
+pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 
 ### s3 ls
@@ -587,16 +586,17 @@ pgmoneta-cli s3 delete primary wal/
 
 ### s3 restore
 
-Descarga un backup desde S3 al directorio de backup local.
+Restaura un backup directamente desde S3 al directorio de destino indicado.
 
 - Descarga y verifica la integridad de `backup.info` mediante SHA512
-- Descarga todos los archivos de datos con las extensiones de compresión/encriptación correctas
-- El backup queda disponible para `pgmoneta-cli restore`
+- Descarga todos los archivos de datos con las extensiones de compresión/cifrado correctas
+- Restaura el backup preparado en el directorio solicitado
+- Elimina la copia local temporal tras una restauración exitosa
 
 Ejemplos
 
 ``` sh
-pgmoneta-cli s3 restore primary 20260316000957
+pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 
 ## clear

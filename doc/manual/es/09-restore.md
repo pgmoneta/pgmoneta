@@ -96,23 +96,18 @@ Este comando toma el backup más reciente y todos los segmentos Write-Ahead Log 
 
 ## Restaurar desde S3
 
-Si tus backups están almacenados en S3, primero necesitas descargarlos al directorio de backup local usando `pgmoneta-cli s3 restore`, y luego restaurar normalmente.
+Si tus backups están almacenados en S3, puedes restaurarlos directamente con `pgmoneta-cli s3 restore`.
 
-Paso 1: Descargar el backup desde S3
+Ejemplo:
 
 ```
-pgmoneta-cli s3 restore primary 20260316000957
+pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 
-Esto descarga los archivos de backup desde S3, verifica la integridad de `backup.info` usando SHA512, y coloca el backup en el directorio de backup local.
-
-Paso 2: Restaurar el backup
-
+Este comando prepara los archivos de backup desde S3, verifica la integridad de `backup.info` mediante SHA512, restaura el backup en el directorio de destino solicitado y elimina la copia local temporal tras una restauración exitosa.
 ```
 pgmoneta-cli restore primary 20260316000957 current /tmp
 ```
-
-Esto descomprime, desencripta, aplica el WAL, y produce un directorio de datos de PostgreSQL utilizable.
 
 ## Hot standby
 

@@ -30,6 +30,7 @@ Puedes revisar la lista de todos los roles predefinidos disponibles en PostgreSQ
 Recupera información trivial sobre un servidor PostgreSQL configurado como:
 - Versión de PostgreSQL del servidor
 - estado de checksums (habilitado/deshabilitado)
+- estado del modo FIPS (habilitado/deshabilitado)
 - tipo de servidor (primary/non-primary)
 - wal level, wal size, segment size, block size configurados
 - estado de wal summarize (habilitado/deshabilitado)

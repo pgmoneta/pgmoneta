@@ -40,6 +40,10 @@ Expone la versión del servicio pgmoneta en ejecución a través de etiquetas.
 | :-------- | :---------- |
 | version | La cadena de versión semántica del pgmoneta en ejecución (por ejemplo, "0.20.0"). |
 
+**pgmoneta_fips**
+
+Indica si la propia biblioteca OpenSSL de pgmoneta está operando en modo FIPS (1) o no (0).
+
 **pgmoneta_logging_info**
 
 Cuenta el número total de mensajes de registro de nivel informativo (INFO) producidos por pgmoneta desde su último inicio.
@@ -307,6 +311,26 @@ Indica si las sumas de verificación de datos están habilitadas en el servidor 
 | Atributo | Descripción | Valores |
 | :-------- | :---------- | :----- |
 | name | El nombre/identificador configurado para el servidor PostgreSQL. | 1: Las sumas de verificación de datos están habilitadas, 0: Las sumas de verificación de datos están deshabilitadas |
+
+**pgmoneta_server_fips_mode**
+
+Indica si PostgreSQL está operando en modo FIPS.
+
+**El método de detección varía según la versión de PostgreSQL:**
+
+**PostgreSQL 14-17:**
+- Utiliza `pgmoneta_ext_fips()` de la extensión pgmoneta\_ext
+- Requiere que pgmoneta\_ext esté instalada (opcional; devuelve 0 si no está instalada)
+- Verifica el OpenSSL interno del backend de PostgreSQL (compatible con OpenSSL 1.1 y 3.0)
+
+**PostgreSQL 18+:**
+- Utiliza la función `fips_mode()` de la extensión pgcrypto
+- Requiere que la extensión pgcrypto esté instalada (opcional; devuelve 0 si no está instalada)
+- No requiere privilegios especiales
+
+| Atributo | Descripción | Valores |
+| :-------- | :---------- | :----- |
+| name | El nombre/identificador configurado para el servidor PostgreSQL. | 1: El modo FIPS está activo, 0: El modo FIPS no está activo o no es detectable |
 
 **pgmoneta_server_summarize_wal**
 
