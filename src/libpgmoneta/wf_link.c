@@ -155,7 +155,7 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
 
          if (number_of_workers > 0)
          {
-            pgmoneta_workers_initialize(number_of_workers, &workers);
+            pgmoneta_workers_initialize(number_of_workers, false, &workers);
          }
 
          from = pgmoneta_get_server_backup_identifier(server, label);

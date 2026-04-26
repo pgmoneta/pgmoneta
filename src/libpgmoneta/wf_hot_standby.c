@@ -157,7 +157,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
          {
             if (number_of_workers > 0 && workers == NULL)
             {
-               pgmoneta_workers_initialize(number_of_workers, &workers);
+               pgmoneta_workers_initialize(number_of_workers, false, &workers);
             }
 
             if (source == NULL)
@@ -297,7 +297,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             }
             if (number_of_workers > 0 && workers == NULL)
             {
-               pgmoneta_workers_initialize(number_of_workers, &workers);
+               pgmoneta_workers_initialize(number_of_workers, false, &workers);
             }
 
             if (pgmoneta_exists(destination))
