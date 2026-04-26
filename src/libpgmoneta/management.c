@@ -234,7 +234,7 @@ error:
    return 1;
 }
 int
-pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, bool plan, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -253,6 +253,7 @@ pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* ba
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_POSITION, (uintptr_t)position, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)directory, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_PLAN, (uintptr_t)plan, ValueBool);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {
