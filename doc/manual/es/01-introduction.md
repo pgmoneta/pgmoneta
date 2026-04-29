@@ -57,7 +57,7 @@ Las plataformas soportadas son:
 
 ## Migración
 
-### De 0.20.x a 0.21.0
+### De 0.20.x a 0.21.x
 
 #### Configuración del límite de velocidad de backup
 
@@ -89,7 +89,7 @@ La derivación de clave para el cifrado del archivo de bóveda ha sido actualiza
 `PKCS5_PBKDF2_HMAC` (SHA-256, sal aleatoria de 16 bytes, 600,000 iteraciones).
 
 Este es un **cambio incompatible**. Los archivos de bóveda existentes cifrados con el
-método anterior no pueden ser descifrados por la versión 0.21.0.
+método anterior no pueden ser descifrados por la versión 0.21.x.
 
 **Acción requerida:**
 

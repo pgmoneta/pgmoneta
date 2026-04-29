@@ -53,7 +53,7 @@ curl http://localhost:5001/metrics
 
 # You should see output like:
 # pgmoneta_state 1
-# pgmoneta_version{version="0.20.0"} 1
+# pgmoneta_version{version="0.22.0"} 1
 # pgmoneta_logging_info 42
 # pgmoneta_server_online{name="primary"} 1
 # ... many more metrics

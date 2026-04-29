@@ -66,7 +66,7 @@ Y obtendrás el siguiente output:
 
 ```
 Header:
-  ClientVersion: 0.21.0
+  ClientVersion: 0.22.0
   Command: 3
   Output: 0
   Timestamp: 20240928130406
@@ -88,7 +88,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.21.0
+  ServerVersion: 0.22.0
 ```
 
 

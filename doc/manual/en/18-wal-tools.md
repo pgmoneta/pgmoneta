@@ -21,7 +21,7 @@ In addition to standard WAL files, `pgmoneta-walinfo` also supports:
 ### Usage
 
 ```bash
-pgmoneta-walinfo 0.20.0
+pgmoneta-walinfo 0.22.0
   Command line utility to read and display Write-Ahead Log (WAL) files
 
 Usage:

@@ -64,7 +64,7 @@ create_mock_backup(char* label, char* lsn, int timeline, int status)
       fprintf(file, "STATUS=%d\n", status);
       fprintf(file, "START_WALPOS=%s\n", lsn);
       fprintf(file, "START_TIMELINE=%d\n", timeline);
-      fprintf(file, "PGMONETA_VERSION=0.21.0\n");
+      fprintf(file, "PGMONETA_VERSION=0.22.0\n");
       fflush(file);
       fclose(file);
    }

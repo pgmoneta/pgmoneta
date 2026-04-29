@@ -14,7 +14,7 @@ y obtendrás una salida como esta
 
 ```
 Header:
-  ClientVersion: 0.21.0
+  ClientVersion: 0.22.0
   Command: 1
   Output: 0
   Timestamp: 20240928065644
@@ -32,7 +32,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.21.0
+  ServerVersion: 0.22.0
 ```
 
 ## Ver backups
@@ -47,7 +47,7 @@ y obtendrás una salida como esta
 
 ```
 Header:
-  ClientVersion: 0.21.0
+  ClientVersion: 0.22.0
   Command: 2
   Output: 0
   Timestamp: 20240928065812
@@ -72,7 +72,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.21.0
+  ServerVersion: 0.22.0
 ```
 
 ## Ordenar backups
@@ -103,7 +103,7 @@ y obtendrás una salida como esta
 
 ```
 Header:
-  ClientVersion: 0.21.0
+  ClientVersion: 0.22.0
   Command: 1
   Output: 0
   Timestamp: 20240928065730
@@ -122,7 +122,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.21.0
+  ServerVersion: 0.22.0
 ```
 
 Los backups incrementales se soportan cuando usas [PostgreSQL 17+](https://www.postgresql.org). Ten en cuenta que actualmente no se permite ramificación para backups incrementales -- un backup puede tener como máximo 1 backup incremental hijo.
@@ -319,7 +319,7 @@ y obtendrás el siguiente output:
 
 ```
 Header:
-  ClientVersion: 0.21.0
+  ClientVersion: 0.22.0
   Command: info
   Output: text
   Timestamp: 20241025163541
@@ -348,7 +348,7 @@ Response:
   NumberOfTablespaces: 0
   RestoreSize: 45.82MB
   Server: primary
-  ServerVersion: 0.21.0
+  ServerVersion: 0.22.0
   StartHiLSN: 0
   StartLoLSN: 4F000060
   StartTimeline: 1
