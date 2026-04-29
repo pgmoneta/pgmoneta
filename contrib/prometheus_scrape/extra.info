@@ -5,7 +5,7 @@ pgmoneta_state
 
 pgmoneta_version
 + Exposes the version of the running pgmoneta service through labels.
-* version: The semantic version string of the running pgmoneta (e.g., "0.20.0").
+* version: The semantic version string of the running pgmoneta (e.g., "0.21.1").
 
 pgmoneta_logging_info
 + Counts the total number of informational (INFO level) log messages produced by pgmoneta since its last startup.

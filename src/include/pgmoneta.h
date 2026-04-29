@@ -50,7 +50,7 @@ extern "C" {
 #include <openssl/ssl.h>
 
 // clang-format off
-#define VERSION                      "0.21.0"
+#define VERSION                      "0.21.1"
 
 #define PGMONETA_HOMEPAGE            "https://pgmoneta.github.io/"
 #define PGMONETA_ISSUES              "https://github.com/pgmoneta/pgmoneta/issues"

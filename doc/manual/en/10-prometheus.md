@@ -38,7 +38,7 @@ Exposes the version of the running pgmoneta service through labels.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| version | The semantic version string of the running pgmoneta (e.g., "0.20.0"). |
+| version | The semantic version string of the running pgmoneta (e.g., "0.21.1"). |
 
 **pgmoneta_fips**
 

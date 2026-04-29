@@ -1,6 +1,6 @@
 # Migration
 
-## From 0.20.x to 0.21.0
+## From 0.20.x to 0.21.x
 
 ### Backup Rate Limit Configuration
 
@@ -39,11 +39,11 @@ Each encrypted file now starts with a unified 32-byte header:
 
 A unique, random Initialization Vector (IV) is generated for every encryption operation and stored in the header. For **AES-GCM**, an additional **Authentication Tag (16 bytes)** is stored at the **end of the data** (after the ciphertext). This unified format is used for streaming, file-based, and one-shot operations.
 
-The PBKDF2 Master Key is now cached in volatile memory for the duration of the backup stream, 
-and securely wiped once processing is complete, significantly improving performance for 
+The PBKDF2 Master Key is now cached in volatile memory for the duration of the backup stream,
+and securely wiped once processing is complete, significantly improving performance for
 large backup sets.
 
-This is a **breaking change**. Backups created with versions prior to 0.21.0 
+This is a **breaking change**. Backups created with versions prior to 0.21.x
 cannot be decrypted by this version as the internal framing and header format has changed for all encryption modes.
 
 **Action required:**
@@ -57,7 +57,7 @@ The key derivation for vault file encryption has been upgraded to
 `PKCS5_PBKDF2_HMAC` (SHA-256, random 16-byte salt, 600,000 iterations).
 
 This is a **breaking change**. Existing vault files encrypted with the
-old method cannot be decrypted by version 0.21.0.
+old method cannot be decrypted by version 0.21.x.
 
 **Action required:**
 

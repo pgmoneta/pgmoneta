@@ -38,7 +38,7 @@ Expone la versión del servicio pgmoneta en ejecución a través de etiquetas.
 
 | Atributo | Descripción |
 | :-------- | :---------- |
-| version | La cadena de versión semántica del pgmoneta en ejecución (por ejemplo, "0.20.0"). |
+| version | La cadena de versión semántica del pgmoneta en ejecución (por ejemplo, "0.21.1"). |
 
 **pgmoneta_fips**
 

@@ -63,7 +63,7 @@ The supported platforms are
 
 ## Migration
 
-### From 0.20.x to 0.21.0
+### From 0.20.x to 0.21.x
 
 #### Backup Rate Limit Configuration
 
@@ -96,7 +96,7 @@ The key derivation for vault file encryption has been upgraded to
 `PKCS5_PBKDF2_HMAC` (SHA-256, random 16-byte salt, 600,000 iterations).
 
 This is a **breaking change**. Existing vault files encrypted with the
-old method cannot be decrypted by version 0.21.0.
+old method cannot be decrypted by version 0.21.x.
 
 **Action required:**
 
