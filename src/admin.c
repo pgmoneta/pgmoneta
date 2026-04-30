@@ -320,9 +320,13 @@ main(int argc, char** argv)
       }
    }
 
+   free(filepath);
+
    exit(0);
 
 error:
+
+   free(filepath);
 
    exit(1);
 }
