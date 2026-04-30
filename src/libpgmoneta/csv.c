@@ -35,20 +35,33 @@ int
 pgmoneta_csv_reader_init(char* path, struct csv_reader** reader)
 {
    struct csv_reader* r = malloc(sizeof(struct csv_reader));
-   r->file = fopen(path, "r");
-   memset(r->line, 0, sizeof(r->line));
-   if (r->file == NULL)
+
+   if (r == NULL)
    {
       goto error;
    }
+
+   r->file = NULL;
+
+   if (pgmoneta_fopen_secure(path, "r", &r->file))
+   {
+      goto error;
+   }
+
+   memset(r->line, 0, sizeof(r->line));
    *reader = r;
+
    return 0;
+
 error:
-   if (r->file != NULL)
+
+   if (r != NULL && r->file != NULL)
    {
       fclose(r->file);
    }
+
    free(r);
+
    return 1;
 }
 
@@ -122,20 +135,33 @@ int
 pgmoneta_csv_writer_init(char* path, struct csv_writer** writer)
 {
    struct csv_writer* w = malloc(sizeof(struct csv_writer));
-   w->file = fopen(path, "w+");
-   if (w->file == NULL)
+
+   if (w == NULL)
    {
       goto error;
    }
+
+   w->file = NULL;
+
+   if (pgmoneta_fopen_secure(path, "w+", &w->file))
+   {
+      goto error;
+   }
+
    *writer = w;
+
    return 0;
+
 error:
-   if (w->file != NULL)
+
+   if (w != NULL && w->file != NULL)
    {
       fflush(w->file);
       fclose(w->file);
    }
+
    free(w);
+
    return 1;
 }
 

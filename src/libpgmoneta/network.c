@@ -164,7 +164,7 @@ pgmoneta_bind_unix_socket(char* directory, char* file, int* fd)
 
    if (!directory)
    {
-      directory = "/tmp/";
+      directory = pgmoneta_get_tmpdir();
    }
 
    memset(&buf, 0, sizeof(buf));

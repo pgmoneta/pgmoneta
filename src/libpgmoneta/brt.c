@@ -280,10 +280,9 @@ pgmoneta_brt_write(block_ref_table* brt, char* file_path)
    block_ref_table_serialized_entry* sentry = NULL;
    unsigned i = 0, j;
 
-   file = fopen(file_path, "w+");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(file_path, "w+", &file))
    {
-      return 1; // Error opening file
+      goto error;
    }
 
    if ((buffer = (block_ref_table_buffer*)malloc(sizeof(block_ref_table_buffer))) == NULL)
