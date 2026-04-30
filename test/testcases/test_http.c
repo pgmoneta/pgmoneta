@@ -39,6 +39,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <string.h>
 
 struct echo_server
 {
@@ -374,6 +375,142 @@ MCTF_TEST(test_pgmoneta_http_header_operations)
 cleanup:
    pgmoneta_http_request_destroy(request);
    pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+struct write_cb_context
+{
+   char data[64];
+   size_t data_size;
+};
+
+static size_t
+collect_write_cb(void* buffer, size_t size, void* userdata)
+{
+   struct write_cb_context* context = (struct write_cb_context*)userdata;
+
+   if (context == NULL || context->data_size + size > sizeof(context->data))
+   {
+      return 0;
+   }
+
+   memcpy(context->data + context->data_size, buffer, size);
+   context->data_size += size;
+
+   return size;
+}
+
+MCTF_TEST(test_pgmoneta_http_cb_fields_initialize)
+{
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   pgmoneta_test_setup();
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/test", &request), cleanup, "failed to create request");
+   response = (struct http_response*)calloc(1, sizeof(struct http_response));
+   MCTF_ASSERT_PTR_NONNULL(response, cleanup, "failed to alloc response");
+   MCTF_ASSERT_PTR_NULL((void*)request->read_cb, cleanup, "read_cb should be NULL initially");
+   MCTF_ASSERT_PTR_NULL((void*)response->write_cb, cleanup, "write_cb should be NULL initially");
+   MCTF_ASSERT_PTR_NULL(request->read_userdata, cleanup, "read_userdata should be NULL initially");
+   MCTF_ASSERT_PTR_NULL(response->write_userdata, cleanup, "write_userdata should be NULL initially");
+   response->write_cb = collect_write_cb;
+   response->write_userdata = response;
+   MCTF_ASSERT_PTR_NONNULL((void*)response->write_cb, cleanup, "write_cb should be set");
+   MCTF_ASSERT(response->write_userdata == response, cleanup, "write_userdata should be set");
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   free(response);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_http_write_cb_content_length)
+{
+   int status;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   struct write_cb_context write_context = {0};
+
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+
+   char* response_text =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Length: 13\r\n"
+      "\r\n"
+      "Hello, World!";
+
+   setup_echo_server(response_text);
+
+   response = (struct http_response*)calloc(1, sizeof(struct http_response));
+   MCTF_ASSERT(response != NULL, cleanup, "failed to allocate response");
+
+   response->write_cb = collect_write_cb;
+   response->write_userdata = &write_context;
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/test", &request), cleanup, "failed to create request");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP request failed");
+   MCTF_ASSERT_INT_EQ(write_context.data_size, 13, cleanup, "write_cb should receive content-length body");
+   MCTF_ASSERT_STR_EQ(write_context.data, "Hello, World!", cleanup, "write_cb content-length body mismatch");
+   MCTF_ASSERT(response->payload.data_size == 0, cleanup, "write_cb should prevent buffering in payload");
+
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_http_write_cb_chunked)
+{
+   int status;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   struct write_cb_context write_context = {0};
+
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+
+   char* response_text =
+      "HTTP/1.1 200 OK\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "5\r\n"
+      "Hello\r\n"
+      "8\r\n"
+      ", World!\r\n"
+      "0\r\n"
+      "\r\n";
+
+   setup_echo_server(response_text);
+
+   response = (struct http_response*)calloc(1, sizeof(struct http_response));
+   MCTF_ASSERT(response != NULL, cleanup, "failed to allocate response");
+
+   response->write_cb = collect_write_cb;
+   response->write_userdata = &write_context;
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/test", &request), cleanup, "failed to create request");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP chunked request failed");
+   MCTF_ASSERT_INT_EQ(write_context.data_size, 13, cleanup, "write_cb should receive chunked body");
+   MCTF_ASSERT_STR_EQ(write_context.data, "Hello, World!", cleanup, "write_cb chunked body mismatch");
+   MCTF_ASSERT(response->payload.data_size == 0, cleanup, "write_cb should prevent buffering for chunked response");
+
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
    MCTF_FINISH();
 }
 
