@@ -69,9 +69,11 @@ struct http_payload
  */
 struct http_request
 {
-   struct http_payload payload; /**< Request payload */
-   int method;                  /**< HTTP method */
-   char* path;                  /**< Request path */
+   struct http_payload payload;                                  /**< Request payload */
+   int method;                                                   /**< HTTP method */
+   char* path;                                                   /**< Request path */
+   size_t (*read_cb)(void* buffer, size_t size, void* userdata); /**< Read callback for streaming upload */
+   void* read_userdata;                                          /**< User data for read callback */
 };
 
 /** @struct http_response
@@ -79,8 +81,10 @@ struct http_request
  */
 struct http_response
 {
-   struct http_payload payload; /**< Response payload */
-   int status_code;             /**< HTTP status code */
+   struct http_payload payload;                                   /**< Response payload */
+   int status_code;                                               /**< HTTP status code */
+   size_t (*write_cb)(void* buffer, size_t size, void* userdata); /**< Write callback for streaming download */
+   void* write_userdata;                                          /**< User data for write callback */
 };
 
 /** @struct http
