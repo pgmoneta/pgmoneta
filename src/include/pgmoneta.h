@@ -146,6 +146,8 @@ extern "C" {
 #define STORAGE_ENGINE_S3            1 << 2
 #define STORAGE_ENGINE_AZURE         1 << 3
 
+#define VFILE_TYPE_LOCAL             "local"
+
 #define DEFAULT_BLOCKING_TIMEOUT     30
 
 #define UPDATE_PROCESS_TITLE_NEVER   0
