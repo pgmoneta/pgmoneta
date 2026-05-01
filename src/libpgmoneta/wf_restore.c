@@ -215,7 +215,7 @@ restore_execute(char* name __attribute__((unused)), struct art* nodes)
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
    {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
+      pgmoneta_workers_initialize(number_of_workers, false, &workers);
    }
 
    if (pgmoneta_copy_postgresql_restore(from, to, directory, config->common.servers[server].name, label, backup, workers))
@@ -752,7 +752,7 @@ copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
    {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
+      pgmoneta_workers_initialize(number_of_workers, false, &workers);
    }
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);

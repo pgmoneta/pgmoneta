@@ -860,7 +860,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
    {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
+      pgmoneta_workers_initialize(number_of_workers, false, &workers);
    }
 
    pgmoneta_deque_iterator_create(prior_labels, &iter);
