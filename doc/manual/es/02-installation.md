@@ -212,6 +212,7 @@ cat > /etc/pgmoneta/pgmoneta.conf
 [pgmoneta]
 host = *
 metrics = 5001
+management = 0
 
 base_dir = /home/pgmoneta/backup
 
