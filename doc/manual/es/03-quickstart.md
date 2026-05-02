@@ -35,6 +35,7 @@ Creemos un archivo de configuración simple llamado `pgmoneta.conf` con el conte
 [pgmoneta]
 host = *
 metrics = 5001
+management = 0
 
 base_dir = /home/pgmoneta
 
