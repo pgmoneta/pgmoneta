@@ -36,6 +36,7 @@
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
+#include <progress.h>
 #include <security.h>
 #include <utils.h>
 #include <value.h>
@@ -49,7 +50,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char* s3_storage_name(void);
+static char* s3_backup_name(void);
+static char* s3_restore_name(void);
+static char* s3_cleanup_name(void);
+static char* s3_info_name(void);
 static int s3_storage_setup(char*, struct art*);
 static int s3_storage_execute(char*, struct art*);
 static int s3_storage_restore(char*, struct art*);
@@ -84,8 +88,25 @@ static int xml_s3_build_delete_list(char** xml, struct deque* keys, size_t max_k
 static int xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuationToken);
 static int xml_parse_s3_list(char* xml, struct deque** keys);
 
+struct s3_transfer_task
+{
+   struct worker_common common;
+   int server;
+   bool progress_enabled;
+   char s3_root[MAX_PATH];
+   char remote_path[MAX_PATH];
+   char local_root[MAX_PATH];
+   char local_path[MAX_PATH];
+   char file_sha512[MISC_LENGTH];
+};
+
 static void do_download_file(struct worker_common* wc);
 static void do_upload_file(struct worker_common* wc);
+static int s3_create_transfer_task(int server, char* s3_root, char* remote_path,
+                                   char* local_root, char* local_path, char* file_sha512,
+                                   struct workers* workers, struct s3_transfer_task** task);
+static int s3_upload_one_file(struct s3_transfer_task* task);
+static int s3_download_one_file(struct s3_transfer_task* task);
 
 struct workflow*
 pgmoneta_storage_create_s3(int workflow_type)
@@ -94,25 +115,28 @@ pgmoneta_storage_create_s3(int workflow_type)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
-   wf->name = &s3_storage_name;
    wf->setup = &s3_storage_setup;
 
    switch (workflow_type)
    {
       case WORKFLOW_TYPE_BACKUP:
+         wf->name = &s3_backup_name;
          wf->execute = &s3_storage_execute;
          wf->teardown = &s3_storage_teardown;
          break;
       case WORKFLOW_TYPE_S3_LIST:
+         wf->name = &s3_info_name;
          wf->execute = &s3_storage_list;
          wf->teardown = &s3_storage_noop_teardown;
          break;
       case WORKFLOW_TYPE_DELETE_BACKUP:
       case WORKFLOW_TYPE_S3_DELETE:
+         wf->name = &s3_cleanup_name;
          wf->execute = &s3_storage_cleanup;
          wf->teardown = &s3_storage_noop_teardown;
          break;
       case WORKFLOW_TYPE_S3_RESTORE:
+         wf->name = &s3_restore_name;
          wf->execute = &s3_storage_restore;
          wf->teardown = &s3_storage_noop_teardown;
          break;
@@ -126,9 +150,27 @@ pgmoneta_storage_create_s3(int workflow_type)
 }
 
 static char*
-s3_storage_name(void)
+s3_backup_name(void)
 {
-   return "S3";
+   return PHASE_NAME_BASEBACKUP;
+}
+
+static char*
+s3_restore_name(void)
+{
+   return PHASE_NAME_RESTORE;
+}
+
+static char*
+s3_cleanup_name(void)
+{
+   return PHASE_NAME_DELETE;
+}
+
+static char*
+s3_info_name(void)
+{
+   return PHASE_NAME_INFO;
 }
 
 static int
@@ -671,6 +713,11 @@ s3_bootstrap(char* s3_root, int server, char* local_root)
 
    pgmoneta_log_debug("S3 bootstrap: downloading root files");
 
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_set_total(server, 3);
+   }
+
    // download backup.sha512 file
 
    if (s3_send_get_request("backup.sha512", s3_root, server, -1, -1, &response))
@@ -702,6 +749,10 @@ s3_bootstrap(char* s3_root, int server, char* local_root)
    pgmoneta_log_debug("S3 bootstrap: downloaded backup.sha512");
    pgmoneta_http_response_destroy(response);
    response = NULL;
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_increment(server, 1);
+   }
 
    if (s3_send_get_request("backup.info", s3_root, server, -1, -1, &response))
    {
@@ -732,6 +783,10 @@ s3_bootstrap(char* s3_root, int server, char* local_root)
    pgmoneta_log_debug("S3 bootstrap: downloaded backup.info");
    pgmoneta_http_response_destroy(response);
    response = NULL;
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_increment(server, 1);
+   }
 
    // verify SHA512 of backup.info
    sha512_file = fopen(sha512_path, "r");
@@ -803,6 +858,10 @@ s3_bootstrap(char* s3_root, int server, char* local_root)
    pgmoneta_log_info("S3 bootstrap: downloaded backup.manifest");
    pgmoneta_http_response_destroy(response);
    response = NULL;
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_increment(server, 1);
+   }
 
    free(sha512_path);
    free(info_path);
@@ -840,7 +899,7 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
    struct deque* paths = NULL;
    struct deque_iterator* iter = NULL;
    struct workers* workers = NULL;
-   struct worker_input* payload = NULL;
+   struct s3_transfer_task* task = NULL;
 
    manifest_path = pgmoneta_append(manifest_path, local_root);
    manifest_path = pgmoneta_append(manifest_path, "backup.manifest.tmp");
@@ -867,6 +926,11 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
 
    pgmoneta_deque_iterator_create(paths, &iter);
 
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_set_total(server, pgmoneta_deque_size(paths));
+   }
+
    while (pgmoneta_deque_iterator_next(iter))
    {
       file_path = iter->tag;
@@ -886,23 +950,36 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
       s3_path = pgmoneta_append(s3_path, filename);
 
       local_file_path = NULL;
-      local_file_path = pgmoneta_append(local_file_path, local_root);
       local_file_path = pgmoneta_append(local_file_path, "data/");
       local_file_path = pgmoneta_append(local_file_path, filename);
 
-      if (pgmoneta_create_worker_input(s3_root, s3_path, local_file_path, server, workers, &payload))
+      if (s3_create_transfer_task(server, s3_root, s3_path, local_root, local_file_path, NULL, workers, &task))
       {
-         pgmoneta_log_error("S3 download: failed to create worker input");
+         pgmoneta_log_error("S3 download: failed to create transfer task");
          goto error;
       }
 
       if (workers != NULL && workers->outcome)
       {
-         pgmoneta_workers_add(workers, do_download_file, (struct worker_common*)payload);
+         if (pgmoneta_workers_add(workers, do_download_file, (struct worker_common*)task))
+         {
+            free(task);
+            task = NULL;
+            pgmoneta_log_error("S3 download: failed to queue worker task");
+            goto error;
+         }
+         task = NULL;
       }
       else
       {
-         do_download_file((struct worker_common*)payload);
+         if (s3_download_one_file(task))
+         {
+            free(task);
+            task = NULL;
+            goto error;
+         }
+         free(task);
+         task = NULL;
       }
 
       free(filename);
@@ -938,76 +1015,161 @@ error:
    free(filename);
    free(s3_path);
    free(local_file_path);
+   free(task);
 
    return 1;
 }
-static void
-do_download_file(struct worker_common* wc)
-{
-   struct worker_input* wi = (struct worker_input*)wc;
-   struct http_response* response = NULL;
-   char* s3_root = wi->directory;
-   char* s3_path = wi->from;
-   char* local_path = wi->to;
-   int server = wi->level;
 
-   if (s3_send_get_request(s3_path, s3_root, server, -1, -1, &response))
+static int
+s3_create_transfer_task(int server, char* s3_root, char* remote_path,
+                        char* local_root, char* local_path, char* file_sha512,
+                        struct workers* workers, struct s3_transfer_task** task)
+{
+   struct s3_transfer_task* t = NULL;
+
+   *task = NULL;
+
+   if (s3_root == NULL || remote_path == NULL || local_path == NULL)
    {
-      pgmoneta_log_error("S3 download: failed to GET %s", s3_path);
+      goto error;
+   }
+
+   if (strlen(s3_root) >= MAX_PATH || strlen(remote_path) >= MAX_PATH || strlen(local_path) >= MAX_PATH)
+   {
+      pgmoneta_log_error("S3 transfer path too long");
+      goto error;
+   }
+
+   if (local_root != NULL && strlen(local_root) >= MAX_PATH)
+   {
+      pgmoneta_log_error("S3 local root path too long");
+      goto error;
+   }
+
+   if (file_sha512 != NULL && strlen(file_sha512) >= MISC_LENGTH)
+   {
+      pgmoneta_log_error("S3 sha512 value too long");
+      goto error;
+   }
+
+   t = (struct s3_transfer_task*)malloc(sizeof(struct s3_transfer_task));
+   if (t == NULL)
+   {
+      goto error;
+   }
+
+   memset(t, 0, sizeof(struct s3_transfer_task));
+   pgmoneta_snprintf(t->s3_root, sizeof(t->s3_root), "%s", s3_root);
+   pgmoneta_snprintf(t->remote_path, sizeof(t->remote_path), "%s", remote_path);
+   pgmoneta_snprintf(t->local_path, sizeof(t->local_path), "%s", local_path);
+   if (local_root != NULL)
+   {
+      pgmoneta_snprintf(t->local_root, sizeof(t->local_root), "%s", local_root);
+   }
+   if (file_sha512 != NULL)
+   {
+      pgmoneta_snprintf(t->file_sha512, sizeof(t->file_sha512), "%s", file_sha512);
+   }
+
+   t->common.workers = workers;
+   t->server = server;
+   t->progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
+
+   *task = t;
+
+   return 0;
+
+error:
+   free(t);
+   return 1;
+}
+
+static int
+s3_download_one_file(struct s3_transfer_task* task)
+{
+   struct http_response* response = NULL;
+   char* full_local = NULL;
+
+   if (s3_send_get_request(task->remote_path, task->s3_root, task->server, -1, -1, &response))
+   {
+      pgmoneta_log_error("S3 download: failed to GET %s", task->remote_path);
       goto error;
    }
 
    if (response->status_code != 200)
    {
-      pgmoneta_log_error("S3 download: %s returned status %d", s3_path, response->status_code);
+      pgmoneta_log_error("S3 download: %s returned status %d", task->remote_path, response->status_code);
       goto error;
    }
 
-   if (pgmoneta_exists(local_path))
-   {
-      pgmoneta_delete_file(local_path, NULL);
-   }
+   full_local = pgmoneta_append(full_local, task->local_root);
+   full_local = pgmoneta_append(full_local, task->local_path);
 
-   if (pgmoneta_append_file_chunk(local_path, response->payload.data, response->payload.data_size, 0))
+   if (pgmoneta_append_file_chunk(full_local, response->payload.data, response->payload.data_size, 0))
    {
-      pgmoneta_log_error("S3 download: failed to write %s", local_path);
+      pgmoneta_log_error("S3 download: failed to write %s", full_local);
       goto error;
    }
 
-   pgmoneta_log_debug("S3 download: %s", s3_path);
+   if (task->progress_enabled)
+   {
+      pgmoneta_progress_increment(task->server, 1);
+   }
+
+   pgmoneta_log_debug("S3 download: %s", task->remote_path);
    pgmoneta_http_response_destroy(response);
-   free(wi);
-   return;
+   free(full_local);
+
+   return 0;
 
 error:
-   if (wi->common.workers != NULL)
-   {
-      wi->common.workers->outcome = false;
-   }
    pgmoneta_http_response_destroy(response);
-   free(wi);
+   free(full_local);
+   return 1;
 }
+
+static void
+do_download_file(struct worker_common* wc)
+{
+   struct s3_transfer_task* task = (struct s3_transfer_task*)wc;
+
+   if (s3_download_one_file(task) && task->common.workers != NULL)
+   {
+      task->common.workers->outcome = false;
+   }
+
+   free(task);
+}
+
+static int
+s3_upload_one_file(struct s3_transfer_task* task)
+{
+   if (s3_send_upload_request(task->local_root, task->s3_root, task->remote_path,
+                              strlen(task->file_sha512) > 0 ? task->file_sha512 : NULL, task->server))
+   {
+      pgmoneta_log_error("S3 upload: failed %s", task->remote_path);
+      return 1;
+   }
+
+   if (task->progress_enabled)
+   {
+      pgmoneta_progress_increment(task->server, 1);
+   }
+
+   return 0;
+}
+
 static void
 do_upload_file(struct worker_common* wc)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-   char* file_sha512 = (char*)pgmoneta_json_get(wi->data, MANAGEMENT_ARGUMENT_ORIGINAL);
+   struct s3_transfer_task* task = (struct s3_transfer_task*)wc;
 
-   if (s3_send_upload_request(wi->directory, wi->from, wi->to, file_sha512, wi->level))
+   if (s3_upload_one_file(task) && task->common.workers != NULL)
    {
-      pgmoneta_log_error("S3 upload: failed %s", wi->to);
-      if (wi->common.workers != NULL)
-      {
-         wi->common.workers->outcome = false;
-      }
+      task->common.workers->outcome = false;
    }
 
-   if (wi->data != NULL)
-   {
-      pgmoneta_json_destroy(wi->data);
-   }
-
-   free(wi);
+   free(task);
 }
 
 static int
@@ -1021,7 +1183,7 @@ s3_upload_files(char* local_root, char* s3_root, int server, int compression, in
    struct deque* paths = NULL;
    struct deque_iterator* iter = NULL;
    struct workers* workers = NULL;
-   struct worker_input* payload = NULL;
+   struct s3_transfer_task* task = NULL;
 
    manifest_path = pgmoneta_append(manifest_path, local_root);
    manifest_path = pgmoneta_append(manifest_path, "backup.manifest");
@@ -1046,6 +1208,11 @@ s3_upload_files(char* local_root, char* s3_root, int server, int compression, in
 
    pgmoneta_deque_iterator_create(paths, &iter);
 
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_set_total(server, pgmoneta_deque_size(paths));
+   }
+
    while (pgmoneta_deque_iterator_next(iter))
    {
       file_path = iter->tag;
@@ -1061,32 +1228,37 @@ s3_upload_files(char* local_root, char* s3_root, int server, int compression, in
          relative_file = pgmoneta_append(relative_file, suffix);
       }
 
-      if (pgmoneta_create_worker_input(local_root, s3_root, relative_file, server, workers, &payload))
+      if (s3_create_transfer_task(server, s3_root, relative_file, local_root, relative_file,
+                                  (char*)iter->cur->data, workers, &task))
       {
-         pgmoneta_log_error("S3 upload: failed to create worker input");
-         free(relative_file);
-         goto error;
-      }
-      if (pgmoneta_json_create(&payload->data))
-      {
-         pgmoneta_log_error("S3 upload: failed to create json");
-         free(relative_file);
-         goto error;
-      }
-      if (pgmoneta_json_put(payload->data, MANAGEMENT_ARGUMENT_ORIGINAL, (uintptr_t)iter->cur->data, ValueString))
-      {
-         pgmoneta_log_error("S3 upload: failed to put sha512 in the json payload->data");
+         pgmoneta_log_error("S3 upload: failed to create transfer task");
          free(relative_file);
          goto error;
       }
 
       if (workers != NULL && workers->outcome)
       {
-         pgmoneta_workers_add(workers, do_upload_file, (struct worker_common*)payload);
+         if (pgmoneta_workers_add(workers, do_upload_file, (struct worker_common*)task))
+         {
+            free(task);
+            task = NULL;
+            pgmoneta_log_error("S3 upload: failed to queue worker task");
+            free(relative_file);
+            goto error;
+         }
+         task = NULL;
       }
       else
       {
-         do_upload_file((struct worker_common*)payload);
+         if (s3_upload_one_file(task))
+         {
+            free(task);
+            task = NULL;
+            free(relative_file);
+            goto error;
+         }
+         free(task);
+         task = NULL;
       }
 
       free(relative_file);
@@ -1135,6 +1307,7 @@ error:
    pgmoneta_workers_destroy(workers);
    free(manifest_path);
    free(suffix);
+   free(task);
 
    return 1;
 }
@@ -1144,6 +1317,7 @@ s3_list_objects(char* relative_path, char* s3_root, int server, struct deque** o
    struct http_response* response = NULL;
    char* continuationToken = NULL;
    bool is_truncated = true;
+   int64_t pages_processed = 0;
 
    while (is_truncated)
    {
@@ -1163,6 +1337,13 @@ s3_list_objects(char* relative_path, char* s3_root, int server, struct deque** o
       if (xml_parse_s3_list(response->payload.data, objects))
       {
          goto error;
+      }
+
+      pages_processed++;
+      if (pgmoneta_is_progress_enabled(server))
+      {
+         pgmoneta_progress_set_total(server, pages_processed + (is_truncated ? 1 : 0));
+         pgmoneta_progress_update_done(server, pages_processed);
       }
 
       pgmoneta_http_response_destroy(response);
@@ -1186,6 +1367,7 @@ s3_delete_all_objects(char* relative_path, char* s3_root, int server, struct art
    char* continuation_token = NULL;
    char* delete_xml = NULL;
    bool is_truncated = true;
+   int64_t deleted_objects = 0;
 
    (void)nodes;
 
@@ -1215,6 +1397,12 @@ s3_delete_all_objects(char* relative_path, char* s3_root, int server, struct art
       if (objects != NULL && pgmoneta_deque_size(objects) > 0)
       {
          size_t sample_size = pgmoneta_deque_size(objects);
+
+         if (pgmoneta_is_progress_enabled(server))
+         {
+            pgmoneta_progress_set_total(server, deleted_objects + (int64_t)sample_size + (is_truncated ? 1 : 0));
+         }
+
          if (xml_s3_build_delete_list(&delete_xml, objects, sample_size))
          {
             goto error;
@@ -1229,6 +1417,12 @@ s3_delete_all_objects(char* relative_path, char* s3_root, int server, struct art
          }
          pgmoneta_http_response_destroy(delete_response);
          delete_response = NULL;
+
+         deleted_objects += (int64_t)sample_size;
+         if (pgmoneta_is_progress_enabled(server))
+         {
+            pgmoneta_progress_update_done(server, deleted_objects);
+         }
 
          free(delete_xml);
          delete_xml = NULL;

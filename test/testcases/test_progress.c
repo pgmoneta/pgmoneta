@@ -36,6 +36,7 @@
 #include <mctf.h>
 #include <progress.h>
 #include <shmem.h>
+#include <storage.h>
 #include <tscommon.h>
 #include <utils.h>
 #include <workflow.h>
@@ -458,6 +459,101 @@ cleanup:
       pgmoneta_workflow_destroy(head);
    }
    pgmoneta_art_destroy(nodes);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_progress_phase_mapping_for_s3)
+{
+   MCTF_ASSERT_INT_EQ(pgmoneta_progress_phase_from_workflow_name(PHASE_NAME_INFO), PHASE_INFO,
+                      cleanup, "info phase name should map to PHASE_INFO");
+   MCTF_ASSERT_INT_EQ(pgmoneta_progress_phase_from_workflow_name(PHASE_NAME_DELETE), PHASE_DELETE,
+                      cleanup, "delete phase name should map to PHASE_DELETE");
+   MCTF_ASSERT_INT_EQ(pgmoneta_progress_phase_from_workflow_name(PHASE_NAME_RESTORE), PHASE_RESTORE,
+                      cleanup, "restore phase name should map to PHASE_RESTORE");
+   MCTF_ASSERT_INT_EQ(pgmoneta_progress_phase_from_workflow_name(PHASE_NAME_VERIFY), PHASE_VERIFY,
+                      cleanup, "verify phase name should map to PHASE_VERIFY");
+
+   MCTF_ASSERT_STR_EQ(pgmoneta_progress_limit_node_key(PHASE_INFO), NODE_PROGRESS_LIMIT_INFO,
+                      cleanup, "info phase should use the info node key");
+   MCTF_ASSERT_STR_EQ(pgmoneta_progress_limit_node_key(PHASE_DELETE), NODE_PROGRESS_LIMIT_DELETE,
+                      cleanup, "delete phase should use the delete node key");
+   MCTF_ASSERT_STR_EQ(pgmoneta_progress_limit_node_key(PHASE_RESTORE), NODE_PROGRESS_LIMIT_RESTORE,
+                      cleanup, "restore phase should use the restore node key");
+   MCTF_ASSERT_STR_EQ(pgmoneta_progress_limit_node_key(PHASE_VERIFY), NODE_PROGRESS_LIMIT_VERIFY,
+                      cleanup, "verify phase should use the verify node key");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_progress_setup_s3_workflows)
+{
+   struct art* nodes = NULL;
+   struct main_configuration* config;
+   struct workflow* workflow = NULL;
+   struct progress* p;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_load_conf(TEST_CONF_DIR "/progress/02.conf"), 0,
+                      cleanup, "failed to read 02.conf");
+
+   config = (struct main_configuration*)shmem;
+   config->common.servers[0].progress_enabled = true;
+   config->storage_engine = STORAGE_ENGINE_S3;
+   p = &config->common.servers[0].progress;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_art_create(&nodes), 0,
+                      cleanup, "failed to create art");
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_S3_LIST, NULL);
+   MCTF_ASSERT_PTR_NONNULL(workflow, cleanup, "failed to create s3 list workflow");
+   pgmoneta_progress_setup(0, workflow, nodes, WORKFLOW_TYPE_S3_LIST);
+
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_INFO), 100,
+                      cleanup, "s3 list should reserve 100 percent for info");
+   MCTF_ASSERT_INT_EQ((int)atomic_load(&p->current_phase), PHASE_INFO,
+                      cleanup, "s3 list should start in info phase");
+   pgmoneta_progress_teardown(0);
+   pgmoneta_workflow_destroy(workflow);
+   workflow = NULL;
+   pgmoneta_art_destroy(nodes);
+   nodes = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_art_create(&nodes), 0,
+                      cleanup, "failed to recreate art");
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_S3_DELETE, NULL);
+   MCTF_ASSERT_PTR_NONNULL(workflow, cleanup, "failed to create s3 delete workflow");
+   pgmoneta_progress_setup(0, workflow, nodes, WORKFLOW_TYPE_S3_DELETE);
+
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_DELETE), 100,
+                      cleanup, "s3 delete should reserve 100 percent for delete");
+   MCTF_ASSERT_INT_EQ((int)atomic_load(&p->current_phase), PHASE_DELETE,
+                      cleanup, "s3 delete should start in delete phase");
+   pgmoneta_progress_teardown(0);
+   pgmoneta_workflow_destroy(workflow);
+   workflow = NULL;
+   pgmoneta_art_destroy(nodes);
+   nodes = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_art_create(&nodes), 0,
+                      cleanup, "failed to recreate art again");
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_S3_RESTORE, NULL);
+   MCTF_ASSERT_PTR_NONNULL(workflow, cleanup, "failed to create s3 restore workflow");
+   pgmoneta_progress_setup(0, workflow, nodes, WORKFLOW_TYPE_S3_RESTORE);
+
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_RESTORE), 100,
+                      cleanup, "s3 restore should reserve 100 percent for restore");
+   MCTF_ASSERT_INT_EQ((int)atomic_load(&p->current_phase), PHASE_RESTORE,
+                      cleanup, "s3 restore should start in restore phase");
+
+cleanup:
+   if (workflow != NULL)
+   {
+      pgmoneta_workflow_destroy(workflow);
+   }
+   if (nodes != NULL)
+   {
+      pgmoneta_art_destroy(nodes);
+   }
    MCTF_FINISH();
 }
 

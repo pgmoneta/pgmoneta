@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <aes.h>
 #include <art.h>
+#include <progress.h>
 #include <s3.h>
 #include <compression.h>
 #include <info.h>
@@ -121,10 +122,16 @@ pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t
       goto error;
    }
 
+   pgmoneta_progress_setup(server, workflow, nodes, WORKFLOW_TYPE_S3_LIST);
+
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       pgmoneta_log_error("List S3: Workflow failed for %s", config->common.servers[server].name);
       goto error;
+   }
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
    }
 
    objects = (struct deque*)pgmoneta_art_search(nodes, NODE_S3_OBJECTS);
@@ -194,6 +201,10 @@ pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t
 
 error:
 
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
+   }
    pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                       ec != -1 ? ec : MANAGEMENT_ERROR_LIST_S3_ERROR, en != NULL ? en : NAME,
                                       compression, encryption, payload);
@@ -264,10 +275,16 @@ pgmoneta_delete_s3_objects(int client_fd, int server, char* prefix, uint8_t comp
       goto error;
    }
 
+   pgmoneta_progress_setup(server, workflow, nodes, WORKFLOW_TYPE_S3_DELETE);
+
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       pgmoneta_log_error("S3 delete: workflow failed for %s", config->common.servers[server].name);
       goto error;
+   }
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
    }
 
    if (pgmoneta_management_create_response(payload, server, &response))
@@ -306,6 +323,10 @@ pgmoneta_delete_s3_objects(int client_fd, int server, char* prefix, uint8_t comp
 
 error:
 
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
+   }
    pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                       ec != -1 ? ec : MANAGEMENT_ERROR_DELETE_S3_ERROR, en != NULL ? en : NAME,
                                       compression, encryption, payload);
@@ -395,6 +416,10 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
       pgmoneta_log_error("S3 restore: S3 storage engine is not configured for %s", config->common.servers[server].name);
       goto error;
    }
+
+   /* TODO: S3 restore progress only covers the staging workflow here.
+    * The subsequent local restore runs via pgmoneta_restore_backup() and
+    * needs its own progress lifecycle until both stages are unified. */
 
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
