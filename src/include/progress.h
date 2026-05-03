@@ -50,6 +50,10 @@ extern "C" {
 #define NODE_PROGRESS_LIMIT_LINK        "progress_limit_link"        /* Link phase limit */
 #define NODE_PROGRESS_LIMIT_MANIFEST    "progress_limit_manifest"    /* Manifest phase limit */
 #define NODE_PROGRESS_LIMIT_SHA512      "progress_limit_sha512"      /* SHA512 phase limit */
+#define NODE_PROGRESS_LIMIT_DELETE      "progress_limit_delete"      /* Delete phase limit */
+#define NODE_PROGRESS_LIMIT_INFO        "progress_limit_info"        /* Info phase limit */
+#define NODE_PROGRESS_LIMIT_RESTORE     "progress_limit_restore"     /* Restore phase limit */
+#define NODE_PROGRESS_LIMIT_VERIFY      "progress_limit_verify"      /* Verify phase limit */
 
 struct workflow;
 

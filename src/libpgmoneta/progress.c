@@ -204,9 +204,13 @@ calculate_fallback_weights(int workflow_type, int* phases, int n_phases, int* we
          /* TODO: Implement fallback weights for verify */
          break;
       case WORKFLOW_TYPE_S3_LIST:
+         weights[0] = 100;
+         break;
       case WORKFLOW_TYPE_S3_DELETE:
+         weights[0] = 100;
+         break;
       case WORKFLOW_TYPE_S3_RESTORE:
-         /* TODO: Implement adaptive/fallback weights for S3 */
+         weights[0] = 100;
          break;
       default:
          break;
@@ -313,7 +317,7 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
       case WORKFLOW_TYPE_S3_LIST:
       case WORKFLOW_TYPE_S3_DELETE:
       case WORKFLOW_TYPE_S3_RESTORE:
-         /* TODO: Implement adaptive/fallback weights for S3 */
+         calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
       default:
          break;
@@ -543,6 +547,22 @@ pgmoneta_progress_phase_from_workflow_name(char* name)
    {
       return PHASE_ENCRYPTION;
    }
+   if (!strcmp(name, PHASE_NAME_DELETE))
+   {
+      return PHASE_DELETE;
+   }
+   if (!strcmp(name, PHASE_NAME_INFO))
+   {
+      return PHASE_INFO;
+   }
+   if (!strcmp(name, PHASE_NAME_RESTORE))
+   {
+      return PHASE_RESTORE;
+   }
+   if (!strcmp(name, PHASE_NAME_VERIFY))
+   {
+      return PHASE_VERIFY;
+   }
    return -1;
 }
 
@@ -563,6 +583,14 @@ pgmoneta_progress_limit_node_key(int phase)
          return NODE_PROGRESS_LIMIT_COMPRESSION;
       case PHASE_ENCRYPTION:
          return NODE_PROGRESS_LIMIT_ENCRYPTION;
+      case PHASE_DELETE:
+         return NODE_PROGRESS_LIMIT_DELETE;
+      case PHASE_INFO:
+         return NODE_PROGRESS_LIMIT_INFO;
+      case PHASE_RESTORE:
+         return NODE_PROGRESS_LIMIT_RESTORE;
+      case PHASE_VERIFY:
+         return NODE_PROGRESS_LIMIT_VERIFY;
       default:
          return NULL;
    }

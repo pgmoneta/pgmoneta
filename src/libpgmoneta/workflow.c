@@ -499,6 +499,14 @@ pgmoneta_phase_name(int phase)
          return PHASE_NAME_COMPRESSION;
       case PHASE_ENCRYPTION:
          return PHASE_NAME_ENCRYPTION;
+      case PHASE_INFO:
+         return PHASE_NAME_INFO;
+      case PHASE_RESTORE:
+         return PHASE_NAME_RESTORE;
+      case PHASE_VERIFY:
+         return PHASE_NAME_VERIFY;
+      case PHASE_DELETE:
+         return PHASE_NAME_DELETE;
       default:
          return PHASE_NAME_UNKNOWN;
    }

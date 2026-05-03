@@ -68,15 +68,23 @@ extern "C" {
 #define WORKFLOW_NAME_S3_RESTORE         "S3 restore"         /**< The name of S3 restore workflow */
 #define WORKFLOW_NAME_UNKNOWN            "Unknown"            /**< The name of unknown workflow */
 
-#define PHASE_NONE                       0 /* No phase */
-#define PHASE_BASEBACKUP                 1 /* Base backup phase */
-#define PHASE_MANIFEST                   2 /* Manifest phase */
-#define PHASE_SHA512                     3 /* SHA512 phase */
-#define PHASE_LINKING                    4 /* Link phase */
-#define PHASE_COMPRESSION                5 /* Compression phase */
-#define PHASE_ENCRYPTION                 6 /* Encryption phase */
+#define PHASE_NONE                       0  /* No phase */
+#define PHASE_BASEBACKUP                 1  /* Base backup phase */
+#define PHASE_MANIFEST                   2  /* Manifest phase */
+#define PHASE_SHA512                     3  /* SHA512 phase */
+#define PHASE_LINKING                    4  /* Link phase */
+#define PHASE_COMPRESSION                5  /* Compression phase */
+#define PHASE_ENCRYPTION                 6  /* Encryption phase */
+#define PHASE_DELETE                     7  /* Delete phase */
+#define PHASE_INFO                       8  /* Info phase */
+#define PHASE_VERIFY                     9  /* Verify phase */
+#define PHASE_RESTORE                    10 /* Restore phase */
 
 #define PHASE_NAME_BASEBACKUP            "Base backup"        /**< The name of base backup phase */
+#define PHASE_NAME_RESTORE               "Restore backup"     /**< The name of restore backup phase */
+#define PHASE_NAME_VERIFY                "Verify backup"      /**< The name of verify backup phase */
+#define PHASE_NAME_DELETE                "Delete backup"      /**< The name of delete backup phase */
+#define PHASE_NAME_INFO                  "Info"               /**< The name of info phase */
 #define PHASE_NAME_INCREMENTAL_BACKUP    "Incremental backup" /**< The name of incremental backup phase */
 #define PHASE_NAME_MANIFEST              "Manifest"           /**< The name of manifest phase */
 #define PHASE_NAME_SHA512                "SHA512"             /**< The name of SHA512 phase */
