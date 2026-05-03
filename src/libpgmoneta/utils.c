@@ -2367,7 +2367,7 @@ error:
       closedir(dir);
    }
 
-   pgmoneta_deque_destroy(*files);
+   pgmoneta_deque_destroy(array);
    *files = NULL;
 
    return 1;
