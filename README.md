@@ -31,11 +31,14 @@ server called [pgmoneta_mcp](https://github.com/pgmoneta/pgmoneta_mcp).
 
 ## Documentation
 
-* [User guide](https://pgmoneta.github.io/documentation.html)
+* [User guide/EN](https://github.com/pgmoneta/pgmoneta/tree/main/doc/manual/en)
+* [User guide/ES](https://github.com/pgmoneta/pgmoneta/tree/main/doc/manual/es)
 * [Developer guide](./doc/DEVELOPERS.md)
 * [Getting Started](./doc/GETTING_STARTED.md)
 * [Configuration](./doc/CONFIGURATION.md)
 * [Web Console](./doc/CONSOLE.md)
+
+See the PDFs on our [web site](https://pgmoneta.github.io/) or our [releases page](https://github.com/pgmoneta/pgmoneta/releases).
 
 ## Overview
 
