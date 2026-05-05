@@ -38,6 +38,11 @@ extern "C" {
 
 #include <stdlib.h>
 
+/* Forward declarations */
+struct backup;
+struct deque;
+struct art;
+
 /**
  * Create a verify
  * @param ssl The SSL connection
@@ -49,6 +54,17 @@ extern "C" {
  */
 void
 pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
+
+/**
+ * Validate restore integrity before performing restore
+ * @param server The server
+ * @param backup The backup
+ * @param labels The backup labels (for incremental chain)
+ * @param nodes The nodes containing restore context
+ * @return 0 on success, restore error code if validation fails
+ */
+int
+pgmoneta_validate_restore(int server, struct backup* backup, struct deque* labels, struct art* nodes);
 
 /**
  * Run sha512 verification job
