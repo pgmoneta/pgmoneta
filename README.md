@@ -5,7 +5,9 @@
 [![GitHub stars](https://img.shields.io/github/stars/pgmoneta/pgmoneta?style=social)](https://github.com/pgmoneta/pgmoneta/stargazers)
 [![Discussions](https://img.shields.io/github/discussions/pgmoneta/pgmoneta)](https://github.com/pgmoneta/pgmoneta/discussions)
 
-<img src="./doc/images/logo-reversed-transparent.svg" alt="pgmoneta logo" width="200"/>
+<p align="center">
+  <img src="doc/images/logo-reversed-transparent.svg" alt="pgmoneta logo" width="256"/>
+</p>
 
 **pgmoneta** is a backup / restore solution for [PostgreSQL](https://www.postgresql.org).
 It supports full and incremental backups, point-in-time restore, WAL shipping, hot
