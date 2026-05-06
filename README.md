@@ -1,12 +1,19 @@
 # pgmoneta
 
-[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
-[![Latest release](https://img.shields.io/github/v/release/pgmoneta/pgmoneta)](https://github.com/pgmoneta/pgmoneta/releases)
-[![GitHub stars](https://img.shields.io/github/stars/pgmoneta/pgmoneta?style=social)](https://github.com/pgmoneta/pgmoneta/stargazers)
-[![Discussions](https://img.shields.io/github/discussions/pgmoneta/pgmoneta)](https://github.com/pgmoneta/pgmoneta/discussions)
+<p align="center">
+  [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+  [![Latest release](https://img.shields.io/github/v/release/pgmoneta/pgmoneta)](https://github.com/pgmoneta/pgmoneta/releases)
+  [![GitHub stars](https://img.shields.io/github/stars/pgmoneta/pgmoneta?style=social)](https://github.com/pgmoneta/pgmoneta/stargazers)
+  [![Discussions](https://img.shields.io/github/discussions/pgmoneta/pgmoneta)](https://github.com/pgmoneta/pgmoneta/discussions)
+</p>
 
 <p align="center">
   <img src="doc/images/logo-reversed-transparent.svg" alt="pgmoneta logo" width="256"/>
+</p>
+
+<p align="center">
+  [English](https://github.com/pgmoneta/pgmoneta/releases/download/0.21.0/pgmoneta-en.pdf) |
+  [Spanish](https://github.com/pgmoneta/pgmoneta/releases/download/0.21.0/pgmoneta-es.pdf)
 </p>
 
 **pgmoneta** is a backup / restore solution for [PostgreSQL](https://www.postgresql.org).
