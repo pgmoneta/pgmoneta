@@ -39,8 +39,7 @@ release downloads.
 - **Restore** to any saved backup, with point-in-time recovery
 - **Compression** &mdash; gzip, zstd, lz4, bzip2
 - **AES encryption** of backups at rest
-- **Symlink support** for tablespaces
-- **WAL shipping** to a remote server
+- **Symlink support** for all files
 - **Hot standby** &mdash; keep a warm copy of the cluster ready
 - **Prometheus** metrics endpoint for monitoring
 - **Web console** for inspecting metrics
@@ -49,6 +48,7 @@ release downloads.
 - **Transport Layer Security (TLS) v1.2+** for client and server connections
 - **Daemon mode** with systemd integration
 - **User vault** for managing PostgreSQL credentials securely
+- **WAL tools** to inspect Write-Ahead Log (WAL) logs, and filter them
 
 ## Installation
 
