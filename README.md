@@ -1,94 +1,115 @@
 # pgmoneta
 
-<p align="center">
-  <img src="doc/images/logo-reversed-transparent.svg" alt="pgmoneta logo" width="256"/>
-</p>
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+[![Latest release](https://img.shields.io/github/v/release/pgmoneta/pgmoneta)](https://github.com/pgmoneta/pgmoneta/releases)
+[![GitHub stars](https://img.shields.io/github/stars/pgmoneta/pgmoneta?style=social)](https://github.com/pgmoneta/pgmoneta/stargazers)
+[![Discussions](https://img.shields.io/github/discussions/pgmoneta/pgmoneta)](https://github.com/pgmoneta/pgmoneta/discussions)
+
+<img src="./doc/images/logo-reversed-transparent.svg" alt="pgmoneta logo" width="200"/>
 
 **pgmoneta** is a backup / restore solution for [PostgreSQL](https://www.postgresql.org).
+It supports full and incremental backups, point-in-time restore, WAL shipping, hot
+standby, compression, encryption, TLS, and a Prometheus interface for operations.
 
 **pgmoneta** is named after the Roman Goddess of Memory.
 
+Visit our [website](https://pgmoneta.github.io/) for documentation, tutorials and
+release downloads.
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+  - [Install from the PostgreSQL YUM repository](#install-from-the-postgresql-yum-repository)
+  - [Compile from source](#compile-from-source)
+- [Documentation](#documentation)
+- [Tested platforms](#tested-platforms)
+- [Overview](#overview)
+- [Related projects](#related-projects)
+- [Contributing](#contributing)
+- [Community](#community)
+- [License](#license)
+
 ## Features
 
-* Full backup
-* Incremental backup (PostgreSQL 14+)
-* Restore
-* Compression (gzip, zstd, lz4, bzip2)
-* AES encryption support
-* Symlink support
-* WAL shipping support
-* Hot standby
-* Prometheus support
-* Web console
-* Remote management
-* Offline detection
-* Transport Layer Security (TLS) v1.2+ support
-* Daemon mode
-* User vault
+- **Full backup** of a PostgreSQL cluster
+- **Incremental backup** (PostgreSQL 14+)
+- **Restore** to any saved backup, with point-in-time recovery
+- **Compression** &mdash; gzip, zstd, lz4, bzip2
+- **AES encryption** of backups at rest
+- **Symlink support** for tablespaces
+- **WAL shipping** to a remote server
+- **Hot standby** &mdash; keep a warm copy of the cluster ready
+- **Prometheus** metrics endpoint for monitoring
+- **Web console** for inspecting metrics
+- **Remote management** via `pgmoneta-cli`
+- **Offline detection** of unreachable instances
+- **Transport Layer Security (TLS) v1.2+** for client and server connections
+- **Daemon mode** with systemd integration
+- **User vault** for managing PostgreSQL credentials securely
 
-[pgmoneta](https://github.com/pgmoneta/pgmoneta) has a [Model Context Protocol](https://modelcontextprotocol.io/)
-server called [pgmoneta_mcp](https://github.com/pgmoneta/pgmoneta_mcp).
+## Installation
 
-## Documentation
+### Install from the PostgreSQL YUM repository
 
-* [User guide/EN](https://github.com/pgmoneta/pgmoneta/tree/main/doc/manual/en)
-* [User guide/ES](https://github.com/pgmoneta/pgmoneta/tree/main/doc/manual/es)
-* [Developer guide](./doc/DEVELOPERS.md)
-* [Getting Started](./doc/GETTING_STARTED.md)
-* [Configuration](./doc/CONFIGURATION.md)
-* [Web Console](./doc/CONSOLE.md)
+For RPM-based distributions (Fedora, RHEL, Rocky Linux, AlmaLinux), `pgmoneta`
+is available as a pre-built package from the official [PostgreSQL YUM
+repository](https://yum.postgresql.org/) (PGDG).
 
-See the PDFs on our [web site](https://pgmoneta.github.io/) or our [releases page](https://github.com/pgmoneta/pgmoneta/releases).
+Add the PGDG repository &mdash; example for **RHEL / Rocky Linux / AlmaLinux 10**:
 
-## Overview
+    dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-**pgmoneta** makes use of
+For Fedora, pick the matching RPM from the [PGDG repo packages
+page](https://yum.postgresql.org/repopackages/).
 
-* Process model
-* Shared memory model across processes
-* [libev](http://software.schmorp.de/pkg/libev.html) for fast network interactions
-* [Atomic operations](https://en.cppreference.com/w/c/atomic) are used to keep track of state
+Then disable the distribution-supplied PostgreSQL module and install `pgmoneta`
+alongside the PostgreSQL version of your choice (example for PostgreSQL 18):
 
-See [Architecture](./doc/ARCHITECTURE.md) for the architecture of **pgmoneta**.
+    dnf -qy module disable postgresql
+    dnf install -y postgresql18 postgresql18-server pgmoneta
 
-## Tested platforms
+See the [Getting Started](https://github.com/pgmoneta/pgmoneta/blob/main/doc/GETTING_STARTED.md)
+guide for first-run configuration once the package is installed.
 
-* [Fedora](https://getfedora.org/) 38+
-* [RHEL 9.x](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9)
-* [Rocky Linux 9.x](https://rockylinux.org/)
-* [FreeBSD](https://www.freebsd.org/)
-* [OpenBSD](http://www.openbsd.org/)
+### Compile from source
 
+#### Required dependencies
 
-## Compiling the source
+- [clang](https://clang.llvm.org/) (or [gcc](https://gcc.gnu.org))
+- [cmake](https://cmake.org)
+- [make](https://www.gnu.org/software/make/)
+- [libev](http://software.schmorp.de/pkg/libev.html)
+- [OpenSSL](http://www.openssl.org/)
+- [zlib](https://zlib.net)
+- [zstd](http://www.zstd.net)
+- [lz4](https://lz4.github.io/lz4/)
+- [bzip2](http://sourceware.org/bzip2/)
+- [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
+- [libssh](https://www.libssh.org/)
+- [libarchive](http://www.libarchive.org/)
+- [rst2man](https://docutils.sourceforge.io/) (man pages)
 
-**pgmoneta** requires
+#### Optional dependencies (for building documentation)
 
-* [clang](https://clang.llvm.org/)
-* [cmake](https://cmake.org)
-* [make](https://www.gnu.org/software/make/)
-* [libev](http://software.schmorp.de/pkg/libev.html)
-* [OpenSSL](http://www.openssl.org/)
-* [zlib](https://zlib.net)
-* [zstd](http://www.zstd.net)
-* [lz4](https://lz4.github.io/lz4/)
-* [bzip2](http://sourceware.org/bzip2/)
-* [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
-* [rst2man](https://docutils.sourceforge.io/)
-* [libssh](https://www.libssh.org/)
-* [libarchive](http://www.libarchive.org/)
-* [pandoc](https://pandoc.org/)
-* [texlive](https://www.tug.org/texlive/)
+- [pandoc](https://pandoc.org/)
+- [texlive](https://www.tug.org/texlive/)
+
+#### Install dependencies on Fedora / RHEL
 
 ```sh
-dnf install git gcc clang clang-analyzer clang-tools-extra cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel libasan libasan-static
+dnf install git gcc clang clang-analyzer clang-tools-extra cmake make \
+            libev libev-devel openssl openssl-devel \
+            systemd systemd-devel zlib zlib-devel \
+            libzstd libzstd-devel lz4 lz4-devel \
+            libssh libssh-devel python3-docutils libatomic \
+            bzip2 bzip2-devel libarchive libarchive-devel \
+            libasan libasan-static
 ```
 
-Alternative [gcc](https://gcc.gnu.org) can be used.
+#### Release build
 
-### Release build
-
-The following commands will install **pgmoneta** in the `/usr/local` hierarchy.
+The following commands will install `pgmoneta` under `/usr/local`:
 
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
@@ -100,11 +121,12 @@ make
 sudo make install
 ```
 
-See [RPM](./doc/RPM.md) for how to build a RPM of **pgmoneta**.
+See [RPM](https://github.com/pgmoneta/pgmoneta/blob/main/doc/RPM.md) for how to
+build a RPM of `pgmoneta`.
 
-### Debug build
+#### Debug build
 
-The following commands will create a `DEBUG` version of **pgmoneta**.
+The following commands will create a `DEBUG` version of `pgmoneta`:
 
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
@@ -117,23 +139,69 @@ make
 
 Remember to set the `log_level` configuration option to `debug5`.
 
+## Documentation
+
+- [User guide / EN](https://github.com/pgmoneta/pgmoneta/tree/main/doc/manual/en)
+- [User guide / ES](https://github.com/pgmoneta/pgmoneta/tree/main/doc/manual/es)
+- [Getting Started](https://github.com/pgmoneta/pgmoneta/blob/main/doc/GETTING_STARTED.md)
+- [Configuration](https://github.com/pgmoneta/pgmoneta/blob/main/doc/CONFIGURATION.md)
+- [Web Console](https://github.com/pgmoneta/pgmoneta/blob/main/doc/CONSOLE.md)
+- [Architecture](https://github.com/pgmoneta/pgmoneta/blob/main/doc/ARCHITECTURE.md)
+- [Developer guide](https://github.com/pgmoneta/pgmoneta/blob/main/doc/DEVELOPERS.md)
+
+PDFs of the documentation are available on our
+[website](https://pgmoneta.github.io/) and on the
+[releases page](https://github.com/pgmoneta/pgmoneta/releases).
+
+## Tested platforms
+
+- [Fedora](https://getfedora.org/) 42+
+- [RHEL 10.x](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10)
+- [Rocky Linux 10.x](https://rockylinux.org/)
+- [AlmaLinux 10.x](https://almalinux.org/)
+- [FreeBSD](https://www.freebsd.org/)
+- [OpenBSD](http://www.openbsd.org/)
+
+## Overview
+
+**pgmoneta** makes use of
+
+- A process model
+- A shared memory model across processes
+- [libev](http://software.schmorp.de/pkg/libev.html) for fast network interactions
+- [Atomic operations](https://en.cppreference.com/w/c/atomic) to keep track of state
+
+See [Architecture](https://github.com/pgmoneta/pgmoneta/blob/main/doc/ARCHITECTURE.md)
+for the architecture of `pgmoneta`.
+
+## Related projects
+
+- [pgmoneta_mcp](https://github.com/pgmoneta/pgmoneta_mcp) &mdash; a
+  [Model Context Protocol](https://modelcontextprotocol.io/) server for `pgmoneta`,
+  letting AI assistants interact with backups and restores.
+
 ## Contributing
 
-Contributions to **pgmoneta** are managed on [GitHub.com](https://github.com/pgmoneta/pgmoneta/)
+Contributions to `pgmoneta` are managed on [GitHub](https://github.com/pgmoneta/pgmoneta/):
 
-* [Ask a question](https://github.com/pgmoneta/pgmoneta/discussions)
-* [Raise an issue](https://github.com/pgmoneta/pgmoneta/issues)
-* [Feature request](https://github.com/pgmoneta/pgmoneta/issues)
-* [Code submission](https://github.com/pgmoneta/pgmoneta/pulls)
+- [Ask a question](https://github.com/pgmoneta/pgmoneta/discussions)
+- [Raise an issue](https://github.com/pgmoneta/pgmoneta/issues)
+- [Feature request](https://github.com/pgmoneta/pgmoneta/issues)
+- [Code submission](https://github.com/pgmoneta/pgmoneta/pulls)
 
-Contributions are most welcome !
+Contributions are most welcome!
 
-Please, consult our [Code of Conduct](./CODE_OF_CONDUCT.md) policies for interacting in our
-community.
+Please consult our [Code of Conduct](https://github.com/pgmoneta/pgmoneta/blob/main/CODE_OF_CONDUCT.md)
+for interacting in our community. New contributors may also want to read the
+[Developer guide](https://github.com/pgmoneta/pgmoneta/blob/main/doc/DEVELOPERS.md).
 
-Consider giving the project a [star](https://github.com/pgmoneta/pgmoneta/stargazers) on
-[GitHub](https://github.com/pgmoneta/pgmoneta/) if you find it useful. And, feel free to follow
-the project on [X](https://x.com/pgmoneta/) as well.
+If you find `pgmoneta` useful, consider giving the project a
+[star](https://github.com/pgmoneta/pgmoneta/stargazers) on GitHub.
+
+## Community
+
+- Website: <https://pgmoneta.github.io/>
+- X / Twitter: [@pgmoneta](https://x.com/pgmoneta/)
 
 ## License
 
