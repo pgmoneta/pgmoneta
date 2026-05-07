@@ -40,6 +40,13 @@
 #define INTpgmoneta_wal_64CONST(x) (x##L)
 #define USECS_PER_SEC              INTpgmoneta_wal_64CONST(1000000)
 
+/*
+ * PostgreSQL 19:
+ * XLOG_GIST_ASSIGN_LSN (RM_GIST_ID, 0x70) was replaced by XLOG_ASSIGN_LSN
+ * (RM_XLOG_ID, 0xC0).
+ */
+#define XLOG_ASSIGN_LSN 0xC0
+
 /**
  * @struct xl_parameter_change
  * @brief Structure representing a change in parameters important for Hot Standby.

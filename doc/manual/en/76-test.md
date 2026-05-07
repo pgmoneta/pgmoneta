@@ -346,6 +346,6 @@ cleanup:
 ```
 and replace `pgmoneta_test_generate_check_point_shutdown_v17` with the function you implemented in step 1.
 
-If the record type you are adding has differences between versions of PostgreSQL (13-17), you will need to implement a generate function per version (`generate_rec_x` -> `generate_rec_x_v16`, `generate_rec_x_v17`, etc.).
+If the record type you are adding has differences between versions of PostgreSQL (13-19), you will need to implement a generate function per version (`generate_rec_x` -> `generate_rec_x_v16`, `generate_rec_x_v17`, etc.).
 
 For the sake of simplicity, please create one test suite per postgres version where the implementation resides in `test/libpgmonetatest/tswalutils/tswalutils_<version>.c` and the testcases in `test/testcases/test_wal_utils.c` and add testcase per record type within this version. You can take a look at [this testcase](../../../../../test/testcases/test_wal_utils.c) for reference.

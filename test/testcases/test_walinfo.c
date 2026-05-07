@@ -27,6 +27,7 @@
  *
  */
 
+#include <shmem.h>
 #include <pgmoneta.h>
 #include <aes.h>
 #include <configuration.h>
@@ -268,6 +269,28 @@ prepare_wal_test_path(char* path, size_t size)
       MCTF_ASSERT_INT_EQ(create_mock_wal_file((path), &(wf)), 0, cleanup, "Failed to create mock WAL file");          \
    }                                                                                                                  \
    while (0)
+
+static bool shmem_allocated = false;
+
+MCTF_MODULE_SETUP(walinfo)
+{
+   if (shmem == NULL)
+   {
+      pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem);
+      memset(shmem, 0, sizeof(struct main_configuration));
+      shmem_allocated = true;
+   }
+}
+
+MCTF_MODULE_TEARDOWN(walinfo)
+{
+   if (shmem_allocated && shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+      shmem = NULL;
+      shmem_allocated = false;
+   }
+}
 
 MCTF_TEST(test_walinfo_describe)
 {

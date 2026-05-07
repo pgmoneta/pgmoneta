@@ -28,39 +28,72 @@
 
 #include <wal.h>
 #include <walfile/rm_standby.h>
+#include <walfile/wal_reader.h>
 #include <utils.h>
 
-static char*
-standby_desc_running_xacts(char* buf, struct xl_running_xacts* xlrec)
+/* system */
+#include <stdlib.h>
+#include <string.h>
+
+struct xl_running_xacts*
+create_xl_running_xacts(void)
 {
-   int i;
+   struct xl_running_xacts* wrapper = malloc(sizeof(struct xl_running_xacts));
+
+   if (server_config->version >= 19)
+   {
+      wrapper->parse = xl_running_xacts_parse_v19;
+      wrapper->format = xl_running_xacts_format_v19;
+   }
+   else
+   {
+      wrapper->parse = xl_running_xacts_parse_v18;
+      wrapper->format = xl_running_xacts_format_v18;
+   }
+
+   return wrapper;
+}
+
+void
+xl_running_xacts_parse_v19(struct xl_running_xacts* wrapper, void* rec)
+{
+   struct xl_running_xacts_v19* xlrec_v19 = &wrapper->data.v19;
+
+   /* Parse PostgreSQL 19 structure with dbid field */
+   memcpy(xlrec_v19, rec, sizeof(struct xl_running_xacts_v19));
+}
+
+void
+xl_running_xacts_parse_v18(struct xl_running_xacts* wrapper, void* rec)
+{
+   struct xl_running_xacts_v18* xlrec_v18 = &wrapper->data.v18;
+
+   /* Parse PostgreSQL 18 structure without dbid field */
+   memcpy(xlrec_v18, rec, sizeof(struct xl_running_xacts_v18));
+}
+
+char*
+xl_running_xacts_format_v19(struct xl_running_xacts* wrapper, char* buf)
+{
+   struct xl_running_xacts_v19* xlrec_v19 = &wrapper->data.v19;
+
+   buf = pgmoneta_format_and_append(buf, "next_xid %u latest_completed_xid %u oldest_running_xid %u dbid: %u",
+                                    xlrec_v19->next_xid,
+                                    xlrec_v19->latest_completed_xid,
+                                    xlrec_v19->oldest_running_xid,
+                                    xlrec_v19->dbid);
+   return buf;
+}
+
+char*
+xl_running_xacts_format_v18(struct xl_running_xacts* wrapper, char* buf)
+{
+   struct xl_running_xacts_v18* xlrec_v18 = &wrapper->data.v18;
 
    buf = pgmoneta_format_and_append(buf, "next_xid %u latest_completed_xid %u oldest_running_xid %u",
-                                    xlrec->next_xid,
-                                    xlrec->latest_completed_xid,
-                                    xlrec->oldest_running_xid);
-   if (xlrec->xcnt > 0)
-   {
-      buf = pgmoneta_format_and_append(buf, "; %d xacts:", xlrec->xcnt);
-      for (i = 0; i < xlrec->xcnt; i++)
-      {
-         buf = pgmoneta_format_and_append(buf, " %u", xlrec->xids[i]);
-      }
-   }
-
-   if (xlrec->subxid_overflow)
-   {
-      buf = pgmoneta_format_and_append(buf, "; subxid overflowed");
-   }
-
-   if (xlrec->subxcnt > 0)
-   {
-      buf = pgmoneta_format_and_append(buf, "; %d subxacts:", xlrec->subxcnt);
-      for (i = 0; i < xlrec->subxcnt; i++)
-      {
-         buf = pgmoneta_format_and_append(buf, " %u", xlrec->xids[xlrec->xcnt + i]);
-      }
-   }
+                                    xlrec_v18->next_xid,
+                                    xlrec_v18->latest_completed_xid,
+                                    xlrec_v18->oldest_running_xid);
    return buf;
 }
 
@@ -163,9 +196,15 @@ pgmoneta_wal_standby_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_RUNNING_XACTS)
    {
-      struct xl_running_xacts* xlrec = (struct xl_running_xacts*)rec;
+      struct xl_running_xacts* wrapper = create_xl_running_xacts();
 
-      buf = standby_desc_running_xacts(buf, xlrec);
+      /* Parse the record based on version */
+      wrapper->parse(wrapper, rec);
+
+      /* Format the record */
+      buf = wrapper->format(wrapper, buf);
+
+      free(wrapper);
    }
    else if (info == XLOG_INVALIDATIONS)
    {
