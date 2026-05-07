@@ -316,7 +316,7 @@ pgmoneta_wal_xlog_desc(char* buf, struct decoded_xlog_record* record)
 
       buf = pgmoneta_format_and_append(buf, xlrec->rp_name);
    }
-   else if (info == XLOG_FPI || info == XLOG_FPI_FOR_HINT)
+   else if (info == XLOG_FPI || info == XLOG_FPI_FOR_HINT || info == XLOG_ASSIGN_LSN)
    {
       /* no further information to print */
    }
