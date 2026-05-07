@@ -399,9 +399,11 @@ In the `rmgr.h` header file, the resource managers are declared as an enum, with
 
 Each resource manager implements the `rm_desc` function, which provides a description of the record type associated with that resource manager. In the future, they will be extended to implement the `rm_redo` function to apply the changes to another server.
 
-**Supporting Various WAL Structures in PostgreSQL Versions 13 to 17**
+**Supporting Various WAL Structures in PostgreSQL Versions 13 to 19**
 
-The WAL structure has evolved across PostgreSQL versions 13 to 17, requiring different handling for each version. To accommodate these differences, we have implemented a wrapper-based approach, such as the factory pattern, to handle varying WAL structures.
+The WAL structure has evolved across PostgreSQL versions 13 to 19, requiring different handling for each version. To accommodate these differences, we have implemented a wrapper-based approach, such as the factory pattern, to handle varying WAL structures.
+
+**PostgreSQL 19 support**: pgmoneta supports the official PostgreSQL 19 WAL format, identified by magic `0xD121`. Development-only PostgreSQL 19 WAL magic values are not supported.
 
 Below are the commit hashes for the officially supported magic values in each PostgreSQL version:
 
@@ -411,6 +413,7 @@ Below are the commit hashes for the officially supported magic values in each Po
 4. PostgreSQL 16 - [0xD113][D113]
 5. PostgreSQL 17 - [0xD116][D116]
 6. PostgreSQL 18 - [0xD118][D118]
+7. PostgreSQL 19 - [0xD121][D121]
 
 
 `xl_end_of_recovery` is an example of how we handle different versions of structures with a wrapper struct and a factory pattern.
@@ -1066,6 +1069,24 @@ typedef struct xl_xact_parsed_commit
 	TimestampTz origin_timestamp;
 } xl_xact_parsed_commit;
 ```
+
+**xl_running_xacts**
+
+PostgreSQL 19's official `0xD121` WAL format uses the same running-transactions record layout as PostgreSQL 18:
+
+```c
+struct xl_running_xacts_v18 {
+   int xcnt;                                   /* Number of transaction IDs in xids[] */
+   int subxcnt;                                /* Number of subtransaction IDs in xids[] */
+   bool subxid_overflow;                       /* Indicates if snapshot overflowed and subxids are missing */
+   transaction_id next_xid;                    /* Next transaction ID from TransamVariables->next_xid */
+   transaction_id oldest_running_xid;          /* Oldest running transaction ID (not oldestXmin) */
+   transaction_id latest_completed_xid;        /* Latest completed transaction ID to set xmax */
+   transaction_id xids[FLEXIBLE_ARRAY_MEMBER]; /* Array of transaction IDs */
+};
+```
+
+The D121 heap WAL updates can register visibility-map blocks in addition to heap blocks. pgmoneta handles these through its generic registered-block decoding and WAL-summary paths.
 
 **xl_xact_parsed_abort**
 

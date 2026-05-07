@@ -29,6 +29,7 @@
 #include <walfile/rm.h>
 #include <walfile/rm_gist.h>
 #include <walfile/transaction.h>
+#include <walfile/wal_reader.h>
 #include <utils.h>
 #include <wal.h>
 

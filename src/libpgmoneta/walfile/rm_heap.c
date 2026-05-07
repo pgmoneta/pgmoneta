@@ -225,13 +225,78 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
 {
    char* rec = record->main_data;
    uint8_t info = record->header.xl_info & ~XLR_INFO_MASK;
+   uint16_t magic_value = pgmoneta_wal_get_current_magic();
    char* dbname = NULL;
    char* relname = NULL;
    char* spcname = NULL;
 
    info &= XLOG_HEAP_OPMASK;
 
-   if ((server_config->version >= 17) && (info == XLOG_HEAP2_PRUNE_ON_ACCESS || info == XLOG_HEAP2_PRUNE_VACUUM_SCAN || info == XLOG_HEAP2_PRUNE_VACUUM_CLEANUP))
+   if ((server_config->version >= 19) && (info == XLOG_HEAP2_PRUNE_ON_ACCESS || info == XLOG_HEAP2_PRUNE_VACUUM_SCAN || info == XLOG_HEAP2_PRUNE_VACUUM_CLEANUP))
+   {
+      struct xl_heap_prune_v19* xlrec = (struct xl_heap_prune_v19*)rec;
+
+      if (xlrec->flags & XLHP_HAS_CONFLICT_HORIZON)
+      {
+         transaction_id conflict_xid;
+
+         memcpy(&conflict_xid, rec + SizeOfHeapPruneV19, sizeof(transaction_id));
+
+         buf = pgmoneta_format_and_append(buf, "snapshot_conflict_horizon_id: %u", conflict_xid);
+      }
+
+      buf = pgmoneta_format_and_append(buf, ", is_catalog_rel: %c", xlrec->flags & XLHP_IS_CATALOG_REL ? 'T' : 'F');
+
+      if (XLogRecHasBlockData(record, 0))
+      {
+         offset_number* redirected;
+         offset_number* nowdead;
+         offset_number* nowunused;
+         int nredirected;
+         int nunused;
+         int ndead;
+         int nplans;
+         struct xlhp_freeze_plan* plans;
+         offset_number* frz_offsets;
+
+         struct decoded_bkp_block bkpb = record->blocks[0];
+         char* cursor = bkpb.data;
+
+         heap_xlog_deserialize_prune_and_freeze(cursor, xlrec->flags,
+                                                &nplans, &plans, &frz_offsets,
+                                                &nredirected, &redirected,
+                                                &ndead, &nowdead,
+                                                &nunused, &nowunused);
+
+         buf = pgmoneta_format_and_append(buf, ", nplans: %u, nredirected: %u, ndead: %u, nunused: %u",
+                                          nplans, nredirected, ndead, nunused);
+
+         if (nplans > 0)
+         {
+            buf = pgmoneta_format_and_append(buf, ", plans:");
+            buf = pgmoneta_wal_array_desc(buf, plans, sizeof(struct xlhp_freeze_plan), nplans);
+         }
+
+         if (nredirected > 0)
+         {
+            buf = pgmoneta_format_and_append(buf, ", redirected:");
+            buf = pgmoneta_wal_array_desc(buf, redirected, sizeof(offset_number) * 2, nredirected);
+         }
+
+         if (ndead > 0)
+         {
+            buf = pgmoneta_format_and_append(buf, ", dead:");
+            buf = pgmoneta_wal_array_desc(buf, nowdead, sizeof(offset_number), ndead);
+         }
+
+         if (nunused > 0)
+         {
+            buf = pgmoneta_format_and_append(buf, ", unused:");
+            buf = pgmoneta_wal_array_desc(buf, nowunused, sizeof(offset_number), nunused);
+         }
+      }
+   }
+   else if ((server_config->version >= 17) && (info == XLOG_HEAP2_PRUNE_ON_ACCESS || info == XLOG_HEAP2_PRUNE_VACUUM_SCAN || info == XLOG_HEAP2_PRUNE_VACUUM_CLEANUP))
    {
       struct xl_heap_prune_v17* xlrec = (struct xl_heap_prune_v17*)rec;
 
@@ -319,10 +384,13 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP2_VISIBLE)
    {
-      struct xl_heap_visible* xlrec = (struct xl_heap_visible*)rec;
+      if (magic_value < WAL_MAGIC_V19)
+      {
+         struct xl_heap_visible* xlrec = (struct xl_heap_visible*)rec;
 
-      buf = pgmoneta_format_and_append(buf, "cutoff xid %u flags 0x%02X",
-                                       xlrec->cutoff_xid, xlrec->flags);
+         buf = pgmoneta_format_and_append(buf, "cutoff xid %u flags 0x%02X",
+                                          xlrec->cutoff_xid, xlrec->flags);
+      }
    }
    else if (info == XLOG_HEAP2_MULTI_INSERT)
    {
@@ -380,7 +448,7 @@ error:
    return NULL;
 }
 void
-heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
+heap_xlog_deserialize_prune_and_freeze(char* cursor, uint16_t flags,
                                        int* nplans, struct xlhp_freeze_plan** plans,
                                        offset_number** frz_offsets,
                                        int* nredirected, offset_number** redirected,
