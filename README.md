@@ -19,7 +19,7 @@ standby, compression, encryption, TLS, and a Prometheus interface for operations
 **pgmoneta** is named after the Roman Goddess of Memory.
 
 Visit our [website](https://pgmoneta.github.io/) for documentation, tutorials and
-release downloads.
+release downloads. Or checkout some demos [here](https://mnemosyne-systems.ai/demo/).
 
 ## Table of Contents
 
@@ -37,21 +37,24 @@ release downloads.
 
 ## Features
 
-- **Full backup** of a PostgreSQL cluster
-- **Incremental backup** (PostgreSQL 14+)
+- **Full backup** of a PostgreSQL cluster with tablespace support
+- **Incremental backup** for PostgreSQL 14+ (tablespace support for PostgreSQL 17+), intuitive backup chain management
 - **Restore** to any saved backup, with point-in-time recovery
+- **WAL streaming** to save Write-Ahead Log (WAL) segments
+- **WAL tools** to inspect Write-Ahead Log (WAL) records, and optionally filter them out
 - **Compression** &mdash; gzip, zstd, lz4, bzip2
 - **AES encryption** of backups at rest
 - **Symlink support** for all files
 - **Hot standby** &mdash; keep a warm copy of the cluster ready
 - **Prometheus** metrics endpoint for monitoring
 - **Web console** for inspecting metrics
-- **Remote management** via `pgmoneta-cli`
+- **Remote management** via `pgmoneta-cli` or `pgmoneta-mcp`
 - **Offline detection** of unreachable instances
 - **Transport Layer Security (TLS) v1.2+** for client and server connections
 - **Daemon mode** with systemd integration
 - **User vault** for managing PostgreSQL credentials securely
-- **WAL tools** to inspect Write-Ahead Log (WAL) logs, and filter them
+- **Worker pool** to accelerate operations (backup/restore/delete/verify...)
+- **MCP server/client** to interact with core using natural language
 
 ## Installation
 
@@ -61,15 +64,20 @@ For RPM-based distributions (Fedora, RHEL, Rocky Linux, AlmaLinux), `pgmoneta`
 is available as a pre-built package from the official [PostgreSQL YUM
 repository](https://yum.postgresql.org/) (PGDG).
 
-Add the PGDG repository &mdash; example for **RHEL / Rocky Linux / AlmaLinux 10**:
+Add the PGDG repository &mdash; pick and install the matching RPM from the [PGDG repo packages
+page](https://yum.postgresql.org/repopackages/), for **Fedora / RHEL / Rocky Linux / AlmaLinux 10**, example to install the RPM:
 
     dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
-For Fedora, pick the matching RPM from the [PGDG repo packages
-page](https://yum.postgresql.org/repopackages/).
 
-Then disable the distribution-supplied PostgreSQL module and install `pgmoneta`
-alongside the PostgreSQL version of your choice (example for PostgreSQL 18):
+
+Then to install `pgmoneta`:
+
+```
+dnf install -y pgmoneta
+```
+
+pgmoneta does not rely on PostgreSQL binary. But if you need PostgreSQL to try the tool, disable the distribution-supplied PostgreSQL module and install the PostgreSQL version of your choice (example for PostgreSQL 18):
 
     dnf -qy module disable postgresql
     dnf install -y postgresql18 postgresql18-server pgmoneta
