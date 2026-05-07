@@ -80,7 +80,7 @@ dnf install -y pgmoneta
 pgmoneta does not rely on PostgreSQL binary. But if you need PostgreSQL to try the tool, disable the distribution-supplied PostgreSQL module and install the PostgreSQL version of your choice (example for PostgreSQL 18):
 
     dnf -qy module disable postgresql
-    dnf install -y postgresql18 postgresql18-server pgmoneta
+    dnf install -y postgresql18 postgresql18-server
 
 See the [Getting Started](https://github.com/pgmoneta/pgmoneta/blob/main/doc/GETTING_STARTED.md)
 guide for first-run configuration once the package is installed.
