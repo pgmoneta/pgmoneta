@@ -147,6 +147,7 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_deque_add(excludes, "backup.sha512", 0, ValueString);
       pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
       pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
+      pgmoneta_workflow_exclude_tablespaces(backup, excludes);
 
       if (pgmoneta_is_progress_enabled(server))
       {

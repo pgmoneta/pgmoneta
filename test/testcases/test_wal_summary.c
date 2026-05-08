@@ -58,7 +58,6 @@
 static void pgmoneta_test_cleanup_ssl(SSL** ssl);
 static void pgmoneta_test_cleanup_socket(int* socket);
 static void pgmoneta_test_cleanup_connection(SSL** ssl, int* socket);
-static void pgmoneta_test_cleanup_query_response(struct query_response** qr);
 static int pgmoneta_test_server_info_check(int srv);
 static void cleanup_connections(SSL** srv_ssl, int* srv_socket, SSL** custom_user_ssl, int* custom_user_socket);
 
@@ -261,16 +260,6 @@ pgmoneta_test_cleanup_connection(SSL** ssl, int* socket)
 {
    pgmoneta_test_cleanup_ssl(ssl);
    pgmoneta_test_cleanup_socket(socket);
-}
-
-static void
-pgmoneta_test_cleanup_query_response(struct query_response** qr)
-{
-   if (qr != NULL && *qr != NULL)
-   {
-      pgmoneta_free_query_response(*qr);
-      *qr = NULL;
-   }
 }
 
 static int

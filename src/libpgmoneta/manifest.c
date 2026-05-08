@@ -312,6 +312,9 @@ error:
    pgmoneta_deque_iterator_destroy(iter);
    pgmoneta_csv_reader_destroy(r1);
    pgmoneta_csv_reader_destroy(r2);
+   pgmoneta_art_destroy(deleted);
+   pgmoneta_art_destroy(changed);
+   pgmoneta_art_destroy(added);
    pgmoneta_art_destroy(tree);
    pgmoneta_deque_destroy(que);
    return 1;

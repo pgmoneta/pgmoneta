@@ -130,6 +130,13 @@ int
 pgmoneta_test_execute_query(int srv, SSL* ssl, int skt, char* query, struct query_response** qr);
 
 /**
+ * Free a query response and set the pointer to NULL.
+ * @param qr The query response pointer
+ */
+void
+pgmoneta_test_cleanup_query_response(struct query_response** qr);
+
+/**
  * Resolve an executable path under build/src from a test process.
  * Example: "pgmoneta-walinfo" -> ".../build/src/pgmoneta-walinfo"
  * @param binary_name The executable name

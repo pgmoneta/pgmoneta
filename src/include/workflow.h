@@ -37,6 +37,8 @@ extern "C" {
 #include <art.h>
 #include <info.h>
 
+struct deque;
+
 #define WORKFLOW_TYPE_BACKUP             0
 #define WORKFLOW_TYPE_RESTORE            1
 #define WORKFLOW_TYPE_ARCHIVE            2
@@ -214,6 +216,14 @@ pgmoneta_common_setup(char* name, struct art* nodes);
  */
 int
 pgmoneta_common_teardown(char* name, struct art* nodes);
+
+/**
+ * Add top-level tablespace directories to an exclude list
+ * @param backup The backup
+ * @param excludes The exclude list
+ */
+void
+pgmoneta_workflow_exclude_tablespaces(struct backup* backup, struct deque* excludes);
 
 /**
  * Get display name for a phase

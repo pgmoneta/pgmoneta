@@ -282,6 +282,11 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
    pgmoneta_art_create(&file_sizes);
    pgmoneta_art_create(&file_checksums);
 
+   if (msg == NULL)
+   {
+      goto error;
+   }
+
    memset(msg, 0, sizeof(struct message));
 
    // Receive the second result set
@@ -294,11 +299,14 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
    {
       char file_path[MAX_PATH];
       char directory[MAX_PATH];
+      char backup_tar_name[MAX_PATH];
       const char* archive_ext = basebackup_archive_extension();
       memset(file_path, 0, sizeof(file_path));
       memset(directory, 0, sizeof(directory));
+      memset(backup_tar_name, 0, sizeof(backup_tar_name));
       if (tup->data[1] == NULL)
       {
+         pgmoneta_snprintf(backup_tar_name, sizeof(backup_tar_name), "base");
          // main data directory
          if (pgmoneta_ends_with(basedir, "/"))
          {
@@ -320,6 +328,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
             if (pgmoneta_compare_string(tup->data[1], tblspc->path))
             {
                tblspc->oid = atoi(tup->data[0]);
+               pgmoneta_snprintf(backup_tar_name, sizeof(backup_tar_name), "%d", tblspc->oid);
                break;
             }
             tblspc = tblspc->next;
@@ -342,6 +351,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
          pgmoneta_log_error("Could not create archive tar file");
          goto error;
       }
+
       // get the copy out response
       while (msg != NULL && msg->kind != 'H')
       {
@@ -394,14 +404,12 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       fclose(file);
 
       // extract the file
-      if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes))
+      if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes, backup_tar_name))
       {
          goto error;
       }
       remove(file_path);
-      pgmoneta_free_message(msg);
-
-      msg = NULL;
+      memset(msg, 0, sizeof(struct message));
       tup = tup->next;
    }
 
@@ -481,6 +489,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    char file_path[MAX_PATH];
    char directory[MAX_PATH];
    char link_path[MAX_PATH];
+   char backup_tar_name[MAX_PATH];
    char tmp_manifest_file_path[MAX_PATH];
    char manifest_file_path[MAX_PATH];
    struct art* file_sizes = NULL;
@@ -489,6 +498,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    memset(file_path, 0, sizeof(file_path));
    memset(directory, 0, sizeof(directory));
    memset(link_path, 0, sizeof(link_path));
+   memset(backup_tar_name, 0, sizeof(backup_tar_name));
    memset(manifest_file_path, 0, sizeof(manifest_file_path));
    memset(tmp_manifest_file_path, 0, sizeof(tmp_manifest_file_path));
    memset(null_buffer, 0, 2 * 512);
@@ -570,7 +580,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   fflush(file);
                   fclose(file);
                   file = NULL;
-                  if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes))
+                  if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes, backup_tar_name))
                   {
                      goto error;
                   }
@@ -582,6 +592,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
 
                memset(file_path, 0, sizeof(file_path));
                memset(directory, 0, sizeof(directory));
+               memset(backup_tar_name, 0, sizeof(backup_tar_name));
                const char* archive_ext = basebackup_archive_extension();
                // The tablespace order in the second result set is presumably the same as the order in which the server sends tablespaces
                tblspc = tablespaces;
@@ -595,6 +606,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                }
                if (tup->data[1] == NULL)
                {
+                  pgmoneta_snprintf(backup_tar_name, sizeof(backup_tar_name), "base");
                   // main data directory
                   if (pgmoneta_ends_with(basedir, "/"))
                   {
@@ -616,6 +628,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                      if (pgmoneta_compare_string(tblspc->path, archive_path))
                      {
                         tblspc->oid = atoi(tup->data[0]);
+                        pgmoneta_snprintf(backup_tar_name, sizeof(backup_tar_name), "%d", tblspc->oid);
                         break;
                      }
                      tblspc = tblspc->next;
@@ -657,7 +670,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   fflush(file);
                   fclose(file);
                   file = NULL;
-                  if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes))
+                  if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes, backup_tar_name))
                   {
                      goto error;
                   }
@@ -797,7 +810,7 @@ error:
 }
 
 int
-pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art* file_checksums, struct art* file_sizes)
+pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art* file_checksums, struct art* file_sizes, char* backup_tar_name)
 {
    char* archive_name = NULL;
    struct archive* a;
@@ -907,6 +920,13 @@ pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art*
          pgmoneta_snprintf(dst_path, sizeof(dst_path), "%s/%s", destination, entry_path);
       }
 
+      if (type == AE_IFLNK && pgmoneta_ends_with(dst_path, "/"))
+      {
+         /* PostgreSQL emits pg_tblspc/<oid>/ as a symlink entry; symlink(2)
+          * treats a trailing slash on the link path as invalid. */
+         dst_path[strlen(dst_path) - 1] = '\0';
+      }
+
       if (type == AE_IFDIR)
       {
          if (pgmoneta_mkdir(dst_path))
@@ -989,6 +1009,12 @@ pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art*
          }
          while (asize > 0);
 
+         if (backup_tar_name != NULL && strlen(backup_tar_name) > 0 && strcmp(backup_tar_name, "base"))
+         {
+            entry_path_cpy = pgmoneta_append(entry_path_cpy, "pg_tblspc/");
+            entry_path_cpy = pgmoneta_append(entry_path_cpy, backup_tar_name);
+            entry_path_cpy = pgmoneta_append(entry_path_cpy, "/");
+         }
          entry_path_cpy = pgmoneta_append(entry_path_cpy, entry_path);
          pgmoneta_art_insert(file_sizes, entry_path_cpy, (uintptr_t)strm->written, ValueUInt64);
          pgmoneta_art_insert(file_checksums, entry_path_cpy, (uintptr_t)hasher->hash, ValueString);

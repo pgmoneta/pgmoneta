@@ -31,6 +31,7 @@
 #include <art.h>
 #include <backup.h>
 #include <compression.h>
+#include <deque.h>
 #include <hot_standby.h>
 #include <info.h>
 #include <logging.h>
@@ -480,6 +481,20 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
    pgmoneta_log_debug("%s (teardown): %s/%s", name, config->common.servers[server].name, label);
 
    return 0;
+}
+
+void
+pgmoneta_workflow_exclude_tablespaces(struct backup* backup, struct deque* excludes)
+{
+   if (backup == NULL || excludes == NULL)
+   {
+      return;
+   }
+
+   for (uint64_t i = 0; i < backup->number_of_tablespaces; i++)
+   {
+      pgmoneta_deque_add(excludes, backup->tablespaces[i], 0, ValueString);
+   }
 }
 
 const char*

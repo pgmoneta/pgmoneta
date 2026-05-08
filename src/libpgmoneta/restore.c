@@ -3194,7 +3194,8 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
             memset(copied_tblspc_mappings, 0, strlen(tblspc_mappings) + 1);
             memcpy(copied_tblspc_mappings, tblspc_mappings, strlen(tblspc_mappings));
 
-            token = strtok(copied_tblspc_mappings, ",");
+            char* saveptr = NULL;
+            token = strtok_r(copied_tblspc_mappings, ",", &saveptr);
 
             if (token == NULL)
             {
@@ -3206,11 +3207,18 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
             {
                char* k = NULL;
                char* v = NULL;
+               char* separator = NULL;
 
-               k = strtok(token, "->");
-               k = pgmoneta_remove_whitespace(k);
-               v = strtok(NULL, "->");
-               v = pgmoneta_remove_whitespace(v);
+               separator = strstr(token, "->");
+               if (separator == NULL)
+               {
+                  token = strtok_r(NULL, ",", &saveptr);
+                  continue;
+               }
+
+               *separator = '\0';
+               k = pgmoneta_remove_whitespace(token);
+               v = pgmoneta_remove_whitespace(separator + 2);
 
                if (!strcmp(k, backup->tablespaces_oids[i]) || !strcmp(k, backup->tablespaces_paths[i]))
                {
@@ -3218,7 +3226,7 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
                   found = true;
                }
 
-               token = strtok(NULL, ",");
+               token = strtok_r(NULL, ",", &saveptr);
                free(k);
                free(v);
             }

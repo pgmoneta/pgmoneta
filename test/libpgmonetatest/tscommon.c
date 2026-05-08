@@ -351,6 +351,16 @@ error:
    return 1;
 }
 
+void
+pgmoneta_test_cleanup_query_response(struct query_response** qr)
+{
+   if (qr != NULL && *qr != NULL)
+   {
+      pgmoneta_free_query_response(*qr);
+      *qr = NULL;
+   }
+}
+
 int
 pgmoneta_test_resolve_binary_path(const char* binary_name, char* out)
 {

@@ -71,6 +71,8 @@ sed -i "s/PG_REPL_PASSWORD/$PG_REPL_PASSWORD/g" /conf/setup.sql
 touch /pglog/logfile
 chmod 666 /pglog/logfile
 
+mkdir -p /conf/tblspc_test
+
 /usr/pgsql-14/bin/pg_ctl -D /pgdata/ start
 /usr/pgsql-14/bin/psql -q -h /tmp -f /conf/setup.sql postgres
 /usr/pgsql-14/bin/pg_ctl -D /pgdata/ stop

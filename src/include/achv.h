@@ -87,10 +87,11 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
  * @param destination The destination to extract to
  * @param checksums [out] The file checksums
  * @param sizes [out] The file sizes
+ * @param backup_tar_name The pg_basebackup tar name, base or tablespace OID
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art* file_checksums, struct art* file_sizes);
+pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art* file_checksums, struct art* file_sizes, char* backup_tar_name);
 
 #ifdef __cplusplus
 }

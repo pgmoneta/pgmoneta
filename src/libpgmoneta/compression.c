@@ -431,6 +431,11 @@ process_directory_operation(int server, char* directory, int type, struct worker
 
       pgmoneta_snprintf(full_path, sizeof(full_path), "%s/%s", directory, entry->d_name);
 
+      if (excludes != NULL && pgmoneta_deque_exists(excludes, entry->d_name))
+      {
+         continue;
+      }
+
       if (is_directory_entry(entry, full_path))
       {
          if (process_directory_operation(server, full_path, type, workers, excludes, decompress))
@@ -450,7 +455,7 @@ process_directory_operation(int server, char* directory, int type, struct worker
       {
          char* ext = strrchr(entry->d_name, '.');
 
-         if (pgmoneta_deque_exists(excludes, entry->d_name) || (ext != NULL && pgmoneta_deque_exists(excludes, ext)))
+         if (ext != NULL && pgmoneta_deque_exists(excludes, ext))
          {
             continue;
          }

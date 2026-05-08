@@ -184,11 +184,16 @@ pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque
 
    while ((entry = readdir(dir)) != NULL)
    {
-      if (entry->d_type == DT_DIR)
+      if (entry->d_type == DT_DIR || entry->d_type == DT_LNK)
       {
          char path[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, "pg_tblspc") == 0)
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         {
+            continue;
+         }
+
+         if (excludes != NULL && pgmoneta_deque_exists(excludes, entry->d_name))
          {
             continue;
          }
