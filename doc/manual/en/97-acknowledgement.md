@@ -61,8 +61,12 @@ Pranav Prajapati <pranavprajapati586@gmail.com>
 Som Shegokar <akashshegokar2186@gmail.com>
 Ameen Sakr <ameensakr623@gmail.com>
 Harshit Shaw <shawharshit116@gmail.com>
+<<<<<<< HEAD
 Ahmed Kamal <ahmedkamal200427@gmail.com>
 Rohan Mishra <kmrrohan29@gmail.com>
+=======
+Ahmed Metwally <t.a.metwally35@gmail.com>
+>>>>>>> 15704997 ([#1096] Add Prometheus alert metrics)
 ```
 
 ## Committers

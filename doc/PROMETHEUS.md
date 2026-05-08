@@ -314,6 +314,59 @@ Status of the pgmoneta extension
 | name | The server identifier |
 | version | The version of the pgmoneta extension (or "not_installed" if not present) |
 
+## pgmoneta_alert_server_down
+
+> **Note:** All `pgmoneta_alert_*` metrics are opt-in. They are only emitted when `alerts = on` is set in the `[pgmoneta]` section or `alerts = 1` is set on a specific server section.
+
+Alert: server is not online (1 = down, 0 = up)
+
+
+| Attribute | Description |
+| :-------- | :---------- |
+| server | The server identifier |
+| alert | The alert name (`server_down`) |
+| type | The alert type (`state`) |
+
+## pgmoneta_alert_wal_streaming_down
+
+Alert: WAL streaming is not active (1 = down, 0 = streaming)
+
+| Attribute | Description |
+| :-------- | :---------- |
+| server | The server identifier |
+| alert | The alert name (`wal_streaming_down`) |
+| type | The alert type (`state`) |
+
+## pgmoneta_alert_no_valid_backup
+
+Alert: no valid backup exists for the server (1 = no valid backup, 0 = ok)
+
+| Attribute | Description |
+| :-------- | :---------- |
+| server | The server identifier |
+| alert | The alert name (`no_valid_backup`) |
+| type | The alert type (`state`) |
+
+## pgmoneta_alert_backup_stale
+
+Alert: newest valid backup is older than the retention period (1 = stale, 0 = fresh)
+
+| Attribute | Description |
+| :-------- | :---------- |
+| server | The server identifier |
+| alert | The alert name (`backup_stale`) |
+| type | The alert type (`state`) |
+
+## pgmoneta_alert_disk_space_critical
+
+Alert: free disk space below 10% of total (1 = critical, 0 = ok)
+
+| Attribute | Description |
+| :-------- | :---------- |
+| server | The server identifier |
+| alert | The alert name (`disk_space_critical`) |
+| type | The alert type (`state`) |
+
 ## pgmoneta_backup_oldest
 
 The oldest backup for a server
@@ -812,3 +865,188 @@ The current WAL log sequence number
 | :-------- | :---------- |
 | name | The server identifier |
 | lsn | The Logical Sequence Number |
+
+# Alerts
+
+`pgmoneta` includes a set of built-in alert metrics that monitor the health of your
+[PostgreSQL](https://www.postgresql.org) servers and expose alert states on the Prometheus
+`/metrics` endpoint.
+
+Alerts let you detect problems — such as a server going down, WAL streaming stopping, or disk
+space running out — early, before they impact your backup operations or data safety.
+
+Each alert evaluates a condition and publishes the result as a Prometheus gauge
+(`1` = alert firing, `0` = OK). You can query them directly at the `/metrics` endpoint
+or visualize them in a Grafana dashboard. To receive notifications when an alert fires
+(for example, via a Slack webhook), see [Alerting with Grafana](#alerting-with-grafana).
+
+## Enabling Alerts
+
+Alert metrics are **opt-in** and can be controlled globally or per server.
+
+Set `alerts = on` in the `[pgmoneta]` section to enable alerts for **all** servers by default.
+You can then override that default for individual servers using `alerts = off` in their own
+section.
+
+```ini
+[pgmoneta]
+alerts = on      # enable alerts globally
+
+[server1]
+...             # inherits alerts = on → alerts are fired for server1
+
+[server2]
+...
+alerts = off     # override → alerts are disabled for server2
+```
+
+In this example alerts fire for `server1` but are suppressed for `server2`.
+
+## Built-in Alerts
+
+| Metric | Alert Name | Fires when (`value = 1`) |
+|--------|------------|--------------------------|
+| `pgmoneta_alert_server_down` | `server_down` | The server is not online |
+| `pgmoneta_alert_wal_streaming_down` | `wal_streaming_down` | WAL streaming is not active |
+| `pgmoneta_alert_no_valid_backup` | `no_valid_backup` | No valid backup exists for the server |
+| `pgmoneta_alert_backup_stale` | `backup_stale` | The newest valid backup is older than the retention period |
+| `pgmoneta_alert_disk_space_critical` | `disk_space_critical` | Free disk space is below 10% of total |
+
+All alert metrics carry three labels: `server` (the server identifier), `alert` (the alert
+name), and `type` (the alert type, currently `state`).
+
+# Alerting with Grafana
+
+In addition to dashboards, Grafana can monitor pgmoneta alert metrics and send notifications
+when something goes wrong — for example, when a PostgreSQL server goes down, WAL streaming
+stops, or disk space runs critically low.
+
+## Setting Up a Contact Point
+
+Before creating alerts you need to configure where notifications are sent. We use Slack as an
+example here, but Grafana also supports Email, PagerDuty, Microsoft Teams, and others (see the
+[Grafana Contact Points documentation](https://grafana.com/docs/grafana/latest/alerting/fundamentals/notifications/contact-points/)).
+
+First, create a Slack Incoming Webhook for the channel you want to receive alerts in
+(Slack -> Apps -> Incoming Webhooks -> Add New Webhook) (see the
+[Slack Incoming Webhooks documentation](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)).
+
+Then in Grafana, click Alerts & IRM -> Contact points -> "Create contact point".
+
+**Click on "Contact points".**
+
+![image](doc/images/pgmoneta_grafana_alerting_contact_point.png)
+
+**Click on "Create contact point".**
+
+![image](doc/images/pgmoneta_grafana_alerting_create_contact_point.png)
+
+**Set contact point**
+
+Set the name (e.g., `pgmoneta-slack`), choose "Slack" as the integration type, and paste
+your Webhook URL. Click "Test" to verify the connection, then "Save contact point".
+
+![image](doc/images/pgmoneta_grafana_alerting_set_contact_point.png)
+
+**Successful connection**
+
+![image](doc/images/pgmoneta_grafana_alerting_slack_success.png)
+
+## Creating an Alert Rule
+
+We will create a `PgMonetaServerDown` alert as an example. This alert fires when a PostgreSQL
+server monitored by pgmoneta becomes unreachable.
+
+Click Alerts & IRM -> Alert rules -> "+ New alert rule".
+
+Enter the rule name `PgMonetaServerDown`.
+
+Then define the query and condition. Select your Prometheus datasource (the one scraping
+pgmoneta) and enter the following query:
+
+```promql
+pgmoneta_alert_server_down == 1
+```
+
+Set the condition to fire when the query result is above `0` (i.e., at least one server is
+down). Click "Preview" to verify the expression.
+
+Then set the folder and labels. Choose or create a folder (e.g., `pgmoneta-alerts`) and add
+labels such as `severity = critical`.
+
+![image](doc/images/pgmoneta_grafana_alerting_new_rule.png)
+
+Next, configure the evaluation behavior. Select or create an evaluation group (e.g.,
+`pgmoneta` with interval `1m`). Set the pending period to `1m` — this means the condition
+must be true for 1 minute before the alert fires, which avoids false alarms from brief scrape
+gaps.
+
+![image](doc/images/pgmoneta_grafana_alerting_evaluation.png)
+
+Then configure the notifications. Select the contact point you created earlier
+(e.g., `pgmoneta-slack`).
+
+![image](doc/images/pgmoneta_grafana_alerting_notifications.png)
+
+You can also add annotations to include useful information in the notification message:
+
+*   **Summary**: `pgmoneta server {{ $labels.server }} is down`
+*   **Description**: `The PostgreSQL instance {{ $labels.server }} has been unreachable for more than 1 minute.`
+
+![image](doc/images/pgmoneta_grafana_alerting_annotations.png)
+
+Click "Save rule and exit".
+
+![image](doc/images/pgmoneta_grafana_alerting_rule_saved.png)
+
+Verify that the new rule appears in the Grafana Managed Alert Rules list.
+
+![image](doc/images/pgmoneta_grafana_alerting_rule_list.png)
+
+You can repeat these steps for the additional recommended alerts below.
+
+## Recommended Alerts
+
+The following alerts cover the most critical conditions for pgmoneta monitoring. For each
+alert, use the same steps described above — only the rule name, query, severity label, and
+pending period change.
+
+> **Note:** All `pgmoneta_alert_*` metrics require `alerts = on` to be set in `pgmoneta.conf`.
+> See [Enabling Alerts](#enabling-alerts).
+
+### Availability
+
+| Alert Name | Severity | PromQL Expression | Pending Period |
+|------------|----------|-------------------|----------------|
+| `PgMonetaServerDown` | critical | `pgmoneta_alert_server_down == 1` | 1m |
+| `PgMonetaWALStreamingDown` | critical | `pgmoneta_alert_wal_streaming_down == 1` | 2m |
+
+### Backup Health
+
+| Alert Name | Severity | PromQL Expression | Pending Period |
+|------------|----------|-------------------|----------------|
+| `PgMonetaNoValidBackup` | critical | `pgmoneta_alert_no_valid_backup == 1` | 5m |
+| `PgMonetaBackupStale` | warning | `pgmoneta_alert_backup_stale == 1` | 10m |
+
+### Disk
+
+| Alert Name | Severity | PromQL Expression | Pending Period |
+|------------|----------|-------------------|----------------|
+| `PgMonetaDiskSpaceCritical` | critical | `pgmoneta_alert_disk_space_critical == 1` | 2m |
+
+## Notes
+
+- Always add a `severity` label (`critical` or `warning`) to each rule. This allows you to
+  route critical alerts to Slack or PagerDuty and warnings to email using Grafana notification
+  policies.
+- pgmoneta labels alert metrics with a `server` label. Use `{{ $labels.server }}` in
+  annotations to identify which server triggered the alert.
+- The pending periods above are sensible defaults. Use longer periods (5m+) for
+  backup-health checks where brief transitions are expected, and shorter ones (1m) for
+  critical availability checks.
+- If you monitor multiple PostgreSQL servers, consider adding `by (server)` to your PromQL
+  expressions so each server fires an independent alert:
+  ```promql
+  pgmoneta_alert_server_down == 1
+  ```
+  Grafana will automatically split the result into one alert instance per `server` label value.
