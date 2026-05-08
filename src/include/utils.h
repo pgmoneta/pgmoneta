@@ -149,7 +149,7 @@ struct pgmoneta_parsed_command
  * @param command_table array containing one `struct pgmoneta_command` for
  * every possible command.
  * @param command_count number of commands in `command_table`.
- * @return true if the parsing of the command line was succesful, false
+ * @return true if the parsing of the command line was successful, false
  * otherwise
  *
  */
@@ -1336,12 +1336,12 @@ bool
 pgmoneta_is_incremental_path(char* path);
 
 /**
- * Splits a string into an array of strings separated by a delimeter
+ * Splits a string into an array of strings separated by a delimiter
  *
  * @param string The string to split
  * @param results The array of strings to store the results
- * @param count The number of strings the string splitted into
- * @param delimeter The delimeter to split the string by
+ * @param count The number of strings the string split into
+ * @param delimiter The delimiter to split the string by
  * @return 0 if success, otherwise 1
  */
 int
@@ -1440,7 +1440,7 @@ pgmoneta_is_wal_file(char* file);
  *
  * @param tli The timeline id
  * @param segno The segment number
- * @param segsize The WAL segemnt size
+ * @param segsize The WAL segment size
  * @return The WAL segment name
  */
 char*

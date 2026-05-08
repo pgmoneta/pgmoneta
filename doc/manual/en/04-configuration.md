@@ -227,7 +227,7 @@ have access to the `postgres` database in order to get the necessary configurati
 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
-| workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting. Maximum is CPU count |
+| workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global setting. Maximum is CPU count |
 
 **Transport Level Security**
 

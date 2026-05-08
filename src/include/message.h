@@ -524,7 +524,7 @@ int
 pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct query_response** response);
 
 /**
- * Receive mainfest file from the copy stream and write to disk
+ * Receive manifest file from the copy stream and write to disk
  * @param srv The server
  * @param ssl The SSL structure
  * @param socket The socket
