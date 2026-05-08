@@ -42,6 +42,7 @@
 #include <utils.h>
 #include <value.h>
 #include <utf8.h>
+#include <prometheus.h>
 
 /* system */
 #include <ctype.h>
@@ -312,6 +313,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   srv.workers = -1;
                   srv.max_rate = -1;
                   srv.progress_enabled = -1;
+                  srv.alert_enabled = -1;
 
                   idx_server++;
                }
@@ -669,6 +671,31 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
                      {
                         srv.progress_enabled = 0;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "alerts"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+                     {
+                        config->alerts = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+                     {
+                        srv.alert_enabled = 1;
+                     }
+                     else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+                     {
+                        srv.alert_enabled = 0;
                      }
                   }
                   else
@@ -3655,6 +3682,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL, (uintptr_t)config->compression_level, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PROGRESS, (uintptr_t)config->progress, ValueBool);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ALERTS, (uintptr_t)config->alerts, ValueBool);
    pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, config->storage_engine, to_storage_engine);
    pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_ENCRYPTION, config->common.encryption, to_encryption);
    pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_CREATE_SLOT, config->create_slot, to_create_slot);
@@ -3785,6 +3813,7 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MAX_RATE, (uintptr_t)config->common.servers[i].max_rate, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PROGRESS, pgmoneta_is_progress_enabled(i), ValueBool);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_ALERTS, pgmoneta_is_alert_enabled(i), ValueBool);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)"SHA512", ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->common.servers[i].tls_cert_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->common.servers[i].tls_ca_file, ValueString);
@@ -4406,6 +4435,17 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
             srv->progress_enabled = 0;
          }
       }
+      else if (!strcmp(key, "alerts"))
+      {
+         if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+         {
+            srv->alert_enabled = 1;
+         }
+         else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+         {
+            srv->alert_enabled = 0;
+         }
+      }
       else
       {
          unknown = true;
@@ -4538,6 +4578,17 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
             config->progress = false;
          }
       }
+      else if (!strcmp(key, "alerts"))
+      {
+         if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+         {
+            config->alerts = true;
+         }
+         else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+         {
+            config->alerts = false;
+         }
+      }
       else
       {
          unknown = true;
@@ -4638,6 +4689,10 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
          {
             pgmoneta_snprintf(buffer, buffer_size, "%s", config->progress ? "on" : "off");
          }
+         else if (!strcmp(key_info.key, "alerts"))
+         {
+            pgmoneta_snprintf(buffer, buffer_size, "%s", config->alerts ? "on" : "off");
+         }
          else
          {
             pgmoneta_log_debug("Unknown main configuration key: %s", key_info.key);
@@ -4732,6 +4787,10 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
                else if (!strcmp(key_info.key, "progress"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->progress_enabled == 1 ? "on" : (srv->progress_enabled == 0 ? "off" : "inherit"));
+               }
+               else if (!strcmp(key_info.key, "alerts"))
+               {
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->alert_enabled == 1 ? "on" : (srv->alert_enabled == 0 ? "off" : "inherit"));
                }
                else
                {
@@ -6178,6 +6237,7 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
 
    config->workers = reload->workers;
    config->progress = reload->progress;
+   config->alerts = reload->alerts;
    config->max_rate = reload->max_rate;
 
    /* prometheus */
@@ -6273,6 +6333,7 @@ copy_server(struct server* dst, struct server* src)
    /* memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH); */
    dst->workers = src->workers;
    dst->progress = src->progress;
+   dst->alert_enabled = src->alert_enabled;
    dst->max_rate = src->max_rate;
 
    if (restart_string("tls_cert_file", dst->tls_cert_file, src->tls_cert_file))
