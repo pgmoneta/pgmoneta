@@ -1,6 +1,6 @@
 \newpage
 
-# Adminstration access
+# Administration access
 
 You can access [**pgmoneta**][pgmoneta] from a remote machine if you enable access.
 

@@ -94,7 +94,7 @@ You can check the commit using:
 
 2. Choose commits to combine:
 
-    - You wil see
+    - You will see
 
             pick 3d50463 3-rd commit
             pick 93d3de2 2-nd commit

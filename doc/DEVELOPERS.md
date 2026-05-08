@@ -177,7 +177,7 @@ export PATH=/usr/bin:$PATH
 initdb -k /tmp/pgsql
 ```
 
-#### Remove default acess
+#### Remove default access
 
 Remove last lines from `/tmp/pgsql/pg_hba.conf`
 

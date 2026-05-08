@@ -111,7 +111,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | hot_standby | | String | No | Hot standby directories. Single directory or comma separated directories up to 8 (e.g., /path/to/hot/standby1,/path/to/hot/standby2) |
 | hot_standby_overrides | | String | No | Files to override in the hot standby directory. If multiple hot standbys are specified then this setting is separated by a \| |
 | hot_standby_tablespaces | | String | No | Tablespace mappings for the hot standby. Syntax is [from -> to,?]+. If multiple hot standbys are specified then this setting is separated by a \| |
-| workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting. Maximum is CPU count |
+| workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global setting. Maximum is CPU count |
 | max_rate | -1 | Int | No | The maximum backup transfer rate in bytes per second. Use 0 to disable, -1 means use the global setting |
 | progress | -1 | Int | No | Enable backup progress tracking. Use 1 to enable, 0 to disable, -1 means use the global setting |
 | tls_cert_file | | String | No | Certificate file for TLS. This file must be owned by either the user running pgmoneta or root. Can interpolate environment variables (e.g., `$HOME`) |
