@@ -69,6 +69,41 @@ pgmoneta: https://pgmoneta.github.io/
 Report bugs: https://github.com/pgmoneta/pgmoneta/issues
 ```
 
+## Archivo de configuración
+
+El flag `-c` acepta un archivo dedicado `pgmoneta_cli.conf` — **no** el archivo de configuración principal `pgmoneta.conf` del servidor.
+
+Pasar `pgmoneta.conf` directamente a `pgmoneta-cli` mediante `-c` hará que el CLI lea el puerto del servidor PostgreSQL (`5432`) en lugar del puerto de gestión, y la conexión fallará.
+
+Para conectarse a una instancia de pgmoneta en ejecución, usa uno de los siguientes métodos:
+
+**Opción 1: Usar un archivo de configuración CLI dedicado (`pgmoneta_cli.conf`)**
+
+``` ini
+host = localhost
+port = 5001
+```
+
+Luego ejecuta:
+
+``` sh
+pgmoneta-cli -c pgmoneta_cli.conf status
+```
+
+**Opción 2: Usar los flags `-h` y `-p` directamente**
+
+``` sh
+pgmoneta-cli -h localhost -p 5001 status
+```
+
+**Opción 3: Usar Unix Domain Socket (solo local)**
+
+Configura `unix_socket_dir` en `pgmoneta.conf` y ejecuta sin flags:
+
+``` sh
+pgmoneta-cli status
+```
+
 ## backup
 
 Hacer backup de un servidor

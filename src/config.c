@@ -280,6 +280,7 @@ config_init(const char* output_path, bool quiet, bool force)
    char base_dir[MAX_PATH];
    char unix_socket_dir[MISC_LENGTH];
    char metrics[MISC_LENGTH];
+   char management[MISC_LENGTH];
    char compression[MISC_LENGTH];
    char retention[MISC_LENGTH];
    char log_type[MISC_LENGTH];
@@ -325,6 +326,7 @@ config_init(const char* output_path, bool quiet, bool force)
       pgmoneta_snprintf(host, sizeof(host), "*");
       pgmoneta_snprintf(base_dir, sizeof(base_dir), "/tmp/pgmoneta/");
       pgmoneta_snprintf(unix_socket_dir, sizeof(unix_socket_dir), "/tmp/");
+      pgmoneta_snprintf(management, sizeof(management), "0");
       pgmoneta_snprintf(metrics, sizeof(metrics), "5001");
       pgmoneta_snprintf(compression, sizeof(compression), "zstd");
       pgmoneta_snprintf(retention, sizeof(retention), "7");
@@ -354,6 +356,11 @@ config_init(const char* output_path, bool quiet, bool force)
       if (prompt_input("Unix socket directory", "/tmp/", unix_socket_dir, sizeof(unix_socket_dir)))
       {
          warnx("Invalid input for unix_socket_dir");
+         goto error;
+      }
+      if (prompt_input("Management port (0 to disable)", "0", management, sizeof(management)))
+      {
+         warnx("Invalid input for management");
          goto error;
       }
 
@@ -405,7 +412,14 @@ config_init(const char* output_path, bool quiet, bool force)
    /* Write [pgmoneta] section */
    write_section(file, "pgmoneta");
    write_key_value(file, "host", host);
-   write_key_value(file, "metrics", metrics);
+   if (atoi(metrics) > 0)
+   {
+      write_key_value(file, "metrics", metrics);
+   }
+   if (atoi(management) > 0)
+   {
+      write_key_value(file, "management", management);
+   }
    fprintf(file, "\n");
    write_key_value(file, "base_dir", base_dir);
    fprintf(file, "\n");
