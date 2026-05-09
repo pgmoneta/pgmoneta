@@ -55,7 +55,8 @@ dnf install pandoc texlive-scheme-basic \
             'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' \
             'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' \
             'tex(titling.sty)' 'tex(csquotes.sty)' \
-            'tex(zref-abspage.sty)' 'tex(needspace.sty)'
+            'tex(zref-abspage.sty)' 'tex(needspace.sty)' \
+            texlive-babel-spanish
 ```
 
 You will need the `Eisvogel` template as well which you can install through
@@ -254,4 +255,3 @@ Developers may want to experiment with additional sanitizer flags not enabled by
 * `-fno-common` - Prevents variables from being merged into common blocks, helping identify variable access issues
 
 Note that some sanitizers are incompatible with each other. For example, you cannot use ASan and MSan together.
-
