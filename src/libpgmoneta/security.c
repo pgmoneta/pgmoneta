@@ -505,6 +505,10 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    }
 
    sasl_continue = pgmoneta_copy_message(msg);
+   if (((char*)sasl_continue->data)[0] == 'E')
+   {
+      goto error;
+   }
 
    get_scram_attribute('r', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &combined_nounce);
    get_scram_attribute('s', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &base64_salt);
@@ -939,6 +943,10 @@ retry:
    }
 
    sasl_continue = pgmoneta_copy_message(msg);
+   if (((char*)sasl_continue->data)[0] == 'E')
+   {
+      goto error;
+   }
 
    pgmoneta_free_message(msg);
    msg = NULL;
@@ -1584,6 +1592,10 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    }
 
    sasl_continue = pgmoneta_copy_message(msg);
+   if (((char*)sasl_continue->data)[0] == 'E')
+   {
+      goto error;
+   }
 
    security_lengths[auth_index] = sasl_continue->length;
    memcpy(&security_messages[auth_index], sasl_continue->data, sasl_continue->length);
