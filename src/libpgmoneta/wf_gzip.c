@@ -131,7 +131,7 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       number_of_workers = pgmoneta_get_number_of_workers(server);
       if (number_of_workers > 0)
       {
-         pgmoneta_workers_initialize(number_of_workers, &workers);
+         pgmoneta_workers_initialize(number_of_workers, false, &workers);
       }
 
       backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
@@ -281,7 +281,7 @@ gzip_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
    {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
+      pgmoneta_workers_initialize(number_of_workers, false, &workers);
    }
 
    if (pgmoneta_decompress_directory(base, COMPRESSION_SERVER_GZIP, workers, NULL))

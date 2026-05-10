@@ -137,7 +137,7 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
       number_of_workers = pgmoneta_get_number_of_workers(server);
       if (number_of_workers > 0)
       {
-         pgmoneta_workers_initialize(number_of_workers, &workers);
+         pgmoneta_workers_initialize(number_of_workers, false, &workers);
       }
 
       if (pgmoneta_deque_create(true, &excludes))
@@ -302,7 +302,7 @@ decryption_execute(char* name __attribute__((unused)), struct art* nodes)
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
    {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
+      pgmoneta_workers_initialize(number_of_workers, false, &workers);
    }
 
    pgmoneta_decrypt_directory(base, workers, NULL);

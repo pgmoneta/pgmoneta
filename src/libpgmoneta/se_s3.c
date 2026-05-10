@@ -915,7 +915,7 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
    {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
+      pgmoneta_workers_initialize(number_of_workers, false, &workers);
    }
 
    if (pgmoneta_manifest_get_paths(manifest_path, &paths))
@@ -1197,7 +1197,7 @@ s3_upload_files(char* local_root, char* s3_root, int server, int compression, in
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
    {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
+      pgmoneta_workers_initialize(number_of_workers, false, &workers);
    }
 
    if (pgmoneta_manifest_get_paths(manifest_path, &paths))
