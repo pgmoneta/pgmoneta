@@ -122,8 +122,7 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
    }
    sha512_path = pgmoneta_append(sha512_path, "backup.sha512");
 
-   sha512_file = fopen(sha512_path, "w");
-   if (sha512_file == NULL)
+   if (pgmoneta_fopen_secure(sha512_path, "w", &sha512_file))
    {
       goto error;
    }
@@ -315,11 +314,9 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
       goto error;
    }
 
-   source_file = fopen(sha512_path, "r");
-   if (source_file == NULL)
+   if (pgmoneta_fopen_secure(sha512_path, "r", &source_file))
    {
-      source_file = fopen(sha512_path, "w");
-      if (source_file == NULL)
+      if (pgmoneta_fopen_secure(sha512_path, "w", &source_file))
       {
          pgmoneta_log_error("Could not create file %s due to %s", sha512_path, strerror(errno));
          errno = 0;
@@ -327,8 +324,7 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
       }
       fflush(source_file);
       fclose(source_file);
-      source_file = fopen(sha512_path, "r");
-      if (source_file == NULL)
+      if (pgmoneta_fopen_secure(sha512_path, "r", &source_file))
       {
          pgmoneta_log_error("Could not open file %s due to %s", sha512_path, strerror(errno));
          errno = 0;
@@ -336,8 +332,7 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
       }
    }
 
-   dest_file = fopen(sha512_tmp_path, "w");
-   if (dest_file == NULL)
+   if (pgmoneta_fopen_secure(sha512_tmp_path, "w", &dest_file))
    {
       pgmoneta_log_error("Could not open file %s due to %s", sha512_tmp_path, strerror(errno));
       errno = 0;

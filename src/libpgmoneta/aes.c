@@ -36,6 +36,9 @@
 #include <workers.h>
 
 /* System */
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
@@ -1374,10 +1377,14 @@ encrypt_file(char* from, char* to, int enc)
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   out = fopen(tmp_to, "wb");
-   if (out == NULL)
+   if (pgmoneta_exists(tmp_to))
    {
-      pgmoneta_log_error("fopen: Could not open %s", tmp_to);
+      pgmoneta_delete_file(tmp_to, NULL);
+   }
+
+   if (pgmoneta_fopen_secure(tmp_to, "w", &out))
+   {
+      pgmoneta_log_error("pgmoneta_fopen_secure: Could not open %s", tmp_to);
       goto error;
    }
 

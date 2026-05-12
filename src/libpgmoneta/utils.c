@@ -805,6 +805,26 @@ pgmoneta_get_home_directory(void)
 }
 
 char*
+pgmoneta_get_tmpdir(void)
+{
+   char* dir = NULL;
+
+#if defined(HAVE_DARWIN) || defined(HAVE_OSX)
+#define GET_ENV(name) getenv(name)
+#else
+#define GET_ENV(name) secure_getenv(name)
+#endif
+
+   dir = GET_ENV("TMPDIR");
+   if (dir == NULL || strlen(dir) == 0)
+   {
+      dir = "/tmp";
+   }
+
+   return dir;
+}
+
+char*
 pgmoneta_get_user_name(void)
 {
    struct passwd* pw = getpwuid(getuid());
@@ -2599,8 +2619,8 @@ do_copy_file(struct worker_common* wc)
    char* to = NULL;
    bool use_direct_io = false;
    bool aligned_buffer = false;
-   int flags_from = O_RDONLY;
-   int flags_to = O_WRONLY | O_CREAT | O_TRUNC;
+   int flags_from = O_RDONLY | O_NOFOLLOW;
+   int flags_to = O_WRONLY | O_CREAT | O_TRUNC | O_EXCL | O_NOFOLLOW;
    size_t alignment = 4096;
 
    /* if the file is partial try for complete file */
@@ -2669,14 +2689,17 @@ do_copy_file(struct worker_common* wc)
 #endif
    }
 
-   if (use_direct_io)
+   if (buffer == NULL)
    {
-      buffer = pgmoneta_allocate_aligned(buffer_size, alignment);
-      aligned_buffer = true;
-   }
-   else
-   {
-      buffer = malloc(buffer_size);
+      if (use_direct_io)
+      {
+         buffer = pgmoneta_allocate_aligned(buffer_size, alignment);
+         aligned_buffer = true;
+      }
+      else
+      {
+         buffer = malloc(buffer_size);
+      }
    }
 
    if (buffer == NULL)
@@ -2721,6 +2744,11 @@ do_copy_file(struct worker_common* wc)
       goto error;
    }
 
+   if (pgmoneta_exists(to))
+   {
+      pgmoneta_delete_file(to, NULL);
+   }
+
    fd_to = open(to, flags_to, permissions);
 
 #if defined(__linux__)
@@ -2752,7 +2780,7 @@ do_copy_file(struct worker_common* wc)
           * Close and reopen destination without O_DIRECT for tail write. */
          pgmoneta_log_debug("Partial block detected (%zu bytes, alignment %zu), switching to buffered I/O for tail", nread, alignment);
          close(fd_to);
-         flags_to &= ~O_DIRECT;
+         flags_to &= ~(O_DIRECT | O_CREAT | O_TRUNC | O_EXCL);
          fd_to = open(to, flags_to | O_APPEND, permissions);
          if (fd_to < 0)
          {
@@ -2781,7 +2809,7 @@ do_copy_file(struct worker_common* wc)
             {
                pgmoneta_log_debug("O_DIRECT write failed for %s (EINVAL), falling back to buffered I/O", to);
                close(fd_to);
-               flags_to &= ~O_DIRECT;
+               flags_to &= ~(O_DIRECT | O_CREAT | O_TRUNC | O_EXCL);
                fd_to = open(to, flags_to | O_APPEND, permissions);
                if (fd_to < 0)
                {
@@ -2884,6 +2912,131 @@ pgmoneta_move_file(char* from, char* to)
    }
 
    return ret;
+}
+
+int
+pgmoneta_fopen_secure(char* path, char* mode, FILE** file)
+{
+   int fd = -1;
+   int flags = 0;
+   bool create = false;
+   bool read = false;
+   bool write = false;
+   bool append = false;
+   bool plus = false;
+   bool exclusive = false;
+
+   *file = NULL;
+
+   if (strchr(mode, 'r'))
+   {
+      read = true;
+   }
+   if (strchr(mode, 'w'))
+   {
+      write = true;
+      create = true;
+   }
+   if (strchr(mode, 'a'))
+   {
+      append = true;
+      create = true;
+   }
+   if (strchr(mode, '+'))
+   {
+      plus = true;
+   }
+   if (strchr(mode, 'x'))
+   {
+      exclusive = true;
+   }
+
+   if (plus)
+   {
+      flags |= O_RDWR;
+   }
+   else if (read)
+   {
+      flags |= O_RDONLY;
+   }
+   else
+   {
+      flags |= O_WRONLY;
+   }
+
+   if (create)
+   {
+      flags |= O_CREAT;
+      if (write)
+      {
+         flags |= O_TRUNC;
+      }
+      if (exclusive)
+      {
+         flags |= O_EXCL;
+      }
+   }
+
+   if (append)
+   {
+      flags |= O_APPEND;
+   }
+
+   if (create || write || append)
+   {
+      flags |= O_NOFOLLOW;
+   }
+   flags |= O_CLOEXEC;
+
+   if (create)
+   {
+      fd = open(path, flags, S_IRUSR | S_IWUSR);
+   }
+   else
+   {
+      fd = open(path, flags);
+   }
+
+   if (fd == -1)
+   {
+      if (errno == EEXIST)
+      {
+         return 1;
+      }
+      return 2;
+   }
+
+   if (create)
+   {
+      if (fchmod(fd, S_IRUSR | S_IWUSR))
+      {
+         close(fd);
+         return 2;
+      }
+   }
+
+   {
+      char fdmode[8];
+      size_t j = 0;
+      const char* p = mode;
+      while (*p != '\0' && j < sizeof(fdmode) - 1)
+      {
+         if (*p == 'r' || *p == 'w' || *p == 'a' || *p == 'b' || *p == '+')
+         {
+            fdmode[j++] = *p;
+         }
+         p++;
+      }
+      fdmode[j] = '\0';
+      *file = fdopen(fd, fdmode);
+   }
+   if (*file == NULL)
+   {
+      close(fd);
+      return 2;
+   }
+
+   return 0;
 }
 
 int
@@ -4088,7 +4241,7 @@ pgmoneta_get_server_workspace(int server)
    }
    else
    {
-      ws = pgmoneta_append(ws, "/tmp/pgmoneta-workspace/");
+      ws = pgmoneta_format_and_append(ws, "%s/pgmoneta-workspace-%d/", pgmoneta_get_tmpdir(), getuid());
    }
 
    if (!pgmoneta_exists(ws))

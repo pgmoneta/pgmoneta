@@ -2031,8 +2031,7 @@ write_reconstructed_file_full(char* output_file_path,
    uint8_t buffer[blocksz];
    struct rfile* s = NULL;
 
-   wfp = fopen(output_file_path, "wb+");
-   if (wfp == NULL)
+   if (pgmoneta_fopen_secure(output_file_path, "wb+", &wfp))
    {
       pgmoneta_log_error("reconstruct: unable to open file for reconstruction at %s", output_file_path);
       goto error;
@@ -2136,8 +2135,7 @@ write_reconstructed_file_incremental(char* output_file_path,
       }
    }
 
-   wfp = fopen(output_file_path, "wb+");
-   if (wfp == NULL)
+   if (pgmoneta_fopen_secure(output_file_path, "wb+", &wfp))
    {
       pgmoneta_log_error("reconstruct: unable to open file for reconstruction at %s", output_file_path);
       goto error;
@@ -2203,16 +2201,13 @@ write_backup_label(char* from_dir, char* to_dir, char* lsn_entry, char* tli_entr
    pgmoneta_snprintf(from_path, MAX_PATH, "%s/backup_label", from_dir);
    pgmoneta_snprintf(to_path, MAX_PATH, "%s/backup_label", to_dir);
 
-   from = fopen(from_path, "r");
-   to = fopen(to_path, "w");
-
-   if (from == NULL)
+   if (pgmoneta_fopen_secure(from_path, "r", &from))
    {
       pgmoneta_log_error("Write backup label, could not open %s", from_path);
       goto error;
    }
 
-   if (to == NULL)
+   if (pgmoneta_fopen_secure(to_path, "w", &to))
    {
       pgmoneta_log_error("Write backup label, could not open %s", to_path);
       goto error;
