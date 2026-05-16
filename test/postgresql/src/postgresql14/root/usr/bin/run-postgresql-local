@@ -56,5 +56,7 @@ sed -i "s/PG_USER_PASSWORD/$PG_USER_PASSWORD/g" /conf/setup.sql
 sed -i "s/PG_REPL_USER_NAME/$PG_REPL_USER_NAME/g" /conf/setup.sql
 sed -i "s/PG_REPL_PASSWORD/$PG_REPL_PASSWORD/g" /conf/setup.sql
 
+mkdir -p /conf/tblspc_test
+
 /usr/pgsql-14/bin/pg_ctl -D /pgdata/ start
 /usr/pgsql-14/bin/psql -q -h /tmp -f /conf/setup.sql postgres

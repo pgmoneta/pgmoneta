@@ -49,3 +49,7 @@ GRANT EXECUTE ON FUNCTION pg_stat_file(text, boolean) TO PG_REPL_USER_NAME;
 -- GRANT REPL_USER execute privileges on backup admin functions
 GRANT EXECUTE ON FUNCTION pg_backup_start(text, boolean) TO PG_REPL_USER_NAME;
 GRANT EXECUTE ON FUNCTION pg_backup_stop(boolean) TO PG_REPL_USER_NAME;
+
+-- Create tablespace for testing
+CREATE TABLESPACE test_ts LOCATION '/conf/tblspc_test';
+GRANT CREATE ON TABLESPACE test_ts TO PG_USER_NAME;

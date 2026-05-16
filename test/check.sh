@@ -86,6 +86,34 @@ detect_container_engine() {
   fi
 }
 
+make_tablespace_cleanup_writable() {
+  local tablespace_dir
+
+  for tablespace_dir in tblspc_test tblspc_tesths; do
+    if [[ ! -d "$PGCONF_DIRECTORY/$tablespace_dir" ]]; then
+      continue
+    fi
+
+    if [[ $MODE != "ci" && -n "${CONTAINER_ENGINE:-}" ]]; then
+      $CONTAINER_ENGINE exec $CONTAINER_NAME chmod -R 777 "/conf/$tablespace_dir" 2>/dev/null || true
+    fi
+    if ! chmod -R 777 "$PGCONF_DIRECTORY/$tablespace_dir" 2>/dev/null; then
+      $SUDO chmod -R 777 "$PGCONF_DIRECTORY/$tablespace_dir" || true
+    fi
+  done
+}
+
+remove_tablespace_cleanup_directory() {
+  local tablespace_dir
+
+  make_tablespace_cleanup_writable
+  for tablespace_dir in tblspc_test tblspc_tesths; do
+    if [[ -d "$PGCONF_DIRECTORY/$tablespace_dir" ]]; then
+      rm -Rf "$PGCONF_DIRECTORY/$tablespace_dir" 2>/dev/null || $SUDO rm -Rf "$PGCONF_DIRECTORY/$tablespace_dir"
+    fi
+  done
+}
+
 if [ -n "$PGMONETA_TEST_PORT" ]; then
     PORT=$PGMONETA_TEST_PORT
 fi
@@ -110,6 +138,8 @@ cleanup() {
 
    echo "Clean Test Resources"
    if [[ -d $PGMONETA_ROOT_DIR ]]; then
+      remove_tablespace_cleanup_directory
+
       if [[ -d $BASE_DIR ]]; then
         rm -Rf "$BASE_DIR"
       fi
@@ -382,6 +412,7 @@ do_setup() {
 
   echo "Preparing the pgmoneta directory"
   export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p-%m.profraw"
+  remove_tablespace_cleanup_directory
   rm -Rf "$PGMONETA_ROOT_DIR"
   mkdir -p "$PGMONETA_ROOT_DIR"
   mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR" "$RETROSPECT_DIR" "$HOT_STANDBY_DIRECTORY"
@@ -617,4 +648,3 @@ fi
 detect_container_engine
 trap cleanup EXIT SIGINT
 run_tests
-

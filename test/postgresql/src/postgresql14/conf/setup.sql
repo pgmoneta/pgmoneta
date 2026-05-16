@@ -48,3 +48,7 @@ GRANT EXECUTE ON FUNCTION pg_stop_backup(boolean, boolean) TO PG_REPL_USER_NAME;
 
 -- GRANT REPL_USER privilege to perform CHECKPOINT and pg_switch_wal
 GRANT EXECUTE ON FUNCTION pg_catalog.pg_switch_wal() TO PG_REPL_USER_NAME;
+
+-- Create tablespace for testing
+CREATE TABLESPACE test_ts LOCATION '/conf/tblspc_test';
+GRANT CREATE ON TABLESPACE test_ts TO PG_USER_NAME;
