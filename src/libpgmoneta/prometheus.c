@@ -99,6 +99,7 @@ static int bad_request(SSL* client_ssl, int client_fd);
 static int redirect_page(SSL* client_ssl, int client_fd, char* path);
 
 static void general_information(prometheus_metrics_container_t* container);
+static void alert_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
 static void backup_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
 static void size_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
 
@@ -1493,6 +1494,7 @@ retry_cache_locking:
                   free(d);
                }
 
+               alert_information(container, num_backups, all_backups);
                backup_information(container, num_backups, all_backups);
                size_information(container, num_backups, all_backups);
 
@@ -1585,6 +1587,210 @@ bad_request(SSL* client_ssl, int client_fd)
    free(data);
 
    return status;
+}
+
+bool
+pgmoneta_is_alert_enabled(int server)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->common.servers[server].alert_enabled == 1)
+   {
+      return true;
+   }
+   else if (config->common.servers[server].alert_enabled == 0)
+   {
+      return false;
+   }
+
+   return config->alerts;
+}
+
+static void
+alert_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups)
+{
+   char* data = NULL;
+   char* base_dir = NULL;
+   unsigned long free_s;
+   unsigned long total_s;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   /* pgmoneta_alert_server_down */
+   data = pgmoneta_append(data, "#HELP pgmoneta_alert_server_down Alert: server is not online (1 = down, 0 = up)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_alert_server_down gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (!pgmoneta_is_alert_enabled(i))
+      {
+         continue;
+      }
+      data = pgmoneta_append(data, "pgmoneta_alert_server_down{");
+      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\",alert=\"server_down\",type=\"state\"} ");
+      data = pgmoneta_append_int(data, config->common.servers[i].online ? 0 : 1);
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+   add_metric_to_art(container->server_metrics, "pgmoneta_alert_server_down", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+
+   /* pgmoneta_alert_wal_streaming_down */
+   data = pgmoneta_append(data, "#HELP pgmoneta_alert_wal_streaming_down Alert: WAL streaming is not active (1 = down, 0 = streaming)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_alert_wal_streaming_down gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (!pgmoneta_is_alert_enabled(i))
+      {
+         continue;
+      }
+      data = pgmoneta_append(data, "pgmoneta_alert_wal_streaming_down{");
+      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\",alert=\"wal_streaming_down\",type=\"state\"} ");
+      data = pgmoneta_append_int(data, config->common.servers[i].wal_streaming > 0 ? 0 : 1);
+      data = pgmoneta_append(data, "\n");
+   }
+
+   data = pgmoneta_append(data, "\n");
+   add_metric_to_art(container->server_metrics, "pgmoneta_alert_wal_streaming_down", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+
+   /* pgmoneta_alert_no_valid_backup */
+   data = pgmoneta_append(data, "#HELP pgmoneta_alert_no_valid_backup Alert: no valid backup exists for the server (1 = no valid backup, 0 = ok)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_alert_no_valid_backup gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (!pgmoneta_is_alert_enabled(i))
+      {
+         continue;
+      }
+      bool has_valid = false;
+
+      for (int j = 0; !has_valid && j < number_of_backups[i]; j++)
+      {
+         if (pgmoneta_is_backup_struct_valid(i, backups[i][j]))
+         {
+            has_valid = true;
+         }
+      }
+
+      data = pgmoneta_append(data, "pgmoneta_alert_no_valid_backup{");
+      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\",alert=\"no_valid_backup\",type=\"state\"} ");
+      data = pgmoneta_append_int(data, has_valid ? 0 : 1);
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+   add_metric_to_art(container->server_metrics, "pgmoneta_alert_no_valid_backup", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+
+   /* pgmoneta_alert_backup_stale */
+   data = pgmoneta_append(data, "#HELP pgmoneta_alert_backup_stale Alert: newest valid backup is older than the retention period (1 = stale, 0 = fresh)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_alert_backup_stale gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (!pgmoneta_is_alert_enabled(i))
+      {
+         continue;
+      }
+      int stale = 0;
+      int retention = config->common.servers[i].retention_days;
+
+      if (retention <= 0)
+      {
+         retention = config->retention_days;
+      }
+      if (retention <= 0)
+      {
+         retention = 1;
+      }
+
+      /* Find the newest valid backup */
+      for (int j = number_of_backups[i] - 1; j >= 0; j--)
+      {
+         if (pgmoneta_is_backup_struct_valid(i, backups[i][j]))
+         {
+            time_t backup_ts = pgmoneta_timestamp_from_string(backups[i][j]->label);
+
+            if (backup_ts > 0)
+            {
+               time_t now = time(NULL);
+               double age_days = difftime(now, backup_ts) / 86400.0;
+
+               stale = (age_days > (double)retention) ? 1 : 0;
+            }
+            else
+            {
+               stale = 1;
+            }
+            break;
+         }
+      }
+
+      /* If there are no valid backups at all, consider it stale too */
+      if (number_of_backups[i] == 0)
+      {
+         stale = 1;
+      }
+
+      data = pgmoneta_append(data, "pgmoneta_alert_backup_stale{");
+      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\",alert=\"backup_stale\",type=\"state\"} ");
+      data = pgmoneta_append_int(data, stale);
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+   add_metric_to_art(container->server_metrics, "pgmoneta_alert_backup_stale", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+
+   /* pgmoneta_alert_disk_space_critical */
+   data = pgmoneta_append(data, "#HELP pgmoneta_alert_disk_space_critical Alert: free disk space below 10%% of total (1 = critical, 0 = ok)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_alert_disk_space_critical gauge\n");
+
+   base_dir = pgmoneta_append(base_dir, config->base_dir);
+   base_dir = pgmoneta_append(base_dir, "/");
+
+   free_s = pgmoneta_free_space(base_dir);
+   total_s = pgmoneta_total_space(base_dir);
+
+   free(base_dir);
+   base_dir = NULL;
+
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (!pgmoneta_is_alert_enabled(i))
+      {
+         continue;
+      }
+      int critical = 0;
+
+      if (total_s > 0 && free_s < total_s / 10)
+      {
+         critical = 1;
+      }
+
+      data = pgmoneta_append(data, "pgmoneta_alert_disk_space_critical{");
+      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\",alert=\"disk_space_critical\",type=\"state\"} ");
+      data = pgmoneta_append_int(data, critical);
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+   add_metric_to_art(container->server_metrics, "pgmoneta_alert_disk_space_critical", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
 }
 
 static void

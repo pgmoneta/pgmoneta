@@ -352,6 +352,7 @@ struct server
    int max_rate;                                                  /**< Maximum backup rate in bytes per second. */
    int number_of_extra;                                           /**< The number of source directory*/
    int progress_enabled;                                          /**< The progress status */
+   int alert_enabled;                                             /**< The alert status */
    char extra[MAX_EXTRA][MAX_EXTRA_PATH];                         /**< Source directory*/
    bool has_extension;                                            /**< Does this have pgmoneta_ext */
    char ext_version[MISC_LENGTH];                                 /**< The major version of the extension*/
@@ -515,6 +516,7 @@ struct main_configuration
    pgmoneta_time_t verification; /**< The sha512 verification interval */
 
    bool progress; /**< Enable backup progress tracking */
+   bool alerts;    /**< Enable Prometheus alert metrics */
 
 #ifdef DEBUG
    bool link; /**< Do linking */
