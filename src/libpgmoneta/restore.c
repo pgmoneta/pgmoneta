@@ -690,9 +690,9 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
 error:
 
-   pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name,
-                                      ec != -1 ? ec : MANAGEMENT_ERROR_ANNOTATE_ERROR, en != NULL ? en : NAME,
-                                      compression, encryption, payload);
+   pgmoneta_management_response_error_with_nodes(ssl, client_fd, config->common.servers[server].name,
+                                                 ec != -1 ? ec : MANAGEMENT_ERROR_ANNOTATE_ERROR, en != NULL ? en : NAME,
+                                                 compression, encryption, payload, nodes);
 
    pgmoneta_json_destroy(payload);
 
@@ -832,7 +832,7 @@ pgmoneta_restore_backup(struct art* nodes)
 }
 
 int
-pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, char* output_dir, struct deque* prior_labels, struct backup* bck, struct json* manifest, bool incremental, bool combine_as_is)
+pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, char* output_dir, struct deque* prior_labels, struct backup* bck, struct json* manifest, bool incremental, bool combine_as_is, struct art* nodes)
 {
    uint32_t tsoid = 0;
    char relative_tablespace_path[MAX_PATH];
@@ -915,8 +915,9 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
 
    pgmoneta_workers_wait(workers);
 
-   if (workers != NULL && !workers->outcome)
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
    {
+      pgmoneta_workers_transfer_failures(workers, nodes);
       goto error;
    }
 
@@ -971,8 +972,9 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
 
    pgmoneta_workers_wait(workers);
 
-   if (workers != NULL && !workers->outcome)
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
    {
+      pgmoneta_workers_transfer_failures(workers, nodes);
       goto error;
    }
 
@@ -1571,7 +1573,7 @@ combine_backups_recursive(uint32_t tsoid,
          if (workers != NULL)
          {
             struct build_backup_file_input* wi = NULL;
-            if (workers->outcome)
+            if (pgmoneta_workers_outcome_ok(workers))
             {
                create_reconstruct_backup_file_input(server,
                                                     label,
@@ -1614,7 +1616,7 @@ combine_backups_recursive(uint32_t tsoid,
          if (workers != NULL)
          {
             struct build_backup_file_input* wi = NULL;
-            if (workers->outcome)
+            if (pgmoneta_workers_outcome_ok(workers))
             {
                create_copy_backup_file_input(server, label, ofulldir, relative_prefix, entry->d_name, exclude, workers, &wi);
                pgmoneta_workers_add(workers, do_copy_backup_file, (struct worker_common*)wi);
@@ -2420,6 +2422,7 @@ restore_backup_full(struct art* nodes)
       if (pgmoneta_mkdir(target_root))
       {
          pgmoneta_log_error("Unable to create target root directory %s", target_root);
+         ret = RESTORE_ERROR;
          goto error;
       }
    }
@@ -2429,6 +2432,7 @@ restore_backup_full(struct art* nodes)
       if (pgmoneta_mkdir(target_base))
       {
          pgmoneta_log_error("Unable to create target base directory %s", target_base);
+         ret = RESTORE_ERROR;
          goto error;
       }
    }
@@ -2876,6 +2880,8 @@ static void
 do_reconstruct_backup_file(struct worker_common* wc)
 {
    struct build_backup_file_input* input = (struct build_backup_file_input*)wc;
+   char* msg = NULL;
+
    if (reconstruct_backup_file(input->server,
                                input->label,
                                input->output_dir,
@@ -2888,13 +2894,15 @@ do_reconstruct_backup_file(struct worker_common* wc)
    {
       goto error;
    }
-   input->common.workers->outcome = true;
    free(input);
    return;
 
 error:
    pgmoneta_log_error("Unable to construct file %s/%s", input->label, input->relative_dir, input->file_name);
-   input->common.workers->outcome = false;
+   msg = pgmoneta_format_and_append(msg, "Reconstruct failed: %s/%s",
+                                    input->relative_dir, input->file_name);
+   pgmoneta_workers_record_failure(input->common.workers, msg);
+   free(msg);
    free(input);
    return;
 }
@@ -2903,6 +2911,8 @@ static void
 do_copy_backup_file(struct worker_common* wc)
 {
    struct build_backup_file_input* input = (struct build_backup_file_input*)wc;
+   char* msg = NULL;
+
    if (copy_backup_file(input->server,
                         input->label,
                         input->output_dir,
@@ -2917,7 +2927,10 @@ do_copy_backup_file(struct worker_common* wc)
 
 error:
    pgmoneta_log_error("Unable to construct file %s/%s", input->label, input->relative_dir, input->file_name);
-   input->common.workers->outcome = false;
+   msg = pgmoneta_format_and_append(msg, "Copy failed: %s/%s",
+                                    input->relative_dir, input->file_name);
+   pgmoneta_workers_record_failure(input->common.workers, msg);
+   free(msg);
    free(input);
    return;
 }

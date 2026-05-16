@@ -241,10 +241,10 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
 error:
 
-   pgmoneta_management_response_error(ssl, client_fd,
-                                      config->common.servers[server].name,
-                                      ec != -1 ? ec : MANAGEMENT_ERROR_ARCHIVE_ERROR, en != NULL ? en : NAME,
-                                      compression, encryption, payload);
+   pgmoneta_management_response_error_with_nodes(ssl, client_fd,
+                                                 config->common.servers[server].name,
+                                                 ec != -1 ? ec : MANAGEMENT_ERROR_ARCHIVE_ERROR, en != NULL ? en : NAME,
+                                                 compression, encryption, payload, nodes);
 
    pgmoneta_art_destroy(nodes);
 

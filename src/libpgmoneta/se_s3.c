@@ -959,7 +959,7 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
          goto error;
       }
 
-      if (workers != NULL && workers->outcome)
+      if (workers != NULL && pgmoneta_workers_outcome_ok(workers))
       {
          if (pgmoneta_workers_add(workers, do_download_file, (struct worker_common*)task))
          {
@@ -991,8 +991,9 @@ s3_download_files(char* s3_root, char* local_root, int server, int compression, 
    }
 
    pgmoneta_workers_wait(workers);
-   if (workers != NULL && !workers->outcome)
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
    {
+      pgmoneta_workers_log_failures(workers);
       goto error;
    }
    pgmoneta_workers_destroy(workers);
@@ -1135,7 +1136,10 @@ do_download_file(struct worker_common* wc)
 
    if (s3_download_one_file(task) && task->common.workers != NULL)
    {
-      task->common.workers->outcome = false;
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "S3 download failed: %s", task->remote_path);
+      pgmoneta_workers_record_failure(task->common.workers, msg);
+      free(msg);
    }
 
    free(task);
@@ -1166,7 +1170,10 @@ do_upload_file(struct worker_common* wc)
 
    if (s3_upload_one_file(task) && task->common.workers != NULL)
    {
-      task->common.workers->outcome = false;
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "S3 upload failed: %s", task->remote_path);
+      pgmoneta_workers_record_failure(task->common.workers, msg);
+      free(msg);
    }
 
    free(task);
@@ -1236,7 +1243,7 @@ s3_upload_files(char* local_root, char* s3_root, int server, int compression, in
          goto error;
       }
 
-      if (workers != NULL && workers->outcome)
+      if (workers != NULL && pgmoneta_workers_outcome_ok(workers))
       {
          if (pgmoneta_workers_add(workers, do_upload_file, (struct worker_common*)task))
          {
@@ -1266,8 +1273,9 @@ s3_upload_files(char* local_root, char* s3_root, int server, int compression, in
    }
 
    pgmoneta_workers_wait(workers);
-   if (workers != NULL && !workers->outcome)
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
    {
+      pgmoneta_workers_log_failures(workers);
       goto error;
    }
    pgmoneta_workers_destroy(workers);

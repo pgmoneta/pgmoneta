@@ -315,8 +315,9 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_debug("hot_standby source:      %s", source);
          pgmoneta_log_debug("hot_standby destination: %s", destination);
          pgmoneta_workers_wait(workers);
-         if (workers != NULL && !workers->outcome)
+         if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
          {
+            pgmoneta_workers_transfer_failures(workers, nodes);
             error = true;
             goto cleanup;
          }
@@ -331,8 +332,9 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             if (workers != NULL)
             {
                pgmoneta_workers_wait(workers);
-               if (!workers->outcome)
+               if (!pgmoneta_workers_outcome_ok(workers))
                {
+                  pgmoneta_workers_transfer_failures(workers, nodes);
                   error = true;
                   goto cleanup;
                }
@@ -349,8 +351,9 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             if (workers != NULL)
             {
                pgmoneta_workers_wait(workers);
-               if (!workers->outcome)
+               if (!pgmoneta_workers_outcome_ok(workers))
                {
+                  pgmoneta_workers_transfer_failures(workers, nodes);
                   error = true;
                   goto cleanup;
                }
@@ -374,8 +377,9 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             pgmoneta_log_debug("No hot_standby_overrides %s", config->common.servers[server].hot_standby[i]);
          }
          pgmoneta_workers_wait(workers);
-         if (workers != NULL && !workers->outcome)
+         if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
          {
+            pgmoneta_workers_transfer_failures(workers, nodes);
             error = true;
             goto cleanup;
          }

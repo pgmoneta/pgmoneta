@@ -96,7 +96,7 @@ pgmoneta_restore_backup(struct art* nodes);
  */
 int
 pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, char* output_dir, struct deque* prior_labels,
-                         struct backup* bck, struct json* manifest, bool incremental, bool combine_as_is);
+                         struct backup* bck, struct json* manifest, bool incremental, bool combine_as_is, struct art* nodes);
 
 /**
  * Rollup backups into a new backup

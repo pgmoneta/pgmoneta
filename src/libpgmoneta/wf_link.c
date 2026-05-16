@@ -175,8 +175,9 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_link_manifest(from, to, from, changed_files, added_files, workers);
 
          pgmoneta_workers_wait(workers);
-         if (workers != NULL && !workers->outcome)
+         if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
          {
+            pgmoneta_workers_transfer_failures(workers, nodes);
             goto error;
          }
          pgmoneta_workers_destroy(workers);

@@ -225,14 +225,14 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
    if (pgmoneta_management_create_response(payload, server, &response))
    {
-      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error_with_nodes(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload, nodes);
 
       goto error;
    }
 
    if (pgmoneta_json_create(&filesj))
    {
-      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error_with_nodes(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload, nodes);
 
       goto error;
    }
@@ -257,7 +257,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
    if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error_with_nodes(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, NAME, compression, encryption, payload, nodes);
       pgmoneta_log_error("Verify: Error sending response for %s/%s", config->common.servers[server].name, identifier);
 
       goto error;

@@ -2385,7 +2385,7 @@ pgmoneta_delete_file(char* file, struct workers* workers)
 
    if (workers != NULL)
    {
-      if (workers->outcome)
+      if (pgmoneta_workers_outcome_ok(workers))
       {
          pgmoneta_workers_add(workers, do_delete_file, (struct worker_common*)fi);
       }
@@ -2566,7 +2566,7 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
 
    if (workers != NULL)
    {
-      if (workers->outcome)
+      if (pgmoneta_workers_outcome_ok(workers))
       {
          pgmoneta_workers_add(workers, do_copy_file, (struct worker_common*)fi);
       }
@@ -2814,11 +2814,6 @@ do_copy_file(struct worker_common* wc)
    pgmoneta_log_trace("FILETRACKER | Copy | %s | %s |", fi->from, fi->to);
 #endif
 
-   if (fi->common.workers != NULL)
-   {
-      fi->common.workers->outcome = true;
-   }
-
    free(dn);
    free(from);
    free(to);
@@ -2853,7 +2848,10 @@ error:
 
    if (fi->common.workers != NULL)
    {
-      fi->common.workers->outcome = false;
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "File copy failed: %s", fi->from);
+      pgmoneta_workers_record_failure(fi->common.workers, msg);
+      free(msg);
    }
 
    free(dn);

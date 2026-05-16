@@ -107,7 +107,7 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
 
                if (workers != NULL)
                {
-                  if (workers->outcome)
+                  if (pgmoneta_workers_outcome_ok(workers))
                   {
                      pgmoneta_workers_add(workers, do_link, (struct worker_common*)wi);
                   }
@@ -244,7 +244,7 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
 
                if (workers != NULL)
                {
-                  if (workers->outcome)
+                  if (pgmoneta_workers_outcome_ok(workers))
                   {
                      pgmoneta_workers_add(workers, do_relink, (struct worker_common*)wi);
                   }
@@ -421,7 +421,7 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
 
             if (workers != NULL)
             {
-               if (workers->outcome)
+               if (pgmoneta_workers_outcome_ok(workers))
                {
                   pgmoneta_workers_add(workers, do_comparefiles, (struct worker_common*)wi);
                }

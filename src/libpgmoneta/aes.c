@@ -232,7 +232,7 @@ pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque
                {
                   if (workers != NULL)
                   {
-                     if (workers->outcome)
+                     if (pgmoneta_workers_outcome_ok(workers))
                      {
                         pgmoneta_workers_add(workers, do_encrypt_file, (struct worker_common*)wi);
                      }
@@ -301,7 +301,10 @@ do_encrypt_file(struct worker_common* wc)
       pgmoneta_log_warn("do_encrypt_file: %s -> %s", wi->from, wi->to);
       if (wi->common.workers != NULL)
       {
-         wi->common.workers->outcome = false;
+         char* msg = NULL;
+         msg = pgmoneta_format_and_append(msg, "AES encrypt failed: %s", wi->from);
+         pgmoneta_workers_record_failure(wi->common.workers, msg);
+         free(msg);
       }
    }
 
@@ -572,7 +575,7 @@ decrypt_data(char* d, struct workers* workers, struct deque* excludes)
             {
                if (workers != NULL)
                {
-                  if (workers->outcome)
+                  if (pgmoneta_workers_outcome_ok(workers))
                   {
                      pgmoneta_workers_add(workers, do_decrypt_file, (struct worker_common*)wi);
                   }
@@ -666,7 +669,10 @@ do_decrypt_file(struct worker_common* wc)
       pgmoneta_log_warn("do_decrypt_file: %s -> %s", wi->from, wi->to);
       if (wi->common.workers != NULL)
       {
-         wi->common.workers->outcome = false;
+         char* msg = NULL;
+         msg = pgmoneta_format_and_append(msg, "AES decrypt failed: %s", wi->from);
+         pgmoneta_workers_record_failure(wi->common.workers, msg);
+         free(msg);
       }
    }
 
@@ -2376,7 +2382,7 @@ dispatch_aes_operation(int server, char* from, char* to, int enc, struct workers
 
    if (workers != NULL)
    {
-      if (workers->outcome)
+      if (pgmoneta_workers_outcome_ok(workers))
       {
          if (pgmoneta_workers_add(workers, do_aes_operation, (struct worker_common*)task))
          {
@@ -2414,7 +2420,12 @@ do_aes_operation(struct worker_common* wc)
 
    if (result != 0 && task->common.workers != NULL)
    {
-      task->common.workers->outcome = false;
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "AES %s failed: %s",
+                                       task->enc ? "encrypt" : "decrypt",
+                                       task->from);
+      pgmoneta_workers_record_failure(task->common.workers, msg);
+      free(msg);
    }
 
    if (task->progress_enabled)

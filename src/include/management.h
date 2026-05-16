@@ -198,6 +198,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_USED_SPACE            "UsedSpace"
 #define MANAGEMENT_ARGUMENT_VALID                 "Valid"
 #define MANAGEMENT_ARGUMENT_WAL                   "WAL"
+#define MANAGEMENT_ARGUMENT_WORKER_ERRORS         "WorkerErrors"
 #define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
 #define MANAGEMENT_ARGUMENT_WORKFLOW              "Workflow"
 #define MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE  "WorkspaceFreeSpace"
@@ -873,6 +874,26 @@ pgmoneta_management_response_ok(SSL* ssl, int socket, struct timespec start_time
 int
 pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, char* workflow,
                                    uint8_t compression, uint8_t encryption, struct json* payload);
+
+/**
+ * Send an error response, attaching any worker failure messages stored in nodes
+ * under NODE_WORKER_ERRORS to the Outcome.WorkerErrors JSON array.
+ * When nodes is NULL this behaves identically to pgmoneta_management_response_error.
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param server The server name
+ * @param error The error code
+ * @param workflow The workflow name
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param payload The full payload
+ * @param nodes The workflow ART node tree (may be NULL)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_response_error_with_nodes(SSL* ssl, int socket, char* server, int32_t error, char* workflow,
+                                              uint8_t compression, uint8_t encryption, struct json* payload,
+                                              struct art* nodes);
 
 /**
  * Create a response

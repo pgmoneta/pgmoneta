@@ -128,6 +128,7 @@ extern "C" {
 #define NODE_TARGET_BASE                 "target_base"         /* The target base directory */
 #define NODE_TARGET_FILE                 "target_file"         /* The target file */
 #define NODE_TARGET_ROOT                 "target_root"         /* The target root directory */
+#define NODE_WORKER_ERRORS               "worker_errors"       /* Deque of worker failure messages */
 
 /* Supplied by the user */
 #define USER_DIRECTORY  "directory"  /* The target root directory */

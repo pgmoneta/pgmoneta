@@ -32,6 +32,7 @@
 #include <deque.h>
 #include <logging.h>
 #include <workers.h>
+#include <workflow.h>
 #include <value.h>
 #include <aes.h>
 
@@ -78,7 +79,13 @@ pgmoneta_workers_initialize(int num, struct workers** workers)
 
    w->number_of_alive = 0;
    w->number_of_working = 0;
-   w->outcome = true;
+   w->outcome = NULL;
+
+   if (pgmoneta_deque_create(true, &w->outcome))
+   {
+      pgmoneta_log_error("Could not allocate memory for workers outcome deque");
+      goto error;
+   }
 
    if (pgmoneta_deque_create(true, &w->queue))
    {
@@ -127,12 +134,109 @@ error:
 
    if (w != NULL)
    {
+      if (w->outcome != NULL)
+      {
+         pgmoneta_deque_destroy(w->outcome);
+      }
       pgmoneta_deque_destroy(w->queue);
       free(w->has_tasks);
       free(w);
    }
 
    return 1;
+}
+
+bool
+pgmoneta_workers_outcome_ok(struct workers* workers)
+{
+   if (workers == NULL || workers->outcome == NULL)
+   {
+      return true;
+   }
+   return pgmoneta_deque_empty(workers->outcome);
+}
+
+void
+pgmoneta_workers_record_failure(struct workers* workers, char* message)
+{
+   char* copy = NULL;
+
+   if (workers == NULL || workers->outcome == NULL || message == NULL)
+   {
+      return;
+   }
+
+   copy = pgmoneta_append(NULL, message);
+   if (copy != NULL)
+   {
+      pgmoneta_deque_add(workers->outcome, NULL, (uintptr_t)copy, ValueString);
+   }
+}
+
+void
+pgmoneta_workers_log_failures(struct workers* workers)
+{
+   struct deque_iterator* iter = NULL;
+
+   if (workers == NULL || workers->outcome == NULL)
+   {
+      return;
+   }
+
+   if (pgmoneta_deque_iterator_create(workers->outcome, &iter))
+   {
+      return;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      pgmoneta_log_error("Worker failure: %s", (char*)pgmoneta_value_data(iter->value));
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+}
+
+void
+pgmoneta_workers_transfer_failures(struct workers* workers, struct art* nodes)
+{
+   struct deque* existing = NULL;
+   struct deque_iterator* iter = NULL;
+
+   pgmoneta_workers_log_failures(workers);
+
+   if (workers == NULL || workers->outcome == NULL || nodes == NULL)
+   {
+      return;
+   }
+
+   existing = (struct deque*)pgmoneta_art_search(nodes, NODE_WORKER_ERRORS);
+
+   if (existing != NULL)
+   {
+      if (!pgmoneta_deque_iterator_create(workers->outcome, &iter))
+      {
+         while (pgmoneta_deque_iterator_next(iter))
+         {
+            char* msg = (char*)pgmoneta_value_data(iter->value);
+            char* copy = pgmoneta_append(NULL, msg);
+
+            if (copy != NULL)
+            {
+               pgmoneta_deque_add(existing, NULL, (uintptr_t)copy, ValueString);
+            }
+         }
+         pgmoneta_deque_iterator_destroy(iter);
+      }
+      pgmoneta_deque_destroy(workers->outcome);
+      workers->outcome = NULL;
+      return;
+   }
+
+   if (pgmoneta_art_insert(nodes, NODE_WORKER_ERRORS, (uintptr_t)workers->outcome, ValueDeque))
+   {
+      return;
+   }
+   workers->outcome = NULL;
 }
 
 int
@@ -213,6 +317,7 @@ pgmoneta_workers_destroy(struct workers* workers)
       }
 
       pgmoneta_deque_destroy(workers->queue);
+      pgmoneta_deque_destroy(workers->outcome);
       free(workers->has_tasks);
 
       for (int n = 0; n < worker_total; n++)

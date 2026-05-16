@@ -164,8 +164,9 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
       if (workers != NULL)
       {
          pgmoneta_workers_wait(workers);
-         if (!workers->outcome)
+         if (!pgmoneta_workers_outcome_ok(workers))
          {
+            pgmoneta_workers_transfer_failures(workers, nodes);
             goto error;
          }
       }
@@ -310,8 +311,9 @@ decryption_execute(char* name __attribute__((unused)), struct art* nodes)
    if (workers != NULL)
    {
       pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
+      if (!pgmoneta_workers_outcome_ok(workers))
       {
+         pgmoneta_workers_transfer_failures(workers, nodes);
          ret = 1;
          goto error;
       }

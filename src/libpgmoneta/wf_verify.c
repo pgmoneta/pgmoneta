@@ -192,7 +192,7 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
 
       if (number_of_workers > 0)
       {
-         if (workers->outcome)
+         if (pgmoneta_workers_outcome_ok(workers))
          {
             pgmoneta_workers_add(workers, do_verify, (struct worker_common*)payload);
          }
@@ -207,8 +207,9 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    pgmoneta_workers_wait(workers);
-   if (workers != NULL && !workers->outcome)
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
    {
+      pgmoneta_workers_transfer_failures(workers, nodes);
       goto error;
    }
    pgmoneta_workers_destroy(workers);

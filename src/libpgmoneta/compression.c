@@ -331,7 +331,12 @@ do_compression_operation(struct worker_common* wc)
 
    if (result != 0 && task->common.workers != NULL)
    {
-      task->common.workers->outcome = false;
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "%s failed: %s",
+                                       task->decompress ? "Decompress" : "Compress",
+                                       task->from);
+      pgmoneta_workers_record_failure(task->common.workers, msg);
+      free(msg);
    }
 
    if (task->progress_enabled)
@@ -354,7 +359,7 @@ dispatch_compression_operation(int server, char* from, char* to, int type, bool 
 
    if (workers != NULL)
    {
-      if (workers->outcome)
+      if (pgmoneta_workers_outcome_ok(workers))
       {
          if (pgmoneta_workers_add(workers, do_compression_operation, (struct worker_common*)task))
          {

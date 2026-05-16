@@ -205,9 +205,9 @@ error:
    {
       pgmoneta_progress_teardown(server);
    }
-   pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                      ec != -1 ? ec : MANAGEMENT_ERROR_LIST_S3_ERROR, en != NULL ? en : NAME,
-                                      compression, encryption, payload);
+   pgmoneta_management_response_error_with_nodes(NULL, client_fd, config->common.servers[server].name,
+                                                 ec != -1 ? ec : MANAGEMENT_ERROR_LIST_S3_ERROR, en != NULL ? en : NAME,
+                                                 compression, encryption, payload, nodes);
 
    pgmoneta_json_destroy(payload);
    pgmoneta_art_destroy(nodes);
@@ -327,9 +327,9 @@ error:
    {
       pgmoneta_progress_teardown(server);
    }
-   pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                      ec != -1 ? ec : MANAGEMENT_ERROR_DELETE_S3_ERROR, en != NULL ? en : NAME,
-                                      compression, encryption, payload);
+   pgmoneta_management_response_error_with_nodes(NULL, client_fd, config->common.servers[server].name,
+                                                 ec != -1 ? ec : MANAGEMENT_ERROR_DELETE_S3_ERROR, en != NULL ? en : NAME,
+                                                 compression, encryption, payload, nodes);
 
    pgmoneta_json_destroy(payload);
    pgmoneta_art_destroy(nodes);
@@ -489,9 +489,9 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
 
 error:
 
-   pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                      ec != -1 ? ec : MANAGEMENT_ERROR_RESTORE_S3_ERROR, en != NULL ? en : NAME,
-                                      compression, encryption, payload);
+   pgmoneta_management_response_error_with_nodes(NULL, client_fd, config->common.servers[server].name,
+                                                 ec != -1 ? ec : MANAGEMENT_ERROR_RESTORE_S3_ERROR, en != NULL ? en : NAME,
+                                                 compression, encryption, payload, nodes);
 
    pgmoneta_json_destroy(payload);
    pgmoneta_art_destroy(nodes);

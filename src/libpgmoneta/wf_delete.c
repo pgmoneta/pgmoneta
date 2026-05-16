@@ -48,7 +48,7 @@
 static char* delete_name(void);
 static int delete_backup_execute(char*, struct art*);
 
-static int delete_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups);
+static int delete_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups, struct art* nodes);
 
 struct workflow*
 pgmoneta_create_delete_backup(void)
@@ -165,7 +165,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
       }
    }
 
-   if (delete_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
+   if (delete_backup(server, backup_index, backups[backup_index], number_of_backups, backups, nodes))
    {
       pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_FULL, ValueInt32);
       pgmoneta_log_error("Delete: Full backup error for %s/%s", config->common.servers[server].name, label);
@@ -248,7 +248,7 @@ error:
 }
 
 static int
-delete_backup(int server, int index, struct backup* backup __attribute__((unused)), int number_of_backups, struct backup** backups)
+delete_backup(int server, int index, struct backup* backup __attribute__((unused)), int number_of_backups, struct backup** backups, struct art* nodes)
 {
    int prev_index = -1;
    int next_index = -1;
@@ -313,8 +313,9 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          pgmoneta_relink(from, to, workers);
 
          pgmoneta_workers_wait(workers);
-         if (workers != NULL && !workers->outcome)
+         if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
          {
+            pgmoneta_workers_transfer_failures(workers, nodes);
             goto error;
          }
          pgmoneta_workers_destroy(workers);
@@ -367,8 +368,9 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          pgmoneta_relink(from, to, workers);
 
          pgmoneta_workers_wait(workers);
-         if (workers != NULL && !workers->outcome)
+         if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
          {
+            pgmoneta_workers_transfer_failures(workers, nodes);
             goto error;
          }
          pgmoneta_workers_destroy(workers);
