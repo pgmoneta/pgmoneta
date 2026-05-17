@@ -245,9 +245,9 @@ In the `rmgr.h` header file, the resource managers are declared as an enum, with
 
 Each resource manager implements the `rm_desc` function, which provides a description of the record type associated with that resource manager. In the future, they will be extended to implement the `rm_redo` function to apply the changes to another server.
 
-**Supporting Various WAL Structures in PostgreSQL Versions 13 to 17**
+**Supporting Various WAL Structures in PostgreSQL Versions 13 to 19**
 
-The WAL structure has evolved across PostgreSQL versions 13 to 17, requiring different handling for each version. To accommodate these differences, we have implemented a wrapper-based approach, such as the factory pattern, to handle varying WAL structures.
+The WAL structure has evolved across PostgreSQL versions 13 to 19, requiring different handling for each version. To accommodate these differences, we have implemented a wrapper-based approach, such as the factory pattern, to handle varying WAL structures.
 
 Below are the commit hashes for the officially supported magic values in each PostgreSQL version:
 
@@ -257,6 +257,7 @@ Below are the commit hashes for the officially supported magic values in each Po
 4. PostgreSQL 16 - [0xD113][D113]
 5. PostgreSQL 17 - [0xD116][D116]
 6. PostgreSQL 18 - [0xD118][D118]
+7. PostgreSQL 19 - [0xD11F][D11F]
 
 
 `xl_end_of_recovery` is an example of how we handle different versions of structures with a wrapper struct and a factory pattern.
