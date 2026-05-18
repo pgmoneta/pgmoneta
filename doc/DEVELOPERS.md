@@ -209,7 +209,7 @@ Set `password_encryption` value in `/tmp/pgsql/postgresql.conf` to be `scram-sha
 password_encryption = scram-sha-256
 ```
 
-For version 13, the default is `md5`, while for version 14 and above, it is `scram-sha-256`. Therefore, you should ensure that the value in `/tmp/pgsql/postgresql.conf` matches the value in `/tmp/pgsql/pg_hba.conf`.
+For version 13, the default `password_encryption` is `md5`, while for version 14 and above, it is `scram-sha-256`. **Note:** pgmoneta no longer supports MD5 authentication. You **must** set `password_encryption = scram-sha-256` in `/tmp/pgsql/postgresql.conf` and use `scram-sha-256` in `/tmp/pgsql/pg_hba.conf` for all PostgreSQL versions.
 
 #### Set replication level
 

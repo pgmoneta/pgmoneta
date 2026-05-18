@@ -76,7 +76,7 @@ host    replication    repl    127.0.0.1/32     scram-sha-256
 host    replication    repl    ::1/128          scram-sha-256
 ```
 
-The authentication type should be based on `postgresql.conf`'s `password_encryption` value.
+The authentication type must be `scram-sha-256`. Note that `pgmoneta` does not support MD5 authentication.
 
 Then, create a physical replication slot that will be used for Write-Ahead Log streaming, like
 

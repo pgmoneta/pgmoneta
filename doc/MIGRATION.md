@@ -1,5 +1,22 @@
 # Migration
 
+## From 0.21.x to 0.22.x
+
+### MD5 Authentication Removal
+
+Legacy MD5 authentication has been completely removed from pgmoneta for improved security. This is a **breaking change** for any deployment still relying on MD5.
+
+**Action required:**
+
+1. **PostgreSQL Server**:
+   - Ensure `password_encryption = scram-sha-256` is set in `postgresql.conf`.
+   - Update `pg_hba.conf` to use `scram-sha-256` instead of `md5`.
+   - For existing users with MD5 passwords, you **must** reset their passwords while SCRAM encryption is active so that PostgreSQL generates SCRAM‑compatible verifiers.
+2. **pgmoneta**:
+   - Ensure the user configured in `pgmoneta.conf` uses `scram-sha-256` for database connectivity. MD5 is no longer a valid method.
+3. **Clients**:
+   - Ensure clients are compatible with `scram-sha-256` (standard for modern PostgreSQL drivers).
+
 ## From 0.20.x to 0.21.x
 
 ### Backup Rate Limit Configuration
