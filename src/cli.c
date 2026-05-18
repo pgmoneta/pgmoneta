@@ -123,7 +123,7 @@ static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uin
 static int list_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, bool plan, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int delete(SSL* ssl, int socket, char* server, char* backup_id, bool force, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -458,6 +458,7 @@ main(int argc, char** argv)
    int num_results = 0;
    bool cascade = false;
    bool force = false;
+   bool plan = false;
    char* sort_option = NULL;
    char port_buf[16] = {0};
 
@@ -476,6 +477,7 @@ main(int argc, char** argv)
       {"s", "sort", true},
       {"", "cascade", false},
       {"", "force", false},
+      {"", "plan", false},
       {"?", "help", false}};
 
    // Disable stdout buffering (i.e. write to stdout immediatelly).
@@ -629,6 +631,10 @@ main(int argc, char** argv)
       else if (!strcmp(optname, "force"))
       {
          force = true;
+      }
+      else if (!strcmp(optname, "plan"))
+      {
+         plan = true;
       }
       else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
       {
@@ -951,11 +957,11 @@ execute:
    {
       if (parsed.args[3])
       {
-         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, encryption, output_format);
+         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], plan, compression, encryption, output_format);
       }
       else
       {
-         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], compression, encryption, output_format);
+         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], plan, compression, encryption, output_format);
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_VERIFY)
@@ -1162,7 +1168,7 @@ static void
 help_restore(void)
 {
    printf("Restore a backup for a server\n");
-   printf("  pgmoneta-cli restore <server> <timestamp|oldest|newest> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
+   printf("  pgmoneta-cli restore [--plan] <server> <timestamp|oldest|newest> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
 }
 
 static void
@@ -1464,6 +1470,7 @@ delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t comp
 error:
    return 1;
 }
+
 static int
 restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
@@ -1482,10 +1489,11 @@ restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, char* posit
 error:
    return 1;
 }
+
 static int
-restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
+restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, bool plan, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_restore(ssl, socket, server, backup_id, position, directory, compression, encryption, output_format))
+   if (pgmoneta_management_request_restore(ssl, socket, server, backup_id, position, directory, plan, compression, encryption, output_format))
    {
       goto error;
    }
