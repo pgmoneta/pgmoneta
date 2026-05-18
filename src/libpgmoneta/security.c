@@ -54,7 +54,6 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
-#include <openssl/md5.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
@@ -72,7 +71,6 @@
 #define SECURITY_REJECT             -1
 #define SECURITY_TRUST              0
 #define SECURITY_PASSWORD           3
-#define SECURITY_MD5                5
 #define SECURITY_SCRAM256           10
 #define SECURITY_ALL                99
 
@@ -90,14 +88,11 @@ static size_t cached_master_salt_length = 0;
 static atomic_schar security_cache_lock = 0;
 
 static int get_auth_type(struct message* msg, int* auth_type);
-static int get_salt(void* data, char** salt);
-static int generate_md5(char* str, int length, char** md5);
 
 static int client_scram256(SSL* c_ssl, int client_fd, char* password, int slot);
 
 static int server_trust(void);
 static int server_password(char* username, char* password, SSL* ssl, int server_fd);
-static int server_md5(char* username, char* password, SSL* ssl, int server_fd);
 static int server_scram256(char* username, char* password, SSL* ssl, int server_fd);
 
 static char* get_admin_password(char* username);
@@ -716,12 +711,7 @@ get_auth_type(struct message* msg, int* auth_type)
          pgmoneta_log_trace("Backend: R - CleartextPassword");
          break;
       case 5:
-         pgmoneta_log_trace("Backend: R - MD5Password");
-         pgmoneta_log_trace("             Salt %02hhx%02hhx%02hhx%02hhx",
-                            (signed char)(pgmoneta_read_byte(msg->data + 9) & 0xFF),
-                            (signed char)(pgmoneta_read_byte(msg->data + 10) & 0xFF),
-                            (signed char)(pgmoneta_read_byte(msg->data + 11) & 0xFF),
-                            (signed char)(pgmoneta_read_byte(msg->data + 12) & 0xFF));
+         pgmoneta_log_warn("MD5 is unsupported - use SCRAM-SHA-256 instead");
          break;
       case 6:
          pgmoneta_log_trace("Backend: R - SCMCredential");
@@ -772,66 +762,6 @@ get_auth_type(struct message* msg, int* auth_type)
    *auth_type = type;
 
    return 0;
-}
-
-static int
-get_salt(void* data, char** salt)
-{
-   char* result;
-
-   result = malloc(4);
-
-   if (result == NULL)
-   {
-      goto error;
-   }
-
-   memset(result, 0, 4);
-
-   memcpy(result, data + 9, 4);
-
-   *salt = result;
-
-   return 0;
-
-error:
-
-   return 1;
-}
-
-static int
-generate_md5(char* str, int length, char** md5)
-{
-   int n;
-   MD5_CTX c;
-   unsigned char digest[16];
-   char* out;
-
-   out = malloc(33);
-
-   if (out == NULL)
-   {
-      goto error;
-   }
-
-   memset(out, 0, 33);
-
-   MD5_Init(&c);
-   MD5_Update(&c, str, length);
-   MD5_Final(digest, &c);
-
-   for (n = 0; n < 16; ++n)
-   {
-      pgmoneta_snprintf(&(out[n * 2]), 33 - (n * 2), "%02x", (unsigned int)digest[n]);
-   }
-
-   *md5 = out;
-
-   return 0;
-
-error:
-
-   return 1;
 }
 
 static int
@@ -1223,7 +1153,7 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    {
       goto error;
    }
-   else if (auth_type != SECURITY_TRUST && auth_type != SECURITY_PASSWORD && auth_type != SECURITY_MD5 && auth_type != SECURITY_SCRAM256)
+   else if (auth_type != SECURITY_TRUST && auth_type != SECURITY_PASSWORD && auth_type != SECURITY_SCRAM256)
    {
       goto error;
    }
@@ -1238,10 +1168,6 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    else if (auth_type == SECURITY_PASSWORD)
    {
       status = server_password(username, password, c_ssl, server_fd);
-   }
-   else if (auth_type == SECURITY_MD5)
-   {
-      status = server_md5(username, password, c_ssl, server_fd);
    }
    else if (auth_type == SECURITY_SCRAM256)
    {
@@ -1379,139 +1305,6 @@ bad_password:
 error:
 
    pgmoneta_free_message(password_msg);
-   pgmoneta_clear_message();
-
-   return AUTH_ERROR;
-}
-
-static int
-server_md5(char* username, char* password, SSL* ssl, int server_fd)
-{
-   int status = MESSAGE_STATUS_ERROR;
-   int auth_index = 1;
-   int auth_response = -1;
-   size_t size;
-   char* pwdusr = NULL;
-   char* shadow = NULL;
-   char* md5_req = NULL;
-   char* md5 = NULL;
-   char md5str[36];
-   char* salt = NULL;
-   struct message* auth_msg = NULL;
-   struct message* md5_msg = NULL;
-
-   pgmoneta_log_trace("server_md5");
-
-   if (get_salt(security_messages[0], &salt))
-   {
-      goto error;
-   }
-
-   size = strlen(username) + strlen(password) + 1;
-   pwdusr = malloc(size);
-   memset(pwdusr, 0, size);
-
-   pgmoneta_snprintf(pwdusr, size, "%s%s", password, username);
-
-   if (generate_md5(pwdusr, strlen(pwdusr), &shadow))
-   {
-      goto error;
-   }
-
-   md5_req = malloc(36);
-   memset(md5_req, 0, 36);
-   memcpy(md5_req, shadow, 32);
-   memcpy(md5_req + 32, salt, 4);
-
-   if (generate_md5(md5_req, 36, &md5))
-   {
-      goto error;
-   }
-
-   memset(&md5str, 0, sizeof(md5str));
-   pgmoneta_snprintf(&md5str[0], 36, "md5%s", md5);
-
-   status = pgmoneta_create_auth_md5_response(md5str, &md5_msg);
-   if (status != MESSAGE_STATUS_OK)
-   {
-      goto error;
-   }
-
-   status = pgmoneta_write_message(ssl, server_fd, md5_msg);
-   if (status != MESSAGE_STATUS_OK)
-   {
-      goto error;
-   }
-
-   security_lengths[auth_index] = md5_msg->length;
-   memcpy(&security_messages[auth_index], md5_msg->data, md5_msg->length);
-   auth_index++;
-
-   status = pgmoneta_read_block_message(ssl, server_fd, &auth_msg);
-   if (auth_msg->length > SECURITY_BUFFER_SIZE)
-   {
-      pgmoneta_log_message(auth_msg);
-      pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
-      goto error;
-   }
-
-   get_auth_type(auth_msg, &auth_response);
-   pgmoneta_log_trace("authenticate: auth response %d", auth_response);
-
-   if (auth_response == 0)
-   {
-      if (auth_msg->length > SECURITY_BUFFER_SIZE)
-      {
-         pgmoneta_log_message(auth_msg);
-         pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
-         goto error;
-      }
-
-      security_lengths[auth_index] = auth_msg->length;
-      memcpy(&security_messages[auth_index], auth_msg->data, auth_msg->length);
-
-      has_security = SECURITY_MD5;
-   }
-   else
-   {
-      goto bad_password;
-   }
-
-   free(pwdusr);
-   free(shadow);
-   free(md5_req);
-   free(md5);
-   free(salt);
-
-   pgmoneta_free_message(md5_msg);
-   pgmoneta_clear_message();
-
-   return AUTH_SUCCESS;
-
-bad_password:
-
-   pgmoneta_log_warn("Wrong password for user: %s", username);
-
-   free(pwdusr);
-   free(shadow);
-   free(md5_req);
-   free(md5);
-   free(salt);
-
-   pgmoneta_free_message(md5_msg);
-   pgmoneta_clear_message();
-
-   return AUTH_BAD_PASSWORD;
-
-error:
-
-   free(pwdusr);
-   free(shadow);
-   free(md5_req);
-   free(md5);
-   free(salt);
-
-   pgmoneta_free_message(md5_msg);
    pgmoneta_clear_message();
 
    return AUTH_ERROR;
