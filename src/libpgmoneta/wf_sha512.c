@@ -45,10 +45,9 @@
 static char* sha512_name(void);
 static int sha512_execute(char*, struct art*);
 
-static int write_backup_sha512(int server, char* root, char* relative_path,
-                               bool progress_enabled);
-
-static FILE* sha512_file = NULL;
+static void do_sha512(struct worker_common* wc);
+static int dispatch_sha512_tasks(int server, char* root, char* relative_path,
+                                 struct workers* workers, struct deque* all_deque);
 
 struct workflow*
 pgmoneta_create_sha512(void)
@@ -80,10 +79,14 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
    struct timespec start_t;
    struct timespec end_t;
    char* root = NULL;
-   char* d = NULL;
    char* sha512_path = NULL;
    char* server_backup = NULL;
    struct backup* backup = NULL;
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
+   struct deque* all_deque = NULL;
+   struct deque_iterator* iter = NULL;
+   FILE* sha512_file = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -122,26 +125,69 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
    }
    sha512_path = pgmoneta_append(sha512_path, "backup.sha512");
 
+   if (pgmoneta_deque_create(true, &all_deque))
+   {
+      goto error;
+   }
+
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      int file_count = pgmoneta_count_files(root);
+      pgmoneta_progress_set_total(server, file_count);
+   }
+
+   if (dispatch_sha512_tasks(server, root, "", workers, all_deque))
+   {
+      goto error;
+   }
+
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+   {
+      pgmoneta_workers_transfer_failures(workers, nodes);
+      goto error;
+   }
+   pgmoneta_workers_destroy(workers);
+   workers = NULL;
+
    sha512_file = fopen(sha512_path, "w");
    if (sha512_file == NULL)
    {
       goto error;
    }
 
-   d = pgmoneta_get_server_backup_identifier_data(server, label);
-
-   bool progress_enabled = pgmoneta_is_progress_enabled(server);
-
-   if (progress_enabled)
-   {
-      int file_count = pgmoneta_count_files(root);
-      pgmoneta_progress_set_total(server, file_count);
-   }
-
-   if (write_backup_sha512(server, root, "", progress_enabled))
+   if (pgmoneta_deque_iterator_create(all_deque, &iter))
    {
       goto error;
    }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      struct json* result = (struct json*)pgmoneta_value_data(iter->value);
+      char* path = (char*)pgmoneta_json_get(result, "Path");
+      char* hash = (char*)pgmoneta_json_get(result, "Hash");
+      char* line = NULL;
+
+      line = pgmoneta_append(line, hash);
+      line = pgmoneta_append(line, " *.");
+      line = pgmoneta_append(line, path);
+      line = pgmoneta_append(line, "\n");
+      fputs(line, sha512_file);
+      fflush(sha512_file);
+      free(line);
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
+
+   pgmoneta_deque_destroy(all_deque);
+   all_deque = NULL;
 
    pgmoneta_permission(sha512_path, 6, 0, 0);
 
@@ -168,11 +214,15 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
 
    free(sha512_path);
    free(root);
-   free(d);
 
    return 0;
 
 error:
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
 
    if (sha512_file != NULL)
    {
@@ -180,23 +230,64 @@ error:
       fclose(sha512_file);
    }
 
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(all_deque);
+
    free(sha512_path);
    free(root);
-   free(d);
 
    return 1;
 }
 
+static void
+do_sha512(struct worker_common* wc)
+{
+   struct worker_input* wi = (struct worker_input*)wc;
+   char* sha512 = NULL;
+   struct json* result = NULL;
+
+   if (pgmoneta_create_sha512_file(wi->from, &sha512))
+   {
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "SHA512 failed: %s", wi->from);
+      pgmoneta_workers_record_failure(wi->common.workers, msg);
+      free(msg);
+      goto done;
+   }
+
+   if (pgmoneta_json_create(&result))
+   {
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "SHA512 allocation failed: %s", wi->from);
+      pgmoneta_workers_record_failure(wi->common.workers, msg);
+      free(msg);
+      goto done;
+   }
+
+   pgmoneta_json_put(result, "Path", (uintptr_t)wi->to, ValueString);
+   pgmoneta_json_put(result, "Hash", (uintptr_t)sha512, ValueString);
+
+   pgmoneta_deque_add(wi->all, wi->from, (uintptr_t)result, ValueJSON);
+   result = NULL;
+
+   if (pgmoneta_is_progress_enabled(wi->level))
+   {
+      pgmoneta_progress_increment(wi->level, 1);
+   }
+
+done:
+   pgmoneta_json_destroy(result);
+   free(sha512);
+   wi->all = NULL;
+   free(wi);
+}
+
 static int
-write_backup_sha512(int server, char* root, char* relative_path,
-                    bool progress_enabled)
+dispatch_sha512_tasks(int server, char* root, char* relative_path,
+                      struct workers* workers, struct deque* all_deque)
 {
    char* dir_path = NULL;
-   char* relative_file_path;
-   char* absolute_file_path;
-   char* buffer;
-   char* sha512;
-   DIR* dir;
+   DIR* dir = NULL;
    struct dirent* entry;
 
    dir_path = pgmoneta_append(dir_path, root);
@@ -209,53 +300,65 @@ write_backup_sha512(int server, char* root, char* relative_path,
 
    while ((entry = readdir(dir)) != NULL)
    {
-      char relative_dir[1024];
+      char entry_path[MAX_PATH];
+      bool is_dir;
 
-      if (entry->d_type == DT_DIR)
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
       {
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-         {
-            continue;
-         }
+         continue;
+      }
 
+      pgmoneta_snprintf(entry_path, sizeof(entry_path), "%s/%s", dir_path, entry->d_name);
+
+      is_dir = (entry->d_type == DT_DIR) ||
+               ((entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN) &&
+                pgmoneta_is_directory(entry_path));
+
+      if (is_dir)
+      {
+         char relative_dir[MAX_PATH];
          pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
 
-         write_backup_sha512(server, root, relative_dir, progress_enabled);
-      }
-      else if (strcmp(entry->d_name, "backup.sha512"))
-      {
-         relative_file_path = NULL;
-         absolute_file_path = NULL;
-         sha512 = NULL;
-         buffer = NULL;
-
-         relative_file_path = pgmoneta_append(relative_file_path, relative_path);
-         relative_file_path = pgmoneta_append(relative_file_path, "/");
-         relative_file_path = pgmoneta_append(relative_file_path, entry->d_name);
-
-         absolute_file_path = pgmoneta_append(absolute_file_path, root);
-         absolute_file_path = pgmoneta_append(absolute_file_path, "/");
-         absolute_file_path = pgmoneta_append(absolute_file_path, relative_file_path);
-
-         pgmoneta_create_sha512_file(absolute_file_path, &sha512);
-
-         buffer = pgmoneta_append(buffer, sha512);
-         buffer = pgmoneta_append(buffer, " *.");
-         buffer = pgmoneta_append(buffer, relative_file_path);
-         buffer = pgmoneta_append(buffer, "\n");
-
-         fputs(buffer, sha512_file);
-         fflush(sha512_file);
-
-         if (progress_enabled)
+         if (dispatch_sha512_tasks(server, root, relative_dir, workers, all_deque))
          {
-            pgmoneta_progress_increment(server, 1);
+            goto error;
+         }
+      }
+      else if (!pgmoneta_compare_string(entry->d_name, "backup.sha512"))
+      {
+         char relative_file[MAX_PATH];
+         char absolute_file[MAX_PATH];
+         struct worker_input* payload = NULL;
+
+         pgmoneta_snprintf(relative_file, sizeof(relative_file), "%s/%s", relative_path, entry->d_name);
+         pgmoneta_snprintf(absolute_file, sizeof(absolute_file), "%s%s", root, relative_file);
+
+         if (pgmoneta_create_worker_input(NULL, absolute_file, relative_file, server, workers, &payload))
+         {
+            goto error;
          }
 
-         free(buffer);
-         free(sha512);
-         free(relative_file_path);
-         free(absolute_file_path);
+         payload->all = all_deque;
+
+         if (workers != NULL)
+         {
+            if (pgmoneta_workers_outcome_ok(workers))
+            {
+               if (pgmoneta_workers_add(workers, do_sha512, (struct worker_common*)payload))
+               {
+                  free(payload);
+                  goto error;
+               }
+            }
+            else
+            {
+               free(payload);
+            }
+         }
+         else
+         {
+            do_sha512((struct worker_common*)payload);
+         }
       }
    }
 

@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <progress.h>
 #include <security.h>
 #include <utils.h>
 #include <workflow.h>
@@ -40,9 +41,9 @@
 static char* sha256_name(void);
 static int sha256_execute(char*, struct art*);
 
-static int write_backup_sha256(char* root, char* relative_path);
-
-static FILE* sha256_file = NULL;
+static void do_sha256(struct worker_common* wc);
+static int dispatch_sha256_tasks(int server, char* root, char* relative_path,
+                                 struct workers* workers, struct deque* all_deque);
 
 struct workflow*
 pgmoneta_create_sha256(void)
@@ -74,6 +75,11 @@ sha256_execute(char* name __attribute__((unused)), struct art* nodes)
    char* root = NULL;
    char* d = NULL;
    char* sha256_path = NULL;
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
+   struct deque* all_deque = NULL;
+   struct deque_iterator* iter = NULL;
+   FILE* sha256_file = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -99,18 +105,71 @@ sha256_execute(char* name __attribute__((unused)), struct art* nodes)
    sha256_path = pgmoneta_append(sha256_path, root);
    sha256_path = pgmoneta_append(sha256_path, "backup.sha256");
 
+   d = pgmoneta_get_server_backup_identifier_data(server, label);
+
+   if (pgmoneta_deque_create(true, &all_deque))
+   {
+      goto error;
+   }
+
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      int file_count = pgmoneta_count_files(d);
+      pgmoneta_progress_set_total(server, file_count);
+   }
+
+   if (dispatch_sha256_tasks(server, d, "", workers, all_deque))
+   {
+      goto error;
+   }
+
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+   {
+      pgmoneta_workers_transfer_failures(workers, nodes);
+      goto error;
+   }
+   pgmoneta_workers_destroy(workers);
+   workers = NULL;
+
    sha256_file = fopen(sha256_path, "w");
    if (sha256_file == NULL)
    {
       goto error;
    }
 
-   d = pgmoneta_get_server_backup_identifier_data(server, label);
-
-   if (write_backup_sha256(d, ""))
+   if (pgmoneta_deque_iterator_create(all_deque, &iter))
    {
       goto error;
    }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      struct json* result = (struct json*)pgmoneta_value_data(iter->value);
+      char* path = (char*)pgmoneta_json_get(result, "Path");
+      char* hash = (char*)pgmoneta_json_get(result, "Hash");
+      char* line = NULL;
+
+      line = pgmoneta_append(line, path);
+      line = pgmoneta_append(line, ":");
+      line = pgmoneta_append(line, hash);
+      line = pgmoneta_append(line, "\n");
+      fputs(line, sha256_file);
+      fflush(sha256_file);
+      free(line);
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
+
+   pgmoneta_deque_destroy(all_deque);
+   all_deque = NULL;
 
    pgmoneta_permission(sha256_path, 6, 0, 0);
 
@@ -125,11 +184,19 @@ sha256_execute(char* name __attribute__((unused)), struct art* nodes)
 
 error:
 
+   if (workers != NULL)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
    if (sha256_file != NULL)
    {
       fflush(sha256_file);
       fclose(sha256_file);
    }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(all_deque);
 
    free(sha256_path);
    free(root);
@@ -138,15 +205,55 @@ error:
    return 1;
 }
 
+static void
+do_sha256(struct worker_common* wc)
+{
+   struct worker_input* wi = (struct worker_input*)wc;
+   char* sha256 = NULL;
+   struct json* result = NULL;
+
+   if (pgmoneta_create_sha256_file(wi->from, &sha256))
+   {
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "SHA256 failed: %s", wi->from);
+      pgmoneta_workers_record_failure(wi->common.workers, msg);
+      free(msg);
+      goto done;
+   }
+
+   if (pgmoneta_json_create(&result))
+   {
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "SHA256 allocation failed: %s", wi->from);
+      pgmoneta_workers_record_failure(wi->common.workers, msg);
+      free(msg);
+      goto done;
+   }
+
+   pgmoneta_json_put(result, "Path", (uintptr_t)wi->to, ValueString);
+   pgmoneta_json_put(result, "Hash", (uintptr_t)sha256, ValueString);
+
+   pgmoneta_deque_add(wi->all, wi->from, (uintptr_t)result, ValueJSON);
+   result = NULL;
+
+   if (pgmoneta_is_progress_enabled(wi->level))
+   {
+      pgmoneta_progress_increment(wi->level, 1);
+   }
+
+done:
+   pgmoneta_json_destroy(result);
+   free(sha256);
+   wi->all = NULL;
+   free(wi);
+}
+
 static int
-write_backup_sha256(char* root, char* relative_path)
+dispatch_sha256_tasks(int server, char* root, char* relative_path,
+                      struct workers* workers, struct deque* all_deque)
 {
    char* dir_path = NULL;
-   char* relative_file_path;
-   char* absolute_file_path;
-   char* buffer;
-   char* sha256;
-   DIR* dir;
+   DIR* dir = NULL;
    struct dirent* entry;
 
    dir_path = pgmoneta_append(dir_path, root);
@@ -159,48 +266,65 @@ write_backup_sha256(char* root, char* relative_path)
 
    while ((entry = readdir(dir)) != NULL)
    {
-      char relative_dir[1024];
+      char entry_path[MAX_PATH];
+      bool is_dir;
 
-      if (entry->d_type == DT_DIR)
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
       {
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-         {
-            continue;
-         }
+         continue;
+      }
 
+      pgmoneta_snprintf(entry_path, sizeof(entry_path), "%s/%s", dir_path, entry->d_name);
+
+      is_dir = (entry->d_type == DT_DIR) ||
+               ((entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN) &&
+                pgmoneta_is_directory(entry_path));
+
+      if (is_dir)
+      {
+         char relative_dir[MAX_PATH];
          pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
 
-         write_backup_sha256(root, relative_dir);
+         if (dispatch_sha256_tasks(server, root, relative_dir, workers, all_deque))
+         {
+            goto error;
+         }
       }
       else
       {
-         relative_file_path = NULL;
-         absolute_file_path = NULL;
-         sha256 = NULL;
-         buffer = NULL;
+         char relative_file[MAX_PATH];
+         char absolute_file[MAX_PATH];
+         struct worker_input* payload = NULL;
 
-         relative_file_path = pgmoneta_append(relative_file_path, relative_path);
-         relative_file_path = pgmoneta_append(relative_file_path, "/");
-         relative_file_path = pgmoneta_append(relative_file_path, entry->d_name);
+         pgmoneta_snprintf(relative_file, sizeof(relative_file), "%s/%s", relative_path, entry->d_name);
+         pgmoneta_snprintf(absolute_file, sizeof(absolute_file), "%s%s", root, relative_file);
 
-         absolute_file_path = pgmoneta_append(absolute_file_path, root);
-         absolute_file_path = pgmoneta_append(absolute_file_path, "/");
-         absolute_file_path = pgmoneta_append(absolute_file_path, relative_file_path);
+         if (pgmoneta_create_worker_input(NULL, absolute_file, relative_file, server, workers, &payload))
+         {
+            goto error;
+         }
 
-         pgmoneta_create_sha256_file(absolute_file_path, &sha256);
+         payload->all = all_deque;
 
-         buffer = pgmoneta_append(buffer, relative_file_path);
-         buffer = pgmoneta_append(buffer, ":");
-         buffer = pgmoneta_append(buffer, sha256);
-         buffer = pgmoneta_append(buffer, "\n");
-
-         fputs(buffer, sha256_file);
-         fflush(sha256_file);
-
-         free(buffer);
-         free(sha256);
-         free(relative_file_path);
-         free(absolute_file_path);
+         if (workers != NULL)
+         {
+            if (pgmoneta_workers_outcome_ok(workers))
+            {
+               if (pgmoneta_workers_add(workers, do_sha256, (struct worker_common*)payload))
+               {
+                  free(payload);
+                  goto error;
+               }
+            }
+            else
+            {
+               free(payload);
+            }
+         }
+         else
+         {
+            do_sha256((struct worker_common*)payload);
+         }
       }
    }
 

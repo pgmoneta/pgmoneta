@@ -102,10 +102,12 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path);
  * @param backup_data The data directory
  * @param backup The backup related to the manifest
  * @param manifest [out] The json manifest generated
+ * @param server The server identifier (for worker count lookup)
+ * @param nodes The workflow nodes (for worker error transfer)
  * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, struct backup* bck, struct json** manifest);
+pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, struct backup* bck, struct json** manifest, int server, struct art* nodes);
 
 /**
  * Get the manifest record of a file
@@ -121,10 +123,12 @@ pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file);
  * Generate the files manifest (in json format)
  * @param path The path to walk for manifest creation
  * @param files The json to append results
+ * @param server The server identifier (for worker count lookup)
+ * @param nodes The workflow nodes (for worker error transfer)
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_generate_files_manifest(char* path, struct json* files);
+pgmoneta_generate_files_manifest(char* path, struct json* files, int server, struct art* nodes);
 
 /**
  * Get file paths from a manifest

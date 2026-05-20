@@ -141,7 +141,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    /* create manifest file manually for incremental backups for PostgreSQL version 14-16 */
    if (incremental && config->common.servers[server].version < 17)
    {
-      if (pgmoneta_generate_manifest(1, 0, backup_data, backup, &m))
+      if (pgmoneta_generate_manifest(1, 0, backup_data, backup, &m, server, nodes))
       {
          pgmoneta_log_error("Could not generate the manifest");
          goto error;

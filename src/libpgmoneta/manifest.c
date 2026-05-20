@@ -34,7 +34,9 @@
 #include <json.h>
 #include <logging.h>
 #include <manifest.h>
+#include <progress.h>
 #include <security.h>
+#include <workers.h>
 
 /* system */
 #include <dirent.h>
@@ -60,6 +62,12 @@ build_deque(struct deque* deque, struct csv_reader* reader, char** f);
 
 static void
 build_tree(struct art* tree, struct csv_reader* reader, char** f);
+
+static void
+do_file_manifest(struct worker_common* wc);
+
+static int
+dispatch_manifest_tasks(int server, char* source_dir, struct workers* workers, struct deque* all_deque);
 
 int
 pgmoneta_manifest_checksum_verify(char* root, struct art* file_checksums, struct art* file_sizes)
@@ -431,7 +439,7 @@ error:
 }
 
 int
-pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, struct backup* bck, struct json** m)
+pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, struct backup* bck, struct json** m, int server, struct art* nodes)
 {
    struct json* manifest = NULL;
    struct json* wal_ranges = NULL;
@@ -452,7 +460,7 @@ pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, s
 
    /* put files */
    pgmoneta_json_create(&files);
-   if (pgmoneta_generate_files_manifest(backup_data, files))
+   if (pgmoneta_generate_files_manifest(backup_data, files, server, nodes))
    {
       pgmoneta_json_destroy(files);
       pgmoneta_log_error("Unable to generate manifest records for: %s", backup_data);
@@ -491,7 +499,7 @@ pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file)
    struct json* f = NULL;
    size_t size = 0;
    time_t t;
-   struct tm* tinfo;
+   struct tm tm_buf;
    char now[MISC_LENGTH];
    char* checksum = NULL;
 
@@ -501,9 +509,9 @@ pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file)
    size = pgmoneta_get_file_size(path);
 
    time(&t);
-   tinfo = gmtime(&t);
+   gmtime_r(&t, &tm_buf);
    memset(now, 0, sizeof(now));
-   strftime(now, sizeof(now), "%Y-%m-%d %H:%M:%S GMT", tinfo);
+   strftime(now, sizeof(now), "%Y-%m-%d %H:%M:%S GMT", &tm_buf);
 
    if (pgmoneta_create_sha512_file(path, &checksum))
    {
@@ -526,20 +534,50 @@ error:
    return 1;
 }
 
-int
-pgmoneta_generate_files_manifest(char* source_dir, struct json* files)
+static void
+do_file_manifest(struct worker_common* wc)
+{
+   struct worker_input* wi = (struct worker_input*)wc;
+   struct json* file = NULL;
+
+   if (pgmoneta_get_file_manifest(wi->from, wi->to, &file))
+   {
+      char* msg = NULL;
+      msg = pgmoneta_format_and_append(msg, "Manifest failed: %s", wi->from);
+      pgmoneta_workers_record_failure(wi->common.workers, msg);
+      free(msg);
+      goto done;
+   }
+
+   pgmoneta_deque_add(wi->all, wi->from, (uintptr_t)file, ValueJSON);
+   file = NULL;
+
+   if (pgmoneta_is_progress_enabled(wi->level))
+   {
+      pgmoneta_progress_increment(wi->level, 1);
+   }
+
+done:
+   pgmoneta_json_destroy(file);
+   wi->all = NULL;
+   free(wi);
+}
+
+static int
+dispatch_manifest_tasks(int server, char* source_dir, struct workers* workers, struct deque* all_deque)
 {
    char real_path[MAX_PATH];
    struct stat s;
    struct dirent* dent;
-   struct json* file = NULL;
+   DIR* dir = NULL;
 
-   DIR* dir = opendir(source_dir);
+   dir = opendir(source_dir);
    if (!dir)
    {
       pgmoneta_log_error("Could not open directory: %s", source_dir);
-      return 1;
+      goto error;
    }
+
    while ((dent = readdir(dir)) != NULL)
    {
       char* entry_name = dent->d_name;
@@ -555,29 +593,126 @@ pgmoneta_generate_files_manifest(char* source_dir, struct json* files)
       lstat(real_path, &s);
       if (S_ISDIR(s.st_mode))
       {
-         if (pgmoneta_generate_files_manifest(real_path, files)) // recurse
+         if (dispatch_manifest_tasks(server, real_path, workers, all_deque))
          {
-            pgmoneta_log_error("Unable to generate manifest records for: %s", entry_name);
             goto error;
          }
       }
       else
       {
-         if (pgmoneta_get_file_manifest(real_path, entry_name, &file))
+         struct worker_input* payload = NULL;
+
+         if (pgmoneta_create_worker_input(NULL, real_path, entry_name, server, workers, &payload))
          {
-            pgmoneta_log_error("Unable to generate manifest records for: %s", entry_name);
             goto error;
          }
 
-         pgmoneta_json_append(files, (uintptr_t)file, ValueJSON);
-         file = NULL;
+         payload->all = all_deque;
+
+         if (workers != NULL)
+         {
+            if (pgmoneta_workers_outcome_ok(workers))
+            {
+               if (pgmoneta_workers_add(workers, do_file_manifest, (struct worker_common*)payload))
+               {
+                  free(payload);
+                  goto error;
+               }
+            }
+            else
+            {
+               free(payload);
+            }
+         }
+         else
+         {
+            do_file_manifest((struct worker_common*)payload);
+         }
       }
    }
 
    closedir(dir);
    return 0;
+
 error:
-   closedir(dir);
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   return 1;
+}
+
+int
+pgmoneta_generate_files_manifest(char* source_dir, struct json* files, int server, struct art* nodes)
+{
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
+   struct deque* all_deque = NULL;
+   struct deque_iterator* iter = NULL;
+
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   if (pgmoneta_deque_create(true, &all_deque))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      int file_count = pgmoneta_count_files(source_dir);
+      pgmoneta_progress_set_total(server, file_count);
+   }
+
+   if (dispatch_manifest_tasks(server, source_dir, workers, all_deque))
+   {
+      goto error;
+   }
+
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+   {
+      pgmoneta_workers_transfer_failures(workers, nodes);
+      goto error;
+   }
+   pgmoneta_workers_destroy(workers);
+   workers = NULL;
+
+   if (pgmoneta_deque_iterator_create(all_deque, &iter))
+   {
+      goto error;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      struct json* file = (struct json*)pgmoneta_value_data(iter->value);
+      pgmoneta_json_append(files, (uintptr_t)file, ValueJSON);
+      iter->value->data = 0;
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
+
+   pgmoneta_deque_destroy(all_deque);
+   all_deque = NULL;
+
+   return 0;
+
+error:
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(all_deque);
+
    return 1;
 }
 

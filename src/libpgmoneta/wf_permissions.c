@@ -30,17 +30,22 @@
 #include <pgmoneta.h>
 #include <extraction.h>
 #include <logging.h>
+#include <progress.h>
 #include <utils.h>
 #include <workflow.h>
 
 /* system */
 #include <assert.h>
+#include <dirent.h>
 #include <stdlib.h>
 
 static char* permissions_name(void);
 static int permissions_execute_backup(char*, struct art*);
 static int permissions_execute_restore(char*, struct art*);
 static int permissions_execute_archive(char*, struct art*);
+
+static void do_set_permissions(struct worker_common* wc);
+static int dispatch_permissions_tasks(int server, char* path, struct workers* workers);
 
 struct workflow*
 pgmoneta_create_permissions(int type)
@@ -88,6 +93,8 @@ permissions_execute_backup(char* name __attribute__((unused)), struct art* nodes
    int server = -1;
    char* label = NULL;
    char* path = NULL;
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -106,11 +113,46 @@ permissions_execute_backup(char* name __attribute__((unused)), struct art* nodes
 
    path = pgmoneta_get_server_backup_identifier_data(server, label);
 
-   pgmoneta_permission_recursive(path);
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      int file_count = pgmoneta_count_files(path);
+      pgmoneta_progress_set_total(server, file_count);
+   }
+
+   if (dispatch_permissions_tasks(server, path, workers))
+   {
+      goto error;
+   }
+
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+   {
+      pgmoneta_workers_transfer_failures(workers, nodes);
+      goto error;
+   }
+   pgmoneta_workers_destroy(workers);
+   workers = NULL;
 
    free(path);
 
    return 0;
+
+error:
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(path);
+
+   return 1;
 }
 
 static int
@@ -119,6 +161,8 @@ permissions_execute_restore(char* name __attribute__((unused)), struct art* node
    int server = -1;
    char* label = NULL;
    char* path = NULL;
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -145,11 +189,46 @@ permissions_execute_restore(char* name __attribute__((unused)), struct art* node
 
    pgmoneta_log_debug("Permissions (restore): %s/%s at %s", config->common.servers[server].name, label, path);
 
-   pgmoneta_permission_recursive(path);
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      int file_count = pgmoneta_count_files(path);
+      pgmoneta_progress_set_total(server, file_count);
+   }
+
+   if (dispatch_permissions_tasks(server, path, workers))
+   {
+      goto error;
+   }
+
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+   {
+      pgmoneta_workers_transfer_failures(workers, nodes);
+      goto error;
+   }
+   pgmoneta_workers_destroy(workers);
+   workers = NULL;
 
    free(path);
 
    return 0;
+
+error:
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(path);
+
+   return 1;
 }
 
 static int
@@ -214,4 +293,97 @@ permissions_execute_archive(char* name __attribute__((unused)), struct art* node
    free(path);
 
    return 0;
+}
+
+static void
+do_set_permissions(struct worker_common* wc)
+{
+   struct worker_input* wi = (struct worker_input*)wc;
+   pgmoneta_permission(wi->from, 6, 0, 0);
+
+   if (pgmoneta_is_progress_enabled(wi->level))
+   {
+      pgmoneta_progress_increment(wi->level, 1);
+   }
+
+   free(wi);
+}
+
+static int
+dispatch_permissions_tasks(int server, char* path, struct workers* workers)
+{
+   DIR* dir = NULL;
+   struct dirent* entry;
+   char full_path[MAX_PATH];
+
+   dir = opendir(path);
+   if (dir == NULL)
+   {
+      goto error;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
+      {
+         continue;
+      }
+
+      pgmoneta_snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
+
+      bool is_dir = (entry->d_type == DT_DIR) ||
+                    ((entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN) &&
+                     pgmoneta_is_directory(full_path));
+
+      if (is_dir)
+      {
+         pgmoneta_permission(full_path, 7, 0, 0);
+
+         if (dispatch_permissions_tasks(server, full_path, workers))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         struct worker_input* payload = NULL;
+
+         if (pgmoneta_create_worker_input(NULL, full_path, NULL, server, workers, &payload))
+         {
+            goto error;
+         }
+
+         if (workers != NULL)
+         {
+            if (pgmoneta_workers_outcome_ok(workers))
+            {
+               if (pgmoneta_workers_add(workers, do_set_permissions, (struct worker_common*)payload))
+               {
+                  free(payload);
+                  goto error;
+               }
+            }
+            else
+            {
+               free(payload);
+            }
+         }
+         else
+         {
+            do_set_permissions((struct worker_common*)payload);
+         }
+      }
+   }
+
+   closedir(dir);
+   return 0;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   return 1;
 }

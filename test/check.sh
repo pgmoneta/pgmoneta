@@ -300,6 +300,7 @@ host = localhost
 port = $PORT
 user = $PG_REPL_USER_NAME
 wal_slot = repl
+workers = 4
 hot_standby = $HOT_STANDBY_DIRECTORY
 hot_standby_overrides = $HOT_STANDBY_DIRECTORY/overrides
 EOF
