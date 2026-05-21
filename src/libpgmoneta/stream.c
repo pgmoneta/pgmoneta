@@ -30,7 +30,7 @@
 #include <aes.h>
 #include <compression.h>
 #include <deque.h>
-#include <extraction.h>
+#include <files.h>
 #include <logging.h>
 #include <stream.h>
 #include <utils.h>

@@ -28,11 +28,13 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <extraction.h>
+#include <files.h>
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
 #include <network.h>
-#include <extraction.h>
+#include <rfile.h>
 #include <restore.h>
 #include <security.h>
 #include <utils.h>

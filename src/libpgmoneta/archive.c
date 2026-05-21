@@ -30,7 +30,7 @@
 #include <pgmoneta.h>
 #include <achv.h>
 #include <backup.h>
-#include <extraction.h>
+#include <files.h>
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>

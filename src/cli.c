@@ -32,7 +32,7 @@
 #include <cmd.h>
 #include <compression.h>
 #include <configuration.h>
-#include <extraction.h>
+#include <files.h>
 #include <info.h>
 #include <json.h>
 #include <logging.h>

@@ -31,7 +31,6 @@
 #include <aes.h>
 #include <compression.h>
 #include <deque.h>
-#include <extraction.h>
 #include <info.h>
 #include <logging.h>
 #include <manifest.h>

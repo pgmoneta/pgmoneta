@@ -30,6 +30,7 @@
 #include <brt.h>
 #include <deque.h>
 #include <extraction.h>
+#include <files.h>
 #include <logging.h>
 #include <utils.h>
 #include <wal.h>

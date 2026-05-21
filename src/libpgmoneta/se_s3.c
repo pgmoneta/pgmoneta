@@ -29,7 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <deque.h>
-#include <extraction.h>
+#include <files.h>
 #include <http.h>
 #include <info.h>
 #include <json.h>

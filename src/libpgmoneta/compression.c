@@ -29,7 +29,7 @@
 #include <aes.h>
 #include <bzip2_compression.h>
 #include <compression.h>
-#include <extraction.h>
+#include <files.h>
 #include <gzip_compression.h>
 #include <logging.h>
 #include <lz4_compression.h>

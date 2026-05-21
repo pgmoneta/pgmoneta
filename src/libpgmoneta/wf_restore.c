@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <art.h>
 #include <extraction.h>
+#include <files.h>
 #include <logging.h>
 #include <restore.h>
 #include <utils.h>

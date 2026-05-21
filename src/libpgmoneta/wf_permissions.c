@@ -28,7 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <extraction.h>
+#include <files.h>
 #include <logging.h>
 #include <progress.h>
 #include <utils.h>

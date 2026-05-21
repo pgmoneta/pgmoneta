@@ -31,7 +31,7 @@
 #include <aes.h>
 #include <brt.h>
 #include <compression.h>
-#include <extraction.h>
+#include <files.h>
 #include <json.h>
 #include <logging.h>
 #include <utils.h>
