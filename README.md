@@ -211,6 +211,10 @@ for interacting in our community. New contributors may also want to read the
 If you find `pgmoneta` useful, consider giving the project a
 [star](https://github.com/pgmoneta/pgmoneta/stargazers) on GitHub.
 
+## Sponsors
+
+- [mnemosyne systems](https://www.mnemosyne-systems.ai/)
+
 ## Community
 
 - Website: <https://pgmoneta.github.io/>
