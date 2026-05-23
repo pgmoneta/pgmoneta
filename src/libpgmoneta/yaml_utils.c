@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <utils.h>
 #include <yaml_utils.h>
 
 /* system */
@@ -107,21 +108,21 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
 
          case YAML_SEQUENCE_START_EVENT:
             if (state == STATE_ROOT && current_key &&
-                strcmp(current_key, "rules") == 0)
+                pgmoneta_compare_string(current_key, "rules"))
             {
                state = STATE_RULES_SEQUENCE;
                free(current_key);
                current_key = NULL;
             }
             else if (state == STATE_RULE_MAPPING && current_key &&
-                     strcmp(current_key, "operations") == 0)
+                     pgmoneta_compare_string(current_key, "operations"))
             {
                state = STATE_OPERATIONS_SEQUENCE;
                free(current_key);
                current_key = NULL;
             }
             else if (state == STATE_RULE_MAPPING && current_key &&
-                     strcmp(current_key, "xids") == 0)
+                     pgmoneta_compare_string(current_key, "xids"))
             {
                state = STATE_XIDS_SEQUENCE;
                free(current_key);
@@ -185,23 +186,23 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
          }
          else
          {
-            if (strcmp(*current_key, "source_dir") == 0)
+            if (pgmoneta_compare_string(*current_key, "source_dir"))
             {
                config->source_dir = strdup(value);
             }
-            else if (strcmp(*current_key, "target_dir") == 0)
+            else if (pgmoneta_compare_string(*current_key, "target_dir"))
             {
                config->target_dir = strdup(value);
             }
-            else if (strcmp(*current_key, "encryption") == 0)
+            else if (pgmoneta_compare_string(*current_key, "encryption"))
             {
                config->encryption = strdup(value);
             }
-            else if (strcmp(*current_key, "compression") == 0)
+            else if (pgmoneta_compare_string(*current_key, "compression"))
             {
                config->compression = strdup(value);
             }
-            else if (strcmp(*current_key, "configuration_file") == 0)
+            else if (pgmoneta_compare_string(*current_key, "configuration_file"))
             {
                config->configuration_file = strdup(value);
             }

@@ -209,23 +209,23 @@ main(int argc, char** argv)
       {
          break;
       }
-      else if (!strcmp(optname, "U") || !strcmp(optname, "user"))
+      else if (pgmoneta_compare_string(optname, "U") || pgmoneta_compare_string(optname, "user"))
       {
          username = optarg;
       }
-      else if (!strcmp(optname, "P") || !strcmp(optname, "password"))
+      else if (pgmoneta_compare_string(optname, "P") || pgmoneta_compare_string(optname, "password"))
       {
          password = optarg;
       }
-      else if (!strcmp(optname, "f") || !strcmp(optname, "file"))
+      else if (pgmoneta_compare_string(optname, "f") || pgmoneta_compare_string(optname, "file"))
       {
          file_path = optarg;
       }
-      else if (!strcmp(optname, "g") || !strcmp(optname, "generate"))
+      else if (pgmoneta_compare_string(optname, "g") || pgmoneta_compare_string(optname, "generate"))
       {
          generate_pwd = true;
       }
-      else if (!strcmp(optname, "l") || !strcmp(optname, "length"))
+      else if (pgmoneta_compare_string(optname, "l") || pgmoneta_compare_string(optname, "length"))
       {
          char* endptr = NULL;
          long val;
@@ -238,11 +238,11 @@ main(int argc, char** argv)
          }
          pwd_length = (int)val;
       }
-      else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
+      else if (pgmoneta_compare_string(optname, "V") || pgmoneta_compare_string(optname, "version"))
       {
          version();
       }
-      else if (!strcmp(optname, "F") || !strcmp(optname, "format"))
+      else if (pgmoneta_compare_string(optname, "F") || pgmoneta_compare_string(optname, "format"))
       {
          if (!strncmp(optarg, "json", MISC_LENGTH))
          {
@@ -258,7 +258,7 @@ main(int argc, char** argv)
             exit(1);
          }
       }
-      else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
+      else if (pgmoneta_compare_string(optname, "?") || pgmoneta_compare_string(optname, "help"))
       {
          usage();
          exit(0);
@@ -709,7 +709,7 @@ username:
          warnx("invalid users file line while adding user");
          goto error;
       }
-      if (!strcmp(username, ptr))
+      if (pgmoneta_compare_string(username, ptr))
       {
          warnx("Existing user: %s", username);
          goto error;
@@ -1065,7 +1065,7 @@ username:
          warnx("invalid users file line while updating user");
          goto error;
       }
-      if (!strcmp(username, ptr))
+      if (pgmoneta_compare_string(username, ptr))
       {
          /* Password */
          if (password == NULL)
@@ -1399,7 +1399,7 @@ username:
          warnx("invalid users file line while removing user");
          goto error;
       }
-      if (!strcmp(username, ptr))
+      if (pgmoneta_compare_string(username, ptr))
       {
          found = true;
       }

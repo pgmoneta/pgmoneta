@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -236,7 +236,7 @@ azure_upload_files(char* local_root, char* azure_root, char* relative_path)
       {
          char relative_dir[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }

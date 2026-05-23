@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -444,7 +444,7 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint3
       goto error;
    }
 
-   if (!(response->is_command_complete && strcmp(response->tuples->data[0], "CHECKPOINT") == 0))
+   if (!(response->is_command_complete && pgmoneta_compare_string(response->tuples->data[0], "CHECKPOINT")))
    {
       goto error;
    }
@@ -527,7 +527,7 @@ pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_pat
    }
 
    cell_output = pgmoneta_query_response_get_data(response, 0);
-   if (cell_output == NULL || strcmp(cell_output, "") == 0)
+   if (cell_output == NULL || pgmoneta_compare_string(cell_output, ""))
    {
       goto error;
    }
@@ -537,14 +537,14 @@ pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_pat
    for (int i = 1; i < 5; i++)
    {
       cell_output = pgmoneta_query_response_get_data(response, i);
-      if (!(cell_output == NULL || strcmp(cell_output, "") == 0))
+      if (!(cell_output == NULL || pgmoneta_compare_string(cell_output, "")))
       {
          strptime(cell_output, "%Y-%m-%d %H:%M:%S", &stat.timetamps[i - 1]);
       }
    }
 
    cell_output = pgmoneta_query_response_get_data(response, 5);
-   if (cell_output == NULL || strcmp(cell_output, "") == 0)
+   if (cell_output == NULL || pgmoneta_compare_string(cell_output, ""))
    {
       goto error;
    }
@@ -933,7 +933,7 @@ q:
 
    pgmoneta_snprintf(&wal_level[0], sizeof(wal_level), "%s", response->tuples->data[0]);
 
-   if (!strcmp("replica", wal_level) || !strcmp("logical", wal_level))
+   if (pgmoneta_compare_string("replica", wal_level) || pgmoneta_compare_string("logical", wal_level))
    {
       *replica = true;
    }
@@ -996,7 +996,7 @@ q:
 
    pgmoneta_snprintf(&data_checksums[0], sizeof(data_checksums), "%s", response->tuples->data[0]);
 
-   if (!strcmp("on", data_checksums))
+   if (pgmoneta_compare_string("on", data_checksums))
    {
       *checksums = true;
    }
@@ -1196,7 +1196,7 @@ q:
 
    pgmoneta_snprintf(&summarize_wal[0], sizeof(summarize_wal), "%s", response->tuples->data[0]);
 
-   if (!strcmp("on", summarize_wal))
+   if (pgmoneta_compare_string("on", summarize_wal))
    {
       *sw = true;
    }
@@ -1298,7 +1298,7 @@ q:
       goto error;
    }
 
-   if (!strcmp(res, "t"))
+   if (pgmoneta_compare_string(res, "t"))
    {
       *has_role = true;
    }
@@ -1365,7 +1365,7 @@ q:
       goto error;
    }
 
-   if (!strcmp(res, "t"))
+   if (pgmoneta_compare_string(res, "t"))
    {
       *is_superuser = true;
    }
@@ -1432,7 +1432,7 @@ q:
       goto error;
    }
 
-   if (!strcmp(res, "t"))
+   if (pgmoneta_compare_string(res, "t"))
    {
       *has_privilege = true;
    }
@@ -1553,27 +1553,27 @@ transform_text_to_label_file_contents(char* text, struct label_file_contents* lf
          value++;
       }
 
-      if (!strcmp(key, "CHECKPOINT LOCATION"))
+      if (pgmoneta_compare_string(key, "CHECKPOINT LOCATION"))
       {
          memcpy(lf->checkpoint_lsn, value, strlen(value) + 1);
       }
-      else if (!strcmp(key, "BACKUP METHOD"))
+      else if (pgmoneta_compare_string(key, "BACKUP METHOD"))
       {
          memcpy(lf->backup_method, value, strlen(value) + 1);
       }
-      else if (!strcmp(key, "BACKUP FROM"))
+      else if (pgmoneta_compare_string(key, "BACKUP FROM"))
       {
          memcpy(lf->backup_from, value, strlen(value) + 1);
       }
-      else if (!strcmp(key, "START TIME"))
+      else if (pgmoneta_compare_string(key, "START TIME"))
       {
          strptime(value, "%Y-%m-%d %H:%M:%S", &lf->start_time);
       }
-      else if (!strcmp(key, "LABEL"))
+      else if (pgmoneta_compare_string(key, "LABEL"))
       {
          memcpy(lf->label, value, strlen(value) + 1);
       }
-      else if (!strcmp(key, "START TIMELINE"))
+      else if (pgmoneta_compare_string(key, "START TIMELINE"))
       {
          lf->start_tli = pgmoneta_atoi(value);
       }
@@ -1624,7 +1624,7 @@ process_server_parameters(int server, struct deque* server_parameters)
    while (pgmoneta_deque_iterator_next(iter))
    {
       pgmoneta_log_debug("%s/process server_parameter '%s'", config->common.servers[server].name, iter->tag);
-      if (!strcmp("server_version", iter->tag))
+      if (pgmoneta_compare_string("server_version", iter->tag))
       {
          char* server_version = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
          if (sscanf(server_version, "%d.%d", &major, &minor) == 2)

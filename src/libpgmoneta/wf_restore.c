@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -515,7 +515,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
                memcpy(&value[0], equal + 1, strlen(equal) - 1);
             }
 
-            if (!strcmp(&key[0], "current") || !strcmp(&key[0], "immediate"))
+            if (pgmoneta_compare_string(&key[0], "current") || pgmoneta_compare_string(&key[0], "immediate"))
             {
                if (!mode)
                {
@@ -526,7 +526,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
                   mode = true;
                }
             }
-            else if (!strcmp(&key[0], "name"))
+            else if (pgmoneta_compare_string(&key[0], "name"))
             {
                if (!mode)
                {
@@ -537,7 +537,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
                   mode = true;
                }
             }
-            else if (!strcmp(&key[0], "xid"))
+            else if (pgmoneta_compare_string(&key[0], "xid"))
             {
                if (!mode)
                {
@@ -548,7 +548,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
                   mode = true;
                }
             }
-            else if (!strcmp(&key[0], "lsn"))
+            else if (pgmoneta_compare_string(&key[0], "lsn"))
             {
                if (!mode)
                {
@@ -559,7 +559,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
                   mode = true;
                }
             }
-            else if (!strcmp(&key[0], "time"))
+            else if (pgmoneta_compare_string(&key[0], "time"))
             {
                if (!mode)
                {
@@ -570,23 +570,23 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
                   mode = true;
                }
             }
-            else if (!strcmp(&key[0], "primary") || !strcmp(&key[0], "replica"))
+            else if (pgmoneta_compare_string(&key[0], "primary") || pgmoneta_compare_string(&key[0], "replica"))
             {
                /* Ok */
             }
-            else if (!strcmp(&key[0], "inclusive"))
+            else if (pgmoneta_compare_string(&key[0], "inclusive"))
             {
                memset(&line[0], 0, sizeof(line));
                pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_inclusive = %s\n", strlen(value) > 0 ? &value[0] : "on");
                fputs(&line[0], tfile);
             }
-            else if (!strcmp(&key[0], "timeline"))
+            else if (pgmoneta_compare_string(&key[0], "timeline"))
             {
                memset(&line[0], 0, sizeof(line));
                pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_timeline = \'%s\'\n", strlen(value) > 0 ? &value[0] : "latest");
                fputs(&line[0], tfile);
             }
-            else if (!strcmp(&key[0], "action"))
+            else if (pgmoneta_compare_string(&key[0], "action"))
             {
                memset(&line[0], 0, sizeof(line));
                pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_action = \'%s\'\n", strlen(value) > 0 ? &value[0] : "pause");
@@ -986,7 +986,7 @@ get_user_password(char* username)
 
    for (int i = 0; i < config->common.number_of_users; i++)
    {
-      if (!strcmp(&config->common.users[i].username[0], username))
+      if (pgmoneta_compare_string(&config->common.users[i].username[0], username))
       {
          return &config->common.users[i].password[0];
       }

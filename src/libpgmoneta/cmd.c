@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -27,6 +27,7 @@
  */
 
 #include <cmd.h>
+#include <utils.h>
 
 #include <err.h>
 
@@ -40,11 +41,11 @@ option_requires_arg(char* option_name, cli_option* options, int num_options, boo
 
       if (is_long_option)
       {
-         matches = (strcmp(option_name, option->long_name) == 0);
+         matches = (pgmoneta_compare_string(option_name, option->long_name));
       }
       else
       {
-         matches = (strcmp(option_name, option->short_name) == 0);
+         matches = (pgmoneta_compare_string(option_name, option->short_name));
       }
 
       if (matches)
@@ -192,12 +193,12 @@ cmd_parse(
             if (is_long_option)
             {
                /* Match long option (--option) */
-               matches = (strcmp(option_text, option->long_name) == 0);
+               matches = (pgmoneta_compare_string(option_text, option->long_name));
             }
             else
             {
                /* Match short option (-X) */
-               matches = (strcmp(option_text, option->short_name) == 0);
+               matches = (pgmoneta_compare_string(option_text, option->short_name));
             }
 
             if (matches)

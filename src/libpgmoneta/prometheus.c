@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -310,11 +310,11 @@ resolve_page(struct message* msg)
 
    pgmoneta_write_byte(msg->data + index, '\0');
 
-   if (strcmp(from, "/") == 0 || strcmp(from, "/index.html") == 0)
+   if (pgmoneta_compare_string(from, "/") || pgmoneta_compare_string(from, "/index.html"))
    {
       return PAGE_HOME;
    }
-   else if (strcmp(from, "/metrics") == 0)
+   else if (pgmoneta_compare_string(from, "/metrics"))
    {
       return PAGE_METRICS;
    }
@@ -2662,7 +2662,7 @@ general_information(prometheus_metrics_container_t* container)
       for (int j = 0; j < config->common.servers[i].number_of_extensions; j++)
       {
          struct extension_info* ext = &config->common.servers[i].extensions[j];
-         if (strcmp(ext->name, "pgmoneta_ext") == 0)
+         if (pgmoneta_compare_string(ext->name, "pgmoneta_ext"))
          {
             found_pgmoneta_ext = true;
             data = pgmoneta_append(data, "pgmoneta_extension_pgmoneta_ext{");
@@ -4809,7 +4809,7 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = pgmoneta_append(data, "\", ");
 
       data = pgmoneta_append(data, "lsn=\"");
-      if (!strcmp(config->common.servers[i].current_wal_lsn, ""))
+      if (pgmoneta_compare_string(config->common.servers[i].current_wal_lsn, ""))
       {
          data = pgmoneta_append(data, "0/0");
       }

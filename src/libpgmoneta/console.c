@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -199,11 +199,11 @@ resolve_page(struct message* msg)
 
    pgmoneta_write_byte(msg->data + index, '\0');
 
-   if (strcmp(from, "/") == 0 || strcmp(from, "/index.html") == 0)
+   if (pgmoneta_compare_string(from, "/") || pgmoneta_compare_string(from, "/index.html"))
    {
       return PAGE_HOME;
    }
-   else if (strcmp(from, "/api") == 0 || strcmp(from, "/api/") == 0)
+   else if (pgmoneta_compare_string(from, "/api") || pgmoneta_compare_string(from, "/api/"))
    {
       return PAGE_API;
    }
@@ -436,7 +436,7 @@ console_refresh_metrics(int endpoint, struct console_page* console)
          }
 
          effective_endpoint = 0;
-         resolved_host = (strlen(config->host) == 0 || strcmp(config->host, "*") == 0 || strcmp(config->host, "0.0.0.0") == 0) ? "127.0.0.1" : config->host;
+         resolved_host = (strlen(config->host) == 0 || pgmoneta_compare_string(config->host, "*") || pgmoneta_compare_string(config->host, "0.0.0.0")) ? "127.0.0.1" : config->host;
 
          if (strcmp(resolved_host, config->host) != 0)
          {
@@ -1296,7 +1296,7 @@ find_or_create_category(struct console_page* console, char* category_name)
    /* Try to find existing */
    for (int i = 0; i < console->category_count; i++)
    {
-      if (strcmp(console->categories[i].name, category_name) == 0)
+      if (pgmoneta_compare_string(console->categories[i].name, category_name))
       {
          return &console->categories[i];
       }
@@ -1448,7 +1448,7 @@ extract_labels_from_prometheus_attrs(struct prometheus_attributes* attrs, struct
          continue;
       }
 
-      if (strcmp(attr->key, "server") == 0 || strcmp(attr->key, "name") == 0)
+      if (pgmoneta_compare_string(attr->key, "server") || pgmoneta_compare_string(attr->key, "name"))
       {
          free(metric->server);
          metric->server = strdup(attr->value);
@@ -1498,7 +1498,7 @@ add_or_increment_prefix(struct prefix_count** counts, int* size, int* capacity, 
    /* Find existing prefix */
    for (int j = 0; j < *size; j++)
    {
-      if (strcmp((*counts)[j].prefix, prefix) == 0)
+      if (pgmoneta_compare_string((*counts)[j].prefix, prefix))
       {
          found = j;
          break;
@@ -1920,14 +1920,14 @@ collect_simple_label_columns(struct console_category* category, char*** label_ke
             continue;
          }
 
-         if (strcmp(key, "endpoint") == 0)
+         if (pgmoneta_compare_string(key, "endpoint"))
          {
             continue;
          }
 
          for (int i = 0; i < count; i++)
          {
-            if (strcmp(keys[i], key) == 0)
+            if (pgmoneta_compare_string(keys[i], key))
             {
                exists = true;
                break;
@@ -1987,7 +1987,7 @@ find_metric_label_value(struct console_metric* metric, const char* key)
          continue;
       }
 
-      if (strcmp(metric->labels[i].key, key) == 0)
+      if (pgmoneta_compare_string(metric->labels[i].key, key))
       {
          return metric->labels[i].value;
       }

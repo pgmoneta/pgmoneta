@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -2665,7 +2665,7 @@ xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuation_t
    if (xml_extract_tag(xml, "IsTruncated", &trunc_values) == 0 && trunc_values != NULL && pgmoneta_deque_size(trunc_values) > 0)
    {
       char* val = (char*)pgmoneta_deque_peek(trunc_values, NULL);
-      if (val != NULL && strcmp(val, "true") == 0)
+      if (val != NULL && pgmoneta_compare_string(val, "true"))
       {
          *is_truncated = true;
       }

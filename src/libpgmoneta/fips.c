@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -106,7 +106,7 @@ pgmoneta_fips_server(SSL* ssl, int socket, int server, bool* status)
          goto done;
       }
 
-      *status = strcmp(current->data[0], "t") == 0;
+      *status = pgmoneta_compare_string(current->data[0], "t");
    }
    else if (config->common.servers[server].version >= 14)
    {
@@ -130,7 +130,7 @@ pgmoneta_fips_server(SSL* ssl, int socket, int server, bool* status)
          goto done;
       }
 
-      *status = strcmp(current->data[0], "t") == 0;
+      *status = pgmoneta_compare_string(current->data[0], "t");
    }
 
 done:

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -128,7 +128,7 @@ extra_execute(char* name __attribute__((unused)), struct art* nodes)
    // find the corresponding user's index of the given server
    for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
    {
-      if (!strcmp(config->common.servers[server].username, config->common.users[i].username))
+      if (pgmoneta_compare_string(config->common.servers[server].username, config->common.users[i].username))
       {
          usr = i;
       }

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -67,7 +67,7 @@ pgmoneta_bind(char* hostname, int port, int** fds, int* length)
    int* star_fds = NULL;
    int star_length = 0;
 
-   if (!strcmp("*", hostname))
+   if (pgmoneta_compare_string("*", hostname))
    {
       if (getifaddrs(&ifaddr) == -1)
       {

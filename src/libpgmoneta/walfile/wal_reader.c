@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -1500,7 +1500,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
       backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
       char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);
 
-      if (rm_desc == NULL || !strcmp(rm_desc, ""))
+      if (rm_desc == NULL || pgmoneta_compare_string(rm_desc, ""))
       {
          enhanced_desc = enhance_description(backup_str, record->header.xl_rmid, record->header.xl_info);
       }
@@ -1785,7 +1785,7 @@ is_included(char* rm, struct deque* rms, uint64_t s_lsn, uint64_t start_lsn, uin
 
          v = (char*)pgmoneta_value_data(rms_iter->value);
 
-         if (!strcmp(rm, v))
+         if (pgmoneta_compare_string(rm, v))
          {
             found = true;
          }

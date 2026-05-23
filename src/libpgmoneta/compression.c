@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -424,7 +424,7 @@ process_directory_operation(int server, char* directory, int type, struct worker
    {
       char* to = NULL;
 
-      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
       {
          continue;
       }

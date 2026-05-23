@@ -334,9 +334,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
 
                /* printf("|%s|%s|\n", key, value); */
 
-               if (!strcmp(key, "host"))
+               if (pgmoneta_compare_string(key, "host"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -365,7 +365,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "port"))
+               else if (pgmoneta_compare_string(key, "port"))
                {
                   if (strlen(section) > 0)
                   {
@@ -379,7 +379,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "user"))
+               else if (pgmoneta_compare_string(key, "user"))
                {
                   if (strlen(section) > 0)
                   {
@@ -401,7 +401,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "extra"))
+               else if (pgmoneta_compare_string(key, "extra"))
                {
                   if (strlen(section) > 0)
                   {
@@ -425,7 +425,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "wal_slot"))
+               else if (pgmoneta_compare_string(key, "wal_slot"))
                {
                   if (strlen(section) > 0)
                   {
@@ -447,9 +447,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "create_slot"))
+               else if (pgmoneta_compare_string(key, "create_slot"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -486,7 +486,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "follow"))
+               else if (pgmoneta_compare_string(key, "follow"))
                {
                   if (strlen(section) > 0)
                   {
@@ -508,9 +508,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "base_dir"))
+               else if (pgmoneta_compare_string(key, "base_dir"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -524,7 +524,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "wal_shipping"))
+               else if (pgmoneta_compare_string(key, "wal_shipping"))
                {
                   if (strcmp(section, "pgmoneta") && strlen(section) > 0)
                   {
@@ -536,7 +536,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      memcpy(&srv.wal_shipping[0], value, max);
                   }
                }
-               else if (!strcmp(key, "hot_standby"))
+               else if (pgmoneta_compare_string(key, "hot_standby"))
                {
                   if (strlen(section) > 0)
                   {
@@ -575,7 +575,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      srv.number_of_hot_standbys = count;
                   }
                }
-               else if (!strcmp(key, "hot_standby_overrides"))
+               else if (pgmoneta_compare_string(key, "hot_standby_overrides"))
                {
                   if (strlen(section) > 0)
                   {
@@ -613,7 +613,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      free(paths);
                   }
                }
-               else if (!strcmp(key, "hot_standby_tablespaces"))
+               else if (pgmoneta_compare_string(key, "hot_standby_tablespaces"))
                {
                   if (strlen(section) > 0)
                   {
@@ -651,22 +651,22 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      free(paths);
                   }
                }
-               else if (!strcmp(key, "progress"))
+               else if (pgmoneta_compare_string(key, "progress"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
-                     if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+                     if (pgmoneta_compare_string(value, "on") || pgmoneta_compare_string(value, "true") || pgmoneta_compare_string(value, "1"))
                      {
                         config->progress = true;
                      }
                   }
                   else if (strlen(section) > 0)
                   {
-                     if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+                     if (pgmoneta_compare_string(value, "on") || pgmoneta_compare_string(value, "true") || pgmoneta_compare_string(value, "1"))
                      {
                         srv.progress_enabled = 1;
                      }
-                     else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+                     else if (pgmoneta_compare_string(value, "off") || pgmoneta_compare_string(value, "false") || pgmoneta_compare_string(value, "0"))
                      {
                         srv.progress_enabled = 0;
                      }
@@ -676,9 +676,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "metrics"))
+               else if (pgmoneta_compare_string(key, "metrics"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->metrics))
                      {
@@ -690,9 +690,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "console"))
+               else if (pgmoneta_compare_string(key, "console"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->console))
                      {
@@ -704,9 +704,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "metrics_cache_max_size"))
+               else if (pgmoneta_compare_string(key, "metrics_cache_max_size"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_bytes(value, &config->metrics_cache_max_size, 0))
                      {
@@ -718,9 +718,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "metrics_cache_max_age"))
+               else if (pgmoneta_compare_string(key, "metrics_cache_max_age"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_seconds(value, &config->metrics_cache_max_age, PGMONETA_TIME_DISABLED))
                      {
@@ -732,9 +732,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "management"))
+               else if (pgmoneta_compare_string(key, "management"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->management))
                      {
@@ -746,9 +746,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "tls"))
+               else if (pgmoneta_compare_string(key, "tls"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_bool(value, &config->tls))
                      {
@@ -760,9 +760,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "tls_ca_file"))
+               else if (pgmoneta_compare_string(key, "tls_ca_file"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -791,9 +791,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "tls_cert_file"))
+               else if (pgmoneta_compare_string(key, "tls_cert_file"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -822,9 +822,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "tls_key_file"))
+               else if (pgmoneta_compare_string(key, "tls_key_file"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -853,9 +853,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "metrics_cert_file"))
+               else if (pgmoneta_compare_string(key, "metrics_cert_file"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -869,9 +869,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "metrics_key_file"))
+               else if (pgmoneta_compare_string(key, "metrics_key_file"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -885,9 +885,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "metrics_ca_file"))
+               else if (pgmoneta_compare_string(key, "metrics_ca_file"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -901,9 +901,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "blocking_timeout"))
+               else if (pgmoneta_compare_string(key, "blocking_timeout"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_seconds(value, &config->blocking_timeout, PGMONETA_TIME_SEC(DEFAULT_BLOCKING_TIMEOUT)))
                      {
@@ -915,9 +915,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "pidfile"))
+               else if (pgmoneta_compare_string(key, "pidfile"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -931,9 +931,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "update_process_title"))
+               else if (pgmoneta_compare_string(key, "update_process_title"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->update_process_title = as_update_process_title(value, UPDATE_PROCESS_TITLE_VERBOSE);
                   }
@@ -942,9 +942,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = false;
                   }
                }
-               else if (!strcmp(key, "workers"))
+               else if (pgmoneta_compare_string(key, "workers"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->workers))
                      {
@@ -963,9 +963,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_type"))
+               else if (pgmoneta_compare_string(key, "log_type"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->common.log_type = as_logging_type(value);
                   }
@@ -974,9 +974,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_level"))
+               else if (pgmoneta_compare_string(key, "log_level"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->common.log_level = as_logging_level(value);
                   }
@@ -985,9 +985,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_path"))
+               else if (pgmoneta_compare_string(key, "log_path"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1001,9 +1001,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_rotation_size"))
+               else if (pgmoneta_compare_string(key, "log_rotation_size"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_logging_rotation_size(value, &config->common.log_rotation_size))
                      {
@@ -1015,9 +1015,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_rotation_age"))
+               else if (pgmoneta_compare_string(key, "log_rotation_age"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_seconds(value, &config->common.log_rotation_age, PGMONETA_TIME_DISABLED))
                      {
@@ -1029,9 +1029,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_line_prefix"))
+               else if (pgmoneta_compare_string(key, "log_line_prefix"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1045,9 +1045,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_mode"))
+               else if (pgmoneta_compare_string(key, "log_mode"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->common.log_mode = as_logging_mode(value);
                   }
@@ -1056,9 +1056,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "unix_socket_dir"))
+               else if (pgmoneta_compare_string(key, "unix_socket_dir"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1072,9 +1072,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "libev"))
+               else if (pgmoneta_compare_string(key, "libev"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1088,9 +1088,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "keep_alive"))
+               else if (pgmoneta_compare_string(key, "keep_alive"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_bool(value, &config->common.keep_alive))
                      {
@@ -1102,9 +1102,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "nodelay"))
+               else if (pgmoneta_compare_string(key, "nodelay"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_bool(value, &config->common.nodelay))
                      {
@@ -1116,9 +1116,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "non_blocking"))
+               else if (pgmoneta_compare_string(key, "non_blocking"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_bool(value, &config->common.non_blocking))
                      {
@@ -1130,9 +1130,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "backlog"))
+               else if (pgmoneta_compare_string(key, "backlog"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->backlog))
                      {
@@ -1144,9 +1144,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "hugepage"))
+               else if (pgmoneta_compare_string(key, "hugepage"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->hugepage = as_hugepage(value);
                   }
@@ -1155,9 +1155,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "direct_io"))
+               else if (pgmoneta_compare_string(key, "direct_io"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->direct_io = as_direct_io(value);
                   }
@@ -1166,9 +1166,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "compression"))
+               else if (pgmoneta_compare_string(key, "compression"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->compression_type = as_compression(value);
                   }
@@ -1177,9 +1177,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "compression_level"))
+               else if (pgmoneta_compare_string(key, "compression_level"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->compression_level))
                      {
@@ -1191,9 +1191,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "storage_engine"))
+               else if (pgmoneta_compare_string(key, "storage_engine"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->storage_engine = as_storage_engine(value);
                   }
@@ -1202,9 +1202,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "ssh_hostname"))
+               else if (pgmoneta_compare_string(key, "ssh_hostname"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1218,9 +1218,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "ssh_username"))
+               else if (pgmoneta_compare_string(key, "ssh_username"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1234,9 +1234,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "ssh_base_dir"))
+               else if (pgmoneta_compare_string(key, "ssh_base_dir"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -1250,9 +1250,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "ssh_ciphers"))
+               else if (pgmoneta_compare_string(key, "ssh_ciphers"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      char* ciphers = as_ciphers(value);
 
@@ -1270,9 +1270,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "ssh_public_key_file"))
+               else if (pgmoneta_compare_string(key, "ssh_public_key_file"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -1286,9 +1286,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "ssh_private_key_file"))
+               else if (pgmoneta_compare_string(key, "ssh_private_key_file"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -1302,9 +1302,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_use_tls"))
+               else if (pgmoneta_compare_string(key, "s3_use_tls"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_bool(value, &config->s3.use_tls))
                      {
@@ -1323,9 +1323,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_storage_class"))
+               else if (pgmoneta_compare_string(key, "s3_storage_class"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1348,9 +1348,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_port"))
+               else if (pgmoneta_compare_string(key, "s3_port"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->s3.port))
                      {
@@ -1369,9 +1369,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_endpoint"))
+               else if (pgmoneta_compare_string(key, "s3_endpoint"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1394,9 +1394,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_region"))
+               else if (pgmoneta_compare_string(key, "s3_region"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1419,9 +1419,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_access_key_id"))
+               else if (pgmoneta_compare_string(key, "s3_access_key_id"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1444,9 +1444,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_secret_access_key"))
+               else if (pgmoneta_compare_string(key, "s3_secret_access_key"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1469,9 +1469,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_bucket"))
+               else if (pgmoneta_compare_string(key, "s3_bucket"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1494,9 +1494,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_base_dir"))
+               else if (pgmoneta_compare_string(key, "s3_base_dir"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -1519,9 +1519,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "azure_storage_account"))
+               else if (pgmoneta_compare_string(key, "azure_storage_account"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1535,9 +1535,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "azure_container"))
+               else if (pgmoneta_compare_string(key, "azure_container"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1551,9 +1551,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "azure_shared_key"))
+               else if (pgmoneta_compare_string(key, "azure_shared_key"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -1567,9 +1567,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "azure_base_dir"))
+               else if (pgmoneta_compare_string(key, "azure_base_dir"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -1583,9 +1583,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "workspace"))
+               else if (pgmoneta_compare_string(key, "workspace"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
@@ -1615,9 +1615,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   }
                }
 
-               else if (!strcmp(key, "retention"))
+               else if (pgmoneta_compare_string(key, "retention"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      config->retention_days = -1;
                      config->retention_weeks = -1;
@@ -1650,9 +1650,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "retention_interval"))
+               else if (pgmoneta_compare_string(key, "retention_interval"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->retention_interval))
                      {
@@ -1664,9 +1664,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "encryption"))
+               else if (pgmoneta_compare_string(key, "encryption"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_encryption_mode(value, &config->common.encryption) != 0)
                      {
@@ -1678,9 +1678,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "max_rate"))
+               else if (pgmoneta_compare_string(key, "max_rate"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->max_rate))
                      {
@@ -1705,9 +1705,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "verification"))
+               else if (pgmoneta_compare_string(key, "verification"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_seconds(value, &config->verification, PGMONETA_TIME_DISABLED))
                      {
@@ -1720,9 +1720,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   }
                }
 #ifdef DEBUG
-               else if (!strcmp(key, "link"))
+               else if (pgmoneta_compare_string(key, "link"))
                {
-                  if (!strcmp(section, "pgmoneta"))
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
                      if (as_bool(value, &config->link))
                      {
@@ -2002,13 +2002,13 @@ pgmoneta_validate_main_configuration(void* shm)
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      if (!strcmp(config->common.servers[i].name, "pgmoneta"))
+      if (pgmoneta_compare_string(config->common.servers[i].name, "pgmoneta"))
       {
          pgmoneta_log_fatal("pgmoneta is a reserved word for a host");
          return 1;
       }
 
-      if (!strcmp(config->common.servers[i].name, "all"))
+      if (pgmoneta_compare_string(config->common.servers[i].name, "all"))
       {
          pgmoneta_log_fatal("all is a reserved word for a host");
          return 1;
@@ -2043,7 +2043,7 @@ pgmoneta_validate_main_configuration(void* shm)
          found = false;
          for (int j = 0; !found && j < config->common.number_of_servers; j++)
          {
-            if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name))
+            if (pgmoneta_compare_string(config->common.servers[i].follow, config->common.servers[j].name))
             {
                found = true;
             }
@@ -2158,7 +2158,7 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
 
          if (key && value)
          {
-            if (!strcmp(key, CONFIGURATION_ARGUMENT_HOST))
+            if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_HOST))
             {
                max = strlen(value);
                if (max > MISC_LENGTH - 1)
@@ -2167,19 +2167,19 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
                }
                memcpy(config->host, value, max);
             }
-            else if (!strcmp(key, CONFIGURATION_ARGUMENT_PORT))
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_PORT))
             {
                as_int(value, &config->port);
             }
-            else if (!strcmp(key, CONFIGURATION_ARGUMENT_LOG_TYPE))
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_LOG_TYPE))
             {
                config->common.log_type = as_logging_type(value);
             }
-            else if (!strcmp(key, CONFIGURATION_ARGUMENT_LOG_LEVEL))
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_LOG_LEVEL))
             {
                config->common.log_level = as_logging_level(value);
             }
-            else if (!strcmp(key, CONFIGURATION_ARGUMENT_LOG_PATH))
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_LOG_PATH))
             {
                max = strlen(value);
                if (max > MISC_LENGTH - 1)
@@ -2188,11 +2188,11 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
                }
                memcpy(config->common.log_path, value, max);
             }
-            else if (!strcmp(key, CONFIGURATION_ARGUMENT_LOG_MODE))
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_LOG_MODE))
             {
                config->common.log_mode = as_logging_mode(value);
             }
-            else if (!strcmp(key, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR))
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR))
             {
                max = strlen(value);
                if (max > MISC_LENGTH - 1)
@@ -2201,7 +2201,7 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
                }
                memcpy(config->common.unix_socket_dir, value, max);
             }
-            else if (!strcmp(key, MANAGEMENT_ARGUMENT_OUTPUT))
+            else if (pgmoneta_compare_string(key, MANAGEMENT_ARGUMENT_OUTPUT))
             {
                int out = as_output_format(value);
                if (out != -1)
@@ -2209,14 +2209,14 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
                   config->output_format = out;
                }
             }
-            else if (!strcmp(key, CONFIGURATION_ARGUMENT_COMPRESSION))
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_COMPRESSION))
             {
                if (as_management_compression(value, &config->compression))
                {
                   warnx("Unknown management compression: %s", value);
                }
             }
-            else if (!strcmp(key, CONFIGURATION_ARGUMENT_ENCRYPTION))
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_ENCRYPTION))
             {
                if (as_management_encryption(value, &config->encryption))
                {
@@ -2398,7 +2398,7 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
 
                /* printf("|%s|%s|\n", key, value); */
 
-               if (!strcmp(key, "host"))
+               if (pgmoneta_compare_string(key, "host"))
                {
                   if (strlen(section) > 0)
                   {
@@ -2420,7 +2420,7 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "port"))
+               else if (pgmoneta_compare_string(key, "port"))
                {
                   if (strlen(section) > 0)
                   {
@@ -2434,7 +2434,7 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "user"))
+               else if (pgmoneta_compare_string(key, "user"))
                {
                   if (strlen(section) > 0)
                   {
@@ -2456,9 +2456,9 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_type"))
+               else if (pgmoneta_compare_string(key, "log_type"))
                {
-                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  if (pgmoneta_compare_string(section, "pgmoneta-walinfo"))
                   {
                      config->common.log_type = as_logging_type(value);
                   }
@@ -2467,9 +2467,9 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_level"))
+               else if (pgmoneta_compare_string(key, "log_level"))
                {
-                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  if (pgmoneta_compare_string(section, "pgmoneta-walinfo"))
                   {
                      config->common.log_level = as_logging_level(value);
                   }
@@ -2478,9 +2478,9 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_path"))
+               else if (pgmoneta_compare_string(key, "log_path"))
                {
-                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  if (pgmoneta_compare_string(section, "pgmoneta-walinfo"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -2494,9 +2494,9 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "encryption"))
+               else if (pgmoneta_compare_string(key, "encryption"))
                {
-                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  if (pgmoneta_compare_string(section, "pgmoneta-walinfo"))
                   {
                      if (as_encryption_mode(value, &config->common.encryption) != 0)
                      {
@@ -2674,7 +2674,7 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
 
                /* printf("|%s|%s|\n", key, value); */
 
-               if (!strcmp(key, "host"))
+               if (pgmoneta_compare_string(key, "host"))
                {
                   if (strlen(section) > 0)
                   {
@@ -2696,7 +2696,7 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "port"))
+               else if (pgmoneta_compare_string(key, "port"))
                {
                   if (strlen(section) > 0)
                   {
@@ -2710,7 +2710,7 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "user"))
+               else if (pgmoneta_compare_string(key, "user"))
                {
                   if (strlen(section) > 0)
                   {
@@ -2732,9 +2732,9 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_type"))
+               else if (pgmoneta_compare_string(key, "log_type"))
                {
-                  if (!strcmp(section, "pgmoneta-walfilter"))
+                  if (pgmoneta_compare_string(section, "pgmoneta-walfilter"))
                   {
                      config->common.log_type = as_logging_type(value);
                   }
@@ -2743,9 +2743,9 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_level"))
+               else if (pgmoneta_compare_string(key, "log_level"))
                {
-                  if (!strcmp(section, "pgmoneta-walfilter"))
+                  if (pgmoneta_compare_string(section, "pgmoneta-walfilter"))
                   {
                      config->common.log_level = as_logging_level(value);
                   }
@@ -2754,9 +2754,9 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "log_path"))
+               else if (pgmoneta_compare_string(key, "log_path"))
                {
-                  if (!strcmp(section, "pgmoneta-walfilter"))
+                  if (pgmoneta_compare_string(section, "pgmoneta-walfilter"))
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
@@ -2770,9 +2770,9 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "encryption"))
+               else if (pgmoneta_compare_string(key, "encryption"))
                {
-                  if (!strcmp(section, "pgmoneta-walfilter"))
+                  if (pgmoneta_compare_string(section, "pgmoneta-walfilter"))
                   {
                      if (as_encryption_mode(value, &config->common.encryption) != 0)
                      {
@@ -3051,7 +3051,7 @@ pgmoneta_validate_users_configuration(void* shm)
 
       for (int j = 0; !found && j < config->common.number_of_users; j++)
       {
-         if (!strcmp(config->common.servers[i].username, config->common.users[j].username))
+         if (pgmoneta_compare_string(config->common.servers[i].username, config->common.users[j].username))
          {
             found = true;
          }
@@ -4316,7 +4316,7 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
    // Server-specific configuration
    if (srv != NULL)
    {
-      if (!strcmp(key, "host"))
+      if (pgmoneta_compare_string(key, "host"))
       {
          max = strlen(value);
          if (max > MISC_LENGTH - 1)
@@ -4326,14 +4326,14 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          memcpy(srv->host, value, max);
          srv->host[max] = '\0';
       }
-      else if (!strcmp(key, "port"))
+      else if (pgmoneta_compare_string(key, "port"))
       {
          if (as_int(value, &srv->port))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "user"))
+      else if (pgmoneta_compare_string(key, "user"))
       {
          max = strlen(value);
          if (max > MAX_USERNAME_LENGTH - 1)
@@ -4343,7 +4343,7 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          memcpy(srv->username, value, max);
          srv->username[max] = '\0';
       }
-      else if (!strcmp(key, "wal_slot"))
+      else if (pgmoneta_compare_string(key, "wal_slot"))
       {
          max = strlen(value);
          if (max > MISC_LENGTH - 1)
@@ -4353,14 +4353,14 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          memcpy(srv->wal_slot, value, max);
          srv->wal_slot[max] = '\0';
       }
-      else if (!strcmp(key, "create_slot"))
+      else if (pgmoneta_compare_string(key, "create_slot"))
       {
          if (as_create_slot(value, &srv->create_slot))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "follow"))
+      else if (pgmoneta_compare_string(key, "follow"))
       {
          max = strlen(value);
          if (max > MISC_LENGTH - 1)
@@ -4370,21 +4370,21 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          memcpy(srv->follow, value, max);
          srv->follow[max] = '\0';
       }
-      else if (!strcmp(key, "workers"))
+      else if (pgmoneta_compare_string(key, "workers"))
       {
          if (as_int(value, &srv->workers))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "max_rate"))
+      else if (pgmoneta_compare_string(key, "max_rate"))
       {
          if (as_int(value, &srv->max_rate))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "retention"))
+      else if (pgmoneta_compare_string(key, "retention"))
       {
          srv->retention_days = -1;
          srv->retention_weeks = -1;
@@ -4395,13 +4395,13 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
             unknown = true;
          }
       }
-      else if (!strcmp(key, "progress"))
+      else if (pgmoneta_compare_string(key, "progress"))
       {
-         if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+         if (pgmoneta_compare_string(value, "on") || pgmoneta_compare_string(value, "true") || pgmoneta_compare_string(value, "1"))
          {
             srv->progress_enabled = 1;
          }
-         else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+         else if (pgmoneta_compare_string(value, "off") || pgmoneta_compare_string(value, "false") || pgmoneta_compare_string(value, "0"))
          {
             srv->progress_enabled = 0;
          }
@@ -4414,7 +4414,7 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
    else
    {
       // Main configuration
-      if (!strcmp(key, "host"))
+      if (pgmoneta_compare_string(key, "host"))
       {
          max = strlen(value);
          if (max > MISC_LENGTH - 1)
@@ -4424,43 +4424,43 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          memcpy(config->host, value, max);
          config->host[max] = '\0';
       }
-      else if (!strcmp(key, "metrics"))
+      else if (pgmoneta_compare_string(key, "metrics"))
       {
          if (as_int(value, &config->metrics))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "console"))
+      else if (pgmoneta_compare_string(key, "console"))
       {
          if (as_int(value, &config->console))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "management"))
+      else if (pgmoneta_compare_string(key, "management"))
       {
          if (as_int(value, &config->management))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "workers"))
+      else if (pgmoneta_compare_string(key, "workers"))
       {
          if (as_int(value, &config->workers))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "log_level"))
+      else if (pgmoneta_compare_string(key, "log_level"))
       {
          config->common.log_level = as_logging_level(value);
       }
-      else if (!strcmp(key, "log_type"))
+      else if (pgmoneta_compare_string(key, "log_type"))
       {
          config->common.log_type = as_logging_type(value);
       }
-      else if (!strcmp(key, "log_path"))
+      else if (pgmoneta_compare_string(key, "log_path"))
       {
          max = strlen(value);
          if (max > MISC_LENGTH - 1)
@@ -4470,18 +4470,18 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          memcpy(config->common.log_path, value, max);
          config->common.log_path[max] = '\0';
       }
-      else if (!strcmp(key, "compression"))
+      else if (pgmoneta_compare_string(key, "compression"))
       {
          config->compression_type = as_compression(value);
       }
-      else if (!strcmp(key, "compression_level"))
+      else if (pgmoneta_compare_string(key, "compression_level"))
       {
          if (as_int(value, &config->compression_level))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "retention"))
+      else if (pgmoneta_compare_string(key, "retention"))
       {
          config->retention_days = -1;
          config->retention_weeks = -1;
@@ -4492,48 +4492,48 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
             unknown = true;
          }
       }
-      else if (!strcmp(key, "max_rate"))
+      else if (pgmoneta_compare_string(key, "max_rate"))
       {
          if (as_int(value, &config->max_rate))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "verification"))
+      else if (pgmoneta_compare_string(key, "verification"))
       {
          if (as_seconds(value, &config->verification, PGMONETA_TIME_DISABLED))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "blocking_timeout"))
+      else if (pgmoneta_compare_string(key, "blocking_timeout"))
       {
          if (as_seconds(value, &config->blocking_timeout, PGMONETA_TIME_SEC(DEFAULT_BLOCKING_TIMEOUT)))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "metrics_cache_max_age"))
+      else if (pgmoneta_compare_string(key, "metrics_cache_max_age"))
       {
          if (as_seconds(value, &config->metrics_cache_max_age, PGMONETA_TIME_DISABLED))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "log_rotation_age"))
+      else if (pgmoneta_compare_string(key, "log_rotation_age"))
       {
          if (as_seconds(value, &config->common.log_rotation_age, PGMONETA_TIME_DISABLED))
          {
             unknown = true;
          }
       }
-      else if (!strcmp(key, "progress"))
+      else if (pgmoneta_compare_string(key, "progress"))
       {
-         if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+         if (pgmoneta_compare_string(value, "on") || pgmoneta_compare_string(value, "true") || pgmoneta_compare_string(value, "1"))
          {
             config->progress = true;
          }
-         else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+         else if (pgmoneta_compare_string(value, "off") || pgmoneta_compare_string(value, "false") || pgmoneta_compare_string(value, "0"))
          {
             config->progress = false;
          }
@@ -4576,65 +4576,65 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
    switch (key_info.section_type)
    {
       case 0: // Main configuration
-         if (!strcmp(key_info.key, "host"))
+         if (pgmoneta_compare_string(key_info.key, "host"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%s", config->host);
          }
-         else if (!strcmp(key_info.key, "metrics"))
+         else if (pgmoneta_compare_string(key_info.key, "metrics"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->metrics);
          }
-         else if (!strcmp(key_info.key, "console"))
+         else if (pgmoneta_compare_string(key_info.key, "console"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->console);
          }
-         else if (!strcmp(key_info.key, "management"))
+         else if (pgmoneta_compare_string(key_info.key, "management"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->management);
          }
-         else if (!strcmp(key_info.key, "workers"))
+         else if (pgmoneta_compare_string(key_info.key, "workers"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->workers);
          }
-         else if (!strcmp(key_info.key, "log_level"))
+         else if (pgmoneta_compare_string(key_info.key, "log_level"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->common.log_level);
          }
-         else if (!strcmp(key_info.key, "log_type"))
+         else if (pgmoneta_compare_string(key_info.key, "log_type"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->common.log_type);
          }
-         else if (!strcmp(key_info.key, "log_path"))
+         else if (pgmoneta_compare_string(key_info.key, "log_path"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%s", config->common.log_path);
          }
-         else if (!strcmp(key_info.key, "compression"))
+         else if (pgmoneta_compare_string(key_info.key, "compression"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->compression_type);
          }
-         else if (!strcmp(key_info.key, "compression_level"))
+         else if (pgmoneta_compare_string(key_info.key, "compression_level"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->compression_level);
          }
-         else if (!strcmp(key_info.key, "storage_engine"))
+         else if (pgmoneta_compare_string(key_info.key, "storage_engine"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->storage_engine);
          }
-         else if (!strcmp(key_info.key, "max_rate"))
+         else if (pgmoneta_compare_string(key_info.key, "max_rate"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%d", config->max_rate);
          }
-         else if (!strcmp(key_info.key, "verification"))
+         else if (pgmoneta_compare_string(key_info.key, "verification"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%" PRId64, pgmoneta_time_convert(config->verification, FORMAT_TIME_S));
          }
-         else if (!strcmp(key_info.key, "retention"))
+         else if (pgmoneta_compare_string(key_info.key, "retention"))
          {
             char* ret = get_retention_string(config->retention_days, config->retention_weeks, config->retention_months, config->retention_years);
             pgmoneta_snprintf(buffer, buffer_size, "%s", ret ? ret : "");
             free(ret);
          }
-         else if (!strcmp(key_info.key, "progress"))
+         else if (pgmoneta_compare_string(key_info.key, "progress"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%s", config->progress ? "on" : "off");
          }
@@ -4655,81 +4655,81 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
                struct server* srv = &config->common.servers[i];
                server_found = true;
 
-               if (!strcmp(key_info.key, "host"))
+               if (pgmoneta_compare_string(key_info.key, "host"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->host);
                }
-               else if (!strcmp(key_info.key, "port"))
+               else if (pgmoneta_compare_string(key_info.key, "port"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%d", srv->port);
                }
-               else if (!strcmp(key_info.key, "user"))
+               else if (pgmoneta_compare_string(key_info.key, "user"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->username);
                }
-               else if (!strcmp(key_info.key, "wal_slot"))
+               else if (pgmoneta_compare_string(key_info.key, "wal_slot"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->wal_slot);
                }
-               else if (!strcmp(key_info.key, "create_slot"))
+               else if (pgmoneta_compare_string(key_info.key, "create_slot"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%d", srv->create_slot);
                }
-               else if (!strcmp(key_info.key, "follow"))
+               else if (pgmoneta_compare_string(key_info.key, "follow"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->follow);
                }
-               else if (!strcmp(key_info.key, "workers"))
+               else if (pgmoneta_compare_string(key_info.key, "workers"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%d", srv->workers);
                }
-               else if (!strcmp(key_info.key, "max_rate"))
+               else if (pgmoneta_compare_string(key_info.key, "max_rate"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%d", srv->max_rate);
                }
-               else if (!strcmp(key_info.key, "retention"))
+               else if (pgmoneta_compare_string(key_info.key, "retention"))
                {
                   char* ret = get_retention_string(srv->retention_days, srv->retention_weeks, srv->retention_months, srv->retention_years);
                   pgmoneta_snprintf(buffer, buffer_size, "%s", ret ? ret : "");
                   free(ret);
                }
-               else if (!strcmp(key_info.key, "s3_use_tls"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_use_tls"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.use_tls ? "true" : "false");
                }
-               else if (!strcmp(key_info.key, "s3_storage_class"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_storage_class"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.storage_class);
                }
-               else if (!strcmp(key_info.key, "s3_endpoint"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_endpoint"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.endpoint);
                }
-               else if (!strcmp(key_info.key, "s3_port"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_port"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%d", srv->s3.port);
                }
-               else if (!strcmp(key_info.key, "s3_region"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_region"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.region);
                }
-               else if (!strcmp(key_info.key, "s3_access_key_id"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_access_key_id"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.access_key_id);
                }
-               else if (!strcmp(key_info.key, "s3_secret_access_key"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_secret_access_key"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.secret_access_key);
                }
-               else if (!strcmp(key_info.key, "s3_bucket"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_bucket"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.bucket);
                }
-               else if (!strcmp(key_info.key, "s3_base_dir"))
+               else if (pgmoneta_compare_string(key_info.key, "s3_base_dir"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.base_dir);
                }
-               else if (!strcmp(key_info.key, "progress"))
+               else if (pgmoneta_compare_string(key_info.key, "progress"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->progress_enabled == 1 ? "on" : (srv->progress_enabled == 0 ? "off" : "inherit"));
                }
@@ -5302,7 +5302,7 @@ as_retention(char* str, int* days, int* weeks, int* months, int* years)
       }
       if (as_int(token, days))
       {
-         if (!strcmp(token, "X") || !strcmp(token, "x") || !strcmp(token, "-"))
+         if (pgmoneta_compare_string(token, "X") || pgmoneta_compare_string(token, "x") || pgmoneta_compare_string(token, "-"))
          {
             *days = -1;
          }
@@ -5346,7 +5346,7 @@ as_retention(char* str, int* days, int* weeks, int* months, int* years)
       }
       if (as_int(token, weeks))
       {
-         if (!strcmp(token, "X") || !strcmp(token, "x") || !strcmp(token, "-"))
+         if (pgmoneta_compare_string(token, "X") || pgmoneta_compare_string(token, "x") || pgmoneta_compare_string(token, "-"))
          {
             *weeks = -1;
          }
@@ -5390,7 +5390,7 @@ as_retention(char* str, int* days, int* weeks, int* months, int* years)
       }
       if (as_int(token, months))
       {
-         if (!strcmp(token, "X") || !strcmp(token, "x") || !strcmp(token, "-"))
+         if (pgmoneta_compare_string(token, "X") || pgmoneta_compare_string(token, "x") || pgmoneta_compare_string(token, "-"))
          {
             *months = -1;
          }
@@ -5434,7 +5434,7 @@ as_retention(char* str, int* days, int* weeks, int* months, int* years)
       }
       if (as_int(token, years))
       {
-         if (!strcmp(token, "X") || !strcmp(token, "x") || !strcmp(token, "-"))
+         if (pgmoneta_compare_string(token, "X") || pgmoneta_compare_string(token, "x") || pgmoneta_compare_string(token, "-"))
          {
             *years = -1;
          }
@@ -5517,31 +5517,31 @@ as_ciphers(char* str)
    ptr = strtok(converted, ",");
    while (ptr != NULL)
    {
-      if (strcmp("aes-256-ctr", ptr) == 0)
+      if (pgmoneta_compare_string("aes-256-ctr", ptr))
       {
          result = pgmoneta_append(result, "aes256-ctr");
       }
-      else if (strcmp("aes-192-ctr", ptr) == 0)
+      else if (pgmoneta_compare_string("aes-192-ctr", ptr))
       {
          result = pgmoneta_append(result, "aes192-ctr");
       }
-      else if (strcmp("aes-128-ctr", ptr) == 0)
+      else if (pgmoneta_compare_string("aes-128-ctr", ptr))
       {
          result = pgmoneta_append(result, "aes128-ctr");
       }
-      else if (strcmp("aes-256-cbc", ptr) == 0 || strcmp("aes-256", ptr) == 0)
+      else if (pgmoneta_compare_string("aes-256-cbc", ptr) || pgmoneta_compare_string("aes-256", ptr))
       {
          result = pgmoneta_append(result, "aes256-cbc");
       }
-      else if (strcmp("aes-192-cbc", ptr) == 0 || strcmp("aes-192", ptr) == 0)
+      else if (pgmoneta_compare_string("aes-192-cbc", ptr) || pgmoneta_compare_string("aes-192", ptr))
       {
          result = pgmoneta_append(result, "aes192-cbc");
       }
-      else if (strcmp("aes-128-cbc", ptr) == 0 || strcmp("aes-128", ptr) == 0)
+      else if (pgmoneta_compare_string("aes-128-cbc", ptr) || pgmoneta_compare_string("aes-128", ptr))
       {
          result = pgmoneta_append(result, "aes128-cbc");
       }
-      else if (strcmp("aes", ptr) == 0)
+      else if (pgmoneta_compare_string("aes", ptr))
       {
          result = pgmoneta_append(result, "aes256-cbc");
       }
@@ -6376,7 +6376,7 @@ is_empty_string(char* s)
       return true;
    }
 
-   if (!strcmp(s, ""))
+   if (pgmoneta_compare_string(s, ""))
    {
       return true;
    }

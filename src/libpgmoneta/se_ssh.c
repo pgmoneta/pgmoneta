@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without
@@ -637,7 +637,7 @@ sftp_copy_directory(char* local_root, char* remote_root, char* relative_path)
       {
          char relative_dir[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -711,7 +711,7 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
 
       if ((latest_sha256 = (char*)pgmoneta_art_search(tree_map, relative_path)) != NULL)
       {
-         if (!strcmp(latest_sha256, sha256))
+         if (pgmoneta_compare_string(latest_sha256, sha256))
          {
             is_link = true;
          }

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -93,7 +93,7 @@ pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, c
 
    old_comments = pgmoneta_append(old_comments, backup->comments);
 
-   if (!strcmp("add", action))
+   if (pgmoneta_compare_string("add", action))
    {
       if (old_comments == NULL || strlen(old_comments) == 0)
       {
@@ -154,7 +154,7 @@ pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, c
          free(tokens);
       }
    }
-   else if (!strcmp("update", action))
+   else if (pgmoneta_compare_string("update", action))
    {
       if (old_comments == NULL || strlen(old_comments) == 0)
       {
@@ -212,7 +212,7 @@ pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, c
          }
       }
    }
-   else if (!strcmp("remove", action))
+   else if (pgmoneta_compare_string("remove", action))
    {
       if (old_comments == NULL || strlen(old_comments) == 0)
       {
@@ -273,7 +273,7 @@ pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, c
 
    if (new_comments != NULL)
    {
-      if (!strcmp(new_comments, ",") || pgmoneta_starts_with(new_comments, ","))
+      if (pgmoneta_compare_string(new_comments, ",") || pgmoneta_starts_with(new_comments, ","))
       {
          new_comments = pgmoneta_remove_first(new_comments);
 
@@ -447,7 +447,7 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
    assert(strlen(identifier) > 0);
 #endif
 
-   if (!strcmp(identifier, "oldest") || !strcmp(identifier, "newest") || !strcmp(identifier, "latest"))
+   if (pgmoneta_compare_string(identifier, "oldest") || pgmoneta_compare_string(identifier, "newest") || pgmoneta_compare_string(identifier, "latest"))
    {
       int number_of_backups = 0;
       struct backup** backups = NULL;
@@ -462,11 +462,11 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
          goto error;
       }
 
-      if (!strcmp(identifier, "oldest"))
+      if (pgmoneta_compare_string(identifier, "oldest"))
       {
          label = pgmoneta_append(label, backups[0]->label);
       }
-      else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
+      else if (pgmoneta_compare_string(identifier, "latest") || pgmoneta_compare_string(identifier, "newest"))
       {
          label = pgmoneta_append(label, backups[number_of_backups - 1]->label);
       }
@@ -539,13 +539,13 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
 
          memcpy(&value[0], ptr, strlen(ptr) - 1);
 
-         if (!strcmp(INFO_PGMONETA_VERSION, &key[0]))
+         if (pgmoneta_compare_string(INFO_PGMONETA_VERSION, &key[0]))
          {
             memcpy(&bck->version[0], &value[0], strlen(&value[0]));
          }
-         else if (!strcmp(INFO_STATUS, &key[0]))
+         else if (pgmoneta_compare_string(INFO_STATUS, &key[0]))
          {
-            if (!strcmp("1", &value[0]))
+            if (pgmoneta_compare_string("1", &value[0]))
             {
                bck->valid = VALID_TRUE;
             }
@@ -554,91 +554,91 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
                bck->valid = VALID_FALSE;
             }
          }
-         else if (!strcmp(INFO_LABEL, &key[0]))
+         else if (pgmoneta_compare_string(INFO_LABEL, &key[0]))
          {
             memcpy(&bck->label[0], &value[0], strlen(&value[0]));
          }
-         else if (!strcmp(INFO_WAL, &key[0]))
+         else if (pgmoneta_compare_string(INFO_WAL, &key[0]))
          {
             memcpy(&bck->wal[0], &value[0], strlen(&value[0]));
          }
-         else if (!strcmp(INFO_BACKUP, &key[0]))
+         else if (pgmoneta_compare_string(INFO_BACKUP, &key[0]))
          {
             bck->backup_size = strtoul(&value[0], &ptr, 10);
          }
-         else if (!strcmp(INFO_RESTORE, &key[0]))
+         else if (pgmoneta_compare_string(INFO_RESTORE, &key[0]))
          {
             bck->restore_size = strtoul(&value[0], &ptr, 10);
          }
-         else if (!strcmp(INFO_BIGGEST_FILE, &key[0]))
+         else if (pgmoneta_compare_string(INFO_BIGGEST_FILE, &key[0]))
          {
             bck->biggest_file_size = strtoul(&value[0], &ptr, 10);
          }
-         else if (!strcmp(INFO_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_ELAPSED, &key[0]))
          {
             bck->total_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_BASEBACKUP_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_BASEBACKUP_ELAPSED, &key[0]))
          {
             bck->basebackup_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_HASH_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_HASH_ELAPSED, &key[0]))
          {
             bck->hash_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_MANIFEST_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_MANIFEST_ELAPSED, &key[0]))
          {
             bck->manifest_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_COMPRESSION_ZSTD_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_COMPRESSION_ZSTD_ELAPSED, &key[0]))
          {
             bck->compression_zstd_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_COMPRESSION_BZIP2_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_COMPRESSION_BZIP2_ELAPSED, &key[0]))
          {
             bck->compression_bzip2_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_COMPRESSION_GZIP_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_COMPRESSION_GZIP_ELAPSED, &key[0]))
          {
             bck->compression_gzip_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_COMPRESSION_LZ4_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_COMPRESSION_LZ4_ELAPSED, &key[0]))
          {
             bck->compression_lz4_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_ENCRYPTION_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_ENCRYPTION_ELAPSED, &key[0]))
          {
             bck->encryption_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_LINKING_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_LINKING_ELAPSED, &key[0]))
          {
             bck->linking_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_REMOTE_SSH_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_REMOTE_SSH_ELAPSED, &key[0]))
          {
             bck->remote_ssh_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_REMOTE_AZURE_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_REMOTE_AZURE_ELAPSED, &key[0]))
          {
             bck->remote_azure_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_REMOTE_S3_ELAPSED, &key[0]))
+         else if (pgmoneta_compare_string(INFO_REMOTE_S3_ELAPSED, &key[0]))
          {
             bck->remote_s3_elapsed_time = atof(&value[0]);
          }
-         else if (!strcmp(INFO_MAJOR_VERSION, &key[0]))
+         else if (pgmoneta_compare_string(INFO_MAJOR_VERSION, &key[0]))
          {
             bck->major_version = atoi(&value[0]);
          }
-         else if (!strcmp(INFO_MINOR_VERSION, &key[0]))
+         else if (pgmoneta_compare_string(INFO_MINOR_VERSION, &key[0]))
          {
             bck->minor_version = atoi(&value[0]);
          }
-         else if (!strcmp(INFO_KEEP, &key[0]))
+         else if (pgmoneta_compare_string(INFO_KEEP, &key[0]))
          {
             bck->keep = atoi(&value[0]) == 1 ? true : false;
          }
-         else if (!strcmp(INFO_TABLESPACES, &key[0]))
+         else if (pgmoneta_compare_string(INFO_TABLESPACES, &key[0]))
          {
             bck->number_of_tablespaces = strtoul(&value[0], &ptr, 10);
          }
@@ -911,7 +911,7 @@ pgmoneta_get_backup_child(int server, struct backup* backup, struct backup** chi
 
    for (int j = 0; c_identifier == NULL && j < number_of_backups; j++)
    {
-      if (!strcmp(backup->label, backups[j]->parent_label))
+      if (pgmoneta_compare_string(backup->label, backups[j]->parent_label))
       {
          c_identifier = pgmoneta_append(c_identifier, backups[j]->label);
       }
@@ -998,11 +998,11 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
       goto error;
    }
 
-   if (!strcmp("oldest", identifier))
+   if (pgmoneta_compare_string("oldest", identifier))
    {
       bck = backups[0];
    }
-   else if (!strcmp("newest", identifier) || !strcmp("latest", identifier))
+   else if (pgmoneta_compare_string("newest", identifier) || pgmoneta_compare_string("latest", identifier))
    {
       bck = backups[number_of_backups - 1];
    }
@@ -1010,7 +1010,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    {
       for (int i = 0; bck == NULL && i < number_of_backups; i++)
       {
-         if (!strcmp(backups[i]->label, identifier))
+         if (pgmoneta_compare_string(backups[i]->label, identifier))
          {
             bck = backups[i];
          }
@@ -1191,11 +1191,11 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    key = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_KEY);
    comment = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_COMMENT);
 
-   if (!strcmp("oldest", backup))
+   if (pgmoneta_compare_string("oldest", backup))
    {
       bck = backups[0];
    }
-   else if (!strcmp("newest", backup) || !strcmp("latest", backup))
+   else if (pgmoneta_compare_string("newest", backup) || pgmoneta_compare_string("latest", backup))
    {
       bck = backups[number_of_backups - 1];
    }
@@ -1203,7 +1203,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    {
       for (int i = 0; bck == NULL && i < number_of_backups; i++)
       {
-         if (!strcmp(backups[i]->label, backup))
+         if (pgmoneta_compare_string(backups[i]->label, backup))
          {
             bck = backups[i];
          }
@@ -1604,7 +1604,7 @@ split_file_path(char* path, char** relative_path, char** bare_file_name)
 
    path_copy = pgmoneta_append(path_copy, path);
 
-   if (path_copy == NULL || !strcmp(path_copy, ".") || !strcmp(path_copy, ".."))
+   if (path_copy == NULL || pgmoneta_compare_string(path_copy, ".") || pgmoneta_compare_string(path_copy, ".."))
    {
       goto error;
    }
@@ -1615,13 +1615,13 @@ split_file_path(char* path, char** relative_path, char** bare_file_name)
    relative_path_len = strlen(rel_path);
 
    /* path is only the filename (doesn't contain any '/') */
-   if (!strcmp(rel_path, "."))
+   if (pgmoneta_compare_string(rel_path, "."))
    {
       file_name = pgmoneta_append(file_name, path);
    }
 
    /* path is the root directory */
-   if (!strcmp(rel_path, "/"))
+   if (pgmoneta_compare_string(rel_path, "/"))
    {
       file_name = pgmoneta_append(file_name, path + relative_path_len);
    }

@@ -604,7 +604,7 @@ config_get(const char* file_path, const char* section, const char* key)
             *(bracket_end + 1) = '\0';
          }
 
-         if (!strcmp(trimmed, section_header))
+         if (pgmoneta_compare_string(trimmed, section_header))
          {
             in_section = true;
          }
@@ -633,7 +633,7 @@ config_get(const char* file_path, const char* section, const char* key)
                *nl = '\0';
             }
 
-            if (!strcmp(found_key, key))
+            if (pgmoneta_compare_string(found_key, key))
             {
                printf("%s\n", found_value);
                fclose(file);
@@ -726,7 +726,7 @@ config_set(const char* file_path, const char* section, const char* key, const ch
             *(bracket_end + 1) = '\0';
          }
 
-         if (!strcmp(trimmed, section_header))
+         if (pgmoneta_compare_string(trimmed, section_header))
          {
             section_found = true;
             section_start = i;
@@ -754,7 +754,7 @@ config_set(const char* file_path, const char* section, const char* key, const ch
             {
                *eq = '\0';
                char* found_key = trim(kt);
-               if (!strcmp(found_key, key))
+               if (pgmoneta_compare_string(found_key, key))
                {
                   key_found = true;
                   key_line = i;
@@ -959,7 +959,7 @@ config_del(const char* file_path, const char* section, const char* key)
          if (bracket_end)
             *(bracket_end + 1) = '\0';
 
-         if (!strcmp(trimmed, section_header))
+         if (pgmoneta_compare_string(trimmed, section_header))
          {
             section_found = true;
             section_start = i;
@@ -984,7 +984,7 @@ config_del(const char* file_path, const char* section, const char* key)
             if (eq != NULL)
             {
                *eq = '\0';
-               if (!strcmp(trim(kt), key))
+               if (pgmoneta_compare_string(trim(kt), key))
                {
                   key_line = i;
                }
@@ -1115,7 +1115,7 @@ config_ls(const char* file_path, const char* section)
 
          if (section != NULL)
          {
-            if (!strcmp(trimmed, section_header))
+            if (pgmoneta_compare_string(trimmed, section_header))
             {
                in_section = true;
             }
@@ -1187,23 +1187,23 @@ main(int argc, char** argv)
       {
          break;
       }
-      else if (!strcmp(optname, "o") || !strcmp(optname, "output"))
+      else if (pgmoneta_compare_string(optname, "o") || pgmoneta_compare_string(optname, "output"))
       {
          output_path = optarg;
       }
-      else if (!strcmp(optname, "q") || !strcmp(optname, "quiet"))
+      else if (pgmoneta_compare_string(optname, "q") || pgmoneta_compare_string(optname, "quiet"))
       {
          quiet = true;
       }
-      else if (!strcmp(optname, "F") || !strcmp(optname, "force"))
+      else if (pgmoneta_compare_string(optname, "F") || pgmoneta_compare_string(optname, "force"))
       {
          force = true;
       }
-      else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
+      else if (pgmoneta_compare_string(optname, "V") || pgmoneta_compare_string(optname, "version"))
       {
          version();
       }
-      else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
+      else if (pgmoneta_compare_string(optname, "?") || pgmoneta_compare_string(optname, "help"))
       {
          usage();
          exit(0);

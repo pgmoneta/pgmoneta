@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -340,31 +340,31 @@ main(int argc, char** argv)
       {
          break;
       }
-      else if (!strcmp(optname, "c") || !strcmp(optname, "config"))
+      else if (pgmoneta_compare_string(optname, "c") || pgmoneta_compare_string(optname, "config"))
       {
          configuration_path = optarg;
       }
-      else if (!strcmp(optname, "u") || !strcmp(optname, "users"))
+      else if (pgmoneta_compare_string(optname, "u") || pgmoneta_compare_string(optname, "users"))
       {
          users_path = optarg;
       }
-      else if (!strcmp(optname, "A") || !strcmp(optname, "admins"))
+      else if (pgmoneta_compare_string(optname, "A") || pgmoneta_compare_string(optname, "admins"))
       {
          admins_path = optarg;
       }
-      else if (!strcmp(optname, "d") || !strcmp(optname, "daemon"))
+      else if (pgmoneta_compare_string(optname, "d") || pgmoneta_compare_string(optname, "daemon"))
       {
          daemon = true;
       }
-      else if (!strcmp(optname, "D") || !strcmp(optname, "directory"))
+      else if (pgmoneta_compare_string(optname, "D") || pgmoneta_compare_string(optname, "directory"))
       {
          directory_path = optarg;
       }
-      else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
+      else if (pgmoneta_compare_string(optname, "V") || pgmoneta_compare_string(optname, "version"))
       {
          version();
       }
-      else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
+      else if (pgmoneta_compare_string(optname, "?") || pgmoneta_compare_string(optname, "help"))
       {
          usage();
          exit(0);
@@ -405,7 +405,7 @@ main(int argc, char** argv)
 
    if (directory_path != NULL)
    {
-      if (!strcmp(directory_path, "/etc/pgmoneta"))
+      if (pgmoneta_compare_string(directory_path, "/etc/pgmoneta"))
       {
          pgmoneta_log_warn("Using the default configuration directory %s, -D can be omitted.", directory_path);
       }
@@ -1134,7 +1134,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1186,7 +1186,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1227,7 +1227,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1271,7 +1271,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1315,7 +1315,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1357,7 +1357,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1399,7 +1399,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1440,7 +1440,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1481,7 +1481,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1718,7 +1718,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1759,7 +1759,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1926,7 +1926,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1967,7 +1967,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -2020,7 +2020,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       srv = -1;
       for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -2028,7 +2028,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         if (!strcmp(action, "offline"))
+         if (pgmoneta_compare_string(action, "offline"))
          {
             pgmoneta_server_set_online(srv, false);
 
@@ -2056,7 +2056,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                goto error;
             }
          }
-         else if (!strcmp(action, "online"))
+         else if (pgmoneta_compare_string(action, "online"))
          {
             pgmoneta_server_set_online(srv, true);
 
@@ -2662,7 +2662,7 @@ valid_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribut
 
             for (int j = 0; usr == -1 && j < config->common.number_of_users; j++)
             {
-               if (!strcmp(config->common.servers[i].username, config->common.users[j].username))
+               if (pgmoneta_compare_string(config->common.servers[i].username, config->common.users[j].username))
                {
                   usr = i;
                }
@@ -2731,7 +2731,7 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
                for (int j = 0;
                     follow == -1 && j < config->common.number_of_servers; j++)
                {
-                  if (!strcmp(config->common.servers[j].follow, config->common.servers[i].name))
+                  if (pgmoneta_compare_string(config->common.servers[j].follow, config->common.servers[i].name))
                   {
                      follow = j;
                   }
@@ -2751,7 +2751,7 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
                for (int j = 0; !start && j < config->common.number_of_servers;
                     j++)
                {
-                  if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name) &&
+                  if (pgmoneta_compare_string(config->common.servers[i].follow, config->common.servers[j].name) &&
                       config->common.servers[j].wal_streaming <= 0)
                   {
                      start = true;
@@ -3015,7 +3015,7 @@ init_replication_slot(int server)
    usr = -1;
    for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
    {
-      if (!strcmp(config->common.servers[server].username, config->common.users[i].username))
+      if (pgmoneta_compare_string(config->common.servers[server].username, config->common.users[i].username))
       {
          usr = i;
       }

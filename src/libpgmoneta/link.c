@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -65,7 +65,7 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
 
    while ((entry = readdir(from_dir)))
    {
-      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
       {
          continue;
       }
@@ -197,7 +197,7 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
 
    while ((entry = readdir(from_dir)))
    {
-      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
       {
          continue;
       }
@@ -385,7 +385,7 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
 
    while ((entry = readdir(from_dir)))
    {
-      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") || !strcmp(entry->d_name, "data"))
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, "..") || pgmoneta_compare_string(entry->d_name, "data"))
       {
          continue;
       }

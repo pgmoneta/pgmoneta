@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -436,7 +436,7 @@ attributes_contains(struct deque* attributes, struct prometheus_attribute* attri
       {
          struct prometheus_attribute* a = (struct prometheus_attribute*)attributes_iterator->value->data;
 
-         if (!strcmp(a->key, attribute->key) && !strcmp(a->value, attribute->value))
+         if (pgmoneta_compare_string(a->key, attribute->key) && pgmoneta_compare_string(a->value, attribute->value))
          {
             found = true;
          }
@@ -1107,7 +1107,7 @@ parse_body_to_bridge(time_t timestamp, char* body, struct prometheus_bridge* bri
 
    while (line != NULL)
    {
-      if (line[0] == '\0' || !strcmp(line, "\r"))
+      if (line[0] == '\0' || pgmoneta_compare_string(line, "\r"))
       {
          line = strtok_r(NULL, "\n", &saveptr);
          continue;
