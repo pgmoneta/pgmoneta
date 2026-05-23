@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -3906,7 +3906,7 @@ show_wal_file_selector(struct ui_state* state)
       struct dirent* entry;
       while ((entry = readdir(dir)) != NULL)
       {
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -4073,7 +4073,7 @@ show_wal_file_selector(struct ui_state* state)
                   char target_dir[MAX_PATH * 2];
                   char* first_wal_path = NULL;
 
-                  if (strcmp(entries[selected].name, "..") == 0)
+                  if (pgmoneta_compare_string(entries[selected].name, ".."))
                   {
                      pgmoneta_snprintf(target_dir, sizeof(target_dir), "%s", current_dir);
 
@@ -4091,7 +4091,7 @@ show_wal_file_selector(struct ui_state* state)
                   {
                      pgmoneta_snprintf(target_dir, sizeof(target_dir), "%s%s%s",
                                        current_dir,
-                                       strcmp(current_dir, "/") == 0 ? "" : "/",
+                                       pgmoneta_compare_string(current_dir, "/") ? "" : "/",
                                        entries[selected].name);
 
                      if (wal_interactive_get_first_wal_path(target_dir, &first_wal_path) == 0)
@@ -4211,7 +4211,7 @@ show_previous_wal_file(struct ui_state* state)
 
    for (int i = 0; i < num_files; i++)
    {
-      if (strcmp(file_list[i], current_basename) == 0)
+      if (pgmoneta_compare_string(file_list[i], current_basename))
       {
          current_index = i;
          break;
@@ -4323,7 +4323,7 @@ show_next_wal_file(struct ui_state* state)
 
    for (int i = 0; i < num_files; i++)
    {
-      if (strcmp(file_list[i], current_basename) == 0)
+      if (pgmoneta_compare_string(file_list[i], current_basename))
       {
          current_index = i;
          break;
@@ -5154,23 +5154,23 @@ main(int argc, char** argv)
       {
          break;
       }
-      else if (!strcmp(optname, "c") || !strcmp(optname, "config"))
+      else if (pgmoneta_compare_string(optname, "c") || pgmoneta_compare_string(optname, "config"))
       {
          configuration_path = optarg;
       }
-      else if (!strcmp(optname, "I") || !strcmp(optname, "interactive"))
+      else if (pgmoneta_compare_string(optname, "I") || pgmoneta_compare_string(optname, "interactive"))
       {
          interactive = true;
       }
-      else if (!strcmp(optname, "o") || !strcmp(optname, "output"))
+      else if (pgmoneta_compare_string(optname, "o") || pgmoneta_compare_string(optname, "output"))
       {
          output = optarg;
       }
-      else if (!strcmp(optname, "F") || !strcmp(optname, "format"))
+      else if (pgmoneta_compare_string(optname, "F") || pgmoneta_compare_string(optname, "format"))
       {
          format = optarg;
 
-         if (!strcmp(format, "json"))
+         if (pgmoneta_compare_string(format, "json"))
          {
             type = ValueJSON;
          }
@@ -5179,17 +5179,17 @@ main(int argc, char** argv)
             type = ValueString;
          }
       }
-      else if (!strcmp(optname, "L") || !strcmp(optname, "logfile"))
+      else if (pgmoneta_compare_string(optname, "L") || pgmoneta_compare_string(optname, "logfile"))
       {
          logfile = optarg;
       }
-      else if (!strcmp(optname, "q") || !strcmp(optname, "quiet"))
+      else if (pgmoneta_compare_string(optname, "q") || pgmoneta_compare_string(optname, "quiet"))
       {
          quiet = true;
       }
-      else if (!strcmp(optname, "color"))
+      else if (pgmoneta_compare_string(optname, "color"))
       {
-         if (!strcmp(optarg, "off"))
+         if (pgmoneta_compare_string(optarg, "off"))
          {
             color = false;
          }
@@ -5198,7 +5198,7 @@ main(int argc, char** argv)
             color = true;
          }
       }
-      else if (!strcmp(optname, "r") || !strcmp(optname, "rmgr"))
+      else if (pgmoneta_compare_string(optname, "r") || pgmoneta_compare_string(optname, "rmgr"))
       {
          if (rms == NULL)
          {
@@ -5210,7 +5210,7 @@ main(int argc, char** argv)
 
          pgmoneta_deque_add(rms, NULL, (uintptr_t)optarg, ValueString);
       }
-      else if (!strcmp(optname, "s") || !strcmp(optname, "start"))
+      else if (pgmoneta_compare_string(optname, "s") || pgmoneta_compare_string(optname, "start"))
       {
          if (strchr(optarg, '/'))
          {
@@ -5230,7 +5230,7 @@ main(int argc, char** argv)
             start_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
          }
       }
-      else if (!strcmp(optname, "e") || !strcmp(optname, "end"))
+      else if (pgmoneta_compare_string(optname, "e") || pgmoneta_compare_string(optname, "end"))
       {
          if (strchr(optarg, '/'))
          {
@@ -5250,7 +5250,7 @@ main(int argc, char** argv)
             end_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
          }
       }
-      else if (!strcmp(optname, "x") || !strcmp(optname, "xid"))
+      else if (pgmoneta_compare_string(optname, "x") || pgmoneta_compare_string(optname, "xid"))
       {
          if (xids == NULL)
          {
@@ -5262,57 +5262,57 @@ main(int argc, char** argv)
 
          pgmoneta_deque_add(xids, NULL, (uintptr_t)pgmoneta_atoi(optarg), ValueUInt32);
       }
-      else if (!strcmp(optname, "l") || !strcmp(optname, "limit"))
+      else if (pgmoneta_compare_string(optname, "l") || pgmoneta_compare_string(optname, "limit"))
       {
          limit = pgmoneta_atoi(optarg);
       }
-      else if (!strcmp(optname, "m") || !strcmp(optname, "mapping"))
+      else if (pgmoneta_compare_string(optname, "m") || pgmoneta_compare_string(optname, "mapping"))
       {
          enable_mapping = true;
          mappings_path = optarg;
       }
-      else if (!strcmp(optname, "t") || !strcmp(optname, "translate"))
+      else if (pgmoneta_compare_string(optname, "t") || pgmoneta_compare_string(optname, "translate"))
       {
          enable_mapping = true;
       }
-      else if (!strcmp(optname, "RT") || !strcmp(optname, "tablespaces"))
+      else if (pgmoneta_compare_string(optname, "RT") || pgmoneta_compare_string(optname, "tablespaces"))
       {
          tablespaces = optarg;
          filtering_enabled = true;
       }
-      else if (!strcmp(optname, "RD") || !strcmp(optname, "databases"))
+      else if (pgmoneta_compare_string(optname, "RD") || pgmoneta_compare_string(optname, "databases"))
       {
          databases = optarg;
          filtering_enabled = true;
       }
-      else if (!strcmp(optname, "RR") || !strcmp(optname, "relations"))
+      else if (pgmoneta_compare_string(optname, "RR") || pgmoneta_compare_string(optname, "relations"))
       {
          relations = optarg;
          filtering_enabled = true;
       }
-      else if (!strcmp(optname, "R") || !strcmp(optname, "filter"))
+      else if (pgmoneta_compare_string(optname, "R") || pgmoneta_compare_string(optname, "filter"))
       {
          filters = optarg;
          filtering_enabled = true;
       }
-      else if (!strcmp(optname, "u") || !strcmp(optname, "users"))
+      else if (pgmoneta_compare_string(optname, "u") || pgmoneta_compare_string(optname, "users"))
       {
          users_path = optarg;
       }
-      else if (!strcmp(optname, "v") || !strcmp(optname, "verbose"))
+      else if (pgmoneta_compare_string(optname, "v") || pgmoneta_compare_string(optname, "verbose"))
       {
          verbose = true;
       }
-      else if (!strcmp(optname, "S") || !strcmp(optname, "summary"))
+      else if (pgmoneta_compare_string(optname, "S") || pgmoneta_compare_string(optname, "summary"))
       {
          summary = true;
       }
-      else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
+      else if (pgmoneta_compare_string(optname, "V") || pgmoneta_compare_string(optname, "version"))
       {
          version();
          exit(0);
       }
-      else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
+      else if (pgmoneta_compare_string(optname, "?") || pgmoneta_compare_string(optname, "help"))
       {
          usage();
          exit(0);

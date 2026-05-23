@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -157,7 +157,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    // find the corresponding user's index of the given server
    for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
    {
-      if (!strcmp(config->common.servers[server].username, config->common.users[i].username))
+      if (pgmoneta_compare_string(config->common.servers[server].username, config->common.users[i].username))
       {
          usr = i;
       }
@@ -473,7 +473,7 @@ directory_size_excludes(char* directory, char** excludes)
          char path[1024];
          bool excluded = false;
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -482,7 +482,7 @@ directory_size_excludes(char* directory, char** excludes)
          {
             for (int i = 0; excludes[i] != NULL; i++)
             {
-               if (!strcmp(entry->d_name, excludes[i]))
+               if (pgmoneta_compare_string(entry->d_name, excludes[i]))
                {
                   excluded = true;
                   break;

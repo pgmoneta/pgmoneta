@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -166,11 +166,11 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
          goto error;
       }
 
-      if (!strcmp(incremental, "oldest"))
+      if (pgmoneta_compare_string(incremental, "oldest"))
       {
          backup_index = 0;
       }
-      else if (!strcmp(incremental, "latest") || !strcmp(incremental, "newest"))
+      else if (pgmoneta_compare_string(incremental, "latest") || pgmoneta_compare_string(incremental, "newest"))
       {
          backup_index = number_of_backups - 1;
       }
@@ -178,7 +178,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       {
          for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
          {
-            if (!strcmp(backups[i]->label, incremental))
+            if (pgmoneta_compare_string(backups[i]->label, incremental))
             {
                backup_index = i;
             }
@@ -418,11 +418,11 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
       if (sort_order != NULL)
       {
          // Only accept valid sort orders: "asc" or "desc"
-         if (!strcmp(sort_order, "desc"))
+         if (pgmoneta_compare_string(sort_order, "desc"))
          {
             sort_desc = true;
          }
-         else if (!strcmp(sort_order, "asc"))
+         else if (pgmoneta_compare_string(sort_order, "asc"))
          {
             sort_desc = false;
          }

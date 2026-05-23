@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -176,7 +176,7 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
 
    for (int i = 0; i < counter; i++)
    {
-      if (!strcmp(array[i], "user"))
+      if (pgmoneta_compare_string(array[i], "user"))
       {
          size = strlen(array[i + 1]) + 1;
          un = malloc(size);
@@ -185,7 +185,7 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
 
          *username = un;
       }
-      else if (!strcmp(array[i], "database"))
+      else if (pgmoneta_compare_string(array[i], "database"))
       {
          size = strlen(array[i + 1]) + 1;
          db = malloc(size);
@@ -194,7 +194,7 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
 
          *database = db;
       }
-      else if (!strcmp(array[i], "application_name"))
+      else if (pgmoneta_compare_string(array[i], "application_name"))
       {
          size = strlen(array[i + 1]) + 1;
          an = malloc(size);
@@ -678,7 +678,7 @@ pgmoneta_libev(char* engine)
 
    if (engine)
    {
-      if (!strcmp("select", engine))
+      if (pgmoneta_compare_string("select", engine))
       {
          if (engines & EVBACKEND_SELECT)
          {
@@ -689,7 +689,7 @@ pgmoneta_libev(char* engine)
             pgmoneta_log_warn("libev not available: select");
          }
       }
-      else if (!strcmp("poll", engine))
+      else if (pgmoneta_compare_string("poll", engine))
       {
          if (engines & EVBACKEND_POLL)
          {
@@ -700,7 +700,7 @@ pgmoneta_libev(char* engine)
             pgmoneta_log_warn("libev not available: poll");
          }
       }
-      else if (!strcmp("epoll", engine))
+      else if (pgmoneta_compare_string("epoll", engine))
       {
          if (engines & EVBACKEND_EPOLL)
          {
@@ -711,11 +711,11 @@ pgmoneta_libev(char* engine)
             pgmoneta_log_warn("libev not available: epoll");
          }
       }
-      else if (!strcmp("linuxaio", engine))
+      else if (pgmoneta_compare_string("linuxaio", engine))
       {
          return EVFLAG_AUTO;
       }
-      else if (!strcmp("iouring", engine))
+      else if (pgmoneta_compare_string("iouring", engine))
       {
          if (engines & EVBACKEND_IOURING)
          {
@@ -726,7 +726,7 @@ pgmoneta_libev(char* engine)
             pgmoneta_log_warn("libev not available: iouring");
          }
       }
-      else if (!strcmp("devpoll", engine))
+      else if (pgmoneta_compare_string("devpoll", engine))
       {
          if (engines & EVBACKEND_DEVPOLL)
          {
@@ -737,7 +737,7 @@ pgmoneta_libev(char* engine)
             pgmoneta_log_warn("libev not available: devpoll");
          }
       }
-      else if (!strcmp("port", engine))
+      else if (pgmoneta_compare_string("port", engine))
       {
          if (engines & EVBACKEND_PORT)
          {
@@ -748,7 +748,7 @@ pgmoneta_libev(char* engine)
             pgmoneta_log_warn("libev not available: port");
          }
       }
-      else if (!strcmp("auto", engine) || !strcmp("", engine))
+      else if (pgmoneta_compare_string("auto", engine) || pgmoneta_compare_string("", engine))
       {
          return EVFLAG_AUTO;
       }
@@ -1755,7 +1755,7 @@ pgmoneta_directory_size(char* directory)
       {
          char path[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -1923,7 +1923,7 @@ pgmoneta_get_directories(char* base, int* number_of_directories, char*** dirs)
 
    nod = 0;
 
-   if (base == NULL || !strcmp(base, ""))
+   if (base == NULL || pgmoneta_compare_string(base, ""))
    {
       goto error;
    }
@@ -1937,7 +1937,7 @@ pgmoneta_get_directories(char* base, int* number_of_directories, char*** dirs)
    {
       if (entry->d_type == DT_DIR)
       {
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -1959,7 +1959,7 @@ pgmoneta_get_directories(char* base, int* number_of_directories, char*** dirs)
       {
          if (entry->d_type == DT_DIR)
          {
-            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
             {
                continue;
             }
@@ -2028,7 +2028,7 @@ pgmoneta_delete_directory(char* path)
       r = 0;
       while (!r && (entry = readdir(d)))
       {
-         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -2138,7 +2138,7 @@ pgmoneta_get_files(uint32_t file_type_mask, char* base, bool recursive, struct d
 
    while ((entry = readdir(dir)) != NULL)
    {
-      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
       {
          continue;
       }
@@ -2431,7 +2431,7 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
    {
       while ((entry = readdir(d)))
       {
-         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -2460,7 +2460,7 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
                {
                   for (int i = 0; restore_last_files_names[i] != NULL; i++)
                   {
-                     file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
+                     file_is_excluded = pgmoneta_compare_string(from_buffer, restore_last_files_names[i]);
                   }
                   if (!file_is_excluded)
                   {
@@ -2503,7 +2503,7 @@ pgmoneta_list_directory(char* directory)
    {
       while ((entry = readdir(d)))
       {
-         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -3508,7 +3508,7 @@ pgmoneta_biggest_file(char* directory)
       {
          char path[MAX_PATH];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -3610,7 +3610,7 @@ pgmoneta_ends_with(char* str, char* suffix)
       str_len = strlen(str);
       suffix_len = strlen(suffix);
 
-      return (str_len >= suffix_len) && (strcmp(str + (str_len - suffix_len), suffix) == 0);
+      return (str_len >= suffix_len) && (pgmoneta_compare_string(str + (str_len - suffix_len), suffix));
    }
 
    return false;
@@ -4226,7 +4226,7 @@ pgmoneta_permission_recursive(char* d)
    {
       while ((entry = readdir(dir)))
       {
-         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -5368,7 +5368,7 @@ pgmoneta_backtrace_string(char** s)
          }
 
          buffer[strlen(buffer) - 1] = '\0'; // Remove trailing newline
-         if (strcmp(buffer, "main") == 0)
+         if (pgmoneta_compare_string(buffer, "main"))
          {
             found_main = true;
          }

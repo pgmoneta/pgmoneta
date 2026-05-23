@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -33,6 +33,7 @@
 #include <info.h>
 #include <logging.h>
 #include <progress.h>
+#include <utils.h>
 #include <workflow.h>
 
 /* system */
@@ -523,43 +524,43 @@ pgmoneta_progress_teardown(int server)
 int
 pgmoneta_progress_phase_from_workflow_name(char* name)
 {
-   if (!strcmp(name, PHASE_NAME_BASEBACKUP) || !strcmp(name, PHASE_NAME_INCREMENTAL_BACKUP))
+   if (pgmoneta_compare_string(name, PHASE_NAME_BASEBACKUP) || pgmoneta_compare_string(name, PHASE_NAME_INCREMENTAL_BACKUP))
    {
       return PHASE_BASEBACKUP;
    }
-   if (!strcmp(name, PHASE_NAME_MANIFEST))
+   if (pgmoneta_compare_string(name, PHASE_NAME_MANIFEST))
    {
       return PHASE_MANIFEST;
    }
-   if (!strcmp(name, PHASE_NAME_SHA512))
+   if (pgmoneta_compare_string(name, PHASE_NAME_SHA512))
    {
       return PHASE_SHA512;
    }
-   if (!strcmp(name, PHASE_NAME_LINK))
+   if (pgmoneta_compare_string(name, PHASE_NAME_LINK))
    {
       return PHASE_LINKING;
    }
-   if (!strcmp(name, PHASE_NAME_ZSTD) || !strcmp(name, PHASE_NAME_GZIP) || !strcmp(name, PHASE_NAME_LZ4) || !strcmp(name, PHASE_NAME_BZIP2))
+   if (pgmoneta_compare_string(name, PHASE_NAME_ZSTD) || pgmoneta_compare_string(name, PHASE_NAME_GZIP) || pgmoneta_compare_string(name, PHASE_NAME_LZ4) || pgmoneta_compare_string(name, PHASE_NAME_BZIP2))
    {
       return PHASE_COMPRESSION;
    }
-   if (!strcmp(name, PHASE_NAME_ENCRYPTION))
+   if (pgmoneta_compare_string(name, PHASE_NAME_ENCRYPTION))
    {
       return PHASE_ENCRYPTION;
    }
-   if (!strcmp(name, PHASE_NAME_DELETE))
+   if (pgmoneta_compare_string(name, PHASE_NAME_DELETE))
    {
       return PHASE_DELETE;
    }
-   if (!strcmp(name, PHASE_NAME_INFO))
+   if (pgmoneta_compare_string(name, PHASE_NAME_INFO))
    {
       return PHASE_INFO;
    }
-   if (!strcmp(name, PHASE_NAME_RESTORE))
+   if (pgmoneta_compare_string(name, PHASE_NAME_RESTORE))
    {
       return PHASE_RESTORE;
    }
-   if (!strcmp(name, PHASE_NAME_VERIFY))
+   if (pgmoneta_compare_string(name, PHASE_NAME_VERIFY))
    {
       return PHASE_VERIFY;
    }

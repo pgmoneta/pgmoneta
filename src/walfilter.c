@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -549,7 +549,7 @@ main(int argc, char* argv[])
       {
          break;
       }
-      else if (!strcmp(optname, "c") || !strcmp(optname, "config"))
+      else if (pgmoneta_compare_string(optname, "c") || pgmoneta_compare_string(optname, "config"))
       {
          configuration_path = optarg;
       }
@@ -881,7 +881,7 @@ main(int argc, char* argv[])
    {
       for (int i = 0; i < yaml_config.operation_count; i++)
       {
-         if (!strcmp(yaml_config.operations[i], OPERATION_DELETE))
+         if (pgmoneta_compare_string(yaml_config.operations[i], OPERATION_DELETE))
          {
             if (pgmoneta_filter_operation_delete(&walfile_count, &walfiles))
             {

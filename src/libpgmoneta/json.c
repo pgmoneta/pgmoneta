@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -180,7 +180,7 @@ pgmoneta_json_locate(struct json_reader* reader, char** key_path, int key_path_l
                goto error;
             }
             // if the cur_key matches current key in path
-            if (!strcmp(cur_key, key))
+            if (pgmoneta_compare_string(cur_key, key))
             {
                if (i == key_path_length - 1)
                {

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -134,7 +134,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
    /* Find backup index */
    for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
    {
-      if (!strcmp(backups[i]->label, label))
+      if (pgmoneta_compare_string(backups[i]->label, label))
       {
          backup_index = i;
       }

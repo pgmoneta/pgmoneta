@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -106,7 +106,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    cascade = (bool)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_CASCADE);
 
-   if (!strcmp(backup_id, "oldest"))
+   if (pgmoneta_compare_string(backup_id, "oldest"))
    {
       for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
       {
@@ -116,7 +116,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
          }
       }
    }
-   else if (!strcmp(backup_id, "latest") || !strcmp(backup_id, "newest"))
+   else if (pgmoneta_compare_string(backup_id, "latest") || pgmoneta_compare_string(backup_id, "newest"))
    {
       for (int i = number_of_backups - 1; backup_index == -1 && i >= 0; i--)
       {
@@ -130,7 +130,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    {
       for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
       {
-         if (backups[i] != NULL && !strcmp(backups[i]->label, backup_id))
+         if (backups[i] != NULL && pgmoneta_compare_string(backups[i]->label, backup_id))
          {
             backup_index = i;
          }

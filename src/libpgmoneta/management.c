@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -1139,7 +1139,7 @@ management_response_error_impl(SSL* ssl, int socket, char* server, int32_t error
    {
       for (int i = 0; i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(server, config->common.servers[i].name))
+         if (pgmoneta_compare_string(server, config->common.servers[i].name))
          {
             srv = i;
          }

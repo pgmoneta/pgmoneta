@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -188,7 +188,7 @@ pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque
       {
          char path[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, "pg_tblspc") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, "..") || pgmoneta_compare_string(entry->d_name, "pg_tblspc"))
          {
             continue;
          }
@@ -539,7 +539,7 @@ decrypt_data(char* d, struct workers* workers, struct deque* excludes)
       {
          char path[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }

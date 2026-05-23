@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -199,7 +199,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
             checksum = (char*)pgmoneta_art_search(tree, iter->tag);
             if (checksum != NULL)
             {
-               if (!strcmp((char*)pgmoneta_value_data(iter->value), checksum))
+               if (pgmoneta_compare_string((char*)pgmoneta_value_data(iter->value), checksum))
                {
                   // not changed but not deleted, remove the entry
                   pgmoneta_deque_iterator_remove(iter);

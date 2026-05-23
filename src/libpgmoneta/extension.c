@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -175,7 +175,7 @@ detect_extensions(SSL* ssl, int socket, int server)
                  current->data[0], MISC_LENGTH - 1);
          config->common.servers[server].extensions[extension_idx].name[MISC_LENGTH - 1] = '\0';
 
-         if (!strcmp(current->data[0], "pgmoneta_ext"))
+         if (pgmoneta_compare_string(current->data[0], "pgmoneta_ext"))
          {
             pgmoneta_ext_found = true;
             if (current->data[1] != NULL)
@@ -288,7 +288,7 @@ pgmoneta_detect_server_extensions(int server)
    /* Find and authenticate user for this server */
    for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
    {
-      if (!strcmp(config->common.servers[server].username, config->common.users[i].username))
+      if (pgmoneta_compare_string(config->common.servers[server].username, config->common.users[i].username))
       {
          usr = i;
       }
@@ -499,7 +499,7 @@ pgmoneta_extension_is_installed(int server, const char* extension_name)
 
    for (int i = 0; i < config->common.servers[server].number_of_extensions; i++)
    {
-      if (strcmp(config->common.servers[server].extensions[i].name, extension_name) == 0 &&
+      if (pgmoneta_compare_string(config->common.servers[server].extensions[i].name, extension_name) &&
           config->common.servers[server].extensions[i].enabled)
       {
          return 1;
@@ -523,7 +523,7 @@ pgmoneta_get_extension_info(int server, const char* extension_name)
 
    for (int i = 0; i < config->common.servers[server].number_of_extensions; i++)
    {
-      if (strcmp(config->common.servers[server].extensions[i].name, extension_name) == 0)
+      if (pgmoneta_compare_string(config->common.servers[server].extensions[i].name, extension_name))
       {
          return &config->common.servers[server].extensions[i];
       }

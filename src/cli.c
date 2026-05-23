@@ -502,39 +502,39 @@ main(int argc, char** argv)
       {
          break;
       }
-      else if (!strcmp(optname, "c") || !strcmp(optname, "config"))
+      else if (pgmoneta_compare_string(optname, "c") || pgmoneta_compare_string(optname, "config"))
       {
          configuration_path = optarg;
       }
-      else if (!strcmp(optname, "h") || !strcmp(optname, "host"))
+      else if (pgmoneta_compare_string(optname, "h") || pgmoneta_compare_string(optname, "host"))
       {
          host = optarg;
       }
-      else if (!strcmp(optname, "p") || !strcmp(optname, "port"))
+      else if (pgmoneta_compare_string(optname, "p") || pgmoneta_compare_string(optname, "port"))
       {
          port = optarg;
       }
-      else if (!strcmp(optname, "U") || !strcmp(optname, "user"))
+      else if (pgmoneta_compare_string(optname, "U") || pgmoneta_compare_string(optname, "user"))
       {
          username = optarg;
       }
-      else if (!strcmp(optname, "P") || !strcmp(optname, "password"))
+      else if (pgmoneta_compare_string(optname, "P") || pgmoneta_compare_string(optname, "password"))
       {
          password = optarg;
       }
-      else if (!strcmp(optname, "L") || !strcmp(optname, "logfile"))
+      else if (pgmoneta_compare_string(optname, "L") || pgmoneta_compare_string(optname, "logfile"))
       {
          logfile = optarg;
       }
-      else if (!strcmp(optname, "v") || !strcmp(optname, "verbose"))
+      else if (pgmoneta_compare_string(optname, "v") || pgmoneta_compare_string(optname, "verbose"))
       {
          verbose = true;
       }
-      else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
+      else if (pgmoneta_compare_string(optname, "V") || pgmoneta_compare_string(optname, "version"))
       {
          version();
       }
-      else if (!strcmp(optname, "F") || !strcmp(optname, "format"))
+      else if (pgmoneta_compare_string(optname, "F") || pgmoneta_compare_string(optname, "format"))
       {
          if (!strncmp(optarg, "json", MISC_LENGTH))
          {
@@ -554,7 +554,7 @@ main(int argc, char** argv)
             exit(1);
          }
       }
-      else if (!strcmp(optname, "C") || !strcmp(optname, "compress"))
+      else if (pgmoneta_compare_string(optname, "C") || pgmoneta_compare_string(optname, "compress"))
       {
          if (!strncmp(optarg, "gz", MISC_LENGTH))
          {
@@ -582,7 +582,7 @@ main(int argc, char** argv)
             exit(1);
          }
       }
-      else if (!strcmp(optname, "E") || !strcmp(optname, "encrypt"))
+      else if (pgmoneta_compare_string(optname, "E") || pgmoneta_compare_string(optname, "encrypt"))
       {
          if (!strncmp(optarg, "aes", MISC_LENGTH))
          {
@@ -610,7 +610,7 @@ main(int argc, char** argv)
             exit(1);
          }
       }
-      else if (!strcmp(optname, "s") || !strcmp(optname, "sort"))
+      else if (pgmoneta_compare_string(optname, "s") || pgmoneta_compare_string(optname, "sort"))
       {
          if (!strncmp(optarg, "asc", 3) || !strncmp(optarg, "desc", 4))
          {
@@ -622,15 +622,15 @@ main(int argc, char** argv)
             exit(1);
          }
       }
-      else if (!strcmp(optname, "cascade"))
+      else if (pgmoneta_compare_string(optname, "cascade"))
       {
          cascade = true;
       }
-      else if (!strcmp(optname, "force"))
+      else if (pgmoneta_compare_string(optname, "force"))
       {
          force = true;
       }
-      else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
+      else if (pgmoneta_compare_string(optname, "?") || pgmoneta_compare_string(optname, "help"))
       {
          usage();
          exit(0);
@@ -1297,91 +1297,91 @@ help_progress(void)
 static void
 display_helper(char* command)
 {
-   if (!strcmp(command, COMMAND_BACKUP))
+   if (pgmoneta_compare_string(command, COMMAND_BACKUP))
    {
       help_backup();
    }
-   else if (!strcmp(command, COMMAND_LIST_BACKUP))
+   else if (pgmoneta_compare_string(command, COMMAND_LIST_BACKUP))
    {
       help_list_backup();
    }
-   else if (!strcmp(command, COMMAND_S3))
+   else if (pgmoneta_compare_string(command, COMMAND_S3))
    {
       help_s3();
    }
-   else if (!strcmp(command, COMMAND_RESTORE))
+   else if (pgmoneta_compare_string(command, COMMAND_RESTORE))
    {
       help_restore();
    }
-   else if (!strcmp(command, COMMAND_VERIFY))
+   else if (pgmoneta_compare_string(command, COMMAND_VERIFY))
    {
       help_verify();
    }
-   else if (!strcmp(command, COMMAND_ARCHIVE))
+   else if (pgmoneta_compare_string(command, COMMAND_ARCHIVE))
    {
       help_archive();
    }
-   else if (!strcmp(command, COMMAND_DELETE))
+   else if (pgmoneta_compare_string(command, COMMAND_DELETE))
    {
       help_delete();
    }
-   else if (!strcmp(command, COMMAND_RETAIN))
+   else if (pgmoneta_compare_string(command, COMMAND_RETAIN))
    {
       help_retain();
    }
-   else if (!strcmp(command, COMMAND_EXPUNGE))
+   else if (pgmoneta_compare_string(command, COMMAND_EXPUNGE))
    {
       help_expunge();
    }
-   else if (!strcmp(command, COMMAND_DECRYPT))
+   else if (pgmoneta_compare_string(command, COMMAND_DECRYPT))
    {
       help_decrypt();
    }
-   else if (!strcmp(command, COMMAND_ENCRYPT))
+   else if (pgmoneta_compare_string(command, COMMAND_ENCRYPT))
    {
       help_encrypt();
    }
-   else if (!strcmp(command, COMMAND_DECOMPRESS))
+   else if (pgmoneta_compare_string(command, COMMAND_DECOMPRESS))
    {
       help_decompress();
    }
-   else if (!strcmp(command, COMMAND_COMPRESS))
+   else if (pgmoneta_compare_string(command, COMMAND_COMPRESS))
    {
       help_compress();
    }
-   else if (!strcmp(command, COMMAND_PING))
+   else if (pgmoneta_compare_string(command, COMMAND_PING))
    {
       help_ping();
    }
-   else if (!strcmp(command, COMMAND_SHUTDOWN))
+   else if (pgmoneta_compare_string(command, COMMAND_SHUTDOWN))
    {
       help_shutdown();
    }
-   else if (!strcmp(command, COMMAND_STATUS))
+   else if (pgmoneta_compare_string(command, COMMAND_STATUS))
    {
       help_status_details();
    }
-   else if (!strcmp(command, COMMAND_CONF))
+   else if (pgmoneta_compare_string(command, COMMAND_CONF))
    {
       help_conf();
    }
-   else if (!strcmp(command, COMMAND_CLEAR))
+   else if (pgmoneta_compare_string(command, COMMAND_CLEAR))
    {
       help_clear();
    }
-   else if (!strcmp(command, COMMAND_INFO))
+   else if (pgmoneta_compare_string(command, COMMAND_INFO))
    {
       help_info();
    }
-   else if (!strcmp(command, COMMAND_ANNOTATE))
+   else if (pgmoneta_compare_string(command, COMMAND_ANNOTATE))
    {
       help_annotate();
    }
-   else if (!strcmp(command, COMMAND_MODE))
+   else if (pgmoneta_compare_string(command, COMMAND_MODE))
    {
       help_mode();
    }
-   else if (!strcmp(command, COMMAND_PROGRESS))
+   else if (pgmoneta_compare_string(command, COMMAND_PROGRESS))
    {
       help_progress();
    }
@@ -2266,7 +2266,7 @@ process_set_result(SSL* ssl, int socket, char* config_key, int32_t output_format
    }
 
    // Handle success cases with accurate messaging
-   if (conf_status && !strcmp(conf_status, CONFIGURATION_STATUS_SUCCESS))
+   if (conf_status && pgmoneta_compare_string(conf_status, CONFIGURATION_STATUS_SUCCESS))
    {
       printf("Configuration change applied successfully\n");
       printf("   Parameter: %s\n", config_key ? config_key : "unknown");
@@ -2274,7 +2274,7 @@ process_set_result(SSL* ssl, int socket, char* config_key, int32_t output_format
       printf("   New value: %s\n", new_value ? new_value : "unknown");
       printf("   Status: Active (applied to running instance)\n");
    }
-   else if (conf_status && !strcmp(conf_status, CONFIGURATION_STATUS_RESTART_REQUIRED))
+   else if (conf_status && pgmoneta_compare_string(conf_status, CONFIGURATION_STATUS_RESTART_REQUIRED))
    {
       printf("Configuration change requires manual restart\n");
       printf("   Parameter: %s\n", config_key ? config_key : "unknown");
@@ -2458,14 +2458,14 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
       if (strlen(context) > 0)
       {
          // Looking for a specific context (like "mydb" in "limit.mydb.username")
-         if (!strcmp(context, iter->key) && iter->value->type == ValueJSON)
+         if (pgmoneta_compare_string(context, iter->key) && iter->value->type == ValueJSON)
          {
             struct json* nested_obj = (struct json*)iter->value->data;
             struct json_iterator* nested_iter;
             pgmoneta_json_iterator_create(nested_obj, &nested_iter);
             while (pgmoneta_json_iterator_next(nested_iter))
             {
-               if (!strcmp(key, nested_iter->key))
+               if (pgmoneta_compare_string(key, nested_iter->key))
                {
                   config_value = pgmoneta_value_to_string(nested_iter->value, FORMAT_TEXT, NULL, 0);
                   if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
@@ -2479,7 +2479,7 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
             break;
          }
       }
-      else if (!strcmp(key, iter->key))
+      else if (pgmoneta_compare_string(key, iter->key))
       {
          // Handle single or two-part keys
          if (iter->value->type == ValueJSON)

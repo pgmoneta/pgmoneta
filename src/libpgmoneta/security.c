@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -1769,7 +1769,7 @@ get_admin_password(char* username)
 
    for (int i = 0; i < config->common.number_of_admins; i++)
    {
-      if (!strcmp(&config->common.admins[i].username[0], username))
+      if (pgmoneta_compare_string(&config->common.admins[i].username[0], username))
       {
          return &config->common.admins[i].password[0];
       }
@@ -3021,15 +3021,15 @@ create_hash_file(char* filename, char* algorithm, char** hash)
       goto error;
    }
 
-   if (strcmp("SHA224", algorithm) == 0)
+   if (pgmoneta_compare_string("SHA224", algorithm))
    {
       hash_len = 57;
    }
-   else if (strcmp("SHA256", algorithm) == 0)
+   else if (pgmoneta_compare_string("SHA256", algorithm))
    {
       hash_len = 65;
    }
-   else if (strcmp("SHA384", algorithm) == 0)
+   else if (pgmoneta_compare_string("SHA384", algorithm))
    {
       hash_len = 97;
    }
@@ -3538,15 +3538,15 @@ pgmoneta_hasher_create(char* algorithm, struct hasher** hasher)
       goto error;
    }
 
-   if (strcmp("SHA224", algorithm) == 0)
+   if (pgmoneta_compare_string("SHA224", algorithm))
    {
       hash_len = 57;
    }
-   else if (strcmp("SHA256", algorithm) == 0)
+   else if (pgmoneta_compare_string("SHA256", algorithm))
    {
       hash_len = 65;
    }
-   else if (strcmp("SHA384", algorithm) == 0)
+   else if (pgmoneta_compare_string("SHA384", algorithm))
    {
       hash_len = 97;
    }

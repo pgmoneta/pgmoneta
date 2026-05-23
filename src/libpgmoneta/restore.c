@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -498,7 +498,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
             memcpy(&value[0], equal + 1, val_len);
          }
 
-         if (!strcmp(&key[0], "lsn"))
+         if (pgmoneta_compare_string(&key[0], "lsn"))
          {
             if (target_identifier != NULL)
             {
@@ -509,7 +509,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
             target_identifier = pgmoneta_append(target_identifier, &value[0]);
             target_count++;
          }
-         else if (!strcmp(&key[0], "time"))
+         else if (pgmoneta_compare_string(&key[0], "time"))
          {
             if (target_identifier != NULL)
             {
@@ -520,19 +520,19 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
             target_identifier = pgmoneta_append(target_identifier, &value[0]);
             target_count++;
          }
-         else if (!strcmp(&key[0], "current") || !strcmp(&key[0], "immediate"))
+         else if (pgmoneta_compare_string(&key[0], "current") || pgmoneta_compare_string(&key[0], "immediate"))
          {
             target_count++;
          }
-         else if (!strcmp(&key[0], "name"))
+         else if (pgmoneta_compare_string(&key[0], "name"))
          {
             target_count++;
          }
-         else if (!strcmp(&key[0], "xid"))
+         else if (pgmoneta_compare_string(&key[0], "xid"))
          {
             target_count++;
          }
-         else if (!strcmp(&key[0], "timeline"))
+         else if (pgmoneta_compare_string(&key[0], "timeline"))
          {
             /* timeline is a modifier, not a primary target.
              * Save the value for potential backup selection below. */
@@ -776,24 +776,24 @@ pgmoneta_restore_backup(struct art* nodes)
             memcpy(&value[0], equal + 1, strlen(equal) - 1);
          }
 
-         if (!strcmp(&key[0], "current") ||
-             !strcmp(&key[0], "immediate") ||
-             !strcmp(&key[0], "name") ||
-             !strcmp(&key[0], "xid") ||
-             !strcmp(&key[0], "lsn") ||
-             !strcmp(&key[0], "time"))
+         if (pgmoneta_compare_string(&key[0], "current") ||
+             pgmoneta_compare_string(&key[0], "immediate") ||
+             pgmoneta_compare_string(&key[0], "name") ||
+             pgmoneta_compare_string(&key[0], "xid") ||
+             pgmoneta_compare_string(&key[0], "lsn") ||
+             pgmoneta_compare_string(&key[0], "time"))
          {
             copy_wal = true;
          }
-         else if (!strcmp(&key[0], "primary"))
+         else if (pgmoneta_compare_string(&key[0], "primary"))
          {
             primary = true;
          }
-         else if (!strcmp(&key[0], "replica"))
+         else if (pgmoneta_compare_string(&key[0], "replica"))
          {
             primary = false;
          }
-         else if (!strcmp(&key[0], "inclusive") || !strcmp(&key[0], "timeline") || !strcmp(&key[0], "action"))
+         else if (pgmoneta_compare_string(&key[0], "inclusive") || pgmoneta_compare_string(&key[0], "timeline") || pgmoneta_compare_string(&key[0], "action"))
          {
             /* Ok */
          }
@@ -1258,7 +1258,7 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
    {
       while ((entry = readdir(d)))
       {
-         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -1281,7 +1281,7 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
          {
             if (S_ISDIR(statbuf.st_mode))
             {
-               if (!strcmp(entry->d_name, "pg_tblspc"))
+               if (pgmoneta_compare_string(entry->d_name, "pg_tblspc"))
                {
                   copy_tablespaces_restore(from, to, base, server, id, backup, workers);
                }
@@ -1297,7 +1297,7 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
                {
                   for (int i = 0; restore_last_files_names[i] != NULL; i++)
                   {
-                     file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
+                     file_is_excluded = pgmoneta_compare_string(from_buffer, restore_last_files_names[i]);
                   }
                   if (!file_is_excluded)
                   {
@@ -1368,7 +1368,7 @@ pgmoneta_copy_postgresql_hotstandby(int server, char* from, char* to, char* tbls
    {
       while ((entry = readdir(d)))
       {
-         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -1385,7 +1385,7 @@ pgmoneta_copy_postgresql_hotstandby(int server, char* from, char* to, char* tbls
          {
             if (S_ISDIR(statbuf.st_mode))
             {
-               if (!strcmp(entry->d_name, "pg_tblspc"))
+               if (pgmoneta_compare_string(entry->d_name, "pg_tblspc"))
                {
                   copy_tablespaces_hotstandby(server, from, to, tblspc_mappings, backup, workers);
                }
@@ -3039,7 +3039,7 @@ copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* i
          char path[MAX_PATH];
          char* tblspc_name = NULL;
 
-         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
             continue;
          }
@@ -3068,7 +3068,7 @@ copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* i
 
          for (uint64_t i = 0; idx == -1 && i < backup->number_of_tablespaces; i++)
          {
-            if (!strcmp(tblspc_name, backup->tablespaces[i]))
+            if (pgmoneta_compare_string(tblspc_name, backup->tablespaces[i]))
             {
                idx = i;
             }
@@ -3212,7 +3212,7 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
                v = strtok(NULL, "->");
                v = pgmoneta_remove_whitespace(v);
 
-               if (!strcmp(k, backup->tablespaces_oids[i]) || !strcmp(k, backup->tablespaces_paths[i]))
+               if (pgmoneta_compare_string(k, backup->tablespaces_oids[i]) || pgmoneta_compare_string(k, backup->tablespaces_paths[i]))
                {
                   dst = pgmoneta_append(dst, v);
                   found = true;
