@@ -33,6 +33,7 @@
 #include <http.h>
 #include <info.h>
 #include <json.h>
+#include <libgen.h>
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
@@ -40,6 +41,7 @@
 #include <security.h>
 #include <utils.h>
 #include <value.h>
+#include <vfile.h>
 #include <workflow.h>
 
 /* system */
@@ -100,6 +102,13 @@ struct s3_transfer_task
    char file_sha512[MISC_LENGTH];
 };
 
+struct s3_download_file_context
+{
+   struct vfile* file;
+   char* path;
+   size_t bytes_written;
+};
+
 static void do_download_file(struct worker_common* wc);
 static void do_upload_file(struct worker_common* wc);
 static int s3_create_transfer_task(int server, char* s3_root, char* remote_path,
@@ -107,6 +116,7 @@ static int s3_create_transfer_task(int server, char* s3_root, char* remote_path,
                                    struct workers* workers, struct s3_transfer_task** task);
 static int s3_upload_one_file(struct s3_transfer_task* task);
 static int s3_download_one_file(struct s3_transfer_task* task);
+static size_t s3_download_write_cb(void* buffer, size_t size, void* userdata);
 
 struct workflow*
 pgmoneta_storage_create_s3(int workflow_type)
@@ -605,7 +615,7 @@ s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   if (rename(info_tmp, info_final))
+   if (pgmoneta_move_file(info_tmp, info_final))
    {
       pgmoneta_log_error("S3 restore: could not rename %s to %s", info_tmp, info_final);
       goto error;
@@ -631,13 +641,13 @@ s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
    sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
    sha512_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512");
 
-   if (rename(manifest_tmp, manifest_final))
+   if (pgmoneta_move_file(manifest_tmp, manifest_final))
    {
       pgmoneta_log_error("S3 restore: could not rename %s to %s", manifest_tmp, manifest_final);
       goto error;
    }
 
-   if (rename(sha512_tmp, sha512_final))
+   if (pgmoneta_move_file(sha512_tmp, sha512_final))
    {
       pgmoneta_log_error("S3 restore: could not rename %s to %s", sha512_tmp, sha512_final);
       goto error;
@@ -1089,29 +1099,66 @@ static int
 s3_download_one_file(struct s3_transfer_task* task)
 {
    struct http_response* response = NULL;
+   struct s3_download_file_context ctx = {0};
    char* full_local = NULL;
+   char* tmp_local = NULL;
+   char* parent_copy = NULL;
+   char* parent = NULL;
+
+   full_local = pgmoneta_append(full_local, task->local_root);
+   full_local = pgmoneta_append(full_local, task->local_path);
+
+   tmp_local = pgmoneta_append(tmp_local, full_local);
+   tmp_local = pgmoneta_append(tmp_local, ".tmp");
+
+   parent_copy = pgmoneta_append(parent_copy, tmp_local);
+   parent = dirname(parent_copy);
+   if (pgmoneta_mkdir(parent))
+   {
+      pgmoneta_log_error("S3 download: failed to create parent directory for %s", tmp_local);
+      goto error;
+   }
+
+   if (pgmoneta_exists(tmp_local))
+   {
+      pgmoneta_delete_file(tmp_local, NULL);
+   }
+
+   if (pgmoneta_vfile_create_local(tmp_local, "wb", &ctx.file))
+   {
+      pgmoneta_log_error("S3 download: failed to create local file %s", tmp_local);
+      goto error;
+   }
+   ctx.path = tmp_local;
+   response = (struct http_response*)malloc(sizeof(struct http_response));
+   if (response == NULL)
+   {
+      goto error;
+   }
+
+   memset(response, 0, sizeof(struct http_response));
+   response->write_cb = s3_download_write_cb;
+   response->write_userdata = &ctx;
 
    if (s3_send_get_request(task->remote_path, task->s3_root, task->server, -1, -1, &response))
    {
       pgmoneta_log_error("S3 download: failed to GET %s", task->remote_path);
       goto error;
    }
-
    if (response->status_code != 200)
    {
       pgmoneta_log_error("S3 download: %s returned status %d", task->remote_path, response->status_code);
       goto error;
    }
 
-   full_local = pgmoneta_append(full_local, task->local_root);
-   full_local = pgmoneta_append(full_local, task->local_path);
+   pgmoneta_vfile_destroy(ctx.file);
+   ctx.file = NULL;
 
-   if (pgmoneta_append_file_chunk(full_local, response->payload.data, response->payload.data_size, 0))
+   if (pgmoneta_move_file(tmp_local, full_local))
    {
-      pgmoneta_log_error("S3 download: failed to write %s", full_local);
+      pgmoneta_log_error("S3 download: failed to rename %s to %s", tmp_local, full_local);
       goto error;
    }
-
    if (task->progress_enabled)
    {
       pgmoneta_progress_increment(task->server, 1);
@@ -1120,12 +1167,27 @@ s3_download_one_file(struct s3_transfer_task* task)
    pgmoneta_log_debug("S3 download: %s", task->remote_path);
    pgmoneta_http_response_destroy(response);
    free(full_local);
+   free(tmp_local);
+   free(parent_copy);
 
    return 0;
 
 error:
+   if (ctx.file != NULL)
+   {
+      pgmoneta_vfile_destroy(ctx.file);
+      ctx.file = NULL;
+   }
+
+   if (pgmoneta_exists(tmp_local))
+   {
+      pgmoneta_delete_file(tmp_local, NULL);
+   }
+
    pgmoneta_http_response_destroy(response);
+   free(parent_copy);
    free(full_local);
+   free(tmp_local);
    return 1;
 }
 
@@ -1143,6 +1205,24 @@ do_download_file(struct worker_common* wc)
    }
 
    free(task);
+}
+
+static size_t
+s3_download_write_cb(void* buffer, size_t size, void* userdata)
+{
+   struct s3_download_file_context* ctx = (struct s3_download_file_context*)userdata;
+   if (ctx == NULL || ctx->file == NULL)
+   {
+      return 0;
+   }
+   /* HTTP write_cb has no end-of-body signal; vfile_local ignores last_chunk. */
+   if (ctx->file->write(ctx->file, buffer, size, false))
+   {
+      pgmoneta_log_error("S3 download: failed to write chunk to %s", ctx->path);
+      return 0;
+   }
+   ctx->bytes_written += size;
+   return size;
 }
 
 static int
