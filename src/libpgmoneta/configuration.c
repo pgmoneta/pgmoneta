@@ -184,6 +184,7 @@ pgmoneta_init_main_configuration(void* shm)
    config->retention_interval = 300;
 
    config->tls = false;
+   config->alerts = false;
 
    config->blocking_timeout = PGMONETA_TIME_SEC(DEFAULT_BLOCKING_TIMEOUT);
    config->authentication_timeout = PGMONETA_TIME_SEC(5);
