@@ -343,7 +343,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
          goto error;
       }
       // get the copy out response
-      while (msg == NULL || msg->kind != 'H')
+      while (msg != NULL && msg->kind != 'H')
       {
          pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
          if (msg->kind == 'E' || msg->kind == 'f')
@@ -525,7 +525,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
       pgmoneta_progress_set_total(srv, total_size);
       pgmoneta_log_debug("Backup progress: total size %" PRId64 " bytes", total_size);
    }
-   while (msg == NULL || msg->kind != 'H')
+   while (msg != NULL && msg->kind != 'H')
    {
       pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')

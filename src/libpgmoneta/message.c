@@ -2371,7 +2371,7 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
    }
 
    // get the copy out response
-   while (msg == NULL || msg->kind != 'H')
+   while (msg != NULL && msg->kind != 'H')
    {
       pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
