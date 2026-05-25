@@ -464,6 +464,8 @@ error:
       pgmoneta_disconnect(socket);
    }
    pgmoneta_free_query_response(response);
+   // clear message data to prevent double free as msg shares data with stream buffer
+   msg->data = NULL;
    pgmoneta_free_message(msg);
    return 1;
 }
