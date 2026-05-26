@@ -50,7 +50,7 @@ The build system will automatically detect the compiler version and enable the a
 
 ```sh
 dnf install pandoc texlive-scheme-basic \
-            'tex(footnote.sty)' 'tex(footnotebackref.sty)' \
+            'tex(fvextra.sty)' 'tex(footnote.sty)' 'tex(footnotebackref.sty)' \
             'tex(pagecolor.sty)' 'tex(hardwrap.sty)' \
             'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' \
             'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' \

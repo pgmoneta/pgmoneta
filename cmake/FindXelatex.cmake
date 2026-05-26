@@ -1,23 +1,22 @@
 #
-# pdflatex Support
+# xelatex Support
 #
 
-find_program(PDFLATEX_EXECUTABLE
-  NAMES pdflatex
+find_program(XELATEX_EXECUTABLE
+  NAMES xelatex
 )
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(Pdflatex DEFAULT_MSG
-                                  PDFLATEX_EXECUTABLE)
+find_package_handle_standard_args(Xelatex DEFAULT_MSG
+                                  XELATEX_EXECUTABLE)
 
-if(PDFLATEX_FOUND)
+if(XELATEX_FOUND)
 
   # check for kpsewhich
   find_program(KPSEWHICH kpsewhich)
-
   if(NOT KPSEWHICH)
     set(DOCS FALSE)
-    message(STATUS "kpsewhich not found. The documentation will be skipped.")
+    message(STATUS "kpsewhich not found. The generation process will be skipped.")
     return()
   endif()
 
@@ -41,6 +40,7 @@ if(PDFLATEX_FOUND)
   endmacro()
 
   # Use the macro to check for packages
+  check_latex_package("fvextra.sty")
   check_latex_package("footnote.sty")
   check_latex_package("footnotebackref.sty")
   check_latex_package("pagecolor.sty")
@@ -53,7 +53,7 @@ if(PDFLATEX_FOUND)
   check_latex_package("csquotes.sty")
   check_latex_package("zref-abspage.sty")
   check_latex_package("needspace.sty")
-
+  check_latex_package("selnolig.sty")
 endif()
 
-mark_as_advanced(PDFLATEX_EXECUTABLE)
+mark_as_advanced(XELATEX_EXECUTABLE)
