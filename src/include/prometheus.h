@@ -105,6 +105,14 @@ pgmoneta_init_prometheus_cache(size_t* p_size, void** p_shmem);
 void
 pgmoneta_prometheus_logging(int logging);
 
+/**
+ * Is alert enabled for a server
+ * @param server The server
+ * @return True if enabled, otherwise false
+ */
+bool
+pgmoneta_is_alert_enabled(int server);
+
 #ifdef __cplusplus
 }
 #endif
