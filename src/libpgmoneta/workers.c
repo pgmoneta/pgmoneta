@@ -159,18 +159,12 @@ pgmoneta_workers_outcome_ok(struct workers* workers)
 void
 pgmoneta_workers_record_failure(struct workers* workers, char* message)
 {
-   char* copy = NULL;
-
    if (workers == NULL || workers->outcome == NULL || message == NULL)
    {
       return;
    }
 
-   copy = pgmoneta_append(NULL, message);
-   if (copy != NULL)
-   {
-      pgmoneta_deque_add(workers->outcome, NULL, (uintptr_t)copy, ValueString);
-   }
+   pgmoneta_deque_add(workers->outcome, NULL, (uintptr_t)message, ValueString);
 }
 
 void
