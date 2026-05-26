@@ -319,8 +319,7 @@ metric_find_create(struct prometheus_bridge* bridge, char* name,
          goto error;
       }
 
-      m->name = strdup(name);
-      if (m->name == NULL)
+      if (!pgmoneta_copy_string(name, &m->name))
       {
          pgmoneta_deque_destroy(defs);
          free(m);
@@ -359,8 +358,7 @@ metric_set_name(struct prometheus_metric* metric, char* name)
       return 0;
    }
 
-   metric->name = strdup(name);
-   if (metric->name == NULL)
+   if (!pgmoneta_copy_string(name, &metric->name))
    {
       errno = 0;
       return 1;
@@ -383,9 +381,7 @@ metric_set_help(struct prometheus_metric* metric, char* help)
       metric->help = NULL;
    }
 
-   metric->help = strdup(help);
-
-   if (metric->help == NULL)
+   if (!pgmoneta_copy_string(help, &metric->help))
    {
       errno = 0;
       return 1;
@@ -408,9 +404,7 @@ metric_set_type(struct prometheus_metric* metric, char* type)
       metric->type = NULL;
    }
 
-   metric->type = strdup(type);
-
-   if (metric->type == NULL)
+   if (!pgmoneta_copy_string(type, &metric->type))
    {
       errno = 0;
       return 1;
@@ -657,9 +651,7 @@ add_value(struct deque* values, time_t timestamp, char* value)
 
    memset(val, 0, sizeof(struct prometheus_value));
    val->timestamp = timestamp;
-   val->value = strdup(value);
-
-   if (val->value == NULL)
+   if (!pgmoneta_copy_string(value, &val->value))
    {
       goto error;
    }
@@ -753,14 +745,12 @@ add_attribute(struct deque* attributes, char* key, char* value)
    }
    memset(attr, 0, sizeof(struct prometheus_attribute));
 
-   attr->key = strdup(key);
-   if (attr->key == NULL)
+   if (!pgmoneta_copy_string(key, &attr->key))
    {
       goto error;
    }
 
-   attr->value = strdup(value);
-   if (attr->value == NULL)
+   if (!pgmoneta_copy_string(value, &attr->value))
    {
       goto error;
    }

@@ -284,8 +284,7 @@ pgmoneta_get_restore_last_files_names(char*** output)
 
    for (int i = 0; i < number_of_elements; i++)
    {
-      (*output)[i] = strdup(restore_last_files_names[i]);
-      if ((*output)[i] == NULL)
+      if (!pgmoneta_copy_string(restore_last_files_names[i], &(*output)[i]))
       {
          goto error;
       }

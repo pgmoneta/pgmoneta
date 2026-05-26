@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <utils.h>
 #include <yaml_utils.h>
 
 /* system */
@@ -181,29 +182,29 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
       case STATE_ROOT:
          if (*current_key == NULL)
          {
-            *current_key = strdup(value);
+            pgmoneta_copy_string(value, current_key);
          }
          else
          {
             if (strcmp(*current_key, "source_dir") == 0)
             {
-               config->source_dir = strdup(value);
+               pgmoneta_copy_string(value, &config->source_dir);
             }
             else if (strcmp(*current_key, "target_dir") == 0)
             {
-               config->target_dir = strdup(value);
+               pgmoneta_copy_string(value, &config->target_dir);
             }
             else if (strcmp(*current_key, "encryption") == 0)
             {
-               config->encryption = strdup(value);
+               pgmoneta_copy_string(value, &config->encryption);
             }
             else if (strcmp(*current_key, "compression") == 0)
             {
-               config->compression = strdup(value);
+               pgmoneta_copy_string(value, &config->compression);
             }
             else if (strcmp(*current_key, "configuration_file") == 0)
             {
-               config->configuration_file = strdup(value);
+               pgmoneta_copy_string(value, &config->configuration_file);
             }
             free(*current_key);
             *current_key = NULL;
@@ -213,7 +214,7 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
       case STATE_RULE_MAPPING:
          if (*current_key == NULL)
          {
-            *current_key = strdup(value);
+            pgmoneta_copy_string(value, current_key);
          }
          else
          {
@@ -228,7 +229,7 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
          config->operations = realloc(
             config->operations,
             (config->operation_count + 1) * sizeof(char*));
-         config->operations[config->operation_count] = strdup(value);
+         pgmoneta_copy_string(value, &config->operations[config->operation_count]);
          config->operation_count++;
          break;
 

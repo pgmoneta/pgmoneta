@@ -79,7 +79,7 @@ pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result
    }
 
    connection->socket = socket_fd;
-   connection->hostname = strdup(hostname);
+   pgmoneta_copy_string(hostname, &connection->hostname);
    connection->port = port;
    connection->secure = secure;
 
@@ -187,8 +187,7 @@ pgmoneta_http_request_create(int method, char* path, struct http_request** resul
    memset(request, 0, sizeof(struct http_request));
 
    request->method = method;
-   request->path = strdup(path);
-   if (request->path == NULL)
+   if (!pgmoneta_copy_string(path, &request->path))
    {
       pgmoneta_log_error("Failed to duplicate path string");
       goto error;
@@ -364,8 +363,8 @@ pgmoneta_http_get_response_header(struct http_response* response, char* name)
       return NULL;
    }
 
-   char* key = strdup(name);
-   if (key == NULL)
+   char* key = NULL;
+   if (!pgmoneta_copy_string(name, &key))
    {
       return NULL;
    }
@@ -958,12 +957,12 @@ http_parse_header(char** header_text, struct http_response* http_response)
    }
 
    // make a copy to work on
-   original = p = strdup(*header_text);
-   if (!p)
+   if (!pgmoneta_copy_string(*header_text, &original))
    {
       pgmoneta_log_error("Failed to duplicate header text");
       goto error;
    }
+   p = original;
 
    // parse the status line
    char* line_end = strstr(p, "\r\n");

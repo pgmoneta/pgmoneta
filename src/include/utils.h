@@ -777,6 +777,15 @@ int
 pgmoneta_copy_directory(char* from, char* to, char** restore_last_paths, struct workers* workers);
 
 /**
+ * Copy a string
+ * @param from The from string
+ * @param to The to string
+ * @return The result
+ */
+bool
+pgmoneta_copy_string(const char* from, char** to);
+
+/**
  * List a directory
  * @param directory The directory
  */
