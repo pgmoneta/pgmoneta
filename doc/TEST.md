@@ -18,17 +18,35 @@ and debugging.
 
 All the configuration, logs, coverage reports and data will be in `/tmp/pgmoneta-test/`, and a cleanup will run whether the script exits normally or not. pgmoneta will be force shutdown if it doesn't terminate normally. So don't worry about your local setup being tampered. The container will be stopped and removed when the script exits or is terminated.
 
-**Setup only (no tests):** Run `<PATH_TO_PGMONETA>/test/check.sh build` to prepare the test environment (image, pgmoneta build, container, config) without running tests. This always does a full build.
+**Setup only (no tests):** Run `<PATH_TO_PGMONETA>/test/check.sh build` to prepare the test environment (image, pgmoneta build, container, config) without running tests. pgmoneta is (re)compiled only when a binary is missing or a source file is newer than the built binaries; remove the `build/` directory if you need a clean rebuild.
 
-**Single test or module:** Run `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` or `<PATH_TO_PGMONETA>/test/check.sh -m <module_name>` (long form: `--test`, `--module`). The script sets up the environment automatically when needed, so you do not need to run the full suite first. For quick iteration, run `<PATH_TO_PGMONETA>/test/check.sh build` once, then `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` (or `-m <module_name>`) repeatedly. Environment variables are unset when the test run finishes or is aborted.
+**Single test or module:** Run `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` or `<PATH_TO_PGMONETA>/test/check.sh -m <module_name>` (long form: `--test`, `--module`). The script sets up the environment automatically when needed, and recompiles pgmoneta whenever your sources are newer than the binaries, so you do not need to run the full suite or rebuild manually first. For quick iteration, just run `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` (or `-m <module_name>`) repeatedly; edits are picked up on the next run. Environment variables are unset when the test run finishes or is aborted.
 
 It is recommended that you **ALWAYS** run tests before raising PR.
 
-**What MCTF Can Do:**
+**MCTF Framework Overview**
 
-- **Automatic test registration** - Tests register automatically via constructor attributes
+MCTF (Minimal C Test Framework) is pgmoneta's custom test framework designed for simplicity and ease of use.
+
+**What MCTF Can Do:**
+- **Automatic test registration** - Tests are automatically registered via constructor attributes
+- **Module organization** - Module names are automatically extracted from file names (e.g., `test_utils.c` → module `utils`)
+- **Flexible assertions** - Assert macros with optional printf-style error messages
+- **Test filtering** - Run tests by name pattern (`-t`) or by module (`-m`)
+- **Test skipping** - Skip tests conditionally using `MCTF_SKIP()` when prerequisites aren't met
 - **Per-test pgmoneta log slicing and validation** - Captures each test's log window to `/tmp/pgmoneta-test/log/<module>__<test_name>.pgmoneta.log`; positive tests fail on unexpected `ERROR` lines, while `MCTF_TEST_NEGATIVE` is used for expected-error scenarios
 - **Maximum runtime (performance gate)** - `MCTF_TEST_MAX(name, seconds)` fails the test if it runs longer than the limit; `MCTF_TEST_MAX_NEGATIVE(name, seconds)` adds a time limit to a negative test. Use to catch performance regressions (e.g. after OpenSSL changes).
+- **Lifecycle hooks** – Automatic per-test and per-module setup/teardown via `MCTF_TEST_SETUP`, `MCTF_TEST_TEARDOWN`, `MCTF_MODULE_SETUP`, `MCTF_MODULE_TEARDOWN`
+- **Config snapshot/restore** – `pgmoneta_test_config_save()` / `pgmoneta_test_config_restore()` to isolate shared-memory config changes between tests
+- **Cleanup pattern** - Structured cleanup using goto labels for resource management
+- **Error tracking** - Automatic error tracking with line numbers and custom error messages
+- **Multiple assertion types** - Various assertion macros (`MCTF_ASSERT`, `MCTF_ASSERT_PTR_NONNULL`, `MCTF_ASSERT_INT_EQ`, `MCTF_ASSERT_STR_EQ`, etc.)
+
+**What MCTF Cannot Do (Limitations):**
+- **No parameterized tests** - Tests cannot be parameterized (each variation needs a separate test function)
+- **No parallel or async execution** - Tests run sequentially and synchronously
+- **No hard kill on timeout** - Max-time only fails after the test returns; it does not interrupt a stuck test (rely on OS signals or external timeouts for that)
+- **No test organization beyond modules** - No test suites, groups, tags, or metadata beyond module names extracted from filenames
 
 **Add Testcases**
 

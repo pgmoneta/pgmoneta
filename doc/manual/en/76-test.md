@@ -18,9 +18,9 @@ and debugging.
 
 All the configuration, logs, coverage reports and data will be in `/tmp/pgmoneta-test/`, and a cleanup will run whether the script exits normally or not. pgmoneta will be force shutdown if it doesn't terminate normally. So don't worry about your local setup being tampered. The container will be stopped and removed when the script exits or is terminated.
 
-**Setup only (no tests):** Run `<PATH_TO_PGMONETA>/test/check.sh build` to prepare the test environment (image, pgmoneta build, container, config) without running tests. This always does a full build.
+**Setup only (no tests):** Run `<PATH_TO_PGMONETA>/test/check.sh build` to prepare the test environment (image, pgmoneta build, container, config) without running tests. pgmoneta is (re)compiled only when a binary is missing or a source file is newer than the built binaries; remove the `build/` directory if you need a clean rebuild.
 
-**Single test or module:** Run `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` or `<PATH_TO_PGMONETA>/test/check.sh -m <module_name>` (long form: `--test`, `--module`). The script sets up the environment automatically when needed, so you do not need to run the full suite first. For quick iteration, run `<PATH_TO_PGMONETA>/test/check.sh build` once, then `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` (or `-m <module_name>`) repeatedly. Environment variables are unset when the test run finishes or is aborted.
+**Single test or module:** Run `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` or `<PATH_TO_PGMONETA>/test/check.sh -m <module_name>` (long form: `--test`, `--module`). The script sets up the environment automatically when needed, and recompiles pgmoneta whenever your sources are newer than the binaries, so you do not need to run the full suite or rebuild manually first. For quick iteration, just run `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` (or `-m <module_name>`) repeatedly; edits are picked up on the next run. Environment variables are unset when the test run finishes or is aborted.
 
 It is recommended that you **ALWAYS** run tests before raising PR.
 

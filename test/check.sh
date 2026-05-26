@@ -370,8 +370,25 @@ need_build() {
   return 0
 }
 
+# Returns 0 if pgmoneta needs to be (re)compiled, 1 otherwise.
+# A (re)compile is needed when a binary is missing, or when any tracked
+# source file is newer than the built binaries.
+need_compile() {
+  if [[ ! -f "$TEST_DIRECTORY/pgmoneta-test" ]] || [[ ! -f "$EXECUTABLE_DIRECTORY/pgmoneta" ]]; then
+    return 0
+  fi
+  local bin
+  for bin in "$EXECUTABLE_DIRECTORY/pgmoneta" "$TEST_DIRECTORY/pgmoneta-test"; do
+    if [[ -n "$(find "$PROJECT_DIRECTORY/src" "$PROJECT_DIRECTORY/test" "$PROJECT_DIRECTORY/cmake" "$PROJECT_DIRECTORY/CMakeLists.txt" \
+                     \( -name '*.c' -o -name '*.h' -o -name 'CMakeLists.txt' -o -name '*.cmake' \) \
+                     -newer "$bin" -print -quit 2>/dev/null)" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 do_setup() {
-  local always_build="${1:-}"
   if [[ $MODE != "ci" ]]; then
     echo "Building PostgreSQL $PG_VERSION image if necessary"
     if $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
@@ -392,8 +409,8 @@ do_setup() {
   chmod -R 777 $PG_LOG_DIR
   chmod -R 777 $PGCONF_DIRECTORY
 
-  if [[ "$always_build" == "force" ]] || [[ ! -f "$TEST_DIRECTORY/pgmoneta-test" ]] || [[ ! -f "$EXECUTABLE_DIRECTORY/pgmoneta" ]]; then
-    echo "Building pgmoneta"
+  if need_compile; then
+    echo "Building pgmoneta (binaries missing or sources changed)"
     mkdir -p "$PROJECT_DIRECTORY/build"
     cd "$PROJECT_DIRECTORY/build"
     export CC=$(which clang)
@@ -401,7 +418,7 @@ do_setup() {
     make -j$(nproc)
     cd ..
   else
-    echo "pgmoneta binaries already present, skipping build"
+    echo "pgmoneta binaries up to date, skipping build"
   fi
 
   if [[ $MODE == "ci" ]]; then
@@ -506,8 +523,8 @@ run_tests() {
   else
     # Double-check: binaries and config must exist (cleanup removes BASE_DIR/conf, so config can be missing)
     if [[ ! -f "$EXECUTABLE_DIRECTORY/pgmoneta" ]] || [[ ! -f "$TEST_DIRECTORY/pgmoneta-test" ]] \
-       || [[ ! -f "$CONFIGURATION_DIRECTORY/pgmoneta.conf" ]]; then
-      echo "Environment incomplete (binaries or config missing), running build"
+       || [[ ! -f "$CONFIGURATION_DIRECTORY/pgmoneta.conf" ]] || need_compile; then
+      echo "Environment incomplete or sources changed, running build"
       do_setup
     else
       echo "Environment already ready, skipping build"
@@ -571,7 +588,7 @@ done
 
 if [[ "$SUBCOMMAND" == "build" ]]; then
    detect_container_engine
-   do_setup force
+   do_setup
    exit 0
 fi
 if [[ "$SUBCOMMAND" == "setup" ]]; then
