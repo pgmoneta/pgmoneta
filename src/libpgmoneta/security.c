@@ -3065,6 +3065,8 @@ create_hash_file(char* filename, char* algorithm, char** hash)
    file = fopen(filename, "rb");
    if (file == NULL)
    {
+      pgmoneta_log_error("create_hash_file: could not open %s (%s)", filename, strerror(errno));
+      errno = 0;
       goto error;
    }
 

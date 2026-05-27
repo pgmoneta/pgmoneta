@@ -71,6 +71,12 @@ RUN mkdir -p /conf /pgconf /pgdata /pgwal /pglog
 COPY conf/* /conf/
 RUN chown -R postgres:postgres /conf /pgconf /pgdata /pgwal /pglog
 RUN chmod 700 /conf /pgconf /pgdata /pgwal
+
+RUN mkdir -p /tmp/pgmoneta_tblspc/ts1 /tmp/pgmoneta_tblspc/ts2
+RUN chown -R postgres:postgres /tmp/pgmoneta_tblspc
+RUN chmod 777 /tmp/pgmoneta_tblspc
+RUN chmod 700 /tmp/pgmoneta_tblspc/ts1 /tmp/pgmoneta_tblspc/ts2
+
 RUN chmod +x /usr/bin/run-postgresql
 RUN mkdir -p /usr/local/bin
 

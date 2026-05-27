@@ -49,7 +49,7 @@ pgmoneta_tar(char* src, char* dst)
    int status;
    size_t src_len = 0;
    size_t end = 0;
-   const char* start = NULL;
+   char* start = NULL;
    size_t root_len = 0;
 
    if (src == NULL || dst == NULL)
@@ -183,7 +183,7 @@ pgmoneta_untar(char* src, char* dst)
    while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
    {
       char dst_file_path[MAX_PATH];
-      const char* entry_path = archive_entry_pathname(entry);
+      char* entry_path = (char*)archive_entry_pathname(entry);
 
       memset(dst_file_path, 0, sizeof(dst_file_path));
       if (pgmoneta_ends_with(dst, "/"))

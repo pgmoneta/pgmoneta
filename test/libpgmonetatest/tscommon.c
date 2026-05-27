@@ -351,6 +351,37 @@ error:
    return 1;
 }
 
+void
+pgmoneta_test_cleanup_query_response(struct query_response** qr)
+{
+   if (qr != NULL && *qr != NULL)
+   {
+      pgmoneta_free_query_response(*qr);
+      *qr = NULL;
+   }
+}
+
+void
+pgmoneta_test_cleanup_connection(SSL** ssl, int* socket)
+{
+   if (ssl != NULL && *ssl != NULL)
+   {
+      pgmoneta_close_ssl(*ssl);
+      *ssl = NULL;
+   }
+   if (socket != NULL && *socket != -1)
+   {
+      pgmoneta_disconnect(*socket);
+      *socket = -1;
+   }
+}
+
+int
+pgmoneta_test_connect_user(SSL** ssl, int* socket)
+{
+   return pgmoneta_server_authenticate(PRIMARY_SERVER, "mydb", "myuser", "mypass", false, ssl, socket);
+}
+
 int
 pgmoneta_test_resolve_binary_path(const char* binary_name, char* out)
 {

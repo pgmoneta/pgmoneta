@@ -130,6 +130,30 @@ int
 pgmoneta_test_execute_query(int srv, SSL* ssl, int skt, char* query, struct query_response** qr);
 
 /**
+ * Free a query response
+ * @param qr The pointer
+ */
+void
+pgmoneta_test_cleanup_query_response(struct query_response** qr);
+
+/**
+ * Close an SSL connection and its socket
+ * @param ssl The SSL pointer
+ * @param socket The socket descriptor
+ */
+void
+pgmoneta_test_cleanup_connection(SSL** ssl, int* socket);
+
+/**
+ * Connect to PG_DATABASE (mydb) as the regular test user (myuser/mypass).
+ * @param ssl The resulting SSL structure (out)
+ * @param socket The resulting socket descriptor (out)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_test_connect_user(SSL** ssl, int* socket);
+
+/**
  * Resolve an executable path under build/src from a test process.
  * Example: "pgmoneta-walinfo" -> ".../build/src/pgmoneta-walinfo"
  * @param binary_name The executable name

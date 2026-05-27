@@ -114,13 +114,13 @@ pgmoneta_manifest_checksum_verify(char* root, struct art* file_checksums, struct
       file_size_manifest = (int64_t)pgmoneta_json_get(file, "Size");
       if (file_size != file_size_manifest)
       {
-         pgmoneta_log_error("File size mismatch: %s, getting %lu, should be %lu", file_size, file_size_manifest);
+         pgmoneta_log_error("File size mismatch, path: %s. getting %lu, should be %lu", file_path, file_size, file_size_manifest);
       }
       hash = (char*)pgmoneta_art_search(file_checksums, file_path);
       checksum = (char*)pgmoneta_json_get(file, "Checksum");
       if (!pgmoneta_compare_string(hash, checksum))
       {
-         pgmoneta_log_error("File checksum mismatch, path: %s. Getting %s, should be %s", file_path, hash, checksum);
+         pgmoneta_log_error("File checksum mismatch, path: %s. getting %s, should be %s", file_path, hash, checksum);
       }
       pgmoneta_json_destroy(file);
       file = NULL;

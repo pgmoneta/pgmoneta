@@ -55,10 +55,6 @@
 #include <unistd.h>
 
 /* Forward declarations for helper functions */
-static void pgmoneta_test_cleanup_ssl(SSL** ssl);
-static void pgmoneta_test_cleanup_socket(int* socket);
-static void pgmoneta_test_cleanup_connection(SSL** ssl, int* socket);
-static void pgmoneta_test_cleanup_query_response(struct query_response** qr);
 static int pgmoneta_test_server_info_check(int srv);
 static void cleanup_connections(SSL** srv_ssl, int* srv_socket, SSL** custom_user_ssl, int* custom_user_socket);
 
@@ -105,7 +101,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
    // Note: Password is "mypass" as set in test/check.sh (PG_USER_PASSWORD=mypass)
    // pg_hba.conf uses "trust" for PG_USER_NAME, so password shouldn't matter, but we use correct one
 
-   MCTF_ASSERT(pgmoneta_server_authenticate(PRIMARY_SERVER, "mydb", "myuser", "mypass", false, &custom_user_ssl, &custom_user_socket) == 0, cleanup, "failed to authenticate with custom user - check user configuration");
+   MCTF_ASSERT(pgmoneta_test_connect_user(&custom_user_ssl, &custom_user_socket) == 0, cleanup, "failed to authenticate with custom user - check user configuration");
 
    // Get server info - this returns void, so we check validity after
 
@@ -236,43 +232,6 @@ cleanup:
 }
 
 /* Helper functions specific to this test file */
-static void
-pgmoneta_test_cleanup_ssl(SSL** ssl)
-{
-   if (ssl != NULL && *ssl != NULL)
-   {
-      pgmoneta_close_ssl(*ssl);
-      *ssl = NULL;
-   }
-}
-
-static void
-pgmoneta_test_cleanup_socket(int* socket)
-{
-   if (socket != NULL && *socket != -1)
-   {
-      pgmoneta_disconnect(*socket);
-      *socket = -1;
-   }
-}
-
-static void
-pgmoneta_test_cleanup_connection(SSL** ssl, int* socket)
-{
-   pgmoneta_test_cleanup_ssl(ssl);
-   pgmoneta_test_cleanup_socket(socket);
-}
-
-static void
-pgmoneta_test_cleanup_query_response(struct query_response** qr)
-{
-   if (qr != NULL && *qr != NULL)
-   {
-      pgmoneta_free_query_response(*qr);
-      *qr = NULL;
-   }
-}
-
 static int
 pgmoneta_test_server_info_check(int srv)
 {

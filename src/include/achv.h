@@ -85,12 +85,13 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
  * Extract from a tar file to a given directory
  * @param file_path The tar file path
  * @param destination The destination to extract to
- * @param checksums [out] The file checksums
- * @param sizes [out] The file sizes
+ * @param manifest_prefix The manifest prefix, NULL for main
+ * @param file_checksums The file checksums (out)
+ * @param file_sizes The file sizes (out)
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art* file_checksums, struct art* file_sizes);
+pgmoneta_extract_backup_tar_file(char* file_path, char* destination, char* manifest_prefix, struct art* file_checksums, struct art* file_sizes);
 
 #ifdef __cplusplus
 }

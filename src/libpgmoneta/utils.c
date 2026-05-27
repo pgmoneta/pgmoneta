@@ -2964,7 +2964,7 @@ pgmoneta_is_directory(char* directory)
 
    memset(&statbuf, 0, sizeof(struct stat));
 
-   if (!lstat(directory, &statbuf))
+   if (!stat(directory, &statbuf))
    {
       if (S_ISDIR(statbuf.st_mode))
       {

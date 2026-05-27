@@ -187,15 +187,6 @@ setup_server_connection(void)
 static void
 teardown_server_connection(void)
 {
-   if (srv_socket != -1)
-   {
-      pgmoneta_disconnect(srv_socket);
-      srv_socket = -1;
-   }
-   if (srv_ssl != NULL)
-   {
-      pgmoneta_close_ssl(srv_ssl);
-      srv_ssl = NULL;
-   }
+   pgmoneta_test_cleanup_connection(&srv_ssl, &srv_socket);
    pgmoneta_test_teardown();
 }

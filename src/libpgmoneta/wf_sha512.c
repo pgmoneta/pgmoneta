@@ -144,12 +144,14 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
 
    if (dispatch_sha512_tasks(server, root, "", workers, all_deque))
    {
+      pgmoneta_log_error("SHA512: dispatch failed for %s", root);
       goto error;
    }
 
    pgmoneta_workers_wait(workers);
    if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
    {
+      pgmoneta_log_error("SHA512: one or more worker tasks failed for %s", root);
       pgmoneta_workers_transfer_failures(workers, nodes);
       goto error;
    }
@@ -159,6 +161,8 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
    sha512_file = fopen(sha512_path, "w");
    if (sha512_file == NULL)
    {
+      pgmoneta_log_error("SHA512: could not open %s for writing (%s)", sha512_path, strerror(errno));
+      errno = 0;
       goto error;
    }
 
@@ -249,6 +253,7 @@ do_sha512(struct worker_common* wc)
    if (pgmoneta_create_sha512_file(wi->from, &sha512))
    {
       char* msg = NULL;
+      pgmoneta_log_error("SHA512 failed for file: %s", wi->from);
       msg = pgmoneta_format_and_append(msg, "SHA512 failed: %s", wi->from);
       pgmoneta_workers_record_failure(wi->common.workers, msg);
       free(msg);
@@ -295,6 +300,8 @@ dispatch_sha512_tasks(int server, char* root, char* relative_path,
 
    if (!(dir = opendir(dir_path)))
    {
+      pgmoneta_log_error("dispatch_sha512_tasks: opendir failed for %s (%s)", dir_path, strerror(errno));
+      errno = 0;
       goto error;
    }
 

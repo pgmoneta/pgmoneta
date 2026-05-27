@@ -48,6 +48,7 @@ LOG_DIR="$PGMONETA_ROOT_DIR/log"
 PG_LOG_DIR="$PGMONETA_ROOT_DIR/pg_log"
 RETROSPECT_DIR="$PGMONETA_ROOT_DIR/retrospect"
 HOT_STANDBY_DIRECTORY="$PGMONETA_ROOT_DIR/standby"
+TABLESPACE_DIR="/tmp/pgmoneta_tblspc"
 
 # BASE DIR holds all the run time data
 WORKSPACE_DIRECTORY="$BASE_DIR/pgmoneta-workspace/"
@@ -78,6 +79,8 @@ fi
 detect_container_engine() {
   if command -v podman &> /dev/null; then
     CONTAINER_ENGINE="podman"
+    export TMPDIR="${TMPDIR:-$HOME/.local/share/containers/tmp}"
+    mkdir -p "$TMPDIR"
   elif command -v docker &> /dev/null; then
     CONTAINER_ENGINE="$SUDO docker"
   else
@@ -111,6 +114,7 @@ cleanup() {
    echo "Clean Test Resources"
    if [[ -d $PGMONETA_ROOT_DIR ]]; then
       if [[ -d $BASE_DIR ]]; then
+        chmod -R u+rwx "$BASE_DIR" 2>/dev/null || true
         rm -Rf "$BASE_DIR"
       fi
 
@@ -167,6 +171,11 @@ cleanup() {
      remove_postgresql_container
    fi
 
+   if [[ -d "$TABLESPACE_DIR" ]]; then
+     chmod -R u+rwx "$TABLESPACE_DIR" 2>/dev/null || true
+     rm -Rf "$TABLESPACE_DIR"
+   fi
+
    echo "Unsetting environment variables"
    unset_pgmoneta_test_variables
 
@@ -195,7 +204,7 @@ cleanup_postgresql_image() {
 }
 
 start_postgresql_container() {
-  # Remove existing container so we can reuse the name 
+  # Remove existing container so we can reuse the name
   remove_postgresql_container
   $CONTAINER_ENGINE run -p $PORT:5432 -v "$PG_LOG_DIR:/pglog:z" -v "$PGCONF_DIRECTORY:/conf:z"\
   --name $CONTAINER_NAME -d \
@@ -240,6 +249,15 @@ start_postgresql() {
   $SUDO chmod -R 777 /conf /pgconf /pgdata /pgwal /pglog /root
   $SUDO chmod +x /root/usr/bin/run-postgresql-local
   $SUDO mkdir -p /root/usr/local/bin
+
+  if [[ "$PG_VERSION" == "17" ]]; then
+    echo "Setting up tablespace location directories (postgres-owned)"
+    $SUDO rm -Rf "$TABLESPACE_DIR"
+    $SUDO mkdir -p "$TABLESPACE_DIR/ts1" "$TABLESPACE_DIR/ts2"
+    $SUDO chown -R postgres:postgres "$TABLESPACE_DIR"
+    $SUDO chmod 777 "$TABLESPACE_DIR"
+    $SUDO chmod 700 "$TABLESPACE_DIR/ts1" "$TABLESPACE_DIR/ts2"
+  fi
 
   echo "Setting up env variables"
   export PG_DATABASE=${PG_DATABASE}
@@ -400,6 +418,7 @@ do_setup() {
 
   echo "Preparing the pgmoneta directory"
   export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p-%m.profraw"
+  chmod -R u+rwx "$PGMONETA_ROOT_DIR" 2>/dev/null || true
   rm -Rf "$PGMONETA_ROOT_DIR"
   mkdir -p "$PGMONETA_ROOT_DIR"
   mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR" "$RETROSPECT_DIR" "$HOT_STANDBY_DIRECTORY"
@@ -427,6 +446,13 @@ do_setup() {
   else
     echo "Start PostgreSQL $PG_VERSION container"
     start_postgresql_container
+    if [[ "$PG_VERSION" == "17" ]]; then
+      echo "Preparing host tablespace directory for hot standby copies"
+      chmod -R u+rwx "$TABLESPACE_DIR" 2>/dev/null || true
+      rm -Rf "$TABLESPACE_DIR"
+      mkdir -p "$TABLESPACE_DIR"
+      chmod 777 "$TABLESPACE_DIR"
+    fi
   fi
 
   echo "Initialize pgmoneta"
@@ -438,7 +464,7 @@ do_setup() {
 execute_testcases() {
    echo "Execute MCTF Testcases"
    set +e
-   
+
    if pgrep -f pgmoneta >/dev/null 2>&1 || [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
       echo "Clean up any existing pgmoneta processes"
       if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
