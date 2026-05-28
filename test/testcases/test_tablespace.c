@@ -254,8 +254,7 @@ populate_tablespaces(SSL* ssl, int socket)
       "DROP TABLE IF EXISTS tblspc_t2;",
       "CREATE TABLE tblspc_t2 (id integer, payload text) TABLESPACE ts2;",
       "INSERT INTO tblspc_t2 SELECT g, 'ts2_row_' || g FROM generate_series(1, 1000) g;",
-      NULL
-   };
+      NULL};
    struct query_response* qr = NULL;
 
    for (int i = 0; ret == 0 && statements[i] != NULL; i++)
@@ -277,8 +276,7 @@ append_tablespace_rows(SSL* ssl, int socket)
    char* statements[] = {
       "INSERT INTO tblspc_t1 SELECT g, 'ts1_inc_' || g FROM generate_series(1001, 2000) g;",
       "INSERT INTO tblspc_t2 SELECT g, 'ts2_inc_' || g FROM generate_series(1001, 2000) g;",
-      NULL
-   };
+      NULL};
    struct query_response* qr = NULL;
 
    for (int i = 0; ret == 0 && statements[i] != NULL; i++)
