@@ -18,9 +18,9 @@ y depuración.
 
 Toda la configuración, registros, informes de cobertura y datos estarán en `/tmp/pgmoneta-test/`, y se ejecutará una limpieza ya sea que el script salga normalmente o no. pgmoneta será forzado a apagar si no termina normalmente. Así que no te preocupes por que tu configuración local sea alterada. El contenedor será detenido y eliminado cuando el script salga o sea terminado.
 
-**Solo configurar (sin pruebas):** Ejecuta `<PATH_TO_PGMONETA>/test/check.sh build` para preparar el entorno de prueba (imagen, compilación de pgmoneta, contenedor, configuración) sin ejecutar pruebas. Esto siempre hace una compilación completa.
+**Solo configurar (sin pruebas):** Ejecuta `<PATH_TO_PGMONETA>/test/check.sh build` para preparar el entorno de prueba (imagen, compilación de pgmoneta, contenedor, configuración) sin ejecutar pruebas. pgmoneta se (re)compila solo cuando falta un binario o cuando un archivo fuente es más reciente que los binarios compilados; elimina el directorio `build/` si necesitas una recompilación limpia.
 
-**Prueba única o módulo:** Ejecuta `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` o `<PATH_TO_PGMONETA>/test/check.sh -m <module_name>` (forma larga: `--test`, `--module`). El script configura el entorno automáticamente cuando es necesario, así que no necesitas ejecutar el conjunto completo primero. Para iteración rápida, ejecuta `<PATH_TO_PGMONETA>/test/check.sh build` una vez, luego `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` (o `-m <module_name>`) repetidamente. Las variables de entorno se reinician cuando la ejecución de prueba finaliza o es abortada.
+**Prueba única o módulo:** Ejecuta `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` o `<PATH_TO_PGMONETA>/test/check.sh -m <module_name>` (forma larga: `--test`, `--module`). El script configura el entorno automáticamente cuando es necesario y recompila pgmoneta cada vez que tus fuentes son más recientes que los binarios, así que no necesitas ejecutar el conjunto completo ni recompilar manualmente primero. Para una iteración rápida, simplemente ejecuta `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` (o `-m <module_name>`) repetidamente; los cambios se recogen en la siguiente ejecución. Las variables de entorno se reinician cuando la ejecución de prueba finaliza o es abortada.
 
 Se recomienda que **SIEMPRE** ejecutes tests antes de presentar un PR.
 
