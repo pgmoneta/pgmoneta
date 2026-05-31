@@ -67,9 +67,11 @@ static int s3_upload_files(char* local_root, char* s3_root, int server, int comp
 static int s3_bootstrap(char* s3_root, int server, char* local_root);
 static int s3_download_files(char* s3_root, char* local_root, int server, int compression, int encryption);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, char* file_sha512, int server);
-static int s3_list_objects(char* relative_path, char* s3_list, int server, struct deque** objects);
+static int s3_list_objects(char* relative_path, char* s3_list, int server, bool common_prefixes, struct deque** objects);
 static int s3_delete_all_objects(char* relative_path, char* s3_list, int server, struct art*) __attribute__((unused));
-static int s3_send_list_request(char* relative_path, char* s3_list, int server, char* continuationToken, struct http_response** response);
+static int s3_send_list_request(char* relative_path, char* s3_list, int server, char* continuationToken, bool common_prefixes, struct http_response** response);
+static int s3_list_backup_prefixes(int server, struct deque** labels);
+
 static int s3_send_delete_request(char* relative_path, char* s3_list, int server, char* xml_body, struct http_response** response);
 static int s3_send_get_request(char* relative_path, char* s3_root, int server, long range_start, long range_end, struct http_response** response);
 
@@ -84,11 +86,13 @@ static int s3_apply_signed_headers(struct http_request* request, struct deque* h
 static char* s3_get_host(int server);
 static char* s3_get_basepath(int server, char* identifier);
 static char* s3_url_encode(char* str);
+static char* s3_label_from_common_prefix(char* prefix);
 static int xml_parse_s3_delete_result(char* xml, bool* has_fatal_error);
 static int xml_s3_build_delete_key(char** xml, char* key);
 static int xml_s3_build_delete_list(char** xml, struct deque* keys, size_t max_keys);
 static int xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuationToken);
 static int xml_parse_s3_list(char* xml, struct deque** keys);
+static int xml_parse_s3_common_prefixes(char* xml, struct deque** prefixes);
 
 struct s3_transfer_task
 {
@@ -157,6 +161,26 @@ pgmoneta_storage_create_s3(int workflow_type)
    wf->next = NULL;
 
    return wf;
+}
+
+int
+pgmoneta_storage_list_backup_labels(int server, struct deque** labels)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   if (labels == NULL)
+   {
+      return 1;
+   }
+
+   *labels = NULL;
+
+   if (config->storage_engine & STORAGE_ENGINE_S3)
+   {
+      return s3_list_backup_prefixes(server, labels);
+   }
+   // it does not support listing
+   return 1;
 }
 
 static char*
@@ -474,7 +498,7 @@ s3_storage_list(char* name __attribute__((unused)), struct art* nodes)
 
    s3_root = s3_get_basepath(server, label);
 
-   if (s3_list_objects("", s3_root, server, &objects))
+   if (s3_list_objects("", s3_root, server, false, &objects))
    {
       goto error;
    }
@@ -1399,8 +1423,58 @@ error:
 
    return 1;
 }
+
 static int
-s3_list_objects(char* relative_path, char* s3_root, int server, struct deque** objects)
+s3_list_backup_prefixes(int server, struct deque** labels)
+{
+   char* root = NULL;
+   struct deque* prefixes = NULL;
+   struct deque_iterator* iter = NULL;
+
+   root = s3_get_basepath(server, NULL);
+   if (s3_list_objects("", root, server, true, &prefixes))
+   {
+      goto error;
+   }
+   if (prefixes == NULL)
+   {
+      free(root);
+      return 0;
+   }
+
+   pgmoneta_deque_iterator_create(prefixes, &iter);
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* prefix = (char*)pgmoneta_value_data(iter->value);
+      char* label = s3_label_from_common_prefix(prefix);
+      if (label != NULL && strlen(label) > 0)
+      {
+         if (*labels == NULL)
+         {
+            pgmoneta_deque_create(false, labels);
+         }
+
+         pgmoneta_deque_add(*labels, NULL, (uintptr_t)label, ValueString);
+      }
+
+      free(label);
+   }
+
+   free(root);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(prefixes);
+   return 0;
+
+error:
+   free(root);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(prefixes);
+   return 1;
+}
+
+static int
+s3_list_objects(char* relative_path, char* s3_root, int server, bool common_prefixes, struct deque** objects)
 {
    struct http_response* response = NULL;
    char* continuationToken = NULL;
@@ -1409,7 +1483,7 @@ s3_list_objects(char* relative_path, char* s3_root, int server, struct deque** o
 
    while (is_truncated)
    {
-      if (s3_send_list_request(relative_path, s3_root, server, continuationToken, &response))
+      if (s3_send_list_request(relative_path, s3_root, server, continuationToken, common_prefixes, &response))
       {
          goto error;
       }
@@ -1422,9 +1496,19 @@ s3_list_objects(char* relative_path, char* s3_root, int server, struct deque** o
          goto error;
       }
 
-      if (xml_parse_s3_list(response->payload.data, objects))
+      if (common_prefixes)
       {
-         goto error;
+         if (xml_parse_s3_common_prefixes(response->payload.data, objects))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         if (xml_parse_s3_list(response->payload.data, objects))
+         {
+            goto error;
+         }
       }
 
       pages_processed++;
@@ -1461,7 +1545,8 @@ s3_delete_all_objects(char* relative_path, char* s3_root, int server, struct art
 
    while (is_truncated)
    {
-      if (s3_send_list_request(relative_path, s3_root, server, continuation_token, &list_response))
+      // we set the common prefixes flag to false to avoid the dir scan
+      if (s3_send_list_request(relative_path, s3_root, server, continuation_token, false, &list_response))
       {
          goto error;
       }
@@ -1728,7 +1813,7 @@ s3_apply_signed_headers(struct http_request* request, struct deque* headers, cha
 }
 
 static int
-s3_send_list_request(char* relative_path, char* s3_root, int server, char* continuationToken, struct http_response** response)
+s3_send_list_request(char* relative_path, char* s3_root, int server, char* continuationToken, bool common_prefixes, struct http_response** response)
 {
    char short_date[SHORT_TIME_LENGTH];
    char long_date[LONG_TIME_LENGTH];
@@ -1793,6 +1878,10 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
    query_string = pgmoneta_append(query_string, "list-type=2&prefix=");
    query_string = pgmoneta_append(query_string, encoded_prefix);
    free(encoded_prefix);
+   if (common_prefixes)
+   {
+      query_string = pgmoneta_append(query_string, "&delimiter=%2F");
+   }
 
    /* Build canonical URI */
    canonical_uri = pgmoneta_append(canonical_uri, "/");
@@ -2563,8 +2652,10 @@ s3_get_basepath(int server, char* identifier)
 
    d = pgmoneta_append(d, config->common.servers[server].name);
    d = pgmoneta_append(d, "/backup/");
-   d = pgmoneta_append(d, identifier);
-
+   if (identifier != NULL)
+   {
+      d = pgmoneta_append(d, identifier);
+   }
    return d;
 }
 
@@ -2646,6 +2737,52 @@ static int
 xml_parse_s3_list(char* xml, struct deque** keys)
 {
    return xml_extract_tag(xml, "Key", keys);
+}
+
+static int
+xml_parse_s3_common_prefixes(char* xml, struct deque** prefixes)
+{
+   struct deque* common_prefix_blocks = NULL;
+   struct deque_iterator* iter = NULL;
+   if (xml_extract_tag(xml, "CommonPrefixes", &common_prefix_blocks))
+   {
+      goto error;
+   }
+   if (common_prefix_blocks == NULL)
+   {
+      return 0;
+   }
+
+   pgmoneta_deque_iterator_create(common_prefix_blocks, &iter);
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* block = (char*)pgmoneta_value_data(iter->value);
+      struct deque* prefix_values = NULL;
+      if (xml_extract_tag(block, "Prefix", &prefix_values))
+      {
+         pgmoneta_deque_destroy(prefix_values);
+         goto error;
+      }
+      if (prefix_values != NULL && pgmoneta_deque_size(prefix_values) > 0)
+      {
+         char* prefix = (char*)pgmoneta_deque_peek(prefix_values, NULL);
+         if (*prefixes == NULL)
+         {
+            pgmoneta_deque_create(false, prefixes);
+         }
+         pgmoneta_deque_add(*prefixes, NULL, (uintptr_t)prefix, ValueString);
+      }
+      pgmoneta_deque_destroy(prefix_values);
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(common_prefix_blocks);
+   return 0;
+
+error:
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(common_prefix_blocks);
+   return 1;
 }
 
 static int
@@ -2828,4 +2965,51 @@ xml_s3_build_delete_list(char** xml, struct deque* keys, size_t max_keys)
 
 error:
    return 1;
+}
+static char*
+s3_label_from_common_prefix(char* prefix)
+{
+   char* copy = NULL;
+   char* slash = NULL;
+   size_t len = 0;
+
+   if (prefix == NULL || strlen(prefix) == 0)
+   {
+      return NULL;
+   }
+
+   copy = pgmoneta_append(copy, prefix);
+   if (copy == NULL)
+   {
+      return NULL;
+   }
+
+   len = strlen(copy);
+   while (len > 0 && copy[len - 1] == '/')
+   {
+      copy[len - 1] = '\0';
+      len--;
+   }
+
+   if (len == 0)
+   {
+      free(copy);
+      return NULL;
+   }
+
+   slash = strrchr(copy, '/');
+   if (slash != NULL)
+   {
+      char* label = NULL;
+
+      if (*(slash + 1) != '\0')
+      {
+         label = pgmoneta_append(label, slash + 1);
+      }
+
+      free(copy);
+      return label;
+   }
+
+   return copy;
 }
