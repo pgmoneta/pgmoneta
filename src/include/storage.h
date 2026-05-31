@@ -65,6 +65,16 @@ struct workflow*
 pgmoneta_storage_create_s3(int workflow_type);
 
 /**
+ * List backup labels available in the configured storage engine.
+ *
+ * @param server The server index
+ * @param labels The resulting deque of backup labels
+ * @return 0 on success, otherwise 1
+*/
+int
+pgmoneta_storage_list_backup_labels(int server, struct deque** labels);
+
+/**
  * Create a workflow for the Azure storage engine
  * @return The workflow
  */
