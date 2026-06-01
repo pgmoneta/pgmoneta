@@ -39,8 +39,9 @@ extern "C" {
 #include <stdbool.h>
 #include <openssl/ssl.h>
 
-#define PRIMARY_SERVER   0
-#define ENV_VAR_BASE_DIR "PGMONETA_TEST_BASE_DIR"
+#define PRIMARY_SERVER               0
+#define ENV_VAR_BASE_DIR             "PGMONETA_TEST_BASE_DIR"
+#define RESTORED_BACKUP_DEFAULT_PORT 15432
 
 extern char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 extern char TEST_RESTORE_DIR[MAX_PATH];
@@ -172,6 +173,24 @@ pgmoneta_test_resolve_binary_path(const char* binary_name, char* out);
  */
 int
 pgmoneta_test_exec_command(const char* command, char** output, int* exit_code);
+
+/**
+ * Start a PostgreSQL server from a restored backup directory.
+ * Ensures required subdirectories exist, keeps the original pg_hba.conf
+ * from the backup, and waits for pg_isready to succeed.
+ * Detects whether to use a container or local pg_ctl based on environment.
+ * @param restore_dir Path to restored PGDATA directory
+ * @param port Host port to listen on (<=0 uses RESTORED_BACKUP_DEFAULT_PORT)
+ * @return The port on success, otherwise -1
+ */
+int
+pgmoneta_start_restored_backup(const char* restore_dir, int port);
+
+/**
+ * Stop the restored backup server, ignoring errors.
+ */
+void
+pgmoneta_stop_restored_backup(void);
 
 /**
  * Load a configuration file into shared memory.
