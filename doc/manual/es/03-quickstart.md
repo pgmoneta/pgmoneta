@@ -75,7 +75,7 @@ host    replication    repl    127.0.0.1/32     scram-sha-256
 host    replication    repl    ::1/128          scram-sha-256
 ```
 
-El tipo de autenticación debe basarse en el valor `password_encryption` de `postgresql.conf`.
+El tipo de autenticación debe ser `scram-sha-256`. Ten en cuenta que `pgmoneta` no soporta autenticación MD5.
 
 Luego crea un slot de replicación física que se usará para la transmisión de WAL, como:
 
