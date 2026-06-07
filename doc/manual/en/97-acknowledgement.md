@@ -68,6 +68,7 @@ R Sai Pranav <rajasaipranav0@gmail.com>
 Krishna Lokhande <krishlokhande45@gmail.com>
 Loay Tarek <loaytareq44@gmail.com>
 Ahmed Mordi <ahmed.m.hamada2003@gmail.com>
+Justin Charles <charlesjustin2124@gmail.com>
 ```
 
 ## Committers
