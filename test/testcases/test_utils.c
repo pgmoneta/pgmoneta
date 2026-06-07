@@ -1551,7 +1551,7 @@ MCTF_TEST(test_utils_files_advanced)
 
    to_ptr = strdup(file_dst);
    MCTF_ASSERT_PTR_NONNULL(to_ptr, cleanup, "strdup failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_extract_file(file_src, 0, true, &to_ptr), 0, cleanup, "extract_file copy failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_extract_file(file_src, 0, true, NULL, &to_ptr), 0, cleanup, "extract_file copy failed");
    MCTF_ASSERT(pgmoneta_exists(file_dst), cleanup, "copied file should exist");
    free(to_ptr);
    to_ptr = NULL;

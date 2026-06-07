@@ -329,14 +329,10 @@ do_compression_operation(struct worker_common* wc)
       result = pgmoneta_compress_file(task->from, task->to, task->type, NULL);
    }
 
-   if (result != 0 && task->common.workers != NULL)
+   if (result != 0)
    {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "%s failed: %s",
-                                       task->decompress ? "Decompress" : "Compress",
-                                       task->from);
-      pgmoneta_workers_record_failure(task->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(task->common.workers != NULL ? task->common.workers->outcome : NULL,
+                              "%s failed: %s", task->decompress ? "Decompress" : "Compress", task->from);
    }
 
    if (task->progress_enabled)

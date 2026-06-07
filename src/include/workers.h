@@ -37,6 +37,7 @@ extern "C" {
 #include <deque.h>
 
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -150,12 +151,12 @@ bool
 pgmoneta_workers_outcome_ok(struct workers* workers);
 
 /**
- * Record a failure message on the workers outcome deque (thread-safe).
- * @param workers The workers
- * @param message Message to append (copied)
+ * Record a formatted failure message into a failure deque (thread-safe).
+ * @param failures The failure deque
+ * @param fmt printf-style format string
  */
 void
-pgmoneta_workers_record_failure(struct workers* workers, char* message);
+pgmoneta_record_failure(struct deque* failures, char* fmt, ...) __attribute__((format(printf, 2, 3)));
 
 /**
  * Log all failure messages collected in the outcome deque.

@@ -542,10 +542,7 @@ do_file_manifest(struct worker_common* wc)
 
    if (pgmoneta_get_file_manifest(wi->from, wi->to, &file))
    {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "Manifest failed: %s", wi->from);
-      pgmoneta_workers_record_failure(wi->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(wi->common.workers->outcome, "Manifest failed: %s", wi->from);
       goto done;
    }
 

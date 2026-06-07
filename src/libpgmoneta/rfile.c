@@ -34,6 +34,7 @@
 #include <pgmoneta.h>
 #include <rfile.h>
 #include <utils.h>
+#include <workers.h>
 
 /* system */
 #include <stdint.h>
@@ -78,7 +79,7 @@ error:
 }
 
 int
-pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile)
+pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct deque* failures, struct rfile** rfile)
 {
    struct rfile* rf = NULL;
    char* extracted_file_path = NULL;
@@ -96,14 +97,15 @@ pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_fi
       pgmoneta_snprintf(base_relative_path, MAX_PATH, "%s/%s", relative_dir, base_file_name);
    }
 
-   /* try both base and final relative path */
-   if (pgmoneta_extract_backup_file(server, label, base_relative_path, NULL, &extracted_file_path))
+   /* try both base path and suffix-decorated path */
+   if (pgmoneta_extract_backup_file(server, label, base_relative_path, failures, &extracted_file_path))
    {
       free(extracted_file_path);
       extracted_file_path = NULL;
       file_final_name(base_relative_path, encryption, compression, &final_relative_path);
-      if (pgmoneta_extract_backup_file(server, label, final_relative_path, NULL, &extracted_file_path))
+      if (pgmoneta_extract_backup_file(server, label, final_relative_path, failures, &extracted_file_path))
       {
+         pgmoneta_record_failure(failures, "rfile_create: file not found in backup %s: %s/%s", label, relative_dir, base_file_name);
          goto error;
       }
    }
@@ -111,6 +113,7 @@ pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_fi
 
    if (fp == NULL)
    {
+      pgmoneta_record_failure(failures, "rfile_create: cannot open extracted file %s (label %s)", extracted_file_path, label);
       goto error;
    }
    rf = (struct rfile*)malloc(sizeof(struct rfile));
@@ -152,7 +155,7 @@ pgmoneta_rfile_destroy(struct rfile* rf)
 }
 
 int
-pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile)
+pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct deque* failures, struct rfile** rfile)
 {
    uint32_t magic = 0;
    uint32_t nread = 0;
@@ -166,7 +169,7 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
    relsegsz = config->common.servers[server].relseg_size;
    blocksz = config->common.servers[server].block_size;
 
-   if (pgmoneta_rfile_create(server, label, relative_dir, base_file_name, encryption, compression, &rf))
+   if (pgmoneta_rfile_create(server, label, relative_dir, base_file_name, encryption, compression, failures, &rf))
    {
       pgmoneta_log_error("rfile initialize: failed to open incremental backup (label %s) file at %s/%s", label, relative_dir, base_file_name);
       goto error;
@@ -176,12 +179,14 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
    if (nread != sizeof(uint32_t))
    {
       pgmoneta_log_error("rfile initialize: incomplete file header at %s, cannot read magic number", rf->filepath);
+      pgmoneta_record_failure(failures, "rfile_initialize: corrupt header in %s (label %s) - cannot read magic", rf->filepath, label);
       goto error;
    }
 
    if (magic != INCREMENTAL_MAGIC)
    {
       pgmoneta_log_error("rfile initialize: incorrect magic number, getting %X, expecting %X", magic, INCREMENTAL_MAGIC);
+      pgmoneta_record_failure(failures, "rfile_initialize: bad magic in %s (label %s): got %X expected %X", rf->filepath, label, magic, INCREMENTAL_MAGIC);
       goto error;
    }
 
@@ -189,11 +194,13 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
    if (nread != sizeof(uint32_t))
    {
       pgmoneta_log_error("rfile initialize: incomplete file header at %s%s, cannot read block count", relative_dir, base_file_name);
+      pgmoneta_record_failure(failures, "rfile_initialize: corrupt header in %s/%s (label %s) - cannot read block count", relative_dir, base_file_name, label);
       goto error;
    }
    if (rf->num_blocks > relsegsz)
    {
       pgmoneta_log_error("rfile initialize: file has %d blocks which is more than server's segment size", rf->num_blocks);
+      pgmoneta_record_failure(failures, "rfile_initialize: block count %u > segment size in %s/%s (label %s)", rf->num_blocks, relative_dir, base_file_name, label);
       goto error;
    }
 
@@ -201,11 +208,13 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
    if (nread != sizeof(uint32_t))
    {
       pgmoneta_log_error("rfile initialize: incomplete file header at %s%s, cannot read truncation block length", relative_dir, base_file_name);
+      pgmoneta_record_failure(failures, "rfile_initialize: corrupt header in %s/%s (label %s) - cannot read truncation length", relative_dir, base_file_name, label);
       goto error;
    }
    if (rf->truncation_block_length > relsegsz)
    {
       pgmoneta_log_error("rfile initialize: file has truncation block length of %d which is more than server's segment size", rf->truncation_block_length);
+      pgmoneta_record_failure(failures, "rfile_initialize: truncation length %u > segment size in %s/%s (label %s)", rf->truncation_block_length, relative_dir, base_file_name, label);
       goto error;
    }
 
@@ -216,6 +225,7 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
       if (nread != rf->num_blocks)
       {
          pgmoneta_log_error("rfile initialize: incomplete file header at %s, cannot read relative block numbers", rf->filepath);
+         pgmoneta_record_failure(failures, "rfile_initialize: corrupt header in %s (label %s) - cannot read block numbers", rf->filepath, label);
          goto error;
       }
    }

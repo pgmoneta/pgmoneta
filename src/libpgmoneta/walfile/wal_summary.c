@@ -200,7 +200,7 @@ summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_ta
    to = pgmoneta_append(to, "/tmp/");
    to = pgmoneta_append(to, basename(path));
 
-   if (pgmoneta_extract_file(from, 0, true, &to))
+   if (pgmoneta_extract_file(from, 0, true, NULL, &to))
    {
       pgmoneta_log_error("Failed to extract WAL file from %s to %s", from, to);
       goto error;

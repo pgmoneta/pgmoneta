@@ -1220,12 +1220,9 @@ do_download_file(struct worker_common* wc)
 {
    struct s3_transfer_task* task = (struct s3_transfer_task*)wc;
 
-   if (s3_download_one_file(task) && task->common.workers != NULL)
+   if (s3_download_one_file(task))
    {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "S3 download failed: %s", task->remote_path);
-      pgmoneta_workers_record_failure(task->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(task->common.workers != NULL ? task->common.workers->outcome : NULL, "S3 download failed: %s", task->remote_path);
    }
 
    free(task);
@@ -1272,12 +1269,9 @@ do_upload_file(struct worker_common* wc)
 {
    struct s3_transfer_task* task = (struct s3_transfer_task*)wc;
 
-   if (s3_upload_one_file(task) && task->common.workers != NULL)
+   if (s3_upload_one_file(task))
    {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "S3 upload failed: %s", task->remote_path);
-      pgmoneta_workers_record_failure(task->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(task->common.workers != NULL ? task->common.workers->outcome : NULL, "S3 upload failed: %s", task->remote_path);
    }
 
    free(task);

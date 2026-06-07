@@ -139,7 +139,8 @@ reconstruct_backup_file(int server,
                         struct deque* prior_labels,
                         struct art* backups,
                         bool incremental,
-                        struct json* files);
+                        struct json* files,
+                        struct deque* failures);
 
 static void
 do_reconstruct_backup_file(struct worker_common* wc);
@@ -166,6 +167,7 @@ create_reconstruct_backup_file_input(int server,
  * @param relative_dir The directory containing the file relative to the root dir, should be the same across all backups
  * @param file_name The name of the file
  * @param exclude Whether to exclude some of the files
+ * @param failures The failure deque
  * @return 0 on success, 1 if otherwise
  */
 static int
@@ -174,7 +176,8 @@ copy_backup_file(int server,
                  char* output_dir,
                  char* relative_dir,
                  char* file_name,
-                 bool exclude);
+                 bool exclude,
+                 struct deque* failures);
 
 static void
 do_copy_backup_file(struct worker_common* wc);
@@ -1606,7 +1609,8 @@ combine_backups_recursive(uint32_t tsoid,
                                         prior_labels,
                                         backups,
                                         incremental,
-                                        files))
+                                        files,
+                                        workers != NULL ? workers->outcome : NULL))
             {
                pgmoneta_log_error("unable to reconstruct file %s%s", relative_prefix, entry->d_name + INCREMENTAL_PREFIX_LENGTH);
                goto error;
@@ -1631,7 +1635,7 @@ combine_backups_recursive(uint32_t tsoid,
          }
          else
          {
-            if (copy_backup_file(server, label, ofulldir, relative_prefix, entry->d_name, exclude))
+            if (copy_backup_file(server, label, ofulldir, relative_prefix, entry->d_name, exclude, NULL))
             {
                pgmoneta_log_error("unable to copy file %s%s", relative_prefix, entry->d_name);
                goto error;
@@ -1663,7 +1667,8 @@ reconstruct_backup_file(int server,
                         struct deque* prior_labels,
                         struct art* backups,
                         bool incremental,
-                        struct json* files)
+                        struct json* files,
+                        struct deque* failures)
 {
    struct deque* sources = NULL;             // bookkeeping of each incr/full backup rfile, so that we can free them conveniently
    struct deque_iterator* label_iter = NULL; // the iterator for backup directories
@@ -1708,7 +1713,7 @@ reconstruct_backup_file(int server,
    pgmoneta_snprintf(incr_file_name, MAX_PATH, "%s%s", INCREMENTAL_PREFIX, base_file_name);
    // handle the latest file specially, it is the only file that can only be incremental
    bck = (struct backup*)pgmoneta_art_search(backups, label);
-   if (pgmoneta_incremental_rfile_initialize(server, label, relative_dir, incr_file_name, bck->encryption, bck->compression, &latest_source))
+   if (pgmoneta_incremental_rfile_initialize(server, label, relative_dir, incr_file_name, bck->encryption, bck->compression, failures, &latest_source))
    {
       goto error;
    }
@@ -1754,6 +1759,7 @@ reconstruct_backup_file(int server,
    // There could be blocks that cannot be sourced. This is probably because the block gets truncated
    // during the backup process before it gets backed up. In this case just zero fill the block later,
    // the WAL replay will fix the inconsistency since it's getting truncated in the first place.
+
    pgmoneta_deque_iterator_create(prior_labels, &label_iter);
    while (pgmoneta_deque_iterator_next(label_iter))
    {
@@ -1766,10 +1772,12 @@ reconstruct_backup_file(int server,
       // 2. final base name (with compression/encryption suffix, no incremental prefix)
       // 3. base incr name (without compression/encryption suffix, with incremental prefix)
       // 4. final incr name (with compression/encryption suffix, and incremental prefix)
-      if (pgmoneta_rfile_create(server, prior_label, relative_dir, base_file_name, bck->encryption, bck->compression, &rf))
+      if (pgmoneta_rfile_create(server, prior_label, relative_dir, base_file_name, bck->encryption, bck->compression, NULL, &rf))
       {
-         if (pgmoneta_incremental_rfile_initialize(server, prior_label, relative_dir, incr_file_name, bck->encryption, bck->compression, &rf))
+         if (pgmoneta_incremental_rfile_initialize(server, prior_label, relative_dir, incr_file_name, bck->encryption, bck->compression, NULL, &rf))
          {
+            pgmoneta_log_error("reconstruct: unable to find file %s%s in prior backup %s", relative_dir, base_file_name, prior_label);
+            pgmoneta_record_failure(failures, "reconstruct: %s%s missing from prior backup %s", relative_dir, base_file_name, prior_label);
             goto error;
          }
       }
@@ -1900,7 +1908,8 @@ copy_backup_file(int server,
                  char* output_dir,
                  char* relative_dir,
                  char* file_name,
-                 bool exclude)
+                 bool exclude,
+                 struct deque* failures)
 {
    bool excluded = false;
    char ofullpath[MAX_PATH_CONCAT];
@@ -1921,7 +1930,7 @@ copy_backup_file(int server,
    // copy the full file from input dir to output dir
    // extract before copy
    pgmoneta_snprintf(manifest_path, MAX_PATH_CONCAT, "%s%s", relative_dir, file_name);
-   if (pgmoneta_extract_backup_file(server, label, manifest_path, NULL, &extracted_file_path))
+   if (pgmoneta_extract_backup_file(server, label, manifest_path, failures, &extracted_file_path))
    {
       goto error;
    }
@@ -2882,7 +2891,8 @@ static void
 do_reconstruct_backup_file(struct worker_common* wc)
 {
    struct build_backup_file_input* input = (struct build_backup_file_input*)wc;
-   char* msg = NULL;
+   struct workers* workers = input->common.workers;
+   struct deque* failures = workers != NULL ? workers->outcome : NULL;
 
    if (reconstruct_backup_file(input->server,
                                input->label,
@@ -2892,7 +2902,8 @@ do_reconstruct_backup_file(struct worker_common* wc)
                                input->prior_labels,
                                input->backups,
                                input->incremental,
-                               input->files))
+                               input->files,
+                               failures))
    {
       goto error;
    }
@@ -2900,11 +2911,9 @@ do_reconstruct_backup_file(struct worker_common* wc)
    return;
 
 error:
-   pgmoneta_log_error("Unable to construct file %s/%s", input->label, input->relative_dir, input->file_name);
-   msg = pgmoneta_format_and_append(msg, "Reconstruct failed: %s/%s",
-                                    input->relative_dir, input->file_name);
-   pgmoneta_workers_record_failure(input->common.workers, msg);
-   free(msg);
+   pgmoneta_log_error("Unable to construct file %s/%s/%s", input->label, input->relative_dir, input->file_name);
+   pgmoneta_record_failure(failures, "Reconstruct failed: %s/%s",
+                           input->relative_dir, input->file_name);
    free(input);
    return;
 }
@@ -2913,14 +2922,16 @@ static void
 do_copy_backup_file(struct worker_common* wc)
 {
    struct build_backup_file_input* input = (struct build_backup_file_input*)wc;
-   char* msg = NULL;
+   struct workers* workers = input->common.workers;
+   struct deque* failures = workers != NULL ? workers->outcome : NULL;
 
    if (copy_backup_file(input->server,
                         input->label,
                         input->output_dir,
                         input->relative_dir,
                         input->file_name,
-                        input->exclude))
+                        input->exclude,
+                        failures))
    {
       goto error;
    }
@@ -2928,11 +2939,9 @@ do_copy_backup_file(struct worker_common* wc)
    return;
 
 error:
-   pgmoneta_log_error("Unable to construct file %s/%s", input->label, input->relative_dir, input->file_name);
-   msg = pgmoneta_format_and_append(msg, "Copy failed: %s/%s",
-                                    input->relative_dir, input->file_name);
-   pgmoneta_workers_record_failure(input->common.workers, msg);
-   free(msg);
+   pgmoneta_log_error("Unable to construct file %s/%s/%s", input->label, input->relative_dir, input->file_name);
+   pgmoneta_record_failure(failures, "Copy failed: %s/%s",
+                           input->relative_dir, input->file_name);
    free(input);
    return;
 }

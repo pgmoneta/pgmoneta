@@ -29,6 +29,8 @@
 #ifndef PGMONETA_EXTRACTION_H
 #define PGMONETA_EXTRACTION_H
 
+#include <deque.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -49,30 +51,31 @@ extern "C" {
  * @param file_path The source file path
  * @param type The file type bitmask (PGMONETA_FILE_TYPE_*), or 0 for auto-detect
  * @param copy If true, extract to destination path. If false, extract archive to destination directory.
+ * @param failures The failure deque
  * @param destination When copy is true, points to the destination path (updated to final extracted path).
  *                    When copy is false, points to the output directory for extraction (not modified).
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_extract_file(char* file_path, uint32_t type, bool copy, char** destination);
+pgmoneta_extract_file(char* file_path, uint32_t type, bool copy, struct deque* failures, char** destination);
 
 /**
  * Extract a file from a backup to a target location.
  * Wrapper around pgmoneta_extract_file for backup-relative paths.
  *
  * Builds the source path from backup data directory + relative_file_path,
- * and the destination from target_directory (or workspace if NULL) + relative_file_path.
+ * and the destination from workspace/label/ + relative_file_path.
  * Then calls pgmoneta_extract_file(from, 0, true, &to).
  *
  * @param server The server index
  * @param label The backup label
  * @param relative_file_path The file path relative to the backup data directory
- * @param target_directory The target directory (NULL to use workspace/label/)
+ * @param failures The failure deque
  * @param target_file [out] The final extracted file path (caller must free)
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file);
+pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, struct deque* failures, char** target_file);
 
 #ifdef __cplusplus
 }

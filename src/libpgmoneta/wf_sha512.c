@@ -252,20 +252,14 @@ do_sha512(struct worker_common* wc)
 
    if (pgmoneta_create_sha512_file(wi->from, &sha512))
    {
-      char* msg = NULL;
       pgmoneta_log_error("SHA512 failed for file: %s", wi->from);
-      msg = pgmoneta_format_and_append(msg, "SHA512 failed: %s", wi->from);
-      pgmoneta_workers_record_failure(wi->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(wi->common.workers->outcome, "SHA512 failed: %s", wi->from);
       goto done;
    }
 
    if (pgmoneta_json_create(&result))
    {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "SHA512 allocation failed: %s", wi->from);
-      pgmoneta_workers_record_failure(wi->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(wi->common.workers->outcome, "SHA512 allocation failed: %s", wi->from);
       goto done;
    }
 

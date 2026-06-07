@@ -2845,13 +2845,7 @@ error:
 
    errno = 0;
 
-   if (fi->common.workers != NULL)
-   {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "File copy failed: %s", fi->from);
-      pgmoneta_workers_record_failure(fi->common.workers, msg);
-      free(msg);
-   }
+   pgmoneta_record_failure(fi->common.workers != NULL ? fi->common.workers->outcome : NULL, "File copy failed: %s", fi->from);
 
    free(dn);
    free(from);

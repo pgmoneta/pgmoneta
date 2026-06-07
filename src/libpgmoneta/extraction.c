@@ -36,6 +36,7 @@
 #include <tar.h>
 #include <utils.h>
 #include <vfile.h>
+#include <workers.h>
 
 #include <libgen.h>
 #include <stdint.h>
@@ -126,10 +127,11 @@ bitmask_to_encryption(uint32_t file_type)
  * @param dst The destination file path (e.g. "file")
  * @param encryption The encryption type (ENCRYPTION_* constant)
  * @param compression The compression type (COMPRESSION_* constant)
+ * @param failures The failure deque
  * @return 0 upon success, otherwise 1
  */
 static int
-stream_restore_file(char* src, char* dst, int encryption, int compression)
+stream_restore_file(char* src, char* dst, int encryption, int compression, struct deque* failures)
 {
    struct streamer* strm = NULL;
    struct vfile* reader = NULL;
@@ -202,6 +204,7 @@ stream_restore_file(char* src, char* dst, int encryption, int compression)
    return 0;
 
 error:
+   pgmoneta_record_failure(failures, "extraction: failed to restore %s", src);
    pgmoneta_vfile_destroy(reader);
    if (!writer_added)
    {
@@ -224,7 +227,7 @@ error:
  *   Simple file copy.
  */
 static int
-extract_file_to_path(char* file_path, uint32_t type, char** destination)
+extract_file_to_path(char* file_path, uint32_t type, struct deque* failures, char** destination)
 {
    char* dest_name = NULL;
    uint32_t file_type = type;
@@ -269,7 +272,7 @@ extract_file_to_path(char* file_path, uint32_t type, char** destination)
    }
 
    /* Stream-restore: decrypt+decompress in one pass, no temp files */
-   if (stream_restore_file(file_path, dest_name, encryption, compression))
+   if (stream_restore_file(file_path, dest_name, encryption, compression, failures))
    {
       goto error;
    }
@@ -294,7 +297,7 @@ error:
  *   3. Clean up temp tar
  */
 static int
-extract_archive_to_directory(char* file_path, uint32_t type, char* destination)
+extract_archive_to_directory(char* file_path, uint32_t type, struct deque* failures, char* destination)
 {
    char* archive_path = NULL;
    bool is_generated_archive = false;
@@ -335,7 +338,7 @@ extract_archive_to_directory(char* file_path, uint32_t type, char* destination)
       is_generated_archive = true;
 
       /* Stream-restore: decrypt+decompress in one pass to temp tar */
-      if (stream_restore_file(file_path, archive_path, encryption, compression))
+      if (stream_restore_file(file_path, archive_path, encryption, compression, failures))
       {
          goto error;
       }
@@ -380,11 +383,11 @@ error:
 }
 
 int
-pgmoneta_extract_file(char* file_path, uint32_t type, bool copy, char** destination)
+pgmoneta_extract_file(char* file_path, uint32_t type, bool copy, struct deque* failures, char** destination)
 {
    if (copy)
    {
-      return extract_file_to_path(file_path, type, destination);
+      return extract_file_to_path(file_path, type, failures, destination);
    }
 
    if (destination == NULL || *destination == NULL)
@@ -392,11 +395,11 @@ pgmoneta_extract_file(char* file_path, uint32_t type, bool copy, char** destinat
       return 1;
    }
 
-   return extract_archive_to_directory(file_path, type, *destination);
+   return extract_archive_to_directory(file_path, type, failures, *destination);
 }
 
 int
-pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file)
+pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, struct deque* failures, char** target_file)
 {
    char* from = NULL;
    char* to = NULL;
@@ -425,16 +428,9 @@ pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, 
       goto error;
    }
 
-   if (target_directory == NULL || strlen(target_directory) == 0)
-   {
-      to = pgmoneta_get_server_workspace(server);
-      to = pgmoneta_append(to, label);
-      to = pgmoneta_append(to, "/");
-   }
-   else
-   {
-      to = pgmoneta_append(to, target_directory);
-   }
+   to = pgmoneta_get_server_workspace(server);
+   to = pgmoneta_append(to, label);
+   to = pgmoneta_append(to, "/");
 
    if (!pgmoneta_ends_with(to, "/"))
    {
@@ -442,8 +438,9 @@ pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, 
    }
    to = pgmoneta_append(to, relative_file_path);
 
-   if (pgmoneta_extract_file(from, 0, true, &to))
+   if (pgmoneta_extract_file(from, 0, true, failures, &to))
    {
+      pgmoneta_record_failure(failures, "extract_backup_file: failed to extract %s from label %s", relative_file_path, label);
       goto error;
    }
 

@@ -858,7 +858,7 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
 
       pgmoneta_log_trace("Excluded: %s -> %s", from_file, to_file);
 
-      if (pgmoneta_extract_file(from_file, 0, true, &to_file))
+      if (pgmoneta_extract_file(from_file, 0, true, NULL, &to_file))
       {
          pgmoneta_log_error("Restore: Could not copy file %s to %s", from_file, to_file);
          free(from_file);
