@@ -100,3 +100,20 @@ pgmoneta_test_generate_check_point_shutdown_v17(void);
  */
 struct walfile*
 pgmoneta_test_generate_mixed_heap_wal_v17(void);
+
+/**
+ * Generate a PostgreSQL 19 WAL file with CHECKPOINT_SHUTDOWN record.
+ * Uses PostgreSQL 19 WAL magic number (0xD11F) and XLP flags.
+ * @return The generated walfile, or NULL on failure
+ */
+struct walfile*
+pgmoneta_test_generate_check_point_shutdown_v19(void);
+
+/**
+ * Generate a PostgreSQL 19 WAL file with 3 records: CHECKPOINT_SHUTDOWN, HEAP INSERT, HEAP DELETE.
+ * The INSERT has XID 100, the DELETE has XID 200.
+ * Uses PostgreSQL 19 WAL magic number (0xD11F) and XLP flags.
+ * @return The generated walfile, or NULL on failure
+ */
+struct walfile*
+pgmoneta_test_generate_mixed_heap_wal_v19(void);

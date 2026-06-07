@@ -6006,6 +6006,11 @@ describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quie
    to = pgmoneta_append(to, "/tmp/");
    to = pgmoneta_append(to, basename(path));
 
+   if (pgmoneta_exists(to))
+   {
+      pgmoneta_delete_file(to, NULL);
+   }
+
    if (pgmoneta_extract_file(from, PGMONETA_FILE_TYPE_UNKNOWN, true, &to))
    {
       pgmoneta_log_error("Failed to extract WAL file from %s to %s", from, to);

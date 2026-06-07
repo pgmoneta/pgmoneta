@@ -27,6 +27,7 @@
  *
  */
 
+#include <shmem.h>
 #include <pgmoneta.h>
 #include <mctf.h>
 #include <tscommon.h>
@@ -123,6 +124,28 @@ write_yaml_config(const char* yaml_path, const char* source_dir, const char* tar
 
    fclose(f);
    return 0;
+}
+
+static bool shmem_allocated = false;
+
+MCTF_MODULE_SETUP(walfilter)
+{
+   if (shmem == NULL)
+   {
+      pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem);
+      memset(shmem, 0, sizeof(struct main_configuration));
+      shmem_allocated = true;
+   }
+}
+
+MCTF_MODULE_TEARDOWN(walfilter)
+{
+   if (shmem_allocated && shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+      shmem = NULL;
+      shmem_allocated = false;
+   }
 }
 
 MCTF_TEST(test_walfilter_cli_usage)

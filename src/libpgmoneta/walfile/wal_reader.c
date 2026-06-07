@@ -52,6 +52,19 @@
 #include <string.h>
 
 struct server* server_config;
+static uint16_t current_wal_magic = 0;
+
+void
+pgmoneta_wal_set_current_magic(uint16_t magic_value)
+{
+   current_wal_magic = magic_value;
+}
+
+uint16_t
+pgmoneta_wal_get_current_magic(void)
+{
+   return current_wal_magic;
+}
 
 static int decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value, xlog_rec_ptr lsn);
 static void record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct value** value);
@@ -87,18 +100,20 @@ magic_value_to_postgres_version(uint16_t magic_value)
 {
    switch (magic_value)
    {
-      case 0xD106:
+      case WAL_MAGIC_V13:
          return 13;
-      case 0xD10D:
+      case WAL_MAGIC_V14:
          return 14;
-      case 0xD110:
+      case WAL_MAGIC_V15:
          return 15;
-      case 0xD113:
+      case WAL_MAGIC_V16:
          return 16;
-      case 0xD116:
+      case WAL_MAGIC_V17:
          return 17;
-      case 0xD118:
+      case WAL_MAGIC_V18:
          return 18;
+      case WAL_MAGIC_V19:
+         return 19;
       default:
          return -1;
    }
@@ -1496,6 +1511,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          backup_str[0] = '\0';
       }
 
+      pgmoneta_wal_set_current_magic(magic_value);
       rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
       backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
       char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);

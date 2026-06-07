@@ -1,0 +1,365 @@
+/*
+ * Copyright (C) 2026 The pgmoneta community
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors may
+ * be used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+ * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
+
+/* pgmoneta */
+#include <pgmoneta.h>
+#include <configuration.h>
+#include <deque.h>
+#include <walfile/pg_control.h>
+#include <walfile/rm_heap.h>
+#include <walfile/rmgr.h>
+#include <utils.h>
+#include <value.h>
+#include <tsclient.h>
+#include <walfile.h>
+#include <tswalutils.h>
+
+/* system */
+#include <err.h>
+#include <getopt.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+
+/* PostgreSQL 19 specific values */
+#define RANDOM_MAGIC_19 0xD11F /* PostgreSQL 19 WAL magic number */
+#define RANDOM_INFO_19  0x0007 /* XLP_ALL_FLAGS for PG19 (no BKP_REMOVABLE) */
+
+static struct decoded_xlog_record*
+create_record(uint8_t rmid, uint8_t info, transaction_id xid,
+              void* main_data_src, uint32_t main_data_len)
+{
+   struct decoded_xlog_record* rec = NULL;
+   uint32_t total_length = 0;
+
+   rec = (struct decoded_xlog_record*)malloc(sizeof(struct decoded_xlog_record));
+   if (rec == NULL)
+   {
+      goto error;
+   }
+
+   memset(rec, 0, sizeof(struct decoded_xlog_record));
+
+   rec->main_data_len = main_data_len;
+   rec->max_block_id = RANDOM_MAX_BLOCK_ID;
+   rec->oversized = RANDOM_OVERSIZED;
+   rec->record_origin = RANDOM_RECORD_ORIGIN;
+   rec->toplevel_xid = RANDOM_TOPLEVEL_XID;
+   rec->partial = RANDOM_PARTIAL;
+
+   total_length = sizeof(struct xlog_record);
+
+   if (rec->record_origin != INVALID_REP_ORIGIN_ID)
+   {
+      total_length += sizeof(uint8_t);
+      total_length += sizeof(rep_origin_id);
+   }
+
+   if (rec->toplevel_xid != INVALID_TRANSACTION_ID)
+   {
+      total_length += sizeof(uint8_t);
+      total_length += sizeof(transaction_id);
+   }
+
+   if (rec->main_data_len > 0)
+   {
+      total_length += sizeof(uint8_t);
+      if (rec->main_data_len <= UINT8_MAX)
+      {
+         total_length += sizeof(uint8_t);
+      }
+      else
+      {
+         total_length += sizeof(uint32_t);
+      }
+      total_length += rec->main_data_len;
+   }
+
+   rec->header.xl_tot_len = total_length;
+   rec->header.xl_xid = xid;
+   rec->header.xl_prev = 0;
+   rec->header.xl_info = info;
+   rec->header.xl_rmid = rmid;
+   rec->header.xl_crc = 0;
+   rec->size = rec->header.xl_tot_len;
+
+   for (int i = 0; i < XLR_MAX_BLOCK_ID + 1; i++)
+   {
+      rec->blocks[i].in_use = false;
+      rec->blocks[i].bimg_len = 0;
+      rec->blocks[i].data_len = 0;
+      rec->blocks[i].bkp_image = NULL;
+      rec->blocks[i].data = NULL;
+   }
+
+   if (main_data_len > 0 && main_data_src != NULL)
+   {
+      rec->main_data = (char*)malloc(main_data_len);
+      if (rec->main_data == NULL)
+      {
+         goto error;
+      }
+      memcpy(rec->main_data, main_data_src, main_data_len);
+   }
+
+   return rec;
+
+error:
+   if (rec != NULL)
+   {
+      free(rec->main_data);
+      free(rec);
+   }
+
+   return NULL;
+}
+
+static struct walfile*
+create_walfile_shell(void)
+{
+   struct walfile* wf = NULL;
+
+   wf = (struct walfile*)malloc(sizeof(struct walfile));
+   if (wf == NULL)
+   {
+      goto error;
+   }
+
+   memset(wf, 0, sizeof(struct walfile));
+
+   wf->long_phd = (struct xlog_long_page_header_data*)malloc(sizeof(struct xlog_long_page_header_data));
+   if (wf->long_phd == NULL)
+   {
+      goto error;
+   }
+
+   memset(wf->long_phd, 0, sizeof(struct xlog_long_page_header_data));
+   wf->long_phd->std.xlp_pageaddr = RANDOM_PAGEADDR;
+   wf->long_phd->std.xlp_magic = RANDOM_MAGIC_19; /* PG19 magic */
+   wf->long_phd->std.xlp_info = RANDOM_INFO_19;   /* PG19 flags */
+   wf->long_phd->std.xlp_tli = RANDOM_TLI;
+   wf->long_phd->xlp_seg_size = RANDOM_SEG_SIZE;
+   wf->long_phd->xlp_xlog_blcksz = RANDOM_XLOG_BLCKSZ;
+   wf->long_phd->std.xlp_rem_len = RANDOM_REMLEN;
+
+   if (pgmoneta_deque_create(false, &wf->page_headers))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_create(false, &wf->records))
+   {
+      goto error;
+   }
+
+   return wf;
+
+error:
+   if (wf != NULL)
+   {
+      pgmoneta_deque_destroy(wf->records);
+      pgmoneta_deque_destroy(wf->page_headers);
+      free(wf->long_phd);
+      free(wf);
+   }
+
+   return NULL;
+}
+
+struct walfile*
+pgmoneta_test_generate_check_point_shutdown_v19(void)
+{
+   struct walfile* wf = NULL;
+   struct decoded_xlog_record* rec = NULL;
+
+   /* PostgreSQL 19 uses the same checkpoint structure as v17 */
+   struct check_point_v17 cp;
+   memset(&cp, 0, sizeof(cp));
+
+   cp.redo = RANDOM_REDO;
+   cp.this_timeline_id = RANDOM_THIS_TLI;
+   cp.prev_timeline_id = RANDOM_PREV_TLI;
+   cp.full_page_writes = RANDOM_FULL_PAGE_WRITES;
+   cp.wal_level = RANDOM_WAL_LEVEL;
+   cp.next_xid.value = RANDOM_NEXT_XID;
+   cp.next_oid = RANDOM_NEXT_OID;
+   cp.next_multi = RANDOM_NEXT_MULTI;
+   cp.next_multi_offset = RANDOM_NEXT_MULTI_OFFSET;
+   cp.oldest_xid = RANDOM_OLDEST_XID;
+   cp.oldest_xid_db = RANDOM_OLDEST_XID_DB;
+   cp.oldest_multi = RANDOM_OLDEST_MULTI;
+   cp.oldest_multi_db = RANDOM_OLDEST_MULTI_DB;
+   cp.time = RANDOM_TIME;
+   cp.oldest_commit_ts_xid = RANDOM_OLDEST_COMMIT_TS_XID;
+   cp.newest_commit_ts_xid = RANDOM_NEWEST_COMMIT_TS_XID;
+   cp.oldest_active_xid = RANDOM_OLDEST_ACTIVE_XID;
+
+   wf = create_walfile_shell();
+   if (wf == NULL)
+   {
+      goto error;
+   }
+
+   rec = create_record(RM_XLOG_ID, XLOG_CHECKPOINT_SHUTDOWN, 0,
+                       &cp, sizeof(cp));
+   if (rec == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(wf->records, NULL, (uintptr_t)rec, ValueRef))
+   {
+      goto error;
+   }
+
+   return wf;
+
+error:
+   if (rec != NULL)
+   {
+      free(rec->main_data);
+      free(rec);
+   }
+
+   pgmoneta_destroy_walfile(wf);
+
+   return NULL;
+}
+
+struct walfile*
+pgmoneta_test_generate_mixed_heap_wal_v19(void)
+{
+   struct walfile* wf = NULL;
+   struct decoded_xlog_record* rec_cp = NULL;
+   struct decoded_xlog_record* rec_ins = NULL;
+   struct decoded_xlog_record* rec_del = NULL;
+
+   /* PostgreSQL 19 uses the same checkpoint structure as v17 */
+   struct check_point_v17 cp;
+   memset(&cp, 0, sizeof(cp));
+   cp.redo = RANDOM_REDO;
+   cp.this_timeline_id = RANDOM_THIS_TLI;
+   cp.prev_timeline_id = RANDOM_PREV_TLI;
+   cp.full_page_writes = RANDOM_FULL_PAGE_WRITES;
+   cp.wal_level = RANDOM_WAL_LEVEL;
+   cp.next_xid.value = RANDOM_NEXT_XID;
+   cp.next_oid = RANDOM_NEXT_OID;
+   cp.next_multi = RANDOM_NEXT_MULTI;
+   cp.next_multi_offset = RANDOM_NEXT_MULTI_OFFSET;
+   cp.oldest_xid = RANDOM_OLDEST_XID;
+   cp.oldest_xid_db = RANDOM_OLDEST_XID_DB;
+   cp.oldest_multi = RANDOM_OLDEST_MULTI;
+   cp.oldest_multi_db = RANDOM_OLDEST_MULTI_DB;
+   cp.time = RANDOM_TIME;
+   cp.oldest_commit_ts_xid = RANDOM_OLDEST_COMMIT_TS_XID;
+   cp.newest_commit_ts_xid = RANDOM_NEWEST_COMMIT_TS_XID;
+   cp.oldest_active_xid = RANDOM_OLDEST_ACTIVE_XID;
+
+   struct xl_heap_insert ins;
+   memset(&ins, 0, sizeof(ins));
+   ins.offnum = 1;
+   ins.flags = 0;
+
+   struct xl_heap_delete del;
+   memset(&del, 0, sizeof(del));
+   del.xmax = 200;
+   del.offnum = 2;
+   del.infobits_set = 0;
+   del.flags = 0;
+
+   wf = create_walfile_shell();
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
+   rec_cp = create_record(RM_XLOG_ID, XLOG_CHECKPOINT_SHUTDOWN, 0,
+                          &cp, sizeof(cp));
+   if (rec_cp == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(wf->records, NULL, (uintptr_t)rec_cp, ValueRef))
+   {
+      goto error;
+   }
+   rec_cp = NULL;
+
+   rec_ins = create_record(RM_HEAP_ID, XLOG_HEAP_INSERT, 100,
+                           &ins, sizeof(ins));
+   if (rec_ins == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(wf->records, NULL, (uintptr_t)rec_ins, ValueRef))
+   {
+      goto error;
+   }
+   rec_ins = NULL;
+
+   rec_del = create_record(RM_HEAP_ID, XLOG_HEAP_DELETE, 200,
+                           &del, sizeof(del));
+   if (rec_del == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(wf->records, NULL, (uintptr_t)rec_del, ValueRef))
+   {
+      goto error;
+   }
+   rec_del = NULL;
+
+   return wf;
+
+error:
+   if (rec_del != NULL)
+   {
+      free(rec_del->main_data);
+      free(rec_del);
+   }
+   if (rec_ins != NULL)
+   {
+      free(rec_ins->main_data);
+      free(rec_ins);
+   }
+   if (rec_cp != NULL)
+   {
+      free(rec_cp->main_data);
+      free(rec_cp);
+   }
+   pgmoneta_destroy_walfile(wf);
+   return NULL;
+}

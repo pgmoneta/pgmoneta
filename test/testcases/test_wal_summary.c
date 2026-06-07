@@ -37,6 +37,7 @@
 #include <network.h>
 #include <security.h>
 #include <server.h>
+#include <shmem.h>
 #include <tsclient.h>
 #include <tscommon.h>
 #include <tswalutils.h>
@@ -57,6 +58,28 @@
 /* Forward declarations for helper functions */
 static int pgmoneta_test_server_info_check(int srv);
 static void cleanup_connections(SSL** srv_ssl, int* srv_socket, SSL** custom_user_ssl, int* custom_user_socket);
+
+static bool shmem_allocated = false;
+
+MCTF_MODULE_SETUP(wal_summary)
+{
+   if (shmem == NULL)
+   {
+      pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem);
+      memset(shmem, 0, sizeof(struct main_configuration));
+      shmem_allocated = true;
+   }
+}
+
+MCTF_MODULE_TEARDOWN(wal_summary)
+{
+   if (shmem_allocated && shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+      shmem = NULL;
+      shmem_allocated = false;
+   }
+}
 
 MCTF_TEST(test_pgmoneta_wal_summary)
 {

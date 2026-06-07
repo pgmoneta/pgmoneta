@@ -59,12 +59,21 @@ typedef oid rel_file_number;
 typedef int64_t timestamp_tz;
 
 /* #define variables */
-#define MAXIMUM_ALIGNOF           8 // TODO: double check this value
-#define ALIGNOF_SHORT             2 // TODO: double check this value
-#define InvalidXLogRecPtr         0
-#define InvalidBlockNumber        ((uint32_t)0xFFFFFFFF)
-#define InvalidBuffer             0
-#define XLOG_PAGE_MAGIC           0xD10D // WAL version indicator
+#define MAXIMUM_ALIGNOF    8 // TODO: double check this value
+#define ALIGNOF_SHORT      2 // TODO: double check this value
+#define InvalidXLogRecPtr  0
+#define InvalidBlockNumber ((uint32_t)0xFFFFFFFF)
+#define InvalidBuffer      0
+#define XLOG_PAGE_MAGIC    WAL_MAGIC_V14 /**< WAL version indicator */
+
+/* WAL Magic Numbers */
+#define WAL_MAGIC_V13             0xD106 /**< PostgreSQL 13 WAL magic number */
+#define WAL_MAGIC_V14             0xD10D /**< PostgreSQL 14 WAL magic number */
+#define WAL_MAGIC_V15             0xD110 /**< PostgreSQL 15 WAL magic number */
+#define WAL_MAGIC_V16             0xD113 /**< PostgreSQL 16 WAL magic number */
+#define WAL_MAGIC_V17             0xD116 /**< PostgreSQL 17 WAL magic number */
+#define WAL_MAGIC_V18             0xD118 /**< PostgreSQL 18 WAL magic number */
+#define WAL_MAGIC_V19             0xD11F /**< PostgreSQL 19 WAL magic number */
 #define InvalidOid                ((oid)0)
 #define FLEXIBLE_ARRAY_MEMBER     /* empty */
 #define INVALID_REP_ORIGIN_ID     0
@@ -103,7 +112,7 @@ typedef int64_t timestamp_tz;
 /* This flag indicates a "long" page header */
 #define XLP_LONG_HEADER 0x0002
 
-/* This flag indicates backup blocks starting in this page are optional */
+/* This flag indicates backup blocks starting in this page are optional (removed in PG19, magic >= WAL_MAGIC_V19 - 3) */
 #define XLP_BKP_REMOVABLE 0x0004
 
 /* Replaces a missing contrecord; see CreateOverwriteContrecordRecord */
@@ -111,6 +120,20 @@ typedef int64_t timestamp_tz;
 
 /* All defined flag bits in xlp_info (used for validity checking of header) */
 #define XLP_ALL_FLAGS 0x000F
+
+/* PostgreSQL repurposed 0x0004 for OVERWRITE_CONTRECORD */
+static inline uint16_t
+pgmoneta_xlp_first_is_overwrite_contrecord(uint16_t magic_value)
+{
+   return (magic_value >= WAL_MAGIC_V19 - 3) ? 0x0004 : 0x0008;
+}
+
+/* PG19 magic >= WAL_MAGIC_V19 - 3: BKP_REMOVABLE removed; OVERWRITE_CONTRECORD is 0x0004 */
+static inline uint16_t
+pgmoneta_xlp_all_flags(uint16_t magic_value)
+{
+   return (magic_value >= WAL_MAGIC_V19 - 3) ? 0x0007 : 0x000F;
+}
 
 #define XLogRecHasBlockRef(record, block_id) \
    ((record->max_block_id >= (block_id)) &&  \
@@ -391,6 +414,14 @@ struct column_widths
 
 /* External variables */
 extern struct server* server_config;
+
+/**
+ * Track the WAL magic value currently being displayed/decoded.
+ * This is used for version-gated decode/format logic in RMGR descriptions,
+ * especially for intra-major WAL format bumps like PostgreSQL 19.
+ */
+void pgmoneta_wal_set_current_magic(uint16_t magic_value);
+uint16_t pgmoneta_wal_get_current_magic(void);
 
 /* Function definitions */
 

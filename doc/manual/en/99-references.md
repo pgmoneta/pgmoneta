@@ -55,6 +55,7 @@
 [D113]: https://github.com/postgres/postgres/commit/6af1793954e8c5e753af83c3edb37ed3267dd179
 [D116]: https://github.com/postgres/postgres/commit/402b586d0a9caae9412d25fcf1b91dae45375833
 [D118]: https://github.com/postgres/postgres/commit/243e9b40f1b2dd09d6e5bf91ebf6e822a2cd3704
+[D11F]: https://github.com/postgres/postgres/commit/0d3dba38c777384a9dd7dffe924355c9683a6b71
 
 [cmake_txt]: https://github.com/pgmoneta/pgmoneta/blob/main/CMakeLists.txt
 [src/cmake_txt]: https://github.com/pgmoneta/pgmoneta/blob/main/src/CMakeLists.txt

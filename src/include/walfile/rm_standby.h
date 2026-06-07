@@ -70,14 +70,14 @@ struct xl_standby_locks
 };
 
 /**
- * @struct xl_running_xacts
- * @brief Represents running transactions data in XLOG.
+ * @struct xl_running_xacts_v18
+ * @brief Represents running transactions data in XLOG for PostgreSQL 18 and earlier.
  *
  * Contains information about currently running transactions,
  * including the next transaction ID, the oldest running transaction ID,
  * and the latest completed transaction ID.
  */
-struct xl_running_xacts
+struct xl_running_xacts_v18
 {
    int xcnt;                                   /**< Number of transaction IDs in xids[]. */
    int subxcnt;                                /**< Number of subtransaction IDs in xids[]. */
@@ -86,6 +86,49 @@ struct xl_running_xacts
    transaction_id oldest_running_xid;          /**< Oldest running transaction ID (not oldestXmin). */
    transaction_id latest_completed_xid;        /**< Latest completed transaction ID to set xmax. */
    transaction_id xids[FLEXIBLE_ARRAY_MEMBER]; /**< Array of transaction IDs. */
+};
+
+/**
+ * @struct xl_running_xacts_v19
+ * @brief Represents running transactions data in XLOG for PostgreSQL 19 and later.
+ *
+ * Contains information about currently running transactions,
+ * including the next transaction ID, the oldest running transaction ID,
+ * and the latest completed transaction ID.
+ *
+ * PostgreSQL 19 added a new 'dbid' field at the beginning of this structure,
+ * which is a MAJOR binary compatibility break that changes all subsequent field offsets.
+ */
+struct xl_running_xacts_v19
+{
+   oid dbid;                                   /**< Database OID. */
+   int xcnt;                                   /**< Number of transaction IDs in xids[]. */
+   int subxcnt;                                /**< Number of subtransaction IDs in xids[]. */
+   bool subxid_overflow;                       /**< Indicates if snapshot overflowed and subxids are missing. */
+   transaction_id next_xid;                    /**< Next transaction ID from TransamVariables->next_xid. */
+   transaction_id oldest_running_xid;          /**< Oldest running transaction ID (not oldestXmin). */
+   transaction_id latest_completed_xid;        /**< Latest completed transaction ID to set xmax. */
+   transaction_id xids[FLEXIBLE_ARRAY_MEMBER]; /**< Array of transaction IDs. */
+};
+
+/**
+ * @struct xl_running_xacts
+ * @brief Wrapper structure to handle different versions of running transactions data.
+ *
+ * Fields:
+ * - data: A union containing version-specific running transactions data.
+ * - parse: Function pointer to parse the record.
+ * - format: Function pointer to format the record.
+ */
+struct xl_running_xacts
+{
+   void (*parse)(struct xl_running_xacts* wrapper, void* rec);   /**< Function pointer to parse the record */
+   char* (*format)(struct xl_running_xacts* wrapper, char* buf); /**< Function pointer to format the record */
+   union
+   {
+      struct xl_running_xacts_v19 v19; /**< Running transactions data for version 19 */
+      struct xl_running_xacts_v18 v18; /**< Running transactions data for version 18 */
+   } data;                             /**< Version-specific running transactions data */
 };
 
 /**
@@ -129,6 +172,52 @@ pgmoneta_wal_standby_desc(char* buf, struct decoded_xlog_record* record);
 char*
 pgmoneta_wal_standby_desc_invalidations(char* buf, int nmsgs, union shared_invalidation_message* msgs, oid dbId, oid tsId,
                                         bool rel_cache_init_file_inval);
+
+/**
+ * @brief Creates a new xl_running_xacts structure.
+ *
+ * @return A pointer to the newly created xl_running_xacts structure.
+ */
+struct xl_running_xacts*
+create_xl_running_xacts(void);
+
+/**
+ * @brief Parses a version 19 running transactions record.
+ *
+ * @param wrapper The wrapper structure containing the record data.
+ * @param rec The record to parse.
+ */
+void
+xl_running_xacts_parse_v19(struct xl_running_xacts* wrapper, void* rec);
+
+/**
+ * @brief Parses a version 18 running transactions record.
+ *
+ * @param wrapper The wrapper structure containing the record data.
+ * @param rec The record to parse.
+ */
+void
+xl_running_xacts_parse_v18(struct xl_running_xacts* wrapper, void* rec);
+
+/**
+ * @brief Formats a version 19 running transactions record.
+ *
+ * @param wrapper The wrapper structure containing the record data.
+ * @param buf The buffer to store the formatted string.
+ * @return A pointer to the formatted string.
+ */
+char*
+xl_running_xacts_format_v19(struct xl_running_xacts* wrapper, char* buf);
+
+/**
+ * @brief Formats a version 18 running transactions record.
+ *
+ * @param wrapper The wrapper structure containing the record data.
+ * @param buf The buffer to store the formatted string.
+ * @return A pointer to the formatted string.
+ */
+char*
+xl_running_xacts_format_v18(struct xl_running_xacts* wrapper, char* buf);
 
 #ifdef __cplusplus
 }

@@ -245,9 +245,11 @@ In the `rmgr.h` header file, the resource managers are declared as an enum, with
 
 Each resource manager implements the `rm_desc` function, which provides a description of the record type associated with that resource manager. In the future, they will be extended to implement the `rm_redo` function to apply the changes to another server.
 
-**Supporting Various WAL Structures in PostgreSQL Versions 13 to 17**
+**Supporting Various WAL Structures in PostgreSQL Versions 13 to 19**
 
-The WAL structure has evolved across PostgreSQL versions 13 to 17, requiring different handling for each version. To accommodate these differences, we have implemented a wrapper-based approach, such as the factory pattern, to handle varying WAL structures.
+The WAL structure has evolved across PostgreSQL versions 13 to 19, requiring different handling for each version. To accommodate these differences, we have implemented a wrapper-based approach, such as the factory pattern, to handle varying WAL structures.
+
+**Important**: PostgreSQL 19 introduced a MAJOR binary compatibility break in the `xl_running_xacts` structure. See the WAL Change List section below for details on the critical field offset changes that require version-gated parsing.
 
 Below are the commit hashes for the officially supported magic values in each PostgreSQL version:
 
@@ -257,6 +259,7 @@ Below are the commit hashes for the officially supported magic values in each Po
 4. PostgreSQL 16 - [0xD113][D113]
 5. PostgreSQL 17 - [0xD116][D116]
 6. PostgreSQL 18 - [0xD118][D118]
+7. PostgreSQL 19 - [0xD11F][D11F]
 
 
 `xl_end_of_recovery` is an example of how we handle different versions of structures with a wrapper struct and a factory pattern.
@@ -912,6 +915,45 @@ typedef struct xl_xact_parsed_commit
 	TimestampTz origin_timestamp;
 } xl_xact_parsed_commit;
 ```
+
+**xl_running_xacts**
+
+19 (MAJOR BINARY COMPATIBILITY BREAK):
+
+```c
+struct xl_running_xacts_v19 {
+   oid dbid;                                   /* NEW field at offset 0 - Database OID */
+   int xcnt;                                   /* Number of transaction IDs in xids[] */
+   int subxcnt;                                /* Number of subtransaction IDs in xids[] */
+   bool subxid_overflow;                       /* Indicates if snapshot overflowed and subxids are missing */
+   transaction_id next_xid;                    /* Next transaction ID from TransamVariables->next_xid */
+   transaction_id oldest_running_xid;          /* Oldest running transaction ID (not oldestXmin) */
+   transaction_id latest_completed_xid;        /* Latest completed transaction ID to set xmax */
+   transaction_id xids[FLEXIBLE_ARRAY_MEMBER]; /* Array of transaction IDs */
+};
+```
+
+18 and earlier:
+
+```c
+struct xl_running_xacts_v18 {
+   int xcnt;                                   /* Number of transaction IDs in xids[] */
+   int subxcnt;                                /* Number of subtransaction IDs in xids[] */
+   bool subxid_overflow;                       /* Indicates if snapshot overflowed and subxids are missing */
+   transaction_id next_xid;                    /* Next transaction ID from TransamVariables->next_xid */
+   transaction_id oldest_running_xid;          /* Oldest running transaction ID (not oldestXmin) */
+   transaction_id latest_completed_xid;        /* Latest completed transaction ID to set xmax */
+   transaction_id xids[FLEXIBLE_ARRAY_MEMBER]; /* Array of transaction IDs */
+};
+```
+
+**Critical Binary Compatibility Note**: PostgreSQL 19 introduced a new `dbid` field at the **beginning** of the `xl_running_xacts` structure. This causes a MAJOR binary compatibility break where all subsequent field offsets are shifted by 4 bytes (sizeof(oid)). Version-gated parsing using the wrapper pattern is required to handle this change.
+
+**Field Offset Comparison**:
+- PostgreSQL 18: `xcnt` at offset 0, `next_xid` at offset 12
+- PostgreSQL 19: `dbid` at offset 0, `xcnt` at offset 4, `next_xid` at offset 16
+
+**Implementation**: pgmoneta uses version-specific structures (`xl_running_xacts_v18` and `xl_running_xacts_v19`) with a wrapper struct and factory pattern similar to `xl_end_of_recovery` to handle this compatibility break. See `src/include/walfile/rm_standby.h` and `src/libpgmoneta/walfile/rm_standby.c` for implementation details.
 
 **xl_xact_parsed_abort**
 
