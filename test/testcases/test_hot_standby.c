@@ -252,6 +252,62 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_pgmoneta_hot_standby_incremental)
+{
+   char standby_dir[MAX_PATH];
+   char overrides_dir[MAX_PATH];
+   char override_src[MAX_PATH];
+   char override_dst[MAX_PATH];
+   char* added_queries[] = {
+      "CREATE TABLE hs_incremental_added (i int); INSERT INTO hs_incremental_added SELECT generate_series(1, 1000)",
+      NULL};
+   char* second_added_queries[] = {
+      "CREATE TABLE hs_incremental_added2 (i int); INSERT INTO hs_incremental_added2 SELECT generate_series(1, 1000)",
+      NULL};
+   int found_files = 0;
+   FILE* f = NULL;
+
+   pgmoneta_test_setup();
+
+   pgmoneta_snprintf(standby_dir, sizeof(standby_dir), "%s/primary", TEST_HOT_STANDBY_DIR);
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "full backup failed");
+   MCTF_ASSERT(create_file(standby_dir, "hs_incremental_marker") == 0, cleanup, "failed to create the marker");
+
+   pgmoneta_snprintf(overrides_dir, sizeof(overrides_dir), "%s/overrides", TEST_HOT_STANDBY_DIR);
+   pgmoneta_mkdir(overrides_dir);
+   pgmoneta_snprintf(override_src, sizeof(override_src), "%s/override_marker_inc.txt", overrides_dir);
+   f = fopen(override_src, "w");
+   MCTF_ASSERT(f != NULL, cleanup, "Failed to create override source file: %s", override_src);
+   fprintf(f, "hot-standby-incremental-override");
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT(run_queries(added_queries) == 0, cleanup, "failed to create the first incremental relation");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0, cleanup, "first incremental backup failed");
+
+   pgmoneta_snprintf(override_dst, sizeof(override_dst), "%s/override_marker_inc.txt", standby_dir);
+   MCTF_ASSERT(standby_has(standby_dir, "hs_incremental_marker"), cleanup, "hot standby was not updated by the first incremental backup");
+   MCTF_ASSERT(pgmoneta_exists(override_dst), cleanup, "override file added after the full backup is missing in hot standby");
+   MCTF_ASSERT(relation_in_standby(standby_dir, "hs_incremental_added") == 0, cleanup, "relation added after the full backup is missing or has the wrong size in hot standby");
+
+   MCTF_ASSERT(run_queries(second_added_queries) == 0, cleanup, "failed to create the second incremental relation");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0, cleanup, "second incremental backup failed");
+   MCTF_ASSERT(relation_in_standby(standby_dir, "hs_incremental_added2") == 0, cleanup, "relation added before the second incremental backup is missing or has the wrong size in hot standby");
+
+   MCTF_ASSERT(check_files_recursive(standby_dir, &found_files) == 0, cleanup, "Found encrypted or compressed files in hot standby (incremental)");
+   MCTF_ASSERT(found_files > 0, cleanup, "No files found in hot standby directory (incremental)");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   pgmoneta_test_superuser_query("DROP TABLE IF EXISTS hs_incremental_added, hs_incremental_added2", NULL);
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_pgmoneta_hot_standby_tablespace)
 {
    char standby_dir[MAX_PATH];
