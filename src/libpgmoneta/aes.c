@@ -299,13 +299,7 @@ do_encrypt_file(struct worker_common* wc)
    else
    {
       pgmoneta_log_warn("do_encrypt_file: %s -> %s", wi->from, wi->to);
-      if (wi->common.workers != NULL)
-      {
-         char* msg = NULL;
-         msg = pgmoneta_format_and_append(msg, "AES encrypt failed: %s", wi->from);
-         pgmoneta_workers_record_failure(wi->common.workers, msg);
-         free(msg);
-      }
+      pgmoneta_record_failure(wi->common.workers != NULL ? wi->common.workers->outcome : NULL, "AES encrypt failed: %s", wi->from);
    }
 
    free(wi);
@@ -667,13 +661,7 @@ do_decrypt_file(struct worker_common* wc)
    else
    {
       pgmoneta_log_warn("do_decrypt_file: %s -> %s", wi->from, wi->to);
-      if (wi->common.workers != NULL)
-      {
-         char* msg = NULL;
-         msg = pgmoneta_format_and_append(msg, "AES decrypt failed: %s", wi->from);
-         pgmoneta_workers_record_failure(wi->common.workers, msg);
-         free(msg);
-      }
+      pgmoneta_record_failure(wi->common.workers != NULL ? wi->common.workers->outcome : NULL, "AES decrypt failed: %s", wi->from);
    }
 
    free(wi);
@@ -2418,14 +2406,10 @@ do_aes_operation(struct worker_common* wc)
       result = pgmoneta_decrypt_file(task->from, task->to, NULL);
    }
 
-   if (result != 0 && task->common.workers != NULL)
+   if (result != 0)
    {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "AES %s failed: %s",
-                                       task->enc ? "encrypt" : "decrypt",
-                                       task->from);
-      pgmoneta_workers_record_failure(task->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(task->common.workers != NULL ? task->common.workers->outcome : NULL,
+                              "AES %s failed: %s", task->enc ? "encrypt" : "decrypt", task->from);
    }
 
    if (task->progress_enabled)

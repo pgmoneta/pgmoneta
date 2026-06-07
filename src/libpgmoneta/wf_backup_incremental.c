@@ -1755,7 +1755,7 @@ copy_wal_from_archive(char* start_wal_file, char* wal_dir, char* backup_data)
          }
 
          // copy and extract
-         if (pgmoneta_extract_file(src_file, 0, true, &dst_file))
+         if (pgmoneta_extract_file(src_file, 0, true, NULL, &dst_file))
          {
             goto error;
          }

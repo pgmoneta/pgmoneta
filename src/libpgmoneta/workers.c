@@ -157,14 +157,33 @@ pgmoneta_workers_outcome_ok(struct workers* workers)
 }
 
 void
-pgmoneta_workers_record_failure(struct workers* workers, char* message)
+pgmoneta_record_failure(struct deque* failures, char* fmt, ...)
 {
-   if (workers == NULL || workers->outcome == NULL || message == NULL)
+   char* msg = NULL;
+   va_list ap;
+   int size_needed;
+
+   if (failures == NULL || fmt == NULL)
    {
       return;
    }
 
-   pgmoneta_deque_add(workers->outcome, NULL, (uintptr_t)message, ValueString);
+   va_start(ap, fmt);
+   size_needed = vsnprintf(NULL, 0, fmt, ap) + 1;
+   va_end(ap);
+
+   msg = malloc(size_needed);
+   if (msg == NULL)
+   {
+      return;
+   }
+
+   va_start(ap, fmt);
+   vsnprintf(msg, size_needed, fmt, ap);
+   va_end(ap);
+
+   pgmoneta_deque_add(failures, NULL, (uintptr_t)msg, ValueString);
+   free(msg);
 }
 
 void

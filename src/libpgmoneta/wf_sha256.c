@@ -214,19 +214,13 @@ do_sha256(struct worker_common* wc)
 
    if (pgmoneta_create_sha256_file(wi->from, &sha256))
    {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "SHA256 failed: %s", wi->from);
-      pgmoneta_workers_record_failure(wi->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(wi->common.workers->outcome, "SHA256 failed: %s", wi->from);
       goto done;
    }
 
    if (pgmoneta_json_create(&result))
    {
-      char* msg = NULL;
-      msg = pgmoneta_format_and_append(msg, "SHA256 allocation failed: %s", wi->from);
-      pgmoneta_workers_record_failure(wi->common.workers, msg);
-      free(msg);
+      pgmoneta_record_failure(wi->common.workers->outcome, "SHA256 allocation failed: %s", wi->from);
       goto done;
    }
 

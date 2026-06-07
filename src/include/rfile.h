@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <deque.h>
+
 #include <stdint.h>
 #include <stdio.h>
 
@@ -68,11 +70,12 @@ struct rfile
  * @param base_file_name The file name
  * @param encryption The encryption method
  * @param compression The compression method
+ * @param failures The failure deque
  * @param rfile [out] The rfile
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile);
+pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct deque* failures, struct rfile** rfile);
 
 /**
  * Destroy the rfile structure
@@ -89,11 +92,12 @@ pgmoneta_rfile_destroy(struct rfile* rf);
  * @param base_file_name The file name
  * @param encryption The encryption method
  * @param compression The compression method
+ * @param failures The failure deque
  * @param rfile [out] The rfile
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile);
+pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct deque* failures, struct rfile** rfile);
 
 #ifdef __cplusplus
 }

@@ -1504,7 +1504,7 @@ pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* big
             goto error;
          }
 
-         if (pgmoneta_incremental_rfile_initialize(server, label, relative_path, bare_file_name, config->common.encryption, config->compression_type, &rf))
+         if (pgmoneta_incremental_rfile_initialize(server, label, relative_path, bare_file_name, config->common.encryption, config->compression_type, NULL, &rf))
          {
             pgmoneta_log_error("Unable to create rfile %s", bare_file_name);
             goto error;

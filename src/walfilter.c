@@ -776,7 +776,7 @@ main(int argc, char* argv[])
             continue;
          }
 
-         if (pgmoneta_extract_file(tar_archive_copy, 0, false, &tar_temp_dir))
+         if (pgmoneta_extract_file(tar_archive_copy, 0, false, NULL, &tar_temp_dir))
          {
             pgmoneta_log_error("Failed to extract TAR archive: %s", current_file);
             free(tar_archive_copy);
@@ -850,7 +850,7 @@ main(int argc, char* argv[])
          tmp_wal = NULL;
          tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
 
-         if (pgmoneta_extract_file(wal_path, 0, true, &tmp_wal))
+         if (pgmoneta_extract_file(wal_path, 0, true, NULL, &tmp_wal))
          {
             pgmoneta_log_fatal("Failed to extract WAL file at %s", file_path);
             goto error;

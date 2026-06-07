@@ -301,7 +301,7 @@ MCTF_TEST(test_extraction_layered_archive)
    file_type = pgmoneta_extraction_get_file_type(encrypted_path);
    {
       char* dest = out_dir;
-      MCTF_ASSERT_INT_EQ(pgmoneta_extract_file(encrypted_path, file_type, false, &dest), 0, cleanup, "extract_file failed");
+      MCTF_ASSERT_INT_EQ(pgmoneta_extract_file(encrypted_path, file_type, false, NULL, &dest), 0, cleanup, "extract_file failed");
    }
    MCTF_ASSERT(pgmoneta_exists(extracted_path), cleanup, "extracted WAL file missing");
 
