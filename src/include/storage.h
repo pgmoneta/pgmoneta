@@ -35,6 +35,7 @@ extern "C" {
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <info.h>
 #include <workflow.h>
 
 /* system */
@@ -73,6 +74,20 @@ pgmoneta_storage_create_s3(int workflow_type);
 */
 int
 pgmoneta_storage_list_backup_labels(int server, struct deque** labels);
+
+/**
+ * Verify a backup label in the configured storage engine.
+ *
+ * This is backend-specific scheduled verification, not necessarily full
+ * file-content verification. For S3 this verifies metadata integrity and
+ * manifest-listed object presence without downloading data objects.
+ *
+ * @param server The server index
+ * @param backup_info The backup info
+ * @return 0 on success, otherwise 1
+*/
+int
+pgmoneta_storage_verify_backup(int server, struct backup* backup_info);
 
 /**
  * Create a workflow for the Azure storage engine

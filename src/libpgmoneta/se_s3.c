@@ -48,6 +48,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +72,7 @@ static int s3_list_objects(char* relative_path, char* s3_list, int server, bool 
 static int s3_delete_all_objects(char* relative_path, char* s3_list, int server, struct art*) __attribute__((unused));
 static int s3_send_list_request(char* relative_path, char* s3_list, int server, char* continuationToken, bool common_prefixes, struct http_response** response);
 static int s3_list_backup_prefixes(int server, struct deque** labels);
+static int s3_verify_backup(int server, struct backup* backup_info);
 
 static int s3_send_delete_request(char* relative_path, char* s3_list, int server, char* xml_body, struct http_response** response);
 static int s3_send_get_request(char* relative_path, char* s3_root, int server, long range_start, long range_end, struct http_response** response);
@@ -179,8 +181,20 @@ pgmoneta_storage_list_backup_labels(int server, struct deque** labels)
    {
       return s3_list_backup_prefixes(server, labels);
    }
-   // it does not support listing
-   return 1;
+   return 0;
+}
+
+int
+pgmoneta_storage_verify_backup(int server, struct backup* backup_info)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   if (config->storage_engine & STORAGE_ENGINE_S3)
+   {
+      return s3_verify_backup(server, backup_info);
+   }
+
+   return 0;
 }
 
 static char*
@@ -593,6 +607,196 @@ error:
    free(s3_root);
    return 1;
 }
+
+static int
+s3_verify_backup(int server, struct backup* backup_info)
+{
+   char* s3_root = NULL;
+   char* local_root = NULL;
+   char* manifest_tmp = NULL;
+   char* sha512_tmp = NULL;
+   char* info_tmp = NULL;
+   char* suffix = NULL;
+   struct deque* paths = NULL;
+   struct deque* objects = NULL;
+   struct deque_iterator* iter = NULL;
+   struct art* remote = NULL;
+
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   pgmoneta_log_debug("S3 storage engine (verify): %s/%s",
+                      config->common.servers[server].name, backup_info->label);
+   pgmoneta_log_debug("S3 effective config: bucket=%s, region=%s, endpoint=%s",
+                      s3_get_effective_bucket(server),
+                      s3_get_effective_region(server),
+                      s3_get_effective_endpoint(server));
+
+   s3_root = s3_get_basepath(server, backup_info->label);
+   local_root = pgmoneta_get_server_backup_identifier(server, backup_info->label);
+
+   if (s3_bootstrap(s3_root, server, local_root))
+   {
+      pgmoneta_log_error("S3 verify: failed to bootstrap");
+      goto error;
+   }
+   if (pgmoneta_extraction_get_suffix(backup_info->compression, backup_info->encryption, &suffix))
+   {
+      pgmoneta_log_error("S3 verify: failed to get suffix");
+      goto error;
+   }
+
+   info_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+   manifest_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+   sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+
+   // load the manifest temp file
+   if (pgmoneta_manifest_get_paths(manifest_tmp, &paths))
+   {
+      pgmoneta_log_error("S3 verify: failed to read manifest %s", manifest_tmp);
+      goto error;
+   }
+
+   if (s3_list_objects("", s3_root, server, false, &objects))
+   {
+      pgmoneta_log_error("S3 verify: failed to list objects");
+      goto error;
+   }
+   if (pgmoneta_art_create(&remote))
+   {
+      pgmoneta_log_error("S3 verify: failed to create art");
+      goto error;
+   }
+
+   if (pgmoneta_deque_iterator_create(objects, &iter))
+   {
+      pgmoneta_log_error("S3 verify: failed to create iterator");
+      goto error;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* key = (char*)pgmoneta_value_data(iter->value);
+      pgmoneta_art_insert(remote, key, (uintptr_t)true, ValueBool);
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
+   if (pgmoneta_deque_iterator_create(paths, &iter))
+   {
+      pgmoneta_log_error("S3 verify: failed to create iterator local paths");
+      goto error;
+   }
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* file_path = iter->tag;
+      char* expected = NULL;
+      char* key_root = s3_root;
+      if (strlen(s3_get_effective_endpoint(server)) > 0)
+      {
+         char* slash = strchr(s3_root, '/');
+         if (slash != NULL)
+            key_root = slash + 1;
+      }
+
+      expected = pgmoneta_append(expected, key_root);
+      if (!pgmoneta_ends_with(expected, "/"))
+      {
+         expected = pgmoneta_append_char(expected, '/');
+      }
+      expected = pgmoneta_append(expected, "data/");
+      expected = pgmoneta_append(expected, file_path);
+      if (suffix != NULL &&
+          !pgmoneta_ends_with(file_path, "backup_label") &&
+          !pgmoneta_ends_with(file_path, "backup_manifest"))
+      {
+         expected = pgmoneta_append(expected, suffix);
+      }
+
+      if (!pgmoneta_art_contains_key(remote, expected))
+      {
+         pgmoneta_log_error("S3 verify: missing object %s", expected);
+         free(expected);
+         goto error;
+      }
+
+      free(expected);
+   }
+   // check the files in the mainfest against the one in the backupe
+
+   if (pgmoneta_delete_file(info_tmp, NULL))
+   {
+      pgmoneta_log_error("Failed to delete info file");
+      goto error;
+   }
+   if (pgmoneta_delete_file(manifest_tmp, NULL))
+   {
+      pgmoneta_log_error("Failed to delete manifest file");
+      goto error;
+   }
+   if (pgmoneta_delete_file(sha512_tmp, NULL))
+   {
+      pgmoneta_log_error("Failed to delete sha512 file");
+      goto error;
+   }
+
+   pgmoneta_log_info("S3 verify: %s/%s completed", config->common.servers[server].name, backup_info->label);
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   pgmoneta_deque_destroy(objects);
+   pgmoneta_art_destroy(remote);
+   free(s3_root);
+   free(local_root);
+   free(manifest_tmp);
+   free(sha512_tmp);
+   free(info_tmp);
+   free(suffix);
+
+   return 0;
+
+error:
+
+   if (local_root != NULL)
+   {
+      char* cleanup = NULL;
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   pgmoneta_deque_destroy(objects);
+   pgmoneta_art_destroy(remote);
+   free(s3_root);
+   free(local_root);
+   free(manifest_tmp);
+   free(sha512_tmp);
+   free(info_tmp);
+   free(suffix);
+
+   return 1;
+}
+
 static int
 s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
 {
@@ -1816,6 +2020,7 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
    char* s3_path = NULL;
    char* request_path = NULL;
    char* query_string = NULL;
+   char* body_hash = NULL;
    char* canonical_uri = NULL;
    struct deque* sign_headers = NULL;
    struct http* connection = NULL;
@@ -1858,25 +2063,40 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
       goto error;
    }
 
+   if (pgmoneta_generate_string_sha256_hash("", &body_hash))
+   {
+      goto error;
+   }
+
    s3_host = s3_get_host(server);
+
+   // Build query string with parameters in lexicographic order
+   // Required order: continuation-token, delimiter, list-type, prefix
 
    if (continuationToken != NULL)
    {
       char* encoded_token = s3_url_encode(continuationToken);
       query_string = pgmoneta_append(query_string, "continuation-token=");
       query_string = pgmoneta_append(query_string, encoded_token);
-      query_string = pgmoneta_append(query_string, "&");
       free(encoded_token);
    }
+
+   if (common_prefixes)
+   {
+      if (query_string != NULL)
+      {
+         query_string = pgmoneta_append(query_string, "&");
+      }
+      query_string = pgmoneta_append(query_string, "delimiter=%2F");
+   }
+
+   if (query_string != NULL)
+      query_string = pgmoneta_append(query_string, "&");
+
    char* encoded_prefix = s3_url_encode(prefix);
    query_string = pgmoneta_append(query_string, "list-type=2&prefix=");
    query_string = pgmoneta_append(query_string, encoded_prefix);
    free(encoded_prefix);
-   if (common_prefixes)
-   {
-      query_string = pgmoneta_append(query_string, "&delimiter=%2F");
-   }
-
    /* Build canonical URI */
    canonical_uri = pgmoneta_append(canonical_uri, "/");
    if (path_style)
@@ -1890,11 +2110,11 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
       goto error;
    }
    pgmoneta_deque_add(sign_headers, "host", (uintptr_t)s3_host, ValueStringRef);
-   pgmoneta_deque_add(sign_headers, "x-amz-content-sha256", (uintptr_t)"UNSIGNED-PAYLOAD", ValueStringRef);
+   pgmoneta_deque_add(sign_headers, "x-amz-content-sha256", (uintptr_t)body_hash, ValueStringRef);
    pgmoneta_deque_add(sign_headers, "x-amz-date", (uintptr_t)long_date, ValueStringRef);
 
    if (s3_sign_request("GET", canonical_uri, query_string,
-                       sign_headers, "UNSIGNED-PAYLOAD",
+                       sign_headers, body_hash,
                        effective_access_key_id, effective_secret_access_key, effective_region,
                        short_date, long_date, &auth_value))
    {
@@ -1967,6 +2187,7 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
    free(s3_path);
    free(auth_value);
    free(query_string);
+   free(body_hash);
    free(canonical_uri);
    pgmoneta_deque_destroy(sign_headers);
    pgmoneta_http_request_destroy(request);
@@ -1981,6 +2202,7 @@ error:
    free(s3_path);
    free(auth_value);
    free(query_string);
+   free(body_hash);
    free(canonical_uri);
    pgmoneta_deque_destroy(sign_headers);
 

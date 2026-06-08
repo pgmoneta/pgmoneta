@@ -35,6 +35,7 @@ extern "C" {
 
 #include <pgmoneta.h>
 #include <json.h>
+#include <storage.h>
 
 #include <stdlib.h>
 
