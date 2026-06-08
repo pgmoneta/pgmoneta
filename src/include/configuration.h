@@ -182,7 +182,9 @@ pgmoneta_init_main_configuration(void* shmem);
  * Read the configuration from a file
  * @param shmem The shared memory segment
  * @param filename The file name
- * @return 0 upon success, otherwise 1
+ * @return 0 upon success, otherwise an error code:
+ *         ENOENT = file does not exist or cannot be opened
+ *         EINVAL = parse error or invalid file format
  */
 int
 pgmoneta_read_main_configuration(void* shmem, char* filename);
@@ -207,7 +209,9 @@ pgmoneta_init_cli_configuration(void* shmem);
  * Read the CLI configuration from a file
  * @param shmem The shared memory segment
  * @param filename The file name
- * @return 0 upon success, otherwise 1
+ * @return 0 upon success, otherwise an error code:
+ *         ENOENT = file does not exist or cannot be opened
+ *         EINVAL = parse error or invalid file format
  */
 int
 pgmoneta_read_cli_configuration(void* shmem, char* filename);
@@ -232,7 +236,9 @@ pgmoneta_init_walinfo_configuration(void* shmem);
  * Read the WALINFO configuration from a file
  * @param shmem The shared memory segment
  * @param filename The file name
- * @return 0 upon success, otherwise 1
+ * @return 0 upon success, otherwise an error code:
+ *         ENOENT = file does not exist or cannot be opened
+ *         EINVAL = parse error or invalid file format
  */
 int
 pgmoneta_read_walinfo_configuration(void* shmem, char* filename);
@@ -256,7 +262,9 @@ pgmoneta_init_walfilter_configuration(void* shmem);
  * Read the WALFILTER configuration from a file
  * @param shmem The shared memory segment
  * @param filename The file name
- * @return 0 upon success, otherwise 1
+ * @return 0 upon success, otherwise an error code:
+ *         ENOENT = file does not exist or cannot be opened
+ *         EINVAL = parse error or invalid file format
  */
 int
 pgmoneta_read_walfilter_configuration(void* shmem, char* filename);
