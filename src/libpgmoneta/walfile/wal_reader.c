@@ -54,9 +54,15 @@
 struct server* server_config;
 
 static int decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value, xlog_rec_ptr lsn);
-static void record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct value** value);
+static void record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct xid_timestamp_map* xid_ts_map, struct value** value);
 static bool get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struct rel_file_locator* pLocator, enum fork_number* pNumber, block_number* pInt, buffer* pVoid);
 static int magic_value_to_postgres_version(uint16_t magic_value);
+static int compare_xid_timestamp_entries(struct value* a, struct value* b);
+static void xid_timestamp_entry_destroy(uintptr_t data);
+static void pgmoneta_xid_timestamp_map_sort(struct xid_timestamp_map* map);
+static int add_xid_and_subxacts_to_map(transaction_id main_xid, transaction_id* subxacts, int nsubxacts, timestamp_tz timestamp, struct xid_timestamp_map* map);
+static int process_commit_record(struct xl_xact_commit* xlrec, uint8_t xl_info, transaction_id xid, bool use_v15_parser, struct xid_timestamp_map* map);
+static int process_abort_record(struct xl_xact_abort* xlrec, uint8_t xl_info, transaction_id xid, bool use_v15_parser, struct xid_timestamp_map* map);
 
 static bool is_included(char* rm, struct deque* rms, uint64_t s_lsn, uint64_t start_lsn, uint64_t e_lsn, uint64_t end_lsn,
                         uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc, uint32_t xl_info, rmgr_id rm_id);
@@ -693,6 +699,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
    decoded->next = NULL;
    decoded->record_origin = INVALID_REP_ORIGIN_ID;
    decoded->toplevel_xid = INVALID_TRANSACTION_ID;
+   decoded->xact_timestamp = 0;
+   decoded->has_xact_timestamp = false;
    decoded->main_data = NULL;
    decoded->main_data_len = 0;
    decoded->block_size = block_size;
@@ -912,6 +920,35 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
       }
       memcpy(decoded->main_data, ptr, decoded->main_data_len);
       ptr += decoded->main_data_len;
+   }
+
+   if (record->xl_rmid == RM_XACT_ID && decoded->main_data != NULL)
+   {
+      if (server_config != NULL && server_config->valid && !server_config->track_commit_timestamp)
+      {
+         decoded->has_xact_timestamp = false;
+      }
+      else
+      {
+         uint8_t op = record->xl_info & XLOG_XACT_OPMASK;
+
+         if (op == XLOG_XACT_COMMIT || op == XLOG_XACT_ABORT)
+         {
+            if (decoded->main_data_len >= sizeof(timestamp_tz))
+            {
+               memcpy(&decoded->xact_timestamp, decoded->main_data, sizeof(timestamp_tz));
+               decoded->has_xact_timestamp = true;
+            }
+         }
+         else if (op == XLOG_XACT_COMMIT_PREPARED || op == XLOG_XACT_ABORT_PREPARED)
+         {
+            if (decoded->main_data_len >= sizeof(timestamp_tz))
+            {
+               memcpy(&decoded->xact_timestamp, decoded->main_data, sizeof(timestamp_tz));
+               decoded->has_xact_timestamp = true;
+            }
+         }
+      }
    }
    decoded->partial = false;
 
@@ -1456,6 +1493,29 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
          widths->xid_width = temp_width;
       }
 
+      if (record->has_xact_timestamp)
+      {
+         char* ts = pgmoneta_wal_timestamptz_to_str(record->xact_timestamp);
+         temp_width = strlen(ts);
+         if (temp_width > widths->ts_width)
+         {
+            widths->ts_width = temp_width;
+         }
+      }
+      else if (wf->xid_ts_map != NULL && record->header.xl_xid != INVALID_TRANSACTION_ID)
+      {
+         timestamp_tz ts;
+         if (pgmoneta_xid_timestamp_map_get(wf->xid_ts_map, record->header.xl_xid, &ts) == 0)
+         {
+            char* ts_str = pgmoneta_wal_timestamptz_to_str(ts);
+            temp_width = strlen(ts_str);
+            if (temp_width > widths->ts_width)
+            {
+               widths->ts_width = temp_width;
+            }
+         }
+      }
+
       free(start_lsn_string);
       free(end_lsn_string);
       start_lsn_string = NULL;
@@ -1468,7 +1528,8 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
 void
 pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out,
                             bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn,
-                            struct deque* xids, uint32_t limit, char** included_objects, struct column_widths* widths)
+                            struct deque* xids, uint32_t limit, char** included_objects, struct column_widths* widths,
+                            struct xid_timestamp_map* xid_ts_map)
 {
    static uint32_t current_limit = 0;
    char* header_str = NULL;
@@ -1477,6 +1538,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    char* start_lsn_string = NULL;
    char* end_lsn_string = NULL;
    char* enhanced_desc = NULL;
+   char* timestamp_str = NULL;
    struct value* record_serialized = NULL;
    char* value_str = NULL;
    uint32_t rec_len = 0;
@@ -1537,7 +1599,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          {
             fprintf(out, ",\n{\"Record\": ");
          }
-         record_json(record, magic_value, &record_serialized);
+         record_json(record, magic_value, xid_ts_map, &record_serialized);
          value_str = pgmoneta_value_to_string(record_serialized, FORMAT_JSON_COMPACT, NULL, 0);
          fprintf(out, "%s}", value_str);
          pgmoneta_value_destroy(record_serialized);
@@ -1569,32 +1631,47 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          start_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
          end_lsn_string = pgmoneta_lsn_to_string(record->lsn);
 
+         if (record->has_xact_timestamp)
+         {
+            timestamp_str = pgmoneta_wal_timestamptz_to_str(record->xact_timestamp);
+         }
+         else if (xid_ts_map != NULL && record->header.xl_xid != INVALID_TRANSACTION_ID)
+         {
+            timestamp_tz ts;
+            if (pgmoneta_xid_timestamp_map_get(xid_ts_map, record->header.xl_xid, &ts) == 0)
+            {
+               timestamp_str = pgmoneta_wal_timestamptz_to_str(ts);
+            }
+         }
+
          bool has_desc = enhanced_desc && strlen(enhanced_desc) > 0;
          bool has_backup = backup_str && strlen(backup_str) > 0;
          bool both_empty = !has_desc && !has_backup;
 
          if (color)
          {
-            fprintf(out, "%s%-*s%s | %s%-*s%s | %s%-*s%s | %s%-*d%s | %s%-*d%s | %s%-*u%s | %s%s%s%s%s\n",
+            fprintf(out, "%s%-*s%s | %s%-*s%s | %s%-*s%s | %s%-*d%s | %s%-*d%s | %s%-*u%s | %s%-*s%s | %s%s%s%s%s\n",
                     COLOR_RED, widths->rm_width, rmgr_table[record->header.xl_rmid].name, COLOR_RESET,
                     COLOR_MAGENTA, widths->lsn_width, start_lsn_string, COLOR_RESET,
                     COLOR_MAGENTA, widths->lsn_width, end_lsn_string, COLOR_RESET,
                     COLOR_BLUE, widths->rec_width, rec_len, COLOR_RESET,
                     COLOR_YELLOW, widths->tot_width, record->header.xl_tot_len, COLOR_RESET,
                     COLOR_CYAN, widths->xid_width, record->header.xl_xid, COLOR_RESET,
+                    COLOR_MAGENTA, widths->ts_width, timestamp_str ? timestamp_str : "", COLOR_RESET,
                     COLOR_GREEN, both_empty ? "<empty>" : (has_desc ? enhanced_desc : ""),
                     has_backup ? " " : "",
                     has_backup ? backup_str : "", COLOR_RESET);
          }
          else
          {
-            fprintf(out, "%-*s | %-*s | %-*s | %-*d | %-*d | %-*u | %s%s%s\n",
+            fprintf(out, "%-*s | %-*s | %-*s | %-*d | %-*d | %-*u | %-*s | %s%s%s\n",
                     widths->rm_width, rmgr_table[record->header.xl_rmid].name,
                     widths->lsn_width, start_lsn_string,
                     widths->lsn_width, end_lsn_string,
                     widths->rec_width, rec_len,
                     widths->tot_width, record->header.xl_tot_len,
                     widths->xid_width, record->header.xl_xid,
+                    widths->ts_width, timestamp_str ? timestamp_str : "",
                     both_empty ? "<empty>" : (has_desc ? enhanced_desc : ""),
                     has_backup ? " " : "",
                     has_backup ? backup_str : "");
@@ -1903,7 +1980,7 @@ no:
 }
 
 static void
-record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct value** value)
+record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct xid_timestamp_map* xid_ts_map, struct value** value)
 {
    char* rm_desc = NULL;
    char* backup_str = NULL;
@@ -1930,6 +2007,20 @@ record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct valu
    pgmoneta_json_put(record_json, "TotalLength", record->header.xl_tot_len, ValueUInt32);
    pgmoneta_json_put(record_json, "Xid", record->header.xl_xid, ValueUInt32);
    pgmoneta_json_put(record_json, "Info", record->header.xl_info, ValueUInt8);
+   if (record->has_xact_timestamp)
+   {
+      char* ts_str = pgmoneta_wal_timestamptz_to_str(record->xact_timestamp);
+      pgmoneta_json_put(record_json, "Timestamp", (uintptr_t)ts_str, ValueString);
+   }
+   else if (xid_ts_map != NULL && record->header.xl_xid != INVALID_TRANSACTION_ID)
+   {
+      timestamp_tz ts;
+      if (pgmoneta_xid_timestamp_map_get(xid_ts_map, record->header.xl_xid, &ts) == 0)
+      {
+         char* ts_str = pgmoneta_wal_timestamptz_to_str(ts);
+         pgmoneta_json_put(record_json, "Timestamp", (uintptr_t)ts_str, ValueString);
+      }
+   }
    pgmoneta_json_put(record_json, "StartLSN", record->header.xl_prev, ValueUInt64);
    pgmoneta_json_put(record_json, "EndLSN", record->lsn, ValueUInt64);
    pgmoneta_json_put(record_json, "ResourceManagerId", record->header.xl_rmid, ValueUInt8);
@@ -2468,4 +2559,312 @@ pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t ma
    assert(ptr - buffer == total_length);
 
    return buffer;
+}
+
+int
+pgmoneta_xid_timestamp_map_create(struct xid_timestamp_map** map)
+{
+   if (map == NULL)
+   {
+      pgmoneta_log_error("Invalid parameter: map is NULL");
+      return 1;
+   }
+
+   struct xid_timestamp_map* m = malloc(sizeof(struct xid_timestamp_map));
+   if (m == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate memory for XID timestamp map");
+      return 1;
+   }
+
+   if (pgmoneta_deque_create(false, &m->entries))
+   {
+      pgmoneta_log_error("Failed to create deque for XID timestamp map");
+      free(m);
+      return 1;
+   }
+
+   m->sorted = false;
+   *map = m;
+   return 0;
+}
+
+void
+pgmoneta_xid_timestamp_map_destroy(struct xid_timestamp_map* map)
+{
+   if (map == NULL)
+   {
+      return;
+   }
+
+   if (map->entries != NULL)
+   {
+      pgmoneta_deque_destroy(map->entries);
+   }
+   free(map);
+}
+
+int
+pgmoneta_xid_timestamp_map_put(struct xid_timestamp_map* map, transaction_id xid, timestamp_tz timestamp)
+{
+   if (map == NULL)
+   {
+      pgmoneta_log_error("Invalid parameter: map is NULL");
+      return 1;
+   }
+
+   map->sorted = false;
+
+   struct xid_timestamp_entry* entry = malloc(sizeof(struct xid_timestamp_entry));
+   if (entry == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate memory for XID timestamp entry");
+      return 1;
+   }
+
+   entry->xid = xid;
+   entry->timestamp = timestamp;
+
+   struct value_config config;
+   memset(&config, 0, sizeof(struct value_config));
+   config.destroy_data = xid_timestamp_entry_destroy;
+
+   pgmoneta_deque_add_with_config(map->entries, NULL, (uintptr_t)entry, &config);
+
+   return 0;
+}
+
+int
+pgmoneta_xid_timestamp_map_get(struct xid_timestamp_map* map, transaction_id xid, timestamp_tz* timestamp)
+{
+   if (map == NULL || timestamp == NULL)
+   {
+      pgmoneta_log_error("Invalid parameter: map or timestamp is NULL");
+      return 1;
+   }
+
+   if (!map->sorted)
+   {
+      pgmoneta_xid_timestamp_map_sort(map);
+   }
+
+   struct deque_iterator* iter = NULL;
+   if (pgmoneta_deque_iterator_create(map->entries, &iter))
+   {
+      pgmoneta_log_error("Failed to create iterator for XID timestamp map");
+      return 1;
+   }
+
+   int result = 1;
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      struct xid_timestamp_entry* entry = (struct xid_timestamp_entry*)pgmoneta_value_data(iter->value);
+      if (entry == NULL)
+      {
+         continue;
+      }
+
+      if (entry->xid == xid)
+      {
+         *timestamp = entry->timestamp;
+         result = 0;
+         break;
+      }
+      else if (entry->xid > xid)
+      {
+         break;
+      }
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   return result;
+}
+
+size_t
+pgmoneta_xid_timestamp_map_size(struct xid_timestamp_map* map)
+{
+   if (map == NULL)
+   {
+      return 0;
+   }
+
+   return pgmoneta_deque_size(map->entries);
+}
+
+static void
+pgmoneta_xid_timestamp_map_sort(struct xid_timestamp_map* map)
+{
+   if (map == NULL || map->entries == NULL)
+   {
+      return;
+   }
+
+   if (pgmoneta_deque_size(map->entries) <= 1)
+   {
+      map->sorted = true;
+      return;
+   }
+
+   pgmoneta_deque_sort(map->entries, compare_xid_timestamp_entries);
+   map->sorted = true;
+}
+
+static int
+compare_xid_timestamp_entries(struct value* a, struct value* b)
+{
+   if (a == NULL || b == NULL)
+   {
+      return 0;
+   }
+
+   const struct xid_timestamp_entry* entry_a = (const struct xid_timestamp_entry*)pgmoneta_value_data(a);
+   const struct xid_timestamp_entry* entry_b = (const struct xid_timestamp_entry*)pgmoneta_value_data(b);
+
+   if (entry_a == NULL || entry_b == NULL)
+   {
+      return 0;
+   }
+
+   if (entry_a->xid < entry_b->xid)
+   {
+      return -1;
+   }
+   if (entry_a->xid > entry_b->xid)
+   {
+      return 1;
+   }
+   return 0;
+}
+
+static void
+xid_timestamp_entry_destroy(uintptr_t data)
+{
+   free((void*)data);
+}
+
+static int
+process_commit_record(struct xl_xact_commit* xlrec, uint8_t xl_info, transaction_id xid,
+                      bool use_v15_parser, struct xid_timestamp_map* map)
+{
+   if (use_v15_parser)
+   {
+      struct xl_xact_parsed_commit_v15 parsed;
+      pgmoneta_wal_parse_commit_record_ge15(xl_info, xlrec, &parsed);
+      return add_xid_and_subxacts_to_map(xid, parsed.subxacts, parsed.nsubxacts, parsed.xact_time, map);
+   }
+   else
+   {
+      struct xl_xact_parsed_commit_v14 parsed;
+      pgmoneta_wal_parse_commit_record_l15(xl_info, xlrec, &parsed);
+      return add_xid_and_subxacts_to_map(xid, parsed.subxacts, parsed.nsubxacts, parsed.xact_time, map);
+   }
+}
+
+static int
+process_abort_record(struct xl_xact_abort* xlrec, uint8_t xl_info, transaction_id xid,
+                     bool use_v15_parser, struct xid_timestamp_map* map)
+{
+   if (use_v15_parser)
+   {
+      struct xl_xact_parsed_abort_v15 parsed;
+      pgmoneta_wal_parse_abort_record_ge15(xl_info, xlrec, &parsed);
+      return add_xid_and_subxacts_to_map(xid, parsed.subxacts, parsed.nsubxacts, parsed.xact_time, map);
+   }
+   else
+   {
+      struct xl_xact_parsed_abort_v14 parsed;
+      pgmoneta_wal_parse_abort_record_l15(xl_info, xlrec, &parsed);
+      return add_xid_and_subxacts_to_map(xid, parsed.subxacts, parsed.nsubxacts, parsed.xact_time, map);
+   }
+}
+
+static int
+add_xid_and_subxacts_to_map(transaction_id main_xid, transaction_id* subxacts, int nsubxacts,
+                            timestamp_tz timestamp, struct xid_timestamp_map* map)
+{
+   if (pgmoneta_xid_timestamp_map_put(map, main_xid, timestamp))
+   {
+      pgmoneta_log_error("Failed to add XID %u to timestamp map", main_xid);
+      return 1;
+   }
+
+   for (int i = 0; i < nsubxacts; i++)
+   {
+      if (pgmoneta_xid_timestamp_map_put(map, subxacts[i], timestamp))
+      {
+         pgmoneta_log_warn("Failed to add subXID %u to timestamp map", subxacts[i]);
+      }
+      else
+      {
+         pgmoneta_log_trace("Added subXID %u -> timestamp %ld to map", subxacts[i], timestamp);
+      }
+   }
+
+   pgmoneta_log_trace("Added XID %u -> timestamp %ld to map with %d subxacts", main_xid, timestamp, nsubxacts);
+   return 0;
+}
+
+int
+pgmoneta_process_xid_timestamp(struct decoded_xlog_record* record, struct xid_timestamp_map* map)
+{
+   if (record == NULL || map == NULL)
+   {
+      pgmoneta_log_error("Invalid parameter: record or map is NULL");
+      return 1;
+   }
+
+   /* Server startup enforces track_commit_timestamp. If server_config exists and is valid,
+    * this code path is only reached when commit timestamp tracking is enabled.
+    */
+   if (server_config != NULL && server_config->valid && !server_config->track_commit_timestamp)
+   {
+      return 0;
+   }
+
+   if (record->header.xl_rmid != RM_XACT_ID || !record->has_xact_timestamp)
+   {
+      return 0;
+   }
+
+   transaction_id xid = record->header.xl_xid;
+   if (xid == INVALID_TRANSACTION_ID)
+   {
+      return 0;
+   }
+
+   uint8_t op = record->header.xl_info & XLOG_XACT_OPMASK;
+
+   if (op == XLOG_XACT_COMMIT || op == XLOG_XACT_ABORT)
+   {
+      bool use_v15_parser = (server_config == NULL || server_config->version == 0 || server_config->version >= 15);
+
+      if (op == XLOG_XACT_COMMIT)
+      {
+         struct xl_xact_commit* xlrec = (struct xl_xact_commit*)record->main_data;
+         if (process_commit_record(xlrec, record->header.xl_info, xid, use_v15_parser, map))
+         {
+            return 1;
+         }
+      }
+      else /* XLOG_XACT_ABORT */
+      {
+         struct xl_xact_abort* xlrec = (struct xl_xact_abort*)record->main_data;
+         if (process_abort_record(xlrec, record->header.xl_info, xid, use_v15_parser, map))
+         {
+            return 1;
+         }
+      }
+   }
+   else if (op == XLOG_XACT_COMMIT_PREPARED || op == XLOG_XACT_ABORT_PREPARED)
+   {
+      if (pgmoneta_xid_timestamp_map_put(map, xid, record->xact_timestamp))
+      {
+         pgmoneta_log_error("Failed to add XID %u to timestamp map", xid);
+         return 1;
+      }
+      pgmoneta_log_trace("Added XID %u -> timestamp %ld to map (prepared transaction)", xid, record->xact_timestamp);
+   }
+
+   return 0;
 }

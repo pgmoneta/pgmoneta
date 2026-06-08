@@ -340,6 +340,8 @@ struct decoded_xlog_record
    struct xlog_record header;                             /**< Header of the record. */
    rep_origin_id record_origin;                           /**< Origin ID of the record. */
    transaction_id toplevel_xid;                           /**< Top-level transaction ID. */
+   timestamp_tz xact_timestamp;                           /**< Commit or abort timestamp, when available. */
+   bool has_xact_timestamp;                               /**< Indicates if xact_timestamp is available. */
    char* main_data;                                       /**< Main data portion of the record. */
    uint32_t main_data_len;                                /**< Length of the main data portion. */
    uint32_t block_size;                                   /**< Block size. */
@@ -387,6 +389,44 @@ struct column_widths
    int rec_width; /**< Width of the record type column. */
    int tot_width; /**< Width of the total length column. */
    int xid_width; /**< Width of the transaction ID column. */
+   int ts_width;  /**< Width of the timestamp column. */
+};
+
+/**
+ * @struct xid_timestamp_entry
+ * @brief Represents a single XID to timestamp mapping entry.
+ *
+ * This structure maps a transaction ID to its commit timestamp.
+ *
+ * Fields:
+ * - xid: The transaction ID.
+ * - timestamp: The commit/abort timestamp for the transaction.
+ */
+struct xid_timestamp_entry
+{
+   transaction_id xid;     /**< The transaction ID. */
+   timestamp_tz timestamp; /**< The commit/abort timestamp. */
+};
+
+/**
+ * @struct xid_timestamp_map
+ * @brief A mapping from transaction IDs to their timestamps.
+ *
+ * This structure maintains a collection of XID -> timestamp mappings,
+ * allowing efficient lookup of transaction commit times.
+ *
+ * This subsystem requires PostgreSQL track_commit_timestamp to be enabled.
+ * If track_commit_timestamp is disabled, WAL transaction timestamp handling is
+ * unsupported and startup will fail.
+ *
+ * Fields:
+ * - entries: Deque of XID timestamp entries.
+ * - sorted: Whether deque entries are sorted and ready for sequential lookup.
+ */
+struct xid_timestamp_map
+{
+   struct deque* entries; /**< Deque of XID timestamp entries. */
+   bool sorted;           /**< Whether deque entries are sorted and ready for sequential lookup. */
 };
 
 /* External variables */
@@ -498,11 +538,13 @@ pgmoneta_wal_array_desc(char* buf, void* array, size_t elem_size, int count);
  * @param limit The limit
  * @param included_objects Objects that will include wal records that reference them
  * @param widths The column widths for consistent formatting
+ * @param xid_ts_map The XID to timestamp mapping for looking up timestamps
  */
 void
 pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out,
                             bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn,
-                            struct deque* xids, uint32_t limit, char** included_objects, struct column_widths* widths);
+                            struct deque* xids, uint32_t limit, char** included_objects, struct column_widths* widths,
+                            struct xid_timestamp_map* xid_ts_map);
 
 /**
  * Display the ocuurance of resource manager in WAL records
@@ -576,6 +618,68 @@ void
 pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_t end_lsn,
                                  struct deque* rms, struct deque* xids, char** included_objects,
                                  struct column_widths* widths);
+
+/**
+ * Create a new deque-backed XID timestamp map
+ *
+ * @param initial_capacity Initial capacity hint for the map
+ * @param map Output parameter for the created map
+ * @return 0 on success, 1 on error
+ */
+int
+pgmoneta_xid_timestamp_map_create(struct xid_timestamp_map** map);
+
+/**
+ * Destroy an XID timestamp map
+ *
+ * @param map The map to destroy
+ */
+void
+pgmoneta_xid_timestamp_map_destroy(struct xid_timestamp_map* map);
+
+/**
+ * Add or update an XID -> timestamp mapping
+ *
+ * @param map The XID timestamp map
+ * @param xid The transaction ID
+ * @param timestamp The commit/abort timestamp
+ * @return 0 on success, 1 on error
+ */
+int
+pgmoneta_xid_timestamp_map_put(struct xid_timestamp_map* map, transaction_id xid, timestamp_tz timestamp);
+
+/**
+ * Get the timestamp for a given XID
+ *
+ * @param map The XID timestamp map
+ * @param xid The transaction ID to look up
+ * @param timestamp Output parameter for the timestamp
+ * @return 0 if found, 1 if not found
+ */
+int
+pgmoneta_xid_timestamp_map_get(struct xid_timestamp_map* map, transaction_id xid, timestamp_tz* timestamp);
+
+/**
+ * Get the size of the XID timestamp map
+ *
+ * @param map The XID timestamp map
+ * @return The number of entries in the map
+ */
+size_t
+pgmoneta_xid_timestamp_map_size(struct xid_timestamp_map* map);
+
+/**
+ * Process a WAL record and extract XID -> timestamp mapping
+ *
+ * This function examines a decoded WAL record and extracts transaction
+ * commit/abort timestamps, adding them to the XID timestamp map.
+ *
+ * @param record The decoded WAL record to process
+ * @param map The XID timestamp map to populate
+ * @return 0 on success, 1 on error
+ */
+int
+pgmoneta_process_xid_timestamp(struct decoded_xlog_record* record, struct xid_timestamp_map* map);
 
 #ifdef __cplusplus
 }

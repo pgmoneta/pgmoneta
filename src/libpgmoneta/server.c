@@ -49,6 +49,7 @@
 
 static int get_primary(SSL* ssl, int socket, bool* primary);
 static int get_wal_level(SSL* ssl, int socket, bool* replica);
+static int get_track_commit_timestamp(SSL* ssl, int socket, bool* enabled);
 static int get_wal_size(SSL* ssl, int socket, int* ws);
 static int get_checksums(SSL* ssl, int socket, bool* checksums);
 static int get_segment_size(SSL* ssl, int socket, size_t* segsz);
@@ -88,6 +89,7 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
    pgmoneta_server_set_online(srv, true);
    config->common.servers[srv].valid = false;
    config->common.servers[srv].checksums = false;
+   config->common.servers[srv].track_commit_timestamp = false;
 
    if (pgmoneta_extract_server_parameters(&server_parameters))
    {
@@ -127,6 +129,20 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
    }
 
    pgmoneta_log_debug("%s/wal_level %s", config->common.servers[srv].name, config->common.servers[srv].valid ? "Yes" : "No");
+
+   if (get_track_commit_timestamp(ssl, socket, &config->common.servers[srv].track_commit_timestamp))
+   {
+      pgmoneta_log_error("Unable to determine track_commit_timestamp for %s", config->common.servers[srv].name);
+      config->common.servers[srv].valid = false;
+      goto done;
+   }
+
+   if (!config->common.servers[srv].track_commit_timestamp)
+   {
+      pgmoneta_log_error("Server %s has track_commit_timestamp disabled; commit timestamps are required for WAL transaction timestamp handling", config->common.servers[srv].name);
+      config->common.servers[srv].valid = false;
+      goto done;
+   }
 
    if (get_checksums(ssl, socket, &checksums))
    {
@@ -1013,6 +1029,82 @@ error:
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
    return 1;
+}
+
+/**
+ * Checks if track_commit_timestamp is enabled on the server.
+ * Retries up to 5 times with 500ms intervals if initial query fails.
+ *
+ * @param ssl SSL connection context
+ * @param socket Socket file descriptor
+ * @param enabled Output: true if track_commit_timestamp is 'on', false otherwise
+ * @return 0 on success, 1 on failure
+ */
+static int
+get_track_commit_timestamp(SSL* ssl, int socket, bool* enabled)
+{
+   int ret;
+   int retry_count = 0;
+   const int max_retries = 5;
+   char timestamp_value[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   *enabled = false;
+
+   ret = pgmoneta_create_query_message("SHOW track_commit_timestamp;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK || query_msg == NULL)
+   {
+      pgmoneta_log_error("Failed to create query message for track_commit_timestamp");
+      pgmoneta_free_message(query_msg);
+      return 1;
+   }
+
+   while (retry_count < max_retries)
+   {
+      pgmoneta_query_execute(ssl, socket, query_msg, &response);
+      if (is_valid_response(response))
+      {
+         break;
+      }
+      pgmoneta_free_query_response(response);
+      response = NULL;
+      retry_count++;
+      if (retry_count < max_retries)
+      {
+         SLEEP(500000L);
+      }
+   }
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_log_error("Failed to get track_commit_timestamp after %d attempts", max_retries);
+      pgmoneta_query_response_debug(response);
+      pgmoneta_free_query_response(response);
+      pgmoneta_free_message(query_msg);
+      return 1;
+   }
+
+   if (response->tuples == NULL || response->tuples->data == NULL || response->tuples->data[0] == NULL)
+   {
+      pgmoneta_log_error("Invalid tuple data for track_commit_timestamp query");
+      pgmoneta_free_query_response(response);
+      pgmoneta_free_message(query_msg);
+      return 1;
+   }
+
+   memset(timestamp_value, 0, sizeof(timestamp_value));
+   pgmoneta_snprintf(timestamp_value, sizeof(timestamp_value), "%s", response->tuples->data[0]);
+
+   if (pgmoneta_compare_string("on", timestamp_value))
+   {
+      *enabled = true;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
 }
 
 static int

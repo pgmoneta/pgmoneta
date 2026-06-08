@@ -113,6 +113,7 @@ struct wal_record_ui
    uint32_t rec_len;
    uint32_t tot_len;
    uint32_t xid;
+   char timestamp[64];
    char description[512];
    char hex_data[512];
    bool verified;
@@ -1146,6 +1147,31 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
 
       /* Transaction ID */
       rec_ui->xid = record->header.xl_xid;
+
+      /* get timestamp - either from record or lookup in XID timestamp map */
+      char* timestamp_str = NULL;
+      if (record->has_xact_timestamp)
+      {
+         timestamp_str = pgmoneta_wal_timestamptz_to_str(record->xact_timestamp);
+      }
+      else if (wf->xid_ts_map != NULL && rec_ui->xid != INVALID_TRANSACTION_ID)
+      {
+         timestamp_tz ts = 0;
+         if (pgmoneta_xid_timestamp_map_get(wf->xid_ts_map, rec_ui->xid, &ts) == 0)
+         {
+            timestamp_str = pgmoneta_wal_timestamptz_to_str(ts);
+         }
+      }
+
+      if (timestamp_str != NULL)
+      {
+         pgmoneta_snprintf(rec_ui->timestamp, sizeof(rec_ui->timestamp), "%s", timestamp_str);
+         /* No free needed - pgmoneta_wal_timestamptz_to_str returns static buffer */
+      }
+      else
+      {
+         rec_ui->timestamp[0] = '\0';
+      }
 
       /* Get human-readable description */
       char* desc = get_simple_record_description(record, wf->magic_number);
@@ -2547,6 +2573,7 @@ draw_main_content(struct ui_state* state)
    const int rec_width = 7;
    const int tot_width = 7;
    const int xid_width = 7;
+   const int ts_width = 22;
 
    /* Draw column headers with exact formatting */
    wattron(state->main_win, A_BOLD | A_UNDERLINE);
@@ -2588,6 +2615,12 @@ draw_main_content(struct ui_state* state)
    mvwprintw(state->main_win, 1, col, "%-*s", xid_width, "XID");
    wattroff(state->main_win, COLOR_PAIR(10));
    col += xid_width + 3;
+
+   /* timestamp header in MAGENTA */
+   wattron(state->main_win, COLOR_PAIR(7));
+   mvwprintw(state->main_win, 1, col, "%-*s", ts_width, "Timestamp");
+   wattroff(state->main_win, COLOR_PAIR(7));
+   col += ts_width + 3;
 
    /* description header in GREEN */
    wattron(state->main_win, COLOR_PAIR(11));
@@ -2714,6 +2747,22 @@ draw_main_content(struct ui_state* state)
          mvwprintw(state->main_win, i + 2, col, "%-*u", xid_width, rec_ui->xid);
          wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(10) | A_BOLD);
          col += xid_width;
+         mvwprintw(state->main_win, i + 2, col, " | ");
+         col += 3;
+
+         /* timestamp in MAGENTA or HIGHLIGHT */
+         if (is_highlighted_row && state->highlight_count > 0 &&
+             state->current_search_field == WAL_SEARCH_FIELD_DESCRIPTION)
+         {
+            wattron(state->main_win, COLOR_PAIR(15) | A_BOLD);
+         }
+         else
+         {
+            wattron(state->main_win, COLOR_PAIR(7));
+         }
+         mvwprintw(state->main_win, i + 2, col, "%-*s", ts_width, rec_ui->timestamp);
+         wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(7) | A_BOLD);
+         col += ts_width;
          mvwprintw(state->main_win, i + 2, col, " | ");
          col += 3;
 
@@ -2855,6 +2904,13 @@ show_detail_view(struct ui_state* state)
    wattron(detail_win, COLOR_PAIR(10));
    mvwprintw(detail_win, row, 17, "%u", rec_ui->xid);
    wattroff(detail_win, COLOR_PAIR(10));
+   row++;
+
+   /* timestamp in MAGENTA */
+   mvwprintw(detail_win, row, 2, "Timestamp:     ");
+   wattron(detail_win, COLOR_PAIR(7));
+   mvwprintw(detail_win, row, 17, "%s", rec_ui->timestamp);
+   wattroff(detail_win, COLOR_PAIR(7));
    row++;
 
    /* Valid status */
@@ -6046,7 +6102,7 @@ describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quie
          else
          {
             pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                        rms, start_lsn, end_lsn, xids, limit, included_objects, widths);
+                                        rms, start_lsn, end_lsn, xids, limit, included_objects, widths, wf->xid_ts_map);
          }
       }
 
@@ -6067,7 +6123,7 @@ describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quie
          else
          {
             pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                        rms, start_lsn, end_lsn, xids, limit, included_objects, widths);
+                                        rms, start_lsn, end_lsn, xids, limit, included_objects, widths, wf->xid_ts_map);
          }
       }
    }

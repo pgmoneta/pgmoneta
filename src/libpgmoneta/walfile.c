@@ -108,12 +108,38 @@ pgmoneta_read_walfile(int server, char* path, struct walfile** wf)
       goto error;
    }
 
+   if (pgmoneta_xid_timestamp_map_create(&new_wf->xid_ts_map))
+   {
+      pgmoneta_log_error("Failed to create XID timestamp map");
+      error_code = PGMONETA_WAL_ERR_MEMORY;
+      goto error;
+   }
+
    if (pgmoneta_wal_parse_wal_file(path, server, new_wf))
    {
       pgmoneta_log_error("Failed to parse WAL file: %s", path);
       error_code = PGMONETA_WAL_ERR_FORMAT;
       goto error;
    }
+
+   struct deque_iterator* record_iterator = NULL;
+   if (pgmoneta_deque_iterator_create(new_wf->records, &record_iterator) == 0)
+   {
+      while (pgmoneta_deque_iterator_next(record_iterator))
+      {
+         struct decoded_xlog_record* record = (struct decoded_xlog_record*)record_iterator->value->data;
+         if (!record->partial)
+         {
+            if (pgmoneta_process_xid_timestamp(record, new_wf->xid_ts_map))
+            {
+               pgmoneta_log_warn("Failed to process XID timestamp for record");
+            }
+         }
+      }
+      pgmoneta_deque_iterator_destroy(record_iterator);
+   }
+
+   pgmoneta_log_debug("Created XID timestamp map with %zu entries", pgmoneta_xid_timestamp_map_size(new_wf->xid_ts_map));
 
    *wf = new_wf;
 
@@ -375,6 +401,11 @@ pgmoneta_destroy_walfile(struct walfile* wf)
    if (wf->long_phd != NULL)
    {
       free(wf->long_phd);
+   }
+
+   if (wf->xid_ts_map != NULL)
+   {
+      pgmoneta_xid_timestamp_map_destroy(wf->xid_ts_map);
    }
 
    free(wf);

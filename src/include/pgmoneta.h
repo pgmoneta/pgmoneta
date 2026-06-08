@@ -331,6 +331,7 @@ struct server
    bool checksums;                                                /**< Are checksums enabled */
    int fips_enabled;                                              /**< FIPS mode status */
    bool summarize_wal;                                            /**< Is summarize_wal enabled */
+   bool track_commit_timestamp;                                   /**< Is commit timestamp tracking enabled */
    bool valid;                                                    /**< Is the server valid */
    int version;                                                   /**< The major version of the server*/
    int minor_version;                                             /**< The minor version of the server*/

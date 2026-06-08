@@ -144,6 +144,26 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_server_api_track_commit_timestamp)
+{
+   struct main_configuration* config = NULL;
+   struct server srv;
+
+   MCTF_ASSERT(setup_server_connection() == 0, cleanup, "failed to setup server connection - check authentication and server configuration");
+
+   pgmoneta_server_info(PRIMARY_SERVER, srv_ssl, srv_socket);
+
+   config = (struct main_configuration*)shmem;
+   srv = config->common.servers[PRIMARY_SERVER];
+
+   MCTF_ASSERT(srv.track_commit_timestamp, cleanup, "track_commit_timestamp should be enabled");
+   MCTF_ASSERT(srv.valid, cleanup, "server should be valid when track_commit_timestamp is enabled");
+
+cleanup:
+   teardown_server_connection();
+   MCTF_FINISH();
+}
+
 static int
 setup_server_connection(void)
 {
