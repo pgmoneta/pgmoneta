@@ -87,6 +87,8 @@ struct xlog_long_page_header_data
  *                   Each page contains metadata about the organization of that page.
  *   - records: A deque that holds the WAL records stored in the WAL file.
  *              Each element has a `struct decoded_xlog_record` data type.
+ *   - xid_timestamp_map: A mapping from transaction IDs to their commit/abort timestamps.
+ *                        This allows efficient lookup of when each transaction committed.
  */
 struct walfile
 {
@@ -94,6 +96,7 @@ struct walfile
    struct xlog_long_page_header_data* long_phd; /**< Extended XLOG page header. */
    struct deque* page_headers;                  /**< Deque of page headers in the WAL file. */
    struct deque* records;                       /**< Deque of records in the WAL file. */
+   struct xid_timestamp_map* xid_ts_map;        /**< XID to timestamp mapping. */
 };
 
 /**
