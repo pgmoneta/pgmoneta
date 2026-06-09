@@ -1349,7 +1349,7 @@ pgmoneta_read_mappings_from_json(char* mappings_path)
 
                oidMappings[index].oid = oid;
                oidMappings[index].type = current_type;
-               oidMappings[index].name = strdup(name);
+               pgmoneta_copy_string(name, &oidMappings[index].name);
                index++;
             }
             pgmoneta_json_iterator_destroy(iter);
@@ -1383,7 +1383,7 @@ pgmoneta_read_mappings_from_json(char* mappings_path)
 
                   oidMappings[index].oid = oid;
                   oidMappings[index].type = current_type;
-                  oidMappings[index].name = strdup(name);
+                  pgmoneta_copy_string(name, &oidMappings[index].name);
                   index++;
                }
                pgmoneta_json_iterator_destroy(inner_iter);
@@ -1502,9 +1502,7 @@ pgmoneta_read_mappings_from_server(int server_index)
 
          oidMappings[mappings_size].type = types[i];
          oidMappings[mappings_size].oid = oid;
-         oidMappings[mappings_size].name = strdup(name);
-
-         if (oidMappings[mappings_size].name == NULL)
+         if (!pgmoneta_copy_string(name, &oidMappings[mappings_size].name))
          {
             pgmoneta_log_error("Failed to duplicate name");
             goto error;
@@ -1547,8 +1545,7 @@ pgmoneta_get_database_name(int oid, char** name)
       {
          if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_DATABASE)
          {
-            temp_name = strdup(oidMappings[i].name);
-            if (temp_name == NULL)
+            if (!pgmoneta_copy_string(oidMappings[i].name, &temp_name))
             {
                goto error;
             }
@@ -1593,8 +1590,7 @@ pgmoneta_get_tablespace_name(int oid, char** name)
       {
          if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_TABLESPACE)
          {
-            temp_name = strdup(oidMappings[i].name);
-            if (temp_name == NULL)
+            if (!pgmoneta_copy_string(oidMappings[i].name, &temp_name))
             {
                goto error;
             }
@@ -1638,8 +1634,7 @@ pgmoneta_get_relation_name(int oid, char** name)
       {
          if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_RELATION)
          {
-            temp_name = strdup(oidMappings[i].name);
-            if (temp_name == NULL)
+            if (!pgmoneta_copy_string(oidMappings[i].name, &temp_name))
             {
                goto error;
             }
@@ -1697,8 +1692,7 @@ pgmoneta_get_tablespace_oid(char* name, char** oid)
 
    if (temp_oid == NULL)
    {
-      temp_oid = strdup(name);
-      if (temp_oid == NULL)
+      if (!pgmoneta_copy_string(name, &temp_oid))
       {
          goto error;
       }
@@ -1741,8 +1735,7 @@ pgmoneta_get_database_oid(char* name, char** oid)
 
    if (temp_oid == NULL)
    {
-      temp_oid = strdup(name);
-      if (temp_oid == NULL)
+      if (!pgmoneta_copy_string(name, &temp_oid))
       {
          goto error;
       }
@@ -1785,8 +1778,7 @@ pgmoneta_get_relation_oid(char* name, char** oid)
 
    if (temp_oid == NULL)
    {
-      temp_oid = strdup(name);
-      if (temp_oid == NULL)
+      if (!pgmoneta_copy_string(name, &temp_oid))
       {
          goto error;
       }

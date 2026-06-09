@@ -345,8 +345,7 @@ pgmoneta_extension_parse_version(char* version_str, struct version* version)
    version->minor = -1;
    version->patch = -1;
 
-   str_copy = strdup(version_str);
-   if (!str_copy)
+   if (!pgmoneta_copy_string(version_str, &str_copy))
    {
       pgmoneta_log_error("Failed to allocate memory for version string copy");
       goto error;

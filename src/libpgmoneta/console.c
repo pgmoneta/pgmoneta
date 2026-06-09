@@ -295,8 +295,8 @@ console_init(int endpoint, const char* brand_name, const char* metric_prefix, st
 
    memset(console, 0, sizeof(struct console_page));
 
-   console->brand_name = brand_name ? strdup(brand_name) : strdup("Metrics Console");
-   console->metric_prefix = metric_prefix ? strdup(metric_prefix) : NULL;
+   pgmoneta_copy_string(brand_name ? brand_name : "Metrics Console", &console->brand_name);
+   pgmoneta_copy_string(metric_prefix, &console->metric_prefix);
 
    console->status = (struct console_status*)malloc(sizeof(struct console_status));
    if (console->status == NULL)
@@ -524,15 +524,15 @@ console_refresh_status(struct console_page* console)
    /* Initialize status with defaults first */
    if (console->status->status == NULL)
    {
-      console->status->status = strdup("Unavailable");
+      pgmoneta_copy_string("Unavailable", &console->status->status);
    }
    if (console->status->version == NULL)
    {
-      console->status->version = strdup(VERSION);
+      pgmoneta_copy_string(VERSION, &console->status->version);
    }
    if (console->status->last_updated == NULL)
    {
-      console->status->last_updated = strdup("Unknown");
+      pgmoneta_copy_string("Unknown", &console->status->last_updated);
    }
    if (console->status->num_servers == 0)
    {
@@ -574,11 +574,11 @@ console_refresh_status(struct console_page* console)
    free(console->status->version);
    if (server_version != NULL)
    {
-      console->status->version = strdup(server_version);
+      pgmoneta_copy_string(server_version, &console->status->version);
    }
    else
    {
-      console->status->version = strdup(VERSION);
+      pgmoneta_copy_string(VERSION, &console->status->version);
    }
 
    if (console->status->servers != NULL)
@@ -616,7 +616,7 @@ console_refresh_status(struct console_page* console)
 
             if (console->status->servers != NULL)
             {
-               console->status->servers[server_idx].name = server_name ? strdup(server_name) : strdup("unknown");
+               pgmoneta_copy_string(server_name ? server_name : "unknown", &console->status->servers[server_idx].name);
                console->status->servers[server_idx].active = active;
             }
 
@@ -628,7 +628,7 @@ console_refresh_status(struct console_page* console)
    }
 
    free(console->status->status);
-   console->status->status = strdup("Running");
+   pgmoneta_copy_string("Running", &console->status->status);
 
    now = time(NULL);
    time_info = localtime(&now);
@@ -636,11 +636,11 @@ console_refresh_status(struct console_page* console)
    if (time_info != NULL)
    {
       strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", time_info);
-      console->status->last_updated = strdup(timestamp);
+      pgmoneta_copy_string(timestamp, &console->status->last_updated);
    }
    else
    {
-      console->status->last_updated = strdup("Unknown");
+      pgmoneta_copy_string("Unknown", &console->status->last_updated);
    }
 
    status = 0;
@@ -659,7 +659,7 @@ error:
    if (status != 0)
    {
       free(console->status->status);
-      console->status->status = strdup("Unavailable");
+      pgmoneta_copy_string("Unavailable", &console->status->status);
    }
 
    return status;
@@ -1126,7 +1126,7 @@ build_categories_from_bridge(struct prometheus_bridge* bridge, struct console_pa
       }
       if (category_name == NULL)
       {
-         category_name = strdup("uncategorized");
+         pgmoneta_copy_string("uncategorized", &category_name);
       }
 
       /* Leaf = remainder after category prefix */
@@ -1134,11 +1134,11 @@ build_categories_from_bridge(struct prometheus_bridge* bridge, struct console_pa
       size_t base_len = strlen(base_name);
       if (base_len > cat_len + 1 && base_name[cat_len] == '_')
       {
-         leaf_name = strdup(base_name + cat_len + 1);
+         pgmoneta_copy_string(base_name + cat_len + 1, &leaf_name);
       }
       else
       {
-         leaf_name = strdup(base_name);
+         pgmoneta_copy_string(base_name, &leaf_name);
       }
 
       category = find_or_create_category(console, category_name);
@@ -1272,8 +1272,7 @@ fallback_category_from_last_underscore(char* metric_name)
       return NULL;
    }
 
-   prefix = strdup(metric_name);
-   if (prefix == NULL)
+   if (!pgmoneta_copy_string(metric_name, &prefix))
    {
       return NULL;
    }
@@ -1315,8 +1314,7 @@ find_or_create_category(struct console_page* console, char* category_name)
    struct console_category* new_cat = &console->categories[console->category_count];
    memset(new_cat, 0, sizeof(struct console_category));
 
-   new_cat->name = strdup(category_name);
-   if (new_cat->name == NULL)
+   if (!pgmoneta_copy_string(category_name, &new_cat->name))
    {
       pgmoneta_log_error("Failed to duplicate category name");
       return NULL;
@@ -1379,9 +1377,9 @@ create_metric_from_prometheus_attrs(struct prometheus_metric* prom_metric, const
 
    memset(metric, 0, sizeof(struct console_metric));
 
-   metric->name = strdup(display_name != NULL ? display_name : prom_metric->name);
-   metric->type = strdup(prom_metric->type != NULL ? prom_metric->type : "gauge");
-   metric->help = strdup(prom_metric->help != NULL ? prom_metric->help : "");
+   pgmoneta_copy_string(display_name != NULL ? display_name : prom_metric->name, &metric->name);
+   pgmoneta_copy_string(prom_metric->type != NULL ? prom_metric->type : "gauge", &metric->type);
+   pgmoneta_copy_string(prom_metric->help != NULL ? prom_metric->help : "", &metric->help);
    metric->value = 0.0;
    metric->server = NULL;
    metric->label_count = 0;
@@ -1451,11 +1449,11 @@ extract_labels_from_prometheus_attrs(struct prometheus_attributes* attrs, struct
       if (pgmoneta_compare_string(attr->key, "server") || pgmoneta_compare_string(attr->key, "name"))
       {
          free(metric->server);
-         metric->server = strdup(attr->value);
+         pgmoneta_copy_string(attr->value, &metric->server);
       }
 
-      metric->labels[label_idx].key = strdup(attr->key);
-      metric->labels[label_idx].value = strdup(attr->value);
+      pgmoneta_copy_string(attr->key, &metric->labels[label_idx].key);
+      pgmoneta_copy_string(attr->value, &metric->labels[label_idx].value);
 
       if (metric->labels[label_idx].key != NULL && metric->labels[label_idx].value != NULL)
       {
@@ -1519,8 +1517,7 @@ add_or_increment_prefix(struct prefix_count** counts, int* size, int* capacity, 
          *counts = resized;
       }
 
-      (*counts)[*size].prefix = strdup(prefix);
-      if ((*counts)[*size].prefix == NULL)
+      if (!pgmoneta_copy_string(prefix, &(*counts)[*size].prefix))
       {
          return 1;
       }
@@ -1638,8 +1635,7 @@ build_category_candidates(struct prefix_count* counts, int size, struct category
             cands = resized;
          }
 
-         cands[count].prefix = strdup(counts[i].prefix);
-         if (cands[count].prefix == NULL)
+         if (!pgmoneta_copy_string(counts[i].prefix, &cands[count].prefix))
          {
             pgmoneta_log_error("Failed to allocate prefix string");
             status = 1;
@@ -1744,7 +1740,7 @@ select_global_categories(struct category_candidate* candidates, int candidate_co
             selected = resized;
          }
 
-         selected[count] = strdup(candidates[i].prefix);
+         pgmoneta_copy_string(candidates[i].prefix, &selected[count]);
          count++;
       }
    }
@@ -1783,7 +1779,9 @@ find_best_category(const char* metric_name, char** categories, int category_coun
       }
    }
 
-   return best != NULL ? strdup(best) : NULL;
+   char* result = NULL;
+   pgmoneta_copy_string(best, &result);
+   return result;
 }
 
 /**
@@ -1944,8 +1942,7 @@ collect_simple_label_columns(struct console_category* category, char*** label_ke
             }
 
             keys = resized;
-            keys[count] = strdup(key);
-            if (keys[count] == NULL)
+            if (!pgmoneta_copy_string(key, &keys[count]))
             {
                goto error;
             }
@@ -2006,7 +2003,9 @@ generate_category_tabs(struct console_page* console)
 
    if (console == NULL || console->category_count == 0)
    {
-      return strdup("<p>No metrics available</p>\n");
+      char* empty = NULL;
+      pgmoneta_copy_string("<p>No metrics available</p>\n", &empty);
+      return empty;
    }
 
    tabs_html = pgmoneta_append(tabs_html,

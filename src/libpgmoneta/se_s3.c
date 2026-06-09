@@ -2807,7 +2807,7 @@ xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuation_t
       char* val = (char*)pgmoneta_deque_peek(token_values, NULL);
       if (val != NULL)
       {
-         *continuation_token = strdup(val);
+         pgmoneta_copy_string(val, continuation_token);
       }
    }
 

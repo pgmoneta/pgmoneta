@@ -2167,3 +2167,31 @@ cleanup:
    pgmoneta_test_teardown();
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_utils_copy_string)
+{
+   char* dest = NULL;
+
+   MCTF_ASSERT(pgmoneta_copy_string("hello", &dest), cleanup, "copy_string basic failed");
+   MCTF_ASSERT_PTR_NONNULL(dest, cleanup, "dest should not be NULL");
+   MCTF_ASSERT_STR_EQ(dest, "hello", cleanup, "copy_string content mismatch");
+   free(dest);
+   dest = NULL;
+
+   MCTF_ASSERT(pgmoneta_copy_string("", &dest), cleanup, "copy_string empty failed");
+   MCTF_ASSERT_PTR_NONNULL(dest, cleanup, "dest should not be NULL for empty string");
+   MCTF_ASSERT_STR_EQ(dest, "", cleanup, "copy_string empty content mismatch");
+   free(dest);
+   dest = NULL;
+
+   MCTF_ASSERT(!pgmoneta_copy_string(NULL, &dest), cleanup, "copy_string NULL should return false");
+   MCTF_ASSERT_PTR_NULL(dest, cleanup, "dest should remain NULL for NULL input");
+
+cleanup:
+   if (dest != NULL)
+   {
+      free(dest);
+      dest = NULL;
+   }
+   MCTF_FINISH();
+}

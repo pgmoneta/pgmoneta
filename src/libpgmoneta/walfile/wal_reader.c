@@ -196,8 +196,7 @@ pgmoneta_validate_wal_filename(char* path, char** base_filename, xlog_seg_no* se
    xlog_seg_no test_logSegNo = 0;
    int seg_size = (wal_size > 0) ? wal_size : DEFAULT_WAL_SEGZ_BYTES;
 
-   wal_filename = strdup(basename(path));
-   if (wal_filename == NULL)
+   if (!pgmoneta_copy_string(basename(path), &wal_filename))
    {
       return 1;
    }
@@ -1244,7 +1243,7 @@ enhance_description(char* record_desc, uint8_t rmid, uint8_t info)
                operation_desc = pgmoneta_format_and_append(NULL, "INPLACE %s", record_desc);
                break;
             default:
-               operation_desc = strdup(record_desc);
+               pgmoneta_copy_string(record_desc, &operation_desc);
                break;
          }
          break;
@@ -1270,7 +1269,7 @@ enhance_description(char* record_desc, uint8_t rmid, uint8_t info)
                operation_desc = pgmoneta_format_and_append(NULL, "DELETE %s", record_desc);
                break;
             default:
-               operation_desc = strdup(record_desc);
+               pgmoneta_copy_string(record_desc, &operation_desc);
                break;
          }
          break;
@@ -1296,7 +1295,7 @@ enhance_description(char* record_desc, uint8_t rmid, uint8_t info)
                operation_desc = pgmoneta_format_and_append(NULL, "ABORT_PREPARED %s", record_desc);
                break;
             default:
-               operation_desc = strdup(record_desc);
+               pgmoneta_copy_string(record_desc, &operation_desc);
                break;
          }
          break;
@@ -1313,7 +1312,7 @@ enhance_description(char* record_desc, uint8_t rmid, uint8_t info)
                operation_desc = pgmoneta_format_and_append(NULL, "RUNNING_XACTS %s", record_desc);
                break;
             default:
-               operation_desc = strdup(record_desc);
+               pgmoneta_copy_string(record_desc, &operation_desc);
                break;
          }
          break;
@@ -1363,14 +1362,14 @@ enhance_description(char* record_desc, uint8_t rmid, uint8_t info)
                operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_REDO %s", record_desc);
                break;
             default:
-               operation_desc = strdup(record_desc);
+               pgmoneta_copy_string(record_desc, &operation_desc);
                break;
          }
          break;
       }
       default:
          // For other resource managers, just use the original description
-         operation_desc = strdup(record_desc);
+         pgmoneta_copy_string(record_desc, &operation_desc);
          break;
    }
 

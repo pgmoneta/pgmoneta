@@ -1982,7 +1982,7 @@ sasl_prep(char* password, char** password_prep)
       goto error;
    }
 
-   *password_prep = strdup(password);
+   pgmoneta_copy_string(password, password_prep);
    return 0;
 
 error:

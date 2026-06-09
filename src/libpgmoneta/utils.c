@@ -207,7 +207,7 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
 
    if (*database == NULL)
    {
-      *database = *username;
+      pgmoneta_copy_string(*username, database);
    }
 
    pgmoneta_log_trace("Username: %s", *username);
@@ -604,6 +604,26 @@ pgmoneta_compare_string(const char* str1, const char* str2)
       return false;
    }
    return strcmp(str1, str2) == 0;
+}
+
+bool
+pgmoneta_copy_string(const char* from, char** to)
+{
+   if (from == NULL)
+   {
+      return false;
+   }
+
+   size_t size = strlen(from) + 1;
+
+   *to = malloc(size);
+   if (*to == NULL)
+   {
+      return false;
+   }
+
+   memcpy(*to, from, size);
+   return true;
 }
 
 void
@@ -1874,7 +1894,7 @@ pgmoneta_calculate_wal_size(char* directory, char* start)
       }
       else
       {
-         basename = strdup(filename);
+         pgmoneta_copy_string(filename, &basename);
       }
 
       if (pgmoneta_is_compressed(basename))
@@ -2618,8 +2638,8 @@ do_copy_file(struct worker_common* wc)
       /* In auto mode, pre-check O_DIRECT support to avoid unnecessary attempts */
       if (config->direct_io == DIRECT_IO_AUTO)
       {
-         char* from_copy = strdup(from);
-         if (from_copy != NULL)
+         char* from_copy = NULL;
+         if (pgmoneta_copy_string(from, &from_copy))
          {
             char* test_dir = dirname(from_copy);
             if (!pgmoneta_direct_io_supported(test_dir))
@@ -2711,8 +2731,8 @@ do_copy_file(struct worker_common* wc)
       goto error;
    }
 
-   to = strdup(fi->to);
-   dn = strdup(dirname(fi->to));
+   pgmoneta_copy_string(fi->to, &to);
+   pgmoneta_copy_string(dirname(fi->to), &dn);
 
    if (pgmoneta_mkdir(dn))
    {
@@ -3144,7 +3164,9 @@ pgmoneta_symlink_at_file(char* from, char* to)
    char* ret_path;
    char absolute_path[MAX_PATH];
 
-   dir_path = dirname(strdup(from));
+   char* from_copy = NULL;
+   pgmoneta_copy_string(from, &from_copy);
+   dir_path = dirname(from_copy);
 #ifndef HAVE_OSX
    dirfd = open(dir_path, O_DIRECTORY | O_NOFOLLOW);
 #elif defined(HAVE_OPENBSD)
@@ -4911,7 +4933,7 @@ int
 pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
 {
    char delim_str[2] = {delimiter, '\0'};
-   char* temp = strdup(string);
+   char* temp = NULL;
    char** temp_results = NULL;
    int num_objects = 0;
    char* token = NULL;
@@ -4919,7 +4941,13 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
    *results = NULL;
    *count = 0;
 
-   if (!string || !results || !count || !temp)
+   if (!string || !results || !count)
+   {
+      goto error;
+   }
+
+   pgmoneta_copy_string(string, &temp);
+   if (!temp)
    {
       goto error;
    }
@@ -4951,7 +4979,8 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
    }
 
    free(temp);
-   temp = strdup(string);
+   temp = NULL;
+   pgmoneta_copy_string(string, &temp);
    if (!temp)
    {
       free(temp_results);
@@ -4961,7 +4990,7 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
    token = strtok(temp, delim_str);
    for (int i = 0; i < num_objects; i++)
    {
-      temp_results[i] = strdup(token);
+      pgmoneta_copy_string(token, &temp_results[i]);
       if (!temp_results[i])
       {
          goto error;
@@ -5027,7 +5056,7 @@ pgmoneta_merge_string_arrays(char** lists[], char*** out_list)
    {
       for (char** str = *current; *str; str++)
       {
-         merged[index] = strdup(*str);
+         pgmoneta_copy_string(*str, &merged[index]);
          if (!merged[index])
          {
             for (int i = 0; i < index; i++)
@@ -5535,8 +5564,8 @@ pgmoneta_get_parent_dir(const char* path)
       return NULL;
    }
 
-   char* parent_dir = strdup(path);
-   if (parent_dir == NULL)
+   char* parent_dir = NULL;
+   if (!pgmoneta_copy_string(path, &parent_dir))
    {
       return NULL;
    }
@@ -5555,7 +5584,7 @@ pgmoneta_get_parent_dir(const char* path)
    {
       // No slash found, return "."
       free(parent_dir);
-      parent_dir = strdup(".");
+      pgmoneta_copy_string(".", &parent_dir);
    }
 
    return parent_dir;
