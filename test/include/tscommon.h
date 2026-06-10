@@ -39,8 +39,9 @@ extern "C" {
 #include <stdbool.h>
 #include <openssl/ssl.h>
 
-#define PRIMARY_SERVER   0
-#define ENV_VAR_BASE_DIR "PGMONETA_TEST_BASE_DIR"
+#define PRIMARY_SERVER               0
+#define ENV_VAR_BASE_DIR             "PGMONETA_TEST_BASE_DIR"
+#define RESTORED_BACKUP_DEFAULT_PORT 15432
 
 extern char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 extern char TEST_RESTORE_DIR[MAX_PATH];
@@ -102,17 +103,12 @@ pgmoneta_test_teardown(void);
 
 /**
  * Snapshot the current shared-memory configuration.
- * Call this at the start of a test (or in MCTF_TEST_SETUP) to preserve
- * the original config before a test modifies it.
  */
 void
 pgmoneta_test_config_save(void);
 
 /**
- * Restore the shared-memory configuration from the last snapshot taken
- * by pgmoneta_test_config_save().
- * Call this at the end of a test (or in MCTF_TEST_TEARDOWN) to roll back
- * any changes made during the test.
+ * Restore the shared-memory configuration from the last snapshot.
  */
 void
 pgmoneta_test_config_restore(void);
@@ -155,7 +151,6 @@ pgmoneta_test_connect_user(SSL** ssl, int* socket);
 
 /**
  * Resolve an executable path under build/src from a test process.
- * Example: "pgmoneta-walinfo" -> ".../build/src/pgmoneta-walinfo"
  * @param binary_name The executable name
  * @param out Output path buffer (MAX_PATH bytes)
  * @return 0 on success, otherwise 1
@@ -174,9 +169,24 @@ int
 pgmoneta_test_exec_command(const char* command, char** output, int* exit_code);
 
 /**
+ * Start a PostgreSQL server from a restored backup directory.
+ * Ensures required subdirectories exist, updates pg_hba.conf for trust auth,
+ * and waits for pg_isready to succeed.
+ * @param restore_dir Path to restored PGDATA directory
+ * @param port Host port to map to container 5432 (<=0 uses RESTORED_BACKUP_DEFAULT_PORT)
+ * @return The port on success, otherwise -1
+ */
+int
+start_restored_backup(const char* restore_dir, int port);
+
+/**
+ * Stop and remove the restored backup container, ignoring errors.
+ */
+void
+stop_restored_backup(void);
+
+/**
  * Load a configuration file into shared memory.
- * Resets the configuration, calls pgmoneta_init_main_configuration(),
- * then reads the file with pgmoneta_read_main_configuration().
  * @param conf_path Path to the .conf file
  * @return 0 on success, otherwise 1
  */
@@ -197,9 +207,6 @@ struct test_encryption_env
 
 /**
  * Set up a mock encryption environment for testing.
- * Creates a temporary HOME directory with a .pgmoneta/master.key,
- * sets encryption to AES-256-GCM, and initialises the master salt.
- * Allocates shared memory if shmem is NULL.
  * @param env [out] Environment state (caller provides storage)
  * @return 0 on success, otherwise 1
  */
@@ -208,8 +215,6 @@ pgmoneta_test_setup_encryption_env(struct test_encryption_env* env);
 
 /**
  * Tear down a mock encryption environment.
- * Restores HOME, config home_dir, encryption mode, and removes
- * temporary files. Frees shared memory if it was locally allocated.
  * @param env The environment state from pgmoneta_test_setup_encryption_env()
  */
 void
