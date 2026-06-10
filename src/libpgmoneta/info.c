@@ -305,31 +305,41 @@ pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, c
 
       new_comments = pgmoneta_append(new_comments, backup->comments);
    }
-
-   d = pgmoneta_get_server(server);
-   d = pgmoneta_append(d, "backup/");
-
-   dir = pgmoneta_append(dir, d);
-   if (!pgmoneta_ends_with(dir, "/"))
+   else
    {
-      dir = pgmoneta_append(dir, "/");
-   }
+      d = pgmoneta_get_server(server);
+      d = pgmoneta_append(d, "backup/");
 
-   if (pgmoneta_load_info(dir, backup->label, &temp_backup))
-   {
-      pgmoneta_log_error("Unable to find backup in directory %s", dir);
-      goto error;
-   }
+      dir = pgmoneta_append(dir, d);
+      if (!pgmoneta_ends_with(dir, "/"))
+      {
+         dir = pgmoneta_append(dir, "/");
+      }
 
-   pgmoneta_snprintf(temp_backup->comments, sizeof(temp_backup->comments), "%s", new_comments);
-   if (pgmoneta_save_info(dir, temp_backup))
-   {
-      pgmoneta_log_error("Unable to save backup info for directory %s", dir);
-      goto error;
-   }
+      if (pgmoneta_load_info(dir, backup->label, &temp_backup))
+      {
+         pgmoneta_log_error("Unable to find backup in directory %s", dir);
+         goto error;
+      }
 
-   memset(backup->comments, 0, sizeof(backup->comments));
-   memcpy(backup->comments, new_comments, strlen(new_comments));
+      memset(backup->comments, 0, sizeof(backup->comments));
+      if (new_comments != NULL)
+      {
+         pgmoneta_snprintf(temp_backup->comments, sizeof(temp_backup->comments), "%s", new_comments);
+         memcpy(backup->comments, new_comments, strlen(new_comments));
+      }
+      else
+      {
+         pgmoneta_snprintf(temp_backup->comments, sizeof(temp_backup->comments), "%s", "");
+         memcpy(backup->comments, "", strlen(""));
+      }
+
+      if (pgmoneta_save_info(dir, temp_backup))
+      {
+         pgmoneta_log_error("Unable to save backup info for directory %s", dir);
+         goto error;
+      }
+   }
    free(temp_backup);
    free(d);
    free(dir);
