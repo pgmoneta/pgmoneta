@@ -166,3 +166,99 @@ cleanup:
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_pgmoneta_hot_standby_incremental)
+{
+   char standby_dir[MAX_PATH];
+   char pg_version_file[MAX_PATH];
+   int found_files = 0;
+   struct json* response = NULL;
+   int num_backups = 0;
+   struct json* b0 = NULL;
+   struct json* b1 = NULL;
+   struct json* b2 = NULL;
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup, "backup chain failed during setup - check server is online and backup configuration");
+
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
+
+   num_backups = pgmoneta_tsclient_get_backup_count(response);
+   MCTF_ASSERT_INT_EQ(num_backups, 3, cleanup, "backup count mismatch");
+
+   b0 = pgmoneta_tsclient_get_backup(response, 0);
+   b1 = pgmoneta_tsclient_get_backup(response, 1);
+   b2 = pgmoneta_tsclient_get_backup(response, 2);
+
+   MCTF_ASSERT_PTR_NONNULL(b0, cleanup, "backup 0 null");
+   MCTF_ASSERT_PTR_NONNULL(b1, cleanup, "backup 1 null");
+   MCTF_ASSERT_PTR_NONNULL(b2, cleanup, "backup 2 null");
+
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b0), "FULL", cleanup, "backup 0 type mismatch");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b1), "INCREMENTAL", cleanup, "backup 1 type mismatch");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b2), "INCREMENTAL", cleanup, "backup 2 type mismatch");
+
+   pgmoneta_snprintf(standby_dir, sizeof(standby_dir), "%s/primary", TEST_HOT_STANDBY_DIR);
+   MCTF_ASSERT(pgmoneta_exists(standby_dir), cleanup, "hot standby directory does not exist after incremental chain: %s", standby_dir);
+
+   pgmoneta_snprintf(pg_version_file, sizeof(pg_version_file), "%s/PG_VERSION", standby_dir);
+   MCTF_ASSERT(pgmoneta_exists(pg_version_file), cleanup, "PG_VERSION file missing in hot standby after incremental chain");
+
+   MCTF_ASSERT(check_files_recursive(standby_dir, &found_files) == 0, cleanup, "Found encrypted or compressed files in hot standby (incremental)");
+   MCTF_ASSERT(found_files > 0, cleanup, "No files found in hot standby directory (incremental)");
+
+cleanup:
+   if (response != NULL)
+   {
+      pgmoneta_json_destroy(response);
+   }
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_hot_standby_incremental_overrides)
+{
+   char overrides_dir[MAX_PATH];
+   char override_src[MAX_PATH];
+   char override_dst[MAX_PATH];
+   char standby_dir[MAX_PATH];
+   int found_files = 0;
+   FILE* f = NULL;
+
+   pgmoneta_test_setup();
+
+   /* Prepare overrides source directory and file */
+   pgmoneta_snprintf(overrides_dir, sizeof(overrides_dir), "%s/overrides", TEST_HOT_STANDBY_DIR);
+   pgmoneta_mkdir(overrides_dir);
+
+   pgmoneta_snprintf(override_src, sizeof(override_src), "%s/override_marker_inc.txt", overrides_dir);
+   f = fopen(override_src, "w");
+   MCTF_ASSERT(f != NULL, cleanup, "Failed to create override source file: %s", override_src);
+   fprintf(f, "hot-standby-incremental-override");
+   fclose(f);
+   f = NULL;
+
+   /* Create a backup chain which should trigger hot_standby and overrides handling */
+   MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup, "backup chain failed during setup - check server is online and backup configuration");
+
+   /* Standby destination for the primary server */
+   pgmoneta_snprintf(standby_dir, sizeof(standby_dir), "%s/primary", TEST_HOT_STANDBY_DIR);
+   MCTF_ASSERT(pgmoneta_exists(standby_dir), cleanup, "hot standby directory does not exist after incremental chain with overrides: %s", standby_dir);
+
+   /* The override file should have been copied into the standby destination */
+   pgmoneta_snprintf(override_dst, sizeof(override_dst), "%s/override_marker_inc.txt", standby_dir);
+   MCTF_ASSERT(pgmoneta_exists(override_dst), cleanup, "override file missing in hot standby (incremental): %s", override_dst);
+
+   /* Ensure there are no encrypted or compressed files in the final standby layout */
+   MCTF_ASSERT(check_files_recursive(standby_dir, &found_files) == 0, cleanup, "Found encrypted or compressed files in hot standby (incremental overrides)");
+   MCTF_ASSERT(found_files > 0, cleanup, "No files found in hot standby directory (incremental overrides)");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
