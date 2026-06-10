@@ -81,7 +81,7 @@ pgmoneta_tswalinfo_describe(char* path, char** output)
    {
       record = (struct decoded_xlog_record*)record_iterator->value->data;
       pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, ValueString, out, false, false,
-                                  NULL, 0, 0, NULL, 0, NULL, &widths);
+                                  NULL, 0, 0, NULL, 0, NULL, &widths, wf->xid_ts_map);
    }
 
    pgmoneta_deque_iterator_destroy(record_iterator);

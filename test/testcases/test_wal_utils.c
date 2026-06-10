@@ -449,5 +449,11 @@ destroy_walfile(struct walfile* wf)
       wf->records = NULL;
    }
 
+   if (wf->xid_ts_map != NULL)
+   {
+      pgmoneta_xid_timestamp_map_destroy(wf->xid_ts_map);
+      wf->xid_ts_map = NULL;
+   }
+
    free(wf);
 }

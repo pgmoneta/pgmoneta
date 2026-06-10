@@ -49,6 +49,7 @@
 
 static int get_primary(SSL* ssl, int socket, bool* primary);
 static int get_wal_level(SSL* ssl, int socket, bool* replica);
+static int get_track_commit_timestamp(SSL* ssl, int socket, bool* enabled);
 static int get_wal_size(SSL* ssl, int socket, int* ws);
 static int get_checksums(SSL* ssl, int socket, bool* checksums);
 static int get_segment_size(SSL* ssl, int socket, size_t* segsz);
@@ -88,6 +89,7 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
    pgmoneta_server_set_online(srv, true);
    config->common.servers[srv].valid = false;
    config->common.servers[srv].checksums = false;
+   config->common.servers[srv].track_commit_timestamp = false;
 
    if (pgmoneta_extract_server_parameters(&server_parameters))
    {
@@ -127,6 +129,17 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
    }
 
    pgmoneta_log_debug("%s/wal_level %s", config->common.servers[srv].name, config->common.servers[srv].valid ? "Yes" : "No");
+
+   if (get_track_commit_timestamp(ssl, socket, &config->common.servers[srv].track_commit_timestamp))
+   {
+      pgmoneta_log_fatal("Unable to determine track_commit_timestamp for %s; commit timestamp tracking is required", config->common.servers[srv].name);
+      exit(1);
+   }
+   else if (!config->common.servers[srv].track_commit_timestamp)
+   {
+      pgmoneta_log_fatal("Server %s has track_commit_timestamp disabled; commit timestamps are required for WAL transaction timestamp handling", config->common.servers[srv].name);
+      exit(1);
+   }
 
    if (get_checksums(ssl, socket, &checksums))
    {
@@ -1008,6 +1021,68 @@ q:
 error:
 
    pgmoneta_log_error("Error getting data_checksums");
+
+   pgmoneta_query_response_debug(response);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+static int
+get_track_commit_timestamp(SSL* ssl, int socket, bool* enabled)
+{
+   int q = 0;
+   int ret;
+   char track_commit_timestamp[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   *enabled = false;
+
+   ret = pgmoneta_create_query_message("SHOW track_commit_timestamp;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&track_commit_timestamp[0], 0, sizeof(track_commit_timestamp));
+   pgmoneta_snprintf(&track_commit_timestamp[0], sizeof(track_commit_timestamp), "%s", response->tuples->data[0]);
+
+   if (!strcmp("on", track_commit_timestamp))
+   {
+      *enabled = true;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+
+   pgmoneta_log_error("Error getting track_commit_timestamp");
 
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
