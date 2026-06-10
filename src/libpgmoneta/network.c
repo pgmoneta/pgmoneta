@@ -241,7 +241,7 @@ pgmoneta_connect(char* hostname, int port, int* fd)
    config = (struct main_configuration*)shmem;
 
    memset(&sport, 0, sizeof(sport));
-   sprintf(&sport[0], "%d", port);
+   pgmoneta_snprintf(&sport[0], sizeof(sport), "%d", port);
 
    /* Connect to server */
    memset(&hints, 0, sizeof hints);
