@@ -139,6 +139,15 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
   following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D'
   for days, and 'W' for weeks. Default is 0 (disabled) |
 
+**Health check**
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| health_check | off | Bool | No | Enable the periodic health check worker that probes each server with `SELECT 1` |
+| health_check_period | 30 | String | No | The interval between health check scans. If this value is specified without units, it is taken as seconds. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
+| health_check_timeout | 5 | String | No | The timeout for each health check probe. If this value is specified without units, it is taken as seconds. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
+| health_check_user | | String | No | The user used to connect to the database for health checks. **Mandatory when `health_check` is enabled.** The user must be present in `pgmoneta_users.conf`. |
+
 **Logging**
 
 | Property | Default | Unit | Required | Description |

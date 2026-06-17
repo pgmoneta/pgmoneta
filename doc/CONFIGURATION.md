@@ -77,6 +77,10 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | max_rate | 0 | Int | No | The maximum backup transfer rate in bytes per second. Use 0 to disable |
 | progress | off | Bool | No | Enable backup progress tracking |
 | verification | 0 | String | No | The time between verification of a backup. Setting this parameter to 0 disables verification. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
+| health_check | off | Bool | No | Enable the periodic health check worker that probes each server with `SELECT 1` |
+| health_check_period | 30 | String | No | The interval between health check scans. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
+| health_check_timeout | 5 | String | No | The timeout for each health check probe. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
+| health_check_user | | String | No | The user used to connect to the database for health checks. Mandatory when `health_check` is enabled. The user must be present in `pgmoneta_users.conf`. |
 | keep_alive | on | Bool | No | Have `SO_KEEPALIVE` on sockets |
 | nodelay | on | Bool | No | Have `TCP_NODELAY` on sockets |
 | non_blocking | on | Bool | No | Have `O_NONBLOCK` on sockets |

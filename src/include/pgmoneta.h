@@ -112,6 +112,21 @@ extern "C" {
 #define DIRECT_IO_AUTO               1
 #define DIRECT_IO_ON                 2
 
+#define SERVER_HEALTH_UNKNOWN        0
+#define SERVER_HEALTH_UP             1
+#define SERVER_HEALTH_DOWN           2
+
+#define HEALTH_CHECK_AUTH_UNKNOWN    0
+#define HEALTH_CHECK_AUTH_TRUST      1
+#define HEALTH_CHECK_AUTH_SCRAM      3
+#define HEALTH_CHECK_AUTH_ERROR      4
+
+#define HEALTH_CHECK_MAX_RETRIES     3
+#define HEALTH_CHECK_MIN_INTERVAL    1
+
+#define DEFAULT_HEALTH_CHECK_PERIOD  30
+#define DEFAULT_HEALTH_CHECK_TIMEOUT 5
+
 // clang-format on
 /* Compression type bits */
 #define COMPRESSION_TYPE_CLIENT 0x10
@@ -307,6 +322,9 @@ struct server
    char username[MAX_USERNAME_LENGTH];                            /**< The user name */
    char wal_slot[MISC_LENGTH];                                    /**< The WAL slot name */
    bool online;                                                   /**< Is the server online ? */
+   atomic_schar health_state;                                     /**< The health state of the server (UNKNOWN/UP/DOWN) */
+   atomic_schar auth_type;                                        /**< The authentication type used for the last health check */
+   int failures;                                                  /**< Consecutive health check failures */
    char current_wal_filename[MISC_LENGTH];                        /**< The current WAL filename*/
    char current_wal_lsn[MISC_LENGTH];                             /**< The current WAL log sequence number*/
    char follow[MISC_LENGTH];                                      /**< Follow a server */
@@ -515,6 +533,12 @@ struct main_configuration
    pgmoneta_time_t verification; /**< The sha512 verification interval */
 
    bool progress; /**< Enable backup progress tracking */
+
+   bool health_check;                           /**< Is the periodic health check enabled */
+   pgmoneta_time_t health_check_period;         /**< The interval between health check scans */
+   pgmoneta_time_t health_check_timeout;        /**< The timeout for each health check probe */
+   char health_check_user[MAX_USERNAME_LENGTH]; /**< The user used for health check probes */
+   pid_t health_check_pid;                      /**< The health check worker PID */
 
 #ifdef DEBUG
    bool link; /**< Do linking */

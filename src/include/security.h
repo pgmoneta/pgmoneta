@@ -66,6 +66,16 @@ int
 pgmoneta_server_authenticate(int server, char* database, char* username, char* password, bool replication, SSL** ssl, int* fd);
 
 /**
+ * Get the authentication method negotiated during the most recent server
+ * authentication, mapped to a HEALTH_CHECK_AUTH_* value. Used by the health
+ * check worker to label the authentication type per server.
+ * @return One of HEALTH_CHECK_AUTH_TRUST, HEALTH_CHECK_AUTH_SCRAM or
+ * HEALTH_CHECK_AUTH_UNKNOWN
+ */
+int
+pgmoneta_get_health_auth_type(void);
+
+/**
  * Authenticate a remote management user
  * @param client_fd The descriptor
  * @param address The client address

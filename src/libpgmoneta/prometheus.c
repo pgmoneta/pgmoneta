@@ -2330,6 +2330,50 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_online", data, NULL, NULL, 0);
    free(data);
    data = NULL;
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_health The health state of the server (0 = DOWN, 1 = UP, 2 = UNKNOWN)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_health gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      int health_state = atomic_load(&config->common.servers[i].health_state);
+      int health_auth = atomic_load(&config->common.servers[i].auth_type);
+      int state_val = 2; /* UNKNOWN */
+      char* auth_str = "unknown";
+
+      if (health_state == SERVER_HEALTH_UP)
+      {
+         state_val = 1;
+      }
+      else if (health_state == SERVER_HEALTH_DOWN)
+      {
+         state_val = 0;
+      }
+
+      if (health_auth == HEALTH_CHECK_AUTH_TRUST)
+      {
+         auth_str = "trust";
+      }
+      else if (health_auth == HEALTH_CHECK_AUTH_SCRAM)
+      {
+         auth_str = "scram-sha-256";
+      }
+      else if (health_auth == HEALTH_CHECK_AUTH_ERROR)
+      {
+         auth_str = "error";
+      }
+
+      data = pgmoneta_append(data, "pgmoneta_server_health{name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\",auth=\"");
+      data = pgmoneta_append(data, auth_str);
+      data = pgmoneta_append(data, "\"} ");
+      data = pgmoneta_append_int(data, state_val);
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_health", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_primary Is the server a primary\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_primary gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
