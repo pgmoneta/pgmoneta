@@ -202,7 +202,7 @@ calculate_fallback_weights(int workflow_type, int* phases, int n_phases, int* we
          /* TODO: Implement fallback weights for archive */
          break;
       case WORKFLOW_TYPE_VERIFY:
-         /* TODO: Implement fallback weights for verify */
+         weights[0] = 100;
          break;
       case WORKFLOW_TYPE_S3_LIST:
          weights[0] = 100;
@@ -310,7 +310,7 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
          /* TODO: Implement adaptive/fallback weights for archive */
          break;
       case WORKFLOW_TYPE_VERIFY:
-         /* TODO: Implement adaptive/fallback weights for verify */
+         calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
       case WORKFLOW_TYPE_S3_LIST:
       case WORKFLOW_TYPE_S3_RESTORE:

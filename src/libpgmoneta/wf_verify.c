@@ -31,6 +31,8 @@
 #include <csv.h>
 #include <logging.h>
 #include <management.h>
+#include <manifest.h>
+#include <progress.h>
 #include <security.h>
 #include <utils.h>
 #include <value.h>
@@ -116,6 +118,18 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
    manifest_file = pgmoneta_append(manifest_file, "/");
    manifest_file = pgmoneta_append(manifest_file, "backup.manifest");
 
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      struct deque* manifest_paths = NULL;
+
+      if (pgmoneta_manifest_get_paths(manifest_file, &manifest_paths))
+      {
+         pgmoneta_log_error("Verify: Unable to get manifest paths for progress tracking: %s", manifest_file);
+         goto error;
+      }
+      pgmoneta_progress_set_total(server, pgmoneta_deque_size(manifest_paths));
+      pgmoneta_deque_destroy(manifest_paths);
+   }
    if (pgmoneta_deque_create(true, &failed_deque))
    {
       goto error;
@@ -171,7 +185,7 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
          goto error;
       }
 
-      if (pgmoneta_create_worker_input(NULL, NULL, NULL, -1, workers, &payload))
+      if (pgmoneta_create_worker_input(NULL, NULL, NULL, server, workers, &payload))
       {
          goto error;
       }
@@ -307,6 +321,11 @@ do_verify(struct worker_common* wc)
       pgmoneta_json_destroy(j);
    }
 
+   if (pgmoneta_is_progress_enabled(wi->level))
+   {
+      pgmoneta_progress_increment(wi->level, 1);
+   }
+
    wi->data = NULL;
    wi->failed = NULL;
    wi->all = NULL;
@@ -321,6 +340,11 @@ error:
    pgmoneta_log_error("Unable to calculate hash for %s", f);
 
    pgmoneta_json_destroy(wi->data);
+
+   if (pgmoneta_is_progress_enabled(wi->level))
+   {
+      pgmoneta_progress_increment(wi->level, 1);
+   }
 
    wi->data = NULL;
    wi->failed = NULL;
