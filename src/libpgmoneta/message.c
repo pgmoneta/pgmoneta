@@ -85,6 +85,105 @@ pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
    return ssl_read_message(ssl, 0, msg);
 }
 
+static int
+read_append(SSL* ssl, int socket, struct message* m, size_t needed)
+{
+   ssize_t numbytes;
+
+   while ((size_t)m->length < needed)
+   {
+      if (ssl != NULL)
+      {
+         numbytes = SSL_read(ssl, (char*)m->data + m->length, DEFAULT_BUFFER_SIZE - m->length);
+
+         if (numbytes <= 0)
+         {
+            int err = SSL_get_error(ssl, numbytes);
+            ERR_clear_error();
+
+            switch (err)
+            {
+               case SSL_ERROR_WANT_READ:
+               case SSL_ERROR_WANT_WRITE:
+                  continue;
+               case SSL_ERROR_ZERO_RETURN:
+                  return MESSAGE_STATUS_ZERO;
+               default:
+                  return MESSAGE_STATUS_ERROR;
+            }
+         }
+      }
+      else
+      {
+         numbytes = read(socket, (char*)m->data + m->length, DEFAULT_BUFFER_SIZE - m->length);
+
+         if (numbytes == 0)
+         {
+            return MESSAGE_STATUS_ZERO;
+         }
+         else if (numbytes < 0)
+         {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+               errno = 0;
+               continue;
+            }
+
+            pgmoneta_log_error("read error: fd=%d errno=%d", socket, errno);
+            errno = 0;
+            return MESSAGE_STATUS_ERROR;
+         }
+      }
+
+      m->length += numbytes;
+   }
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_read_complete_message(SSL* ssl, int socket, struct message** msg)
+{
+   int status;
+   int32_t length;
+   size_t total;
+   struct message* m = NULL;
+
+   *msg = NULL;
+
+   status = pgmoneta_read_block_message(ssl, socket, &m);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      return status;
+   }
+
+   /* kind (1 byte) + length (4 bytes, includes itself) */
+   status = read_append(ssl, socket, m, 5);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      return status;
+   }
+
+   length = pgmoneta_read_int32((char*)m->data + 1);
+   if (length < 4 || (size_t)length + 1 > DEFAULT_BUFFER_SIZE)
+   {
+      pgmoneta_log_error("Invalid message length: fd=%d kind=%c length=%d", socket, m->kind, length);
+      return MESSAGE_STATUS_ERROR;
+   }
+
+   total = (size_t)length + 1;
+
+   status = read_append(ssl, socket, m, total);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      return status;
+   }
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
 int
 pgmoneta_read_timeout_message(SSL* ssl, int socket, int timeout, struct message** msg)
 {
