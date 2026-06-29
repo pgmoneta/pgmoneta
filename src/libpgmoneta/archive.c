@@ -274,15 +274,13 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
    char null_buffer[2 * 512]; // 2 tar block size of terminator null bytes
    FILE* file = NULL;
    struct query_response* response = NULL;
-   struct message* msg = (struct message*)malloc(sizeof(struct message));
+   struct message* msg = NULL;
    struct tuple* tup = NULL;
    struct art* file_sizes = NULL;
    struct art* file_checksums = NULL;
 
    pgmoneta_art_create(&file_sizes);
    pgmoneta_art_create(&file_checksums);
-
-   memset(msg, 0, sizeof(struct message));
 
    // Receive the second result set
    if (pgmoneta_consume_data_row_messages(srv, ssl, socket, buffer, &response))
@@ -345,6 +343,16 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
          pgmoneta_log_error("Could not create archive tar file");
          goto error;
       }
+
+      msg = (struct message*)malloc(sizeof(struct message));
+      if (msg == NULL)
+      {
+         pgmoneta_log_error("Failed to allocate memory for msg");
+         goto error;
+      }
+
+      memset(msg, 0, sizeof(struct message));
+
       // get the copy out response
       while (msg != NULL && msg->kind != 'H')
       {
