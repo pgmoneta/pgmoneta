@@ -29,12 +29,15 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <http.h>
 #include <info.h>
 #include <logging.h>
 #include <mctf_container.h>
 #include <mctf_se.h>
+#include <security.h>
 #include <shmem.h>
 #include <tscommon.h>
+#include <utils.h>
 
 /* system */
 #include <signal.h>
@@ -56,13 +59,13 @@
  * driver below, and add one row to the table. Nothing else changes.
  */
 extern const struct mctf_se_driver mctf_garage_driver;
-/* extern const struct mctf_se_driver mctf_azurite_driver; */
-/* extern const struct mctf_se_driver mctf_ssh_driver;     */
+extern const struct mctf_se_driver mctf_azurite_driver;
+/* extern const struct mctf_se_driver mctf_ssh_driver; */
 
 static const struct mctf_se_driver* registry[] = {
-   [MCTF_BACKEND_GARAGE] = &mctf_garage_driver,
-   /* [MCTF_BACKEND_AZURITE] = &mctf_azurite_driver, */
-   /* [MCTF_BACKEND_SSH]     = &mctf_ssh_driver,     */
+   [MCTF_BACKEND_GARAGE]  = &mctf_garage_driver,
+   [MCTF_BACKEND_AZURITE] = &mctf_azurite_driver,
+   /* [MCTF_BACKEND_SSH] = &mctf_ssh_driver, */
 };
 
 /* Managed-instance state (single active backend). */
@@ -118,6 +121,14 @@ write_confs(void)
    fprintf(f, "unix_socket_dir = %s/\n", sock_dir);
    fprintf(f, "pidfile = %s/pgmoneta.pid\n", run_dir);
    fprintf(f, "workspace = %s/workspace\n", run_dir);
+   if (storage.driver->write_global_conf != NULL)
+   {
+      if (storage.driver->write_global_conf(&storage, f) != MCTF_OK)
+      {
+         fclose(f);
+         return MCTF_FAIL;
+      }
+   }
    fprintf(f, "\n");
    fprintf(f, "[primary]\n");
    fprintf(f, "host = %s\n", primary->host);
@@ -125,10 +136,13 @@ write_confs(void)
    fprintf(f, "user = %s\n", primary->username);
    fprintf(f, "wal_slot = mctf_se\n");
    fprintf(f, "create_slot = yes\n");
-   if (storage.driver->write_server_conf(&storage, f) != MCTF_OK)
+   if (storage.driver->write_server_conf != NULL)
    {
-      fclose(f);
-      return MCTF_FAIL;
+      if (storage.driver->write_server_conf(&storage, f) != MCTF_OK)
+      {
+         fclose(f);
+         return MCTF_FAIL;
+      }
    }
    fclose(f);
 
@@ -414,4 +428,134 @@ const struct mctf_se*
 mctf_se_context(void)
 {
    return storage_active ? &storage : NULL;
+}
+
+int
+mctf_se_azure_blob_count(void)
+{
+   const struct mctf_se* ctx = mctf_se_context();
+   char utc_date[UTC_TIME_LENGTH];
+   char* string_to_sign = NULL;
+   char* signing_key = NULL;
+   char* base64_signature = NULL;
+   size_t base64_signature_length = 0;
+   char* auth_value = NULL;
+   unsigned char* signature_hmac = NULL;
+   int hmac_length = 0;
+   size_t signing_key_length = 0;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   char request_path[512];
+   char* body = NULL;
+   char* p = NULL;
+   int count = -1;
+
+   if (ctx == NULL || ctx->driver == NULL)
+   {
+      goto done;
+   }
+
+   memset(utc_date, 0, sizeof(utc_date));
+   if (pgmoneta_get_timestamp_UTC_format(utc_date))
+   {
+      goto done;
+   }
+
+   /*
+    * Canonical string for Azurite list-blobs (GET).
+    * Content-Length is empty (not "0") for GET requests.
+    * Canonical resource uses the account name twice for path-style URLs:
+    *   /{account}/{account}/{container}\ncomp:list\nrestype:container
+    */
+   string_to_sign = pgmoneta_append(string_to_sign, "GET\n\n\n\n\n\n\n\n\n\n\n\n");
+   string_to_sign = pgmoneta_append(string_to_sign, "x-ms-date:");
+   string_to_sign = pgmoneta_append(string_to_sign, utc_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:2020-08-04\n/");
+   string_to_sign = pgmoneta_append(string_to_sign, ctx->access_key);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, ctx->access_key);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, ctx->bucket);
+   string_to_sign = pgmoneta_append(string_to_sign, "\ncomp:list\nrestype:container");
+
+   if (pgmoneta_base64_decode((char*)ctx->secret_key, strlen(ctx->secret_key), (void**)&signing_key, &signing_key_length))
+   {
+      goto done;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash(signing_key, (int)signing_key_length,
+                                                  string_to_sign, strlen(string_to_sign),
+                                                  &signature_hmac, &hmac_length))
+   {
+      goto done;
+   }
+
+   if (pgmoneta_base64_encode((char*)signature_hmac, hmac_length, &base64_signature, &base64_signature_length))
+   {
+      goto done;
+   }
+
+   auth_value = pgmoneta_append(auth_value, "SharedKey ");
+   auth_value = pgmoneta_append(auth_value, ctx->access_key);
+   auth_value = pgmoneta_append(auth_value, ":");
+   auth_value = pgmoneta_append(auth_value, base64_signature);
+
+   if (pgmoneta_http_create((char*)ctx->endpoint, ctx->port, ctx->use_tls, &connection))
+   {
+      goto done;
+   }
+
+   pgmoneta_snprintf(request_path, sizeof(request_path),
+                     "/%s/%s?restype=container&comp=list",
+                     ctx->access_key, ctx->bucket);
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_GET, request_path, &request))
+   {
+      goto done;
+   }
+
+   pgmoneta_http_request_add_header(request, "x-ms-date", utc_date);
+   pgmoneta_http_request_add_header(request, "x-ms-version", "2020-08-04");
+   pgmoneta_http_request_add_header(request, "Authorization", auth_value);
+
+   if (pgmoneta_http_invoke(connection, request, &response))
+   {
+      goto done;
+   }
+
+   if (response == NULL || response->status_code != 200 || response->payload.data_size == 0)
+   {
+      goto done;
+   }
+
+   /* Count <Blob> tags in the XML response to determine how many blobs exist. */
+   body = malloc(response->payload.data_size + 1);
+   if (body == NULL)
+   {
+      goto done;
+   }
+   memcpy(body, response->payload.data, response->payload.data_size);
+   body[response->payload.data_size] = '\0';
+
+   count = 0;
+   p = body;
+   while ((p = strstr(p, "<Blob>")) != NULL)
+   {
+      count++;
+      p += 6;
+   }
+
+done:
+   free(body);
+   free(string_to_sign);
+   free(signing_key);
+   free(base64_signature);
+   free(auth_value);
+   free(signature_hmac);
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+
+   return count;
 }

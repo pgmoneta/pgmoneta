@@ -46,11 +46,17 @@
 #define GARAGE_READY_CMD     "/garage -c /etc/garage.toml status"
 #define GARAGE_READY_RETRIES 30
 
+/* Azurite (Azure Blob Storage emulator) container definition. */
+#define AZURITE_IMAGE         "mcr.microsoft.com/azure-storage/azurite"
+#define AZURITE_BLOB_PORT     10000
+#define AZURITE_READY_RETRIES 30
+
 /* Image-pull retry policy (transient registry failures). */
 #define PULL_RETRIES         3
 #define PULL_BACKOFF_SECONDS 2
 
 static int start_garage(struct mctf_container* c);
+static int start_azurite(struct mctf_container* c);
 
 int
 mctf_sh(char** output, const char* fmt, ...)
@@ -248,11 +254,53 @@ mctf_container_start(struct mctf_container* c, enum mctf_container_kind kind)
    {
       case MCTF_CONTAINER_GARAGE:
          return start_garage(c);
-      /* TODO: add cases for new container kinds as backends land */
+      case MCTF_CONTAINER_AZURITE:
+         return start_azurite(c);
       default:
          pgmoneta_log_error("mctf_container: unknown kind %d", (int)kind);
          return MCTF_FAIL;
    }
+}
+
+static int
+start_azurite(struct mctf_container* c)
+{
+   char name[128];
+   int i;
+
+   snprintf(name, sizeof(name), "pgmoneta-mctf-azurite-%d", (int)getpid());
+   snprintf(c->name, sizeof(c->name), "%s", name);
+
+   mctf_container_pull(c->engine, AZURITE_IMAGE, PULL_RETRIES);
+
+   /* Remove any stale container with the same name. */
+   mctf_sh(NULL, "%s rm -f %s 2>/dev/null", c->engine, name);
+
+   /* Start blob-only with --skipApiVersionCheck (modern SDK API versions). */
+   if (mctf_sh(NULL, "%s run -d --name %s --label %s --network host %s "
+               "azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck",
+               c->engine, name, MCTF_CONTAINER_LABEL, AZURITE_IMAGE) != 0)
+   {
+      pgmoneta_log_error("mctf_container: failed to start azurite");
+      return MCTF_FAIL;
+   }
+   c->running = true;
+
+   /* Wait until the blob port accepts TCP connections (checked from the host). */
+   for (i = 0; i < AZURITE_READY_RETRIES; i++)
+   {
+      if (mctf_sh(NULL, "python3 -c \""
+                  "import socket, sys; s=socket.socket(); s.settimeout(1); "
+                  "s.connect(('127.0.0.1', %d)); s.close()"
+                  "\" 2>/dev/null", AZURITE_BLOB_PORT) == 0)
+      {
+         return MCTF_OK;
+      }
+      sleep(1);
+   }
+
+   pgmoneta_log_error("mctf_container: azurite not ready after %d s", AZURITE_READY_RETRIES);
+   return MCTF_FAIL;
 }
 
 static int

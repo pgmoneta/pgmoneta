@@ -508,7 +508,9 @@ execute_testcases() {
    echo "Start running MCTF tests"
    if [[ -f "$TEST_DIRECTORY/pgmoneta-test" ]]; then
       TEST_FILTER_ARGS=()
-      if [[ -n "${TEST_FILTER:-}" ]]; then
+      if [[ "${INTEGRATION_MODE:-false}" == "true" ]]; then
+         TEST_FILTER_ARGS=(-i)
+      elif [[ -n "${TEST_FILTER:-}" ]]; then
          TEST_FILTER_ARGS=(-t "$TEST_FILTER")
       elif [[ -n "${MODULE_FILTER:-}" ]]; then
          TEST_FILTER_ARGS=(-m "$MODULE_FILTER")
@@ -535,11 +537,17 @@ usage() {
    echo "Options (run tests with optional filter; default is full suite):"
    echo " -t, --test NAME     Run only tests matching NAME"
    echo " -m, --module NAME   Run all tests in module NAME"
+   echo " -i, --integration   Run only the storage-engine integration tests (all backends)"
+   echo "Note: PGMONETA_TEST_PORT overrides the default container port (6432)"
    echo "Examples:"
-   echo "  $0                  Run full test suite"
-   echo "  $0 build            Set up environment only; then run e.g. $0 -t backup_full"
-   echo "  $0 -t backup_full   Run test matching 'backup_full' (runs build if needed)"
-   echo "  $0 -m restore       Run all tests in module 'restore'"
+   echo "  $0                           Run full test suite"
+   echo "  $0 build                     Set up environment only; then run e.g. $0 -t backup_full"
+   echo "  $0 -t backup_full            Run test matching 'backup_full' (runs build if needed)"
+   echo "  $0 -m restore                Run all tests in module 'restore'"
+   echo "  $0 -m azure                  Run Azure integration tests"
+   echo "  $0 -m s3                     Run S3/Garage integration tests"
+   echo "  $0 -i                        Run all storage-engine integration tests"
+   echo "  PGMONETA_TEST_PORT=6433 $0   Use port 6433 for the PostgreSQL container"
    exit 1
 }
 
@@ -561,21 +569,27 @@ run_tests() {
 
 TEST_FILTER=""
 MODULE_FILTER=""
+INTEGRATION_MODE=false
 SUBCOMMAND=""
 while [[ $# -gt 0 ]]; do
    case "$1" in
       -t|--test)
-         [[ -n "$MODULE_FILTER" ]] && { echo "Error: Cannot specify both -t and -m options"; usage; }
+         [[ -n "$MODULE_FILTER" || "$INTEGRATION_MODE" == "true" ]] && { echo "Error: Cannot combine -t with -m or -i"; usage; }
          shift
          [[ $# -eq 0 ]] && { echo "Error: -t/--test requires NAME"; usage; }
          TEST_FILTER="$1"
          shift
          ;;
       -m|--module)
-         [[ -n "$TEST_FILTER" ]] && { echo "Error: Cannot specify both -t and -m options"; usage; }
+         [[ -n "$TEST_FILTER" || "$INTEGRATION_MODE" == "true" ]] && { echo "Error: Cannot combine -m with -t or -i"; usage; }
          shift
          [[ $# -eq 0 ]] && { echo "Error: -m/--module requires NAME"; usage; }
          MODULE_FILTER="$1"
+         shift
+         ;;
+      -i|--integration)
+         [[ -n "$TEST_FILTER" || -n "$MODULE_FILTER" ]] && { echo "Error: Cannot combine -i with -t or -m"; usage; }
+         INTEGRATION_MODE=true
          shift
          ;;
       build)

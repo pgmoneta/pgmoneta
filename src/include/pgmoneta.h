@@ -481,6 +481,9 @@ struct main_configuration
    char azure_container[MISC_LENGTH];       /**< The Azure container name */
    char azure_shared_key[MISC_LENGTH];      /**< The Azure storage account key */
    char azure_base_dir[MAX_PATH];           /**< The Azure base directory */
+   char azure_endpoint[MISC_LENGTH];        /**< The Azure endpoint override (e.g. 127.0.0.1 for Azurite) */
+   int azure_port;                          /**< The Azure port (0 = default 443) */
+   bool azure_use_tls;                      /**< Use TLS for Azure endpoint */
 
    int retention_days;     /**< The retention days for the server */
    int retention_weeks;    /**< The retention weeks for the server */

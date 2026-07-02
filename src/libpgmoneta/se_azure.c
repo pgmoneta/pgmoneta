@@ -137,6 +137,12 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
    base_dir = pgmoneta_get_server_backup(server);
    azure_root = azure_get_basepath(server, label);
 
+   if (pgmoneta_load_info(base_dir, label, &temp_backup))
+   {
+      pgmoneta_log_error("Unable to get backup for directory %s", base_dir);
+      goto error;
+   }
+
    if (azure_upload_files(local_root, azure_root, ""))
    {
       goto error;
@@ -149,11 +155,6 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 #endif
 
    remote_azure_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
-   if (pgmoneta_load_info(base_dir, label, &temp_backup))
-   {
-      pgmoneta_log_error("Unable to get backup for directory %s", base_dir);
-      goto error;
-   }
    temp_backup->remote_azure_elapsed_time = remote_azure_elapsed_time;
    if (pgmoneta_save_info(base_dir, temp_backup))
    {
@@ -163,13 +164,16 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 
    free(temp_backup);
    free(local_root);
+   free(base_dir);
    free(azure_root);
 
    return 0;
 
 error:
 
+   free(temp_backup);
    free(local_root);
+   free(base_dir);
    free(azure_root);
 
    return 1;
@@ -424,6 +428,13 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:2021-08-06\n/");
    string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
    string_to_sign = pgmoneta_append(string_to_sign, "/");
+   /* For path-style endpoints (Azurite), the URI already contains /<account>/<container>/<blob>.
+    * The canonical resource is "/" + account_name + uri_path, so the account appears twice. */
+   if (strlen(config->azure_endpoint) > 0)
+   {
+      string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
+      string_to_sign = pgmoneta_append(string_to_sign, "/");
+   }
    string_to_sign = pgmoneta_append(string_to_sign, config->azure_container);
    string_to_sign = pgmoneta_append(string_to_sign, "/");
    string_to_sign = pgmoneta_append(string_to_sign, azure_path);
@@ -450,13 +461,28 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
 
    azure_host = azure_get_host();
 
-   if (pgmoneta_http_create(azure_host, 443, true, &connection))
    {
-      pgmoneta_log_error("Failed to connect to Azure host: %s", azure_host);
-      goto error;
-   }
+      bool use_endpoint = (strlen(config->azure_endpoint) > 0);
+      int conn_port = use_endpoint ? (config->azure_port > 0 ? config->azure_port : 443) : 443;
+      bool conn_tls = use_endpoint ? config->azure_use_tls : true;
 
-   pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s", config->azure_container, azure_path);
+      if (pgmoneta_http_create(azure_host, conn_port, conn_tls, &connection))
+      {
+         pgmoneta_log_error("Failed to connect to Azure host: %s:%d", azure_host, conn_port);
+         goto error;
+      }
+
+      if (use_endpoint)
+      {
+         pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s/%s",
+                           config->azure_storage_account, config->azure_container, azure_path);
+      }
+      else
+      {
+         pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s",
+                           config->azure_container, azure_path);
+      }
+   }
 
    if (pgmoneta_http_request_create(PGMONETA_HTTP_PUT, azure_put_path, &request))
    {
@@ -599,8 +625,15 @@ azure_get_host()
 
    config = (struct main_configuration*)shmem;
 
-   host = pgmoneta_append(host, config->azure_storage_account);
-   host = pgmoneta_append(host, ".blob.core.windows.net");
+   if (strlen(config->azure_endpoint) > 0)
+   {
+      host = pgmoneta_append(host, config->azure_endpoint);
+   }
+   else
+   {
+      host = pgmoneta_append(host, config->azure_storage_account);
+      host = pgmoneta_append(host, ".blob.core.windows.net");
+   }
 
    return host;
 }
