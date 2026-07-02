@@ -99,11 +99,13 @@ cleanup() {
    set +e
    echo "Shutdown pgmoneta"
    if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
-     $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf shutdown
-     sleep 5
+     if [[ -f "$CONFIGURATION_DIRECTORY/pgmoneta_cli.conf" ]]; then
+       $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf shutdown
+       sleep 5
+     fi
      if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
        echo "Force stop pgmoneta"
-       kill -9 $(pgrep pgmoneta)
+       kill -9 $(pgrep pgmoneta) 2>/dev/null || true
        rm -f "/tmp/pgmoneta.localhost.pid"
      fi
    fi
@@ -203,9 +205,24 @@ cleanup_postgresql_image() {
   set -e
 }
 
+find_free_port() {
+  local p=$1
+  while ss -tlnp 2>/dev/null | grep -q ":$p "; do
+    p=$((p + 1))
+  done
+  echo $p
+}
+
 start_postgresql_container() {
   # Remove existing container so we can reuse the name
   remove_postgresql_container
+  # If the requested port is still occupied by a non-container process, pick a free one
+  if ss -tlnp 2>/dev/null | grep -q ":$PORT "; then
+    local free_port
+    free_port=$(find_free_port $((PORT + 1)))
+    echo "Port $PORT is already in use; using port $free_port instead"
+    PORT=$free_port
+  fi
   $CONTAINER_ENGINE run -p $PORT:5432 -v "$PG_LOG_DIR:/pglog:z" -v "$PGCONF_DIRECTORY:/conf:z"\
   --name $CONTAINER_NAME -d \
   -e PG_DATABASE=$PG_DATABASE \
