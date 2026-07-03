@@ -67,7 +67,7 @@ static void
 do_file_manifest(struct worker_common* wc);
 
 static int
-dispatch_manifest_tasks(int server, char* source_dir, struct workers* workers, struct deque* all_deque);
+dispatch_manifest_tasks(int server, char* source_dir, char* rel_path, struct workers* workers, struct deque* all_deque);
 
 int
 pgmoneta_manifest_checksum_verify(char* root, struct art* file_checksums, struct art* file_sizes)
@@ -561,9 +561,10 @@ done:
 }
 
 static int
-dispatch_manifest_tasks(int server, char* source_dir, struct workers* workers, struct deque* all_deque)
+dispatch_manifest_tasks(int server, char* source_dir, char* rel_path, struct workers* workers, struct deque* all_deque)
 {
    char real_path[MAX_PATH];
+   char relative_path[MAX_PATH];
    struct stat s;
    struct dirent* dent;
    DIR* dir = NULL;
@@ -585,21 +586,54 @@ dispatch_manifest_tasks(int server, char* source_dir, struct workers* workers, s
       }
 
       memset(real_path, 0, sizeof(real_path));
+      memset(relative_path, 0, sizeof(relative_path));
       pgmoneta_snprintf(real_path, sizeof(real_path), "%s/%s", source_dir, entry_name);
+      if (pgmoneta_compare_string(rel_path, ""))
+      {
+         pgmoneta_snprintf(relative_path, sizeof(relative_path), "%s", entry_name);
+      }
+      else
+      {
+         pgmoneta_snprintf(relative_path, sizeof(relative_path), "%s/%s", rel_path, entry_name);
+      }
 
       lstat(real_path, &s);
       if (S_ISDIR(s.st_mode))
       {
-         if (dispatch_manifest_tasks(server, real_path, workers, all_deque))
+         if (dispatch_manifest_tasks(server, real_path, relative_path, workers, all_deque))
          {
             goto error;
          }
+      }
+      else if (S_ISLNK(s.st_mode))
+      {
+         char* link_target = NULL;
+
+         if (!pgmoneta_starts_with(relative_path, "pg_tblspc"))
+         {
+            continue;
+         }
+
+         /* manifest for tablespace */
+         link_target = pgmoneta_get_symlink(real_path);
+
+         if (link_target == NULL)
+         {
+            continue;
+         }
+
+         if (dispatch_manifest_tasks(server, link_target, relative_path, workers, all_deque))
+         {
+            goto error;
+         }
+
+         free(link_target);
       }
       else
       {
          struct worker_input* payload = NULL;
 
-         if (pgmoneta_create_worker_input(NULL, real_path, entry_name, server, workers, &payload))
+         if (pgmoneta_create_worker_input(NULL, real_path, relative_path, server, workers, &payload))
          {
             goto error;
          }
@@ -666,7 +700,7 @@ pgmoneta_generate_files_manifest(char* source_dir, struct json* files, int serve
       pgmoneta_progress_set_total(server, file_count);
    }
 
-   if (dispatch_manifest_tasks(server, source_dir, workers, all_deque))
+   if (dispatch_manifest_tasks(server, source_dir, "", workers, all_deque))
    {
       goto error;
    }
