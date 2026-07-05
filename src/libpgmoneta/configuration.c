@@ -1302,6 +1302,20 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (pgmoneta_compare_string(key, "ssh_port"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->ssh_port))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (pgmoneta_compare_string(key, "s3_use_tls"))
                {
                   if (pgmoneta_compare_string(section, "pgmoneta"))

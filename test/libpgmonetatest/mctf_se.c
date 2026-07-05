@@ -50,6 +50,9 @@
 #include <unistd.h>
 
 #define MANAGED_DAEMON_RETRIES 15
+/* WAL streaming starts on a 60 s wall-clock periodic (wal_streaming_cb), so
+ * the receiver may connect up to a minute after the daemon reports ready. */
+#define WAL_STREAMING_RETRIES  90
 
 /*
  * The backend registry.
@@ -60,12 +63,12 @@
  */
 extern const struct mctf_se_driver mctf_garage_driver;
 extern const struct mctf_se_driver mctf_azurite_driver;
-/* extern const struct mctf_se_driver mctf_ssh_driver; */
+extern const struct mctf_se_driver mctf_ssh_driver;
 
 static const struct mctf_se_driver* registry[] = {
    [MCTF_BACKEND_GARAGE]  = &mctf_garage_driver,
    [MCTF_BACKEND_AZURITE] = &mctf_azurite_driver,
-   /* [MCTF_BACKEND_SSH] = &mctf_ssh_driver, */
+   [MCTF_BACKEND_SSH]     = &mctf_ssh_driver,
 };
 
 /* Managed-instance state (single active backend). */
@@ -179,12 +182,30 @@ daemon_up(void)
       {
          fprintf(stderr, "    - managed pgmoneta started\n");
          fflush(stderr);
+         break;
+      }
+      sleep(1);
+   }
+   if (i == MANAGED_DAEMON_RETRIES)
+   {
+      pgmoneta_log_error("mctf_se: managed pgmoneta did not become ready");
+      return MCTF_FAIL;
+   }
+
+   /* A backup issued before the WAL receiver connects fails with "not WAL
+    * streaming"; wait for the first (partial) WAL segment to appear. */
+   for (i = 0; i < WAL_STREAMING_RETRIES; i++)
+   {
+      if (mctf_sh(NULL, "ls %s/backup/primary/wal/ 2>/dev/null | grep -q .", run_dir) == 0)
+      {
+         fprintf(stderr, "    - WAL streaming active\n");
+         fflush(stderr);
          return MCTF_OK;
       }
       sleep(1);
    }
 
-   pgmoneta_log_error("mctf_se: managed pgmoneta did not become ready");
+   pgmoneta_log_error("mctf_se: WAL streaming did not start");
    return MCTF_FAIL;
 }
 
@@ -221,12 +242,14 @@ signal_cleanup(int sig)
 }
 
 int
-mctf_se_up(enum mctf_backend backend)
+mctf_se_up(int backend)
 {
    const struct mctf_se_driver* driver;
    const char* uc;
    time_t start;
    int rc;
+   char backup_dir[MAX_PATH];
+   char workspace_dir[MAX_PATH];
 
    if (storage_active)
    {
@@ -237,7 +260,7 @@ mctf_se_up(enum mctf_backend backend)
    if ((size_t)backend >= sizeof(registry) / sizeof(registry[0]) ||
        registry[backend] == NULL)
    {
-      pgmoneta_log_error("mctf_se: unknown backend %d", (int)backend);
+      pgmoneta_log_error("mctf_se: unknown backend %d", backend);
       return MCTF_FAIL;
    }
    driver = registry[backend];
@@ -252,7 +275,7 @@ mctf_se_up(enum mctf_backend backend)
       pgmoneta_log_info("mctf_se: test environment not initialised; skipping");
       return MCTF_SKIPPED;
    }
-   snprintf(user_conf, sizeof(user_conf), "%s", uc);
+   pgmoneta_snprintf(user_conf, sizeof(user_conf), "%s", uc);
 
    if (pgmoneta_test_resolve_binary_path("pgmoneta", daemon_bin) != 0 ||
        pgmoneta_test_resolve_binary_path("pgmoneta-cli", cli_bin) != 0)
@@ -261,14 +284,17 @@ mctf_se_up(enum mctf_backend backend)
       return MCTF_FAIL;
    }
 
-   snprintf(run_dir, sizeof(run_dir), "%s/se-%s", TEST_BASE_DIR, driver->name);
-   snprintf(sock_dir, sizeof(sock_dir), "%s/sock", run_dir);
-   snprintf(conf_path, sizeof(conf_path), "%s/pgmoneta.conf", run_dir);
-   snprintf(cli_conf_path, sizeof(cli_conf_path), "%s/pgmoneta_cli.conf", run_dir);
+   pgmoneta_snprintf(run_dir, sizeof(run_dir), "%s/se-%s", TEST_BASE_DIR, driver->name);
+   pgmoneta_snprintf(sock_dir, sizeof(sock_dir), "%s/sock", run_dir);
+   pgmoneta_snprintf(conf_path, sizeof(conf_path), "%s/pgmoneta.conf", run_dir);
+   pgmoneta_snprintf(cli_conf_path, sizeof(cli_conf_path), "%s/pgmoneta_cli.conf", run_dir);
 
-   mkdir(run_dir, 0700);
-   mkdir(sock_dir, 0700);
-   mctf_sh(NULL, "mkdir -p %s/backup %s/workspace", run_dir, run_dir);
+   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup", run_dir);
+   pgmoneta_snprintf(workspace_dir, sizeof(workspace_dir), "%s/workspace", run_dir);
+
+   pgmoneta_mkdir(sock_dir);
+   pgmoneta_mkdir(backup_dir);
+   pgmoneta_mkdir(workspace_dir);
 
    if (!atexit_registered)
    {
@@ -347,7 +373,7 @@ mctf_se_backup(const char* server)
 {
    char args[256];
 
-   snprintf(args, sizeof(args), "backup %s", server != NULL ? server : "primary");
+   pgmoneta_snprintf(args, sizeof(args), "backup %s", server != NULL ? server : "primary");
    return mctf_se_cli(args, NULL);
 }
 
@@ -356,7 +382,7 @@ mctf_se_restore(const char* server, const char* backup_id, const char* directory
 {
    char args[2 * MAX_PATH];
 
-   snprintf(args, sizeof(args), "restore %s %s %s",
+   pgmoneta_snprintf(args, sizeof(args), "restore %s %s %s",
             server != NULL ? server : "primary",
             backup_id != NULL ? backup_id : "newest",
             directory != NULL ? directory : TEST_RESTORE_DIR);
@@ -368,7 +394,7 @@ mctf_se_list_backup(const char* server, char** output)
 {
    char args[256];
 
-   snprintf(args, sizeof(args), "-F json list-backup %s", server != NULL ? server : "primary");
+   pgmoneta_snprintf(args, sizeof(args), "-F json list-backup %s", server != NULL ? server : "primary");
    return mctf_se_cli(args, output);
 }
 
@@ -377,7 +403,7 @@ mctf_se_s3_ls(const char* server, const char* label, char** output)
 {
    char args[512];
 
-   snprintf(args, sizeof(args), "-F json s3 ls %s %s",
+   pgmoneta_snprintf(args, sizeof(args), "-F json s3 ls %s %s",
             server != NULL ? server : "primary",
             label != NULL ? label : "");
    return mctf_se_cli(args, output);
@@ -388,7 +414,7 @@ mctf_se_delete(const char* server, const char* label)
 {
    char args[512];
 
-   snprintf(args, sizeof(args), "delete %s %s",
+   pgmoneta_snprintf(args, sizeof(args), "delete %s %s",
             server != NULL ? server : "primary",
             label != NULL ? label : "newest");
    return mctf_se_cli(args, NULL);
@@ -406,7 +432,7 @@ mctf_se_has_local_metadata(const char* server)
       return false;
    }
 
-   snprintf(path, sizeof(path), "%s/backup/%s/backup", run_dir, server != NULL ? server : "primary");
+   pgmoneta_snprintf(path, sizeof(path), "%s/backup/%s/backup", run_dir, server != NULL ? server : "primary");
    pgmoneta_load_infos(path, &number_of_backups, &backups);
 
    for (int i = 0; i < number_of_backups; i++)

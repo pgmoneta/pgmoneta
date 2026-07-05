@@ -52,10 +52,9 @@ extern "C" {
 /**
  * Storage backends supported by the integration-test layer.
  */
-enum mctf_backend {
-   MCTF_BACKEND_GARAGE = 0, /**< S3, emulated by Garage */
-   MCTF_BACKEND_AZURITE = 1 /**< Azure Blob Storage, emulated by Azurite */
-};
+#define MCTF_BACKEND_GARAGE  0 /**< S3, emulated by Garage */
+#define MCTF_BACKEND_AZURITE 1 /**< Azure Blob Storage, emulated by Azurite */
+#define MCTF_BACKEND_SSH     2 /**< SSH, emulated by atmoz/sftp */
 
 /**
  * Shared context for one active backend, filled by the driver's start()
@@ -123,7 +122,7 @@ struct mctf_se_driver
  *         MCTF_FAIL on error
  */
 int
-mctf_se_up(enum mctf_backend backend);
+mctf_se_up(int backend);
 
 /**
  * Tear down the managed pgmoneta instance and the backend. Idempotent.

@@ -474,6 +474,7 @@ struct main_configuration
    char ssh_ciphers[MISC_LENGTH];       /**< The SSH supported ciphers */
    char ssh_public_key_file[MAX_PATH];  /**< The SSH public key path */
    char ssh_private_key_file[MAX_PATH]; /**< The SSH private key path */
+   int ssh_port;                        /**< The SSH port (0 = default 22) */
 
    struct s3_configuration s3; /**< The S3 configuration */
 

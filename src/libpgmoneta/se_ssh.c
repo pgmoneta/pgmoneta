@@ -135,13 +135,13 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_dump_art(nodes);
 
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->common.servers[server].name,
+                      label != NULL ? label : "(wal)");
 
    session = ssh_new();
 
@@ -152,6 +152,11 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
 
    ssh_options_set(session, SSH_OPTIONS_USER, config->ssh_username);
    ssh_options_set(session, SSH_OPTIONS_HOST, config->ssh_hostname);
+   if (config->ssh_port > 0)
+   {
+      unsigned int port = (unsigned int)config->ssh_port;
+      ssh_options_set(session, SSH_OPTIONS_PORT, &port);
+   }
 
    if (strlen(config->ssh_ciphers) == 0)
    {
@@ -448,13 +453,13 @@ ssh_storage_wal_shipping_execute(char* name __attribute__((unused)), struct art*
    pgmoneta_dump_art(nodes);
 
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->common.servers[server].name,
+                      label != NULL ? label : "(wal)");
 
    remote_root = get_remote_server_wal(server);
    local_root = pgmoneta_get_server_wal(server);
@@ -538,13 +543,13 @@ ssh_storage_wal_shipping_teardown(char* name __attribute__((unused)), struct art
    pgmoneta_dump_art(nodes);
 
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->common.servers[server].name,
+                      label != NULL ? label : "(wal)");
 
    sftp_free(sftp);
 

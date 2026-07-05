@@ -54,10 +54,9 @@ extern "C" {
 /**
  * Well-known container kinds the framework knows how to start.
  */
-enum mctf_container_kind {
-   MCTF_CONTAINER_GARAGE = 0, /**< Garage, an S3-compatible object store */
-   MCTF_CONTAINER_AZURITE = 1 /**< Azurite, a local Azure Blob Storage emulator */
-};
+#define MCTF_CONTAINER_GARAGE  0 /**< Garage, an S3-compatible object store */
+#define MCTF_CONTAINER_AZURITE 1 /**< Azurite, a local Azure Blob Storage emulator */
+#define MCTF_CONTAINER_SFTP    2 /**< atmoz/sftp, SSH/SFTP test server */
 
 /**
  * A running container handle.
@@ -115,7 +114,7 @@ mctf_container_engine(char* out, size_t size);
  * @return MCTF_OK, MCTF_SKIPPED, or MCTF_FAIL
  */
 int
-mctf_container_start(struct mctf_container* c, enum mctf_container_kind kind);
+mctf_container_start(struct mctf_container* c, int kind);
 
 /**
  * Pull a container image with retries (best-effort; a cached image is

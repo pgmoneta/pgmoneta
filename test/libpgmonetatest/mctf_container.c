@@ -32,6 +32,7 @@
 #include <logging.h>
 #include <mctf_container.h>
 #include <tscommon.h>
+#include <utils.h>
 
 /* system */
 #include <stdarg.h>
@@ -51,12 +52,22 @@
 #define AZURITE_BLOB_PORT     10000
 #define AZURITE_READY_RETRIES 30
 
+/* atmoz/sftp container definition. SFTP_USER_CONF is the image's per-user
+ * spec: user:pass:uid:gid:homedir-subfolders. */
+#define SFTP_IMAGE           "atmoz/sftp:latest"
+#define SFTP_PORT            2222
+#define SFTP_USER            "pgmoneta"
+#define SFTP_BASEDIR         "/home/pgmoneta/upload"
+#define SFTP_USER_CONF       SFTP_USER "::::upload"
+#define SFTP_READY_RETRIES   30
+
 /* Image-pull retry policy (transient registry failures). */
 #define PULL_RETRIES         3
 #define PULL_BACKOFF_SECONDS 2
 
 static int start_garage(struct mctf_container* c);
 static int start_azurite(struct mctf_container* c);
+static int start_sftp(struct mctf_container* c);
 
 int
 mctf_sh(char** output, const char* fmt, ...)
@@ -99,13 +110,13 @@ mctf_container_engine(char* out, size_t size)
 {
    if (mctf_sh(NULL, "podman info >/dev/null") == 0)
    {
-      snprintf(out, size, "podman");
+      pgmoneta_snprintf(out, size, "podman");
       return MCTF_OK;
    }
 
    if (mctf_sh(NULL, "docker info >/dev/null") == 0)
    {
-      snprintf(out, size, "docker");
+      pgmoneta_snprintf(out, size, "docker");
       return MCTF_OK;
    }
 
@@ -137,7 +148,7 @@ mctf_project_root(char* out, size_t size)
       *slash = '\0';
    }
 
-   if (snprintf(out, size, "%s", self) <= 0)
+   if (pgmoneta_snprintf(out, size, "%s", self) <= 0)
    {
       return MCTF_FAIL;
    }
@@ -174,7 +185,7 @@ mctf_container_run(struct mctf_container* c, const char* name, const char* image
 {
    int i;
 
-   snprintf(c->name, sizeof(c->name), "%s", name);
+   pgmoneta_snprintf(c->name, sizeof(c->name), "%s", name);
 
    /* Pull up front (with retry) so the run below is a local, network-free
     * operation. Best-effort: run auto-pulls too, and a cached image may exist. */
@@ -236,7 +247,7 @@ mctf_container_sweep(const char* engine)
 }
 
 int
-mctf_container_start(struct mctf_container* c, enum mctf_container_kind kind)
+mctf_container_start(struct mctf_container* c, int kind)
 {
    int rc;
 
@@ -256,8 +267,10 @@ mctf_container_start(struct mctf_container* c, enum mctf_container_kind kind)
          return start_garage(c);
       case MCTF_CONTAINER_AZURITE:
          return start_azurite(c);
+      case MCTF_CONTAINER_SFTP:
+         return start_sftp(c);
       default:
-         pgmoneta_log_error("mctf_container: unknown kind %d", (int)kind);
+         pgmoneta_log_error("mctf_container: unknown kind %d", kind);
          return MCTF_FAIL;
    }
 }
@@ -268,8 +281,8 @@ start_azurite(struct mctf_container* c)
    char name[128];
    int i;
 
-   snprintf(name, sizeof(name), "pgmoneta-mctf-azurite-%d", (int)getpid());
-   snprintf(c->name, sizeof(c->name), "%s", name);
+   pgmoneta_snprintf(name, sizeof(name), "pgmoneta-mctf-azurite-%d", (int)getpid());
+   pgmoneta_snprintf(c->name, sizeof(c->name), "%s", name);
 
    mctf_container_pull(c->engine, AZURITE_IMAGE, PULL_RETRIES);
 
@@ -304,6 +317,56 @@ start_azurite(struct mctf_container* c)
 }
 
 static int
+start_sftp(struct mctf_container* c)
+{
+   char name[128];
+   char pubkey_path[256];
+   int i;
+
+   pgmoneta_snprintf(name, sizeof(name), "pgmoneta-mctf-sftp-%d", (int)getpid());
+   pgmoneta_snprintf(pubkey_path, sizeof(pubkey_path), "/tmp/mctf-sftp-%d.pub", (int)getpid());
+
+   /* The SSH backend driver generates the key pair and places the public
+    * key here before calling MCTF_START_CONTAINER. */
+   if (access(pubkey_path, R_OK) != 0)
+   {
+      pgmoneta_log_error("mctf_container: sftp public key not found: %s", pubkey_path);
+      return MCTF_FAIL;
+   }
+
+   mctf_container_pull(c->engine, SFTP_IMAGE, PULL_RETRIES);
+   mctf_sh(NULL, "%s rm -f %s", c->engine, name);
+
+   if (mctf_sh(NULL, "%s run -d --name %s --label %s "
+               "-p %d:22 "
+               "-v %s:/home/%s/.ssh/keys/id_ed25519.pub:ro "
+               "%s %s",
+               c->engine, name, MCTF_CONTAINER_LABEL,
+               SFTP_PORT,
+               pubkey_path, SFTP_USER,
+               SFTP_IMAGE, SFTP_USER_CONF) != 0)
+   {
+      pgmoneta_log_error("mctf_container: failed to start %s", name);
+      return MCTF_FAIL;
+   }
+
+   pgmoneta_snprintf(c->name, sizeof(c->name), "%s", name);
+   c->running = true;
+
+   for (i = 0; i < SFTP_READY_RETRIES; i++)
+   {
+      if (mctf_container_exec(c, "pgrep sshd", NULL) == 0)
+      {
+         return MCTF_OK;
+      }
+      sleep(1);
+   }
+
+   pgmoneta_log_error("mctf_container: sftp sshd not ready after %d s", SFTP_READY_RETRIES);
+   return MCTF_FAIL;
+}
+
+static int
 start_garage(struct mctf_container* c)
 {
    char root[MAX_PATH];
@@ -316,7 +379,7 @@ start_garage(struct mctf_container* c)
       pgmoneta_log_error("mctf_container: cannot resolve project root");
       return MCTF_FAIL;
    }
-   snprintf(toml, sizeof(toml), "%s/%s", root, GARAGE_TOML);
+   pgmoneta_snprintf(toml, sizeof(toml), "%s/%s", root, GARAGE_TOML);
 
    if (access(toml, R_OK) != 0)
    {
@@ -324,8 +387,8 @@ start_garage(struct mctf_container* c)
       return MCTF_FAIL;
    }
 
-   snprintf(name, sizeof(name), "pgmoneta-mctf-garage-%d", (int)getpid());
-   snprintf(run_args, sizeof(run_args), "--network host -v %s:/etc/garage.toml:ro", toml);
+   pgmoneta_snprintf(name, sizeof(name), "pgmoneta-mctf-garage-%d", (int)getpid());
+   pgmoneta_snprintf(run_args, sizeof(run_args), "--network host -v %s:/etc/garage.toml:ro", toml);
 
    /* The image's default command is already ["/garage","server"] and reads
     * /etc/garage.toml; do not append a command (that would override it). */
