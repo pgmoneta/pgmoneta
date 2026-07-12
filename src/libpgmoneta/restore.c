@@ -2210,7 +2210,7 @@ reconstruct_backup_file(int server,
    }
 
    // Update file entry in manifest
-   if (pgmoneta_get_file_manifest(ofullpath, manifest_path, &file))
+   if (pgmoneta_get_file_manifest(ofullpath, manifest_path, 0, &file))
    {
       pgmoneta_log_error("Unable to get manifest for file %s", ofullpath);
       goto error;

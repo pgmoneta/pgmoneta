@@ -36,15 +36,28 @@ extern "C" {
 #include <pgmoneta.h>
 #include <art.h>
 #include <backup.h>
+#include <csv.h>
 #include <deque.h>
 #include <json.h>
 
 #define MANIFEST_CHUNK_SIZE 8192
 
 // simple manifest csv structure definition in case we want to change later
-#define MANIFEST_COLUMN_COUNT   2
-#define MANIFEST_PATH_INDEX     0
-#define MANIFEST_CHECKSUM_INDEX 1
+#define MANIFEST_COLUMN_COUNT                2
+#define MANIFEST_PATH_INDEX                  0
+#define MANIFEST_CHECKSUM_INDEX              1
+
+#define MANIFEST_KEY_VERSION                 "PostgreSQL-Backup-Manifest-Version"
+#define MANIFEST_KEY_SYS_IDENTIFIER          "System-Identifier"
+#define MANIFEST_KEY_FILES                   "Files"
+#define MANIFEST_KEY_WAL_RANGES              "WAL-Ranges"
+#define MANIFEST_KEY_CHECKSUM                "Manifest-Checksum"
+
+#define MANIFEST_FILE_KEY_CHECKSUM_ALGORITHM "Checksum-Algorithm"
+#define MANIFEST_FILE_KEY_PATH               "Path"
+#define MANIFEST_FILE_KEY_SIZE               "Size"
+#define MANIFEST_FILE_KEY_LAST_MODIFIED      "Last-Modified"
+#define MANIFEST_FILE_KEY_CHECKSUM           "Checksum"
 
 /** @struct manifest_file
  * Defines a manifest file
@@ -113,11 +126,12 @@ pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, s
  * Get the manifest record of a file
  * @param path The system path of the file
  * @param manifest_path The path to be used in manifest record entry
+ * @param last_modified Optional timestamp, defaults to current time if is 0
  * @param file [out] The json returning the manifest record
  * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file);
+pgmoneta_get_file_manifest(char* path, char* manifest_path, time_t last_modified, struct json** file);
 
 /**
  * Generate the files manifest (in json format)
@@ -151,6 +165,20 @@ pgmoneta_manifest_get_paths(char* manifest_path, struct deque** paths);
  */
 int
 pgmoneta_manifest_get_directories(char* manifest_path, struct deque** dirs);
+
+/**
+ * A directory holding no files has no entry of its own in the PostgreSQL
+ * manifest, so it would be lost by anything that reconstructs a backup from the
+ * file list alone. Record every directory with a trailing slash so those
+ * consumers can tell the two apart; the checksum column is not meaningful for a
+ * directory and is written as "-". 
+ * @param writer The CSV writer
+ * @param base The base directory
+ * @param relative The relative directory
+ * @return int 0 upon success, otherwise 1
+ */
+int
+pgmoneta_manifest_write_directory_entries(struct csv_writer* writer, char* base, char* relative);
 
 #ifdef __cplusplus
 }

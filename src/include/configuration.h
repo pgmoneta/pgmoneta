@@ -43,6 +43,7 @@ extern "C" {
 #define PGMONETA_CLI_DEFAULT_CONFIG_FILE_PATH       "/etc/pgmoneta/pgmoneta_cli.conf"
 #define PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH   "/etc/pgmoneta/pgmoneta_walinfo.conf"
 #define PGMONETA_WALFILTER_DEFAULT_CONFIG_FILE_PATH "/etc/pgmoneta/pgmoneta_walfilter.conf"
+#define PGMONETA_MUSE_DEFAULT_CONFIG_FILE_PATH      "/etc/pgmoneta/pgmoneta_muse.conf"
 #define PGMONETA_DEFAULT_USERS_FILE_PATH            "/etc/pgmoneta/pgmoneta_users.conf"
 
 /* Main configuration fields */
@@ -132,8 +133,14 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_WORKSPACE               "workspace"
 #define CONFIGURATION_ARGUMENT_SERVER                  "server"
 
-#define CONFIGURATION_TYPE_MAIN                        0
-#define CONFIGURATION_TYPE_WALINFO                     1
+/* Muse configuration fields */
+#define CONFIGURATION_ARGUMENT_SOURCE_PASSWORD "source_password"
+#define CONFIGURATION_ARGUMENT_SOURCE_TOOL     "source_tool"
+#define CONFIGURATION_ARGUMENT_SOURCE_DATA_DIR "source_data_dir"
+#define CONFIGURATION_ARGUMENT_SOURCE_WAL_DIR  "source_wal_dir"
+
+#define CONFIGURATION_TYPE_MAIN                0
+#define CONFIGURATION_TYPE_WALINFO             1
 
 // Set configuration argument constants
 #define CONFIGURATION_RESPONSE_STATUS           "status"
@@ -328,6 +335,12 @@ pgmoneta_validate_admins_configuration(void* shmem);
  */
 int
 pgmoneta_reload_configuration(bool* restart);
+
+/**
+ * Validate the muse configuration
+ */
+void
+pgmoneta_validate_muse_configuration();
 
 /**
  * Get a configuration parameter value

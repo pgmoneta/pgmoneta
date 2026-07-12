@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -4185,6 +4185,10 @@ error:
 bool
 pgmoneta_is_wal_file(char* file)
 {
+   if (file == NULL)
+   {
+      return false;
+   }
    if (strlen(file) != 24)
    {
       return false;
@@ -6425,4 +6429,40 @@ pgmoneta_fsync_directory(const char* file_path)
    }
    close(fd);
    return 0;
+}
+
+int
+pgmoneta_string_to_uint64(char* str, bool strict, uint64_t* number)
+{
+   unsigned long long n = 0;
+   char* endptr;
+   errno = 0;
+   if (str == NULL || strlen(str) == 0)
+   {
+      goto error;
+   }
+
+   n = strtoull(str, &endptr, 10);
+   if (errno == ERANGE)
+   {
+      pgmoneta_log_error("String %s out of range of unsigned long long type", str);
+      errno = 0;
+      goto error;
+   }
+   else if (endptr == str)
+   {
+      pgmoneta_log_error("No digits detected in the string %s", str);
+      goto error;
+   }
+   else if (*endptr != '\0' && strict)
+   {
+      pgmoneta_log_error("Trailing non-numeric characters left in string %s", str);
+      goto error;
+   }
+
+   *number = (uint64_t)n;
+   return 0;
+error:
+
+   return 1;
 }

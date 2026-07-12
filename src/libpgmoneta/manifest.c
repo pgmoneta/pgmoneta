@@ -45,18 +45,6 @@
 #include <string.h>
 #include <time.h>
 
-#define MANIFEST_KEY_VERSION                 "PostgreSQL-Backup-Manifest-Version"
-#define MANIFEST_KEY_SYS_IDENTIFIER          "System-Identifier"
-#define MANIFEST_KEY_FILES                   "Files"
-#define MANIFEST_KEY_WAL_RANGES              "WAL-Ranges"
-#define MANIFEST_KEY_CHECKSUM                "Manifest-Checksum"
-
-#define MANIFEST_FILE_KEY_CHECKSUM_ALGORITHM "Checksum-Algorithm"
-#define MANIFEST_FILE_KEY_PATH               "Path"
-#define MANIFEST_FILE_KEY_SIZE               "Size"
-#define MANIFEST_FILE_KEY_LAST_MODIFIED      "Last-Modified"
-#define MANIFEST_FILE_KEY_CHECKSUM           "Checksum"
-
 static void
 build_deque(struct deque* deque, struct csv_reader* reader, char** f);
 
@@ -495,7 +483,7 @@ error:
 }
 
 int
-pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file)
+pgmoneta_get_file_manifest(char* path, char* manifest_path, time_t last_modified, struct json** file)
 {
    struct json* f = NULL;
    size_t size = 0;
@@ -509,7 +497,11 @@ pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file)
 
    size = pgmoneta_get_file_size(path);
 
-   time(&t);
+   t = last_modified;
+   if (t == 0)
+   {
+      time(&t);
+   }
    gmtime_r(&t, &tm_buf);
    memset(now, 0, sizeof(now));
    strftime(now, sizeof(now), "%Y-%m-%d %H:%M:%S GMT", &tm_buf);
@@ -541,7 +533,7 @@ do_file_manifest(struct worker_common* wc)
    struct worker_input* wi = (struct worker_input*)wc;
    struct json* file = NULL;
 
-   if (pgmoneta_get_file_manifest(wi->from, wi->to, &file))
+   if (pgmoneta_get_file_manifest(wi->from, wi->to, 0, &file))
    {
       pgmoneta_record_failure(wi->common.workers->outcome, "Manifest failed: %s", wi->from);
       goto done;
@@ -914,4 +906,74 @@ error:
    pgmoneta_deque_destroy(deque);
 
    return 1;
+}
+
+int
+pgmoneta_manifest_write_directory_entries(struct csv_writer* writer, char* base, char* relative)
+{
+   DIR* dir = NULL;
+   struct dirent* entry = NULL;
+   char path[MAX_PATH];
+   char child[MAX_PATH];
+   char row[MAX_PATH];
+   char probe[MAX_PATH];
+   struct stat sb;
+   bool is_dir = false;
+   char* info[MANIFEST_COLUMN_COUNT];
+
+   if (pgmoneta_snprintf(path, sizeof(path), "%s%s%s", base,
+                         strlen(relative) > 0 ? "/" : "", relative) <= 0)
+   {
+      return 1;
+   }
+
+   if (!(dir = opendir(path)))
+   {
+      return 1;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      is_dir = (entry->d_type == DT_DIR);
+
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
+      {
+         continue;
+      }
+
+      /* some filesystems do not populate d_type */
+      if (entry->d_type == DT_UNKNOWN &&
+          pgmoneta_snprintf(probe, sizeof(probe), "%s/%s", path, entry->d_name) > 0 &&
+          stat(probe, &sb) == 0)
+      {
+         is_dir = S_ISDIR(sb.st_mode);
+      }
+
+      if (!is_dir)
+      {
+         continue;
+      }
+
+      if (pgmoneta_snprintf(child, sizeof(child), "%s%s%s",
+                            relative, strlen(relative) > 0 ? "/" : "", entry->d_name) <= 0 ||
+          pgmoneta_snprintf(row, sizeof(row), "%s/", child) <= 0)
+      {
+         closedir(dir);
+         return 1;
+      }
+
+      info[MANIFEST_PATH_INDEX] = row;
+      info[MANIFEST_CHECKSUM_INDEX] = "-";
+      pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);
+
+      if (pgmoneta_manifest_write_directory_entries(writer, base, child))
+      {
+         closedir(dir);
+         return 1;
+      }
+   }
+
+   closedir(dir);
+
+   return 0;
 }
