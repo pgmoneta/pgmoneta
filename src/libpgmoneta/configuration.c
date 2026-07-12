@@ -84,6 +84,7 @@ static int as_compression(char* str, int* compression);
 static int as_storage_engine(char* str);
 static char* as_ciphers(char* str);
 static int as_encryption_mode(char* str, int* encryption);
+static int as_compression_mode(char* str, int* compression);
 static int as_management_encryption(char* str, int* encryption);
 static int as_management_compression(char* str, int* compression);
 static int as_output_format(char* str);
@@ -2495,7 +2496,7 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
             {
                if (as_management_compression(value, &config->compression))
                {
-                  warnx("Unknown management compression: %s", value);
+                  warnx("Unknown management compression mode: %s", value);
                }
             }
             else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_ENCRYPTION))
@@ -2571,6 +2572,272 @@ pgmoneta_validate_cli_configuration(void* shmem)
          config->encryption = MANAGEMENT_ENCRYPTION_NONE;
    }
 
+   return 0;
+}
+
+int
+pgmoneta_init_muse_configuration(void* shmem)
+{
+   struct muse_configuration* config;
+   char* home_dir = NULL;
+
+   config = (struct muse_configuration*)shmem;
+
+   home_dir = pgmoneta_get_home_directory();
+   memcpy(&config->common.home_dir, home_dir, strlen(home_dir));
+
+   config->common.log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
+   config->common.log_level = PGMONETA_LOGGING_LEVEL_INFO;
+   config->common.log_mode = PGMONETA_LOGGING_MODE_APPEND;
+   atomic_init(&config->common.log_lock, STATE_FREE);
+
+   config->compression = COMPRESSION_NONE;
+   config->encryption = ENCRYPTION_NONE;
+   config->compression_level = 3;
+   config->source_tool = 0;
+
+   free(home_dir);
+
+   return 0;
+}
+
+int
+pgmoneta_read_muse_configuration(void* shmem, char* filename)
+{
+   FILE* file;
+   char line[LINE_LENGTH];
+   char* trimmed_line = NULL;
+   char* key = NULL;
+   char* value = NULL;
+   size_t max;
+   struct muse_configuration* config;
+
+   file = fopen(filename, "r");
+
+   if (!file)
+   {
+      goto error;
+   }
+
+   config = (struct muse_configuration*)shmem;
+
+   while (fgets(line, sizeof(line), file))
+   {
+      if (!is_empty_string(line))
+      {
+         if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
+         {
+            if (is_empty_string(trimmed_line))
+            {
+               free(trimmed_line);
+               trimmed_line = NULL;
+               continue;
+            }
+         }
+         else
+         {
+            free(trimmed_line);
+            trimmed_line = NULL;
+            continue;
+         }
+
+         /* Skip section markers */
+         if (trimmed_line[0] == '[')
+         {
+            free(trimmed_line);
+            trimmed_line = NULL;
+            continue;
+         }
+
+         /* Extract and process all key-value pairs */
+         if (pgmoneta_starts_with(trimmed_line, CONFIGURATION_ARGUMENT_LOG_PATH) ||
+             pgmoneta_starts_with(trimmed_line, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR))
+         {
+            extract_syskey_value(trimmed_line, &key, &value);
+         }
+         else
+         {
+            extract_key_value(trimmed_line, &key, &value);
+         }
+
+         if (key && value)
+         {
+            if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_LOG_TYPE))
+            {
+               config->common.log_type = as_logging_type(value);
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_LOG_LEVEL))
+            {
+               config->common.log_level = as_logging_level(value);
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_LOG_PATH))
+            {
+               max = strlen(value);
+               if (max > MISC_LENGTH - 1)
+               {
+                  max = MISC_LENGTH - 1;
+               }
+               memcpy(config->common.log_path, value, max);
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_LOG_MODE))
+            {
+               config->common.log_mode = as_logging_mode(value);
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_COMPRESSION))
+            {
+               if (as_compression_mode(value, &config->compression))
+               {
+                  warnx("Unknown compression mode: %s", value);
+                  goto error;
+               }
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_ENCRYPTION))
+            {
+               if (as_encryption_mode(value, &config->encryption))
+               {
+                  warnx("Unknown encryption mode: %s", value);
+                  goto error;
+               }
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL))
+            {
+               if (as_int(value, &config->compression_level))
+               {
+                  warnx("Unknown encryption level: %s", value);
+                  goto error;
+               }
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_SOURCE_PASSWORD))
+            {
+               max = strlen(value);
+               if (max > MAX_PASSWORD_LENGTH - 1)
+               {
+                  warnx("Cipher length of %d exceeds %d", (int)max, MAX_PASSWORD_LENGTH);
+                  goto error;
+               }
+               memcpy(config->source_password, value, max);
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_BASE_DIR))
+            {
+               max = strlen(value);
+               if (max > MAX_PATH - 1)
+               {
+                  warnx("Base directory length of %d exceeds %d", (int)max, MAX_PATH);
+                  goto error;
+               }
+               memcpy(config->base_dir, value, max);
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_SOURCE_DATA_DIR))
+            {
+               max = strlen(value);
+               if (max > MAX_PATH - 1)
+               {
+                  warnx("Base directory length of %d exceeds %d", (int)max, MAX_PATH);
+                  goto error;
+               }
+               memcpy(config->source_data_dir, value, max);
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_SOURCE_WAL_DIR))
+            {
+               max = strlen(value);
+               if (max > MAX_PATH - 1)
+               {
+                  warnx("Base directory length of %d exceeds %d", (int)max, MAX_PATH);
+                  goto error;
+               }
+               memcpy(config->source_wal_dir, value, max);
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_SOURCE_TOOL))
+            {
+               if (pgmoneta_compare_string(value, "pgbackrest"))
+               {
+                  config->source_tool = TOOL_PGBACKREST;
+               }
+               else
+               {
+                  warnx("Unknown source tool: %s, support \"pgbackrest\"", value);
+                  goto error;
+               }
+            }
+            else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_WORKSPACE))
+            {
+               max = strlen(value);
+               if (max > MAX_PATH - 1)
+               {
+                  warnx("Workspace directory length of %d exceeds %d", (int)max, MAX_PATH);
+                  goto error;
+               }
+               memcpy(config->workspace, value, max);
+            }
+         }
+
+         free(key);
+         free(value);
+         key = NULL;
+         value = NULL;
+      }
+      else
+      {
+         warnx("Unknown line format: %s", line);
+      }
+      free(trimmed_line);
+      trimmed_line = NULL;
+   }
+
+   if (strlen(config->workspace) == 0)
+   {
+      memcpy(config->workspace, WORKSPACE_DEFAULT, strlen(WORKSPACE_DEFAULT));
+   }
+
+   fclose(file);
+
+   return 0;
+
+error:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   free(trimmed_line);
+   free(key);
+   free(value);
+   return 1;
+}
+
+int
+pgmoneta_validate_muse_configuration(void* shmem)
+{
+   struct muse_configuration* config = NULL;
+
+   config = (struct muse_configuration*)shmem;
+   if (strlen(config->base_dir) == 0 || !pgmoneta_exists(config->base_dir) || !pgmoneta_is_directory(config->base_dir))
+   {
+      errx(1, "Unable to find base directory %s", config->base_dir);
+   }
+   if (strlen(config->source_data_dir) == 0 || !pgmoneta_exists(config->source_data_dir) || !pgmoneta_is_directory(config->source_data_dir))
+   {
+      errx(1, "Unable to find source data directory %s", config->source_data_dir);
+   }
+   if (strlen(config->source_wal_dir) == 0 || !pgmoneta_exists(config->source_wal_dir) || !pgmoneta_is_directory(config->source_wal_dir))
+   {
+      errx(1, "Unable to find source WAL directory %s", config->source_wal_dir);
+   }
+   if (COMPRESSION_IS_SERVER(config->compression))
+   {
+      errx(1, "Server side compression is not supported during migration");
+   }
+   if (config->source_tool == 0)
+   {
+      errx(1, "Source backup tool must be specified");
+   }
+   if (pgmoneta_starts_with(config->base_dir, config->source_data_dir))
+   {
+      errx(1, "Target base directory cannot be sub-directory of source data repository");
+   }
+   if (pgmoneta_starts_with(config->base_dir, config->source_wal_dir))
+   {
+      errx(1, "Target base directory cannot be sub-directory of source WAL repository");
+   }
    return 0;
 }
 
@@ -6109,6 +6376,60 @@ as_encryption_mode(char* str, int* encryption)
    if (!strcasecmp(str, "aes-128") || !strcasecmp(str, "aes-128-gcm"))
    {
       *encryption = ENCRYPTION_AES_128_GCM;
+      return 0;
+   }
+
+   return 1;
+}
+
+static int
+as_compression_mode(char* str, int* compression)
+{
+   if (!strcasecmp(str, "none"))
+   {
+      *compression = COMPRESSION_NONE;
+      return 0;
+   }
+
+   if (!strcasecmp(str, "gzip") || !strcasecmp(str, "client-gzip"))
+   {
+      *compression = COMPRESSION_CLIENT_GZIP;
+      return 0;
+   }
+
+   if (!strcasecmp(str, "server-gzip"))
+   {
+      *compression = COMPRESSION_SERVER_GZIP;
+      return 0;
+   }
+
+   if (!strcasecmp(str, "zstd") || !strcasecmp(str, "client-zstd"))
+   {
+      *compression = COMPRESSION_CLIENT_ZSTD;
+      return 0;
+   }
+
+   if (!strcasecmp(str, "server-zstd"))
+   {
+      *compression = COMPRESSION_SERVER_ZSTD;
+      return 0;
+   }
+
+   if (!strcasecmp(str, "lz4") || !strcasecmp(str, "client-lz4"))
+   {
+      *compression = COMPRESSION_CLIENT_LZ4;
+      return 0;
+   }
+
+   if (!strcasecmp(str, "server-lz4"))
+   {
+      *compression = COMPRESSION_SERVER_LZ4;
+      return 0;
+   }
+
+   if (!strcasecmp(str, "bz2") || !strcasecmp(str, "client-bz2"))
+   {
+      *compression = COMPRESSION_CLIENT_BZIP2;
       return 0;
    }
 

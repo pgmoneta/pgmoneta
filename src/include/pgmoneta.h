@@ -103,6 +103,7 @@ extern "C" {
 #define ENCRYPTION_AES_256_GCM       1
 #define ENCRYPTION_AES_192_GCM       2
 #define ENCRYPTION_AES_128_GCM       3
+#define ENCRYPTION_AES_256_CBC       4
 
 #define HUGEPAGE_OFF                 0
 #define HUGEPAGE_TRY                 1
@@ -172,6 +173,9 @@ extern "C" {
 #define INCREMENTAL_PREFIX           "INCREMENTAL."
 
 #define JOBS_DIR                     ".jobs"
+#define TOOL_PGBACKREST              1
+
+#define WORKSPACE_DEFAULT            "/tmp/pgmoneta-workspace/"
 
 #define likely(x)                    __builtin_expect(!!(x), 1)
 #define unlikely(x)                  __builtin_expect(!!(x), 0)
@@ -611,6 +615,24 @@ struct walinfo_configuration
 struct walfilter_configuration
 {
    struct common_configuration common; /**< Common configurations that are shared across multiple tools */
+} __attribute__((aligned(64)));
+
+/** @struct muse_configuration
+ * Defines the muse configuration to migrate the backup(s)
+ */
+struct muse_configuration
+{
+   struct common_configuration common;
+   char base_dir[MAX_PATH];                   /**< The target base directory */
+   char source_password[MAX_PASSWORD_LENGTH]; /**< The source cipher password for encryption */
+   int source_tool;                           /**< The source tool */
+   int encryption;                            /**< The encryption method of migrated backup */
+   int compression;                           /**< The compression method of migrated backup */
+   int compression_level;                     /**< The compression level of migrated backup */
+   int output_format;                         /**< Default output format for the outcome */
+   char workspace[MAX_PATH];                  /**< A workspace for migration */
+   char source_data_dir[MAX_PATH];            /**< The direct source data directory */
+   char source_wal_dir[MAX_PATH];             /**< The direct source WAL directory */
 } __attribute__((aligned(64)));
 
 #ifdef __cplusplus
