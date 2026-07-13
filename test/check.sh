@@ -522,6 +522,23 @@ execute_testcases() {
       sleep 2
    done
 
+   echo "Wait for WAL streaming to be ready"
+   for i in {1..5}; do
+      if $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf status details -F json 2>/dev/null | \
+         grep -q '"WalStreaming": true'; then
+         echo "WAL streaming ready ... ok"
+         break
+      fi
+      if [[ $i -eq 5 ]]; then
+         echo "WAL streaming not ready ... not ok"
+         echo "Checking logs:"
+         tail -20 $LOG_DIR/pgmoneta.log 2>/dev/null || echo "Log file not found"
+         exit 1
+      fi
+      echo "Waiting for WAL streaming to be ready"
+      sleep 2
+   done
+
    echo "Start running MCTF tests"
    if [[ -f "$TEST_DIRECTORY/pgmoneta-test" ]]; then
       TEST_FILTER_ARGS=()

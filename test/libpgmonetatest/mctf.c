@@ -372,6 +372,15 @@ get_or_create_module_hooks(const char* module)
 }
 
 void
+mctf_register_global_test_setup(mctf_hook_func_t func)
+{
+   if (!g_initialized)
+      mctf_init();
+
+   g_runner.global_test_setup = func;
+}
+
+void
 mctf_register_test_setup(const char* module, mctf_hook_func_t func)
 {
    mctf_test_hooks_t* h;
@@ -628,6 +637,12 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
 
       mctf_errno = 0;
       if (mctf_errmsg) { free(mctf_errmsg); mctf_errmsg = NULL; }
+
+      // global per test setup
+      if (g_runner.global_test_setup)
+      {
+         g_runner.global_test_setup();
+      }
 
       /* Per-test setup */
       if (cur_test_hooks && cur_test_hooks->setup)

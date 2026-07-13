@@ -197,6 +197,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_USED_SPACE            "UsedSpace"
 #define MANAGEMENT_ARGUMENT_VALID                 "Valid"
 #define MANAGEMENT_ARGUMENT_WAL                   "WAL"
+#define MANAGEMENT_ARGUMENT_WAL_STREAMING         "WalStreaming"
 #define MANAGEMENT_ARGUMENT_WORKER_ERRORS         "WorkerErrors"
 #define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
 #define MANAGEMENT_ARGUMENT_WORKFLOW              "Workflow"

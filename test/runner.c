@@ -28,6 +28,7 @@
  */
 #include <mctf.h>
 #include <html_report.h>
+#include <tsclient.h>
 #include <tscommon.h>
 #include <utils.h>
 #include <logging.h>
@@ -398,6 +399,8 @@ main(int argc, char* argv[])
    }
 
    setup_signal_handlers();
+
+   mctf_register_global_test_setup(pgmoneta_test_wait_for_wal_streaming);
 
    if (getenv("PGMONETA_TEST_CONF") != NULL)
    {

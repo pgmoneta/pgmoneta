@@ -63,6 +63,7 @@ Ameen Sakr <ameensakr623@gmail.com>
 Harshit Shaw <shawharshit116@gmail.com>
 Ahmed Kamal <ahmedkamal200427@gmail.com>
 Rohan Mishra <kmrrohan29@gmail.com>
+Mostafa Mahmoud <mm1471800@gmail.com>
 ```
 
 ## Committers

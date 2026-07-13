@@ -115,16 +115,17 @@ typedef struct mctf_result
  */
 typedef struct mctf_runner
 {
-   mctf_test_t* tests;                /**< Linked list of registered tests */
-   mctf_test_t* tests_tail;           /**< Tail pointer for O(1) append */
-   mctf_result_t* results;            /**< Array of test results */
-   mctf_test_hooks_t* test_hooks;     /**< Per-test hook registrations (by module) */
-   mctf_module_hooks_t* module_hooks; /**< Per-module hook registrations */
-   size_t test_count;                 /**< Total number of tests */
-   size_t result_count;               /**< Total number of results */
-   size_t passed_count;               /**< Number of passed tests */
-   size_t failed_count;               /**< Number of failed tests */
-   size_t skipped_count;              /**< Number of skipped tests */
+   mctf_test_t* tests;                 /**< Linked list of registered tests */
+   mctf_test_t* tests_tail;            /**< Tail pointer for O(1) append */
+   mctf_result_t* results;             /**< Array of test results */
+   mctf_test_hooks_t* test_hooks;      /**< Per-test hook registrations (by module) */
+   mctf_module_hooks_t* module_hooks;  /**< Per-module hook registrations */
+   mctf_hook_func_t global_test_setup; /**< Called before EVERY test, regardless of module */
+   size_t test_count;                  /**< Total number of tests */
+   size_t result_count;                /**< Total number of results */
+   size_t passed_count;                /**< Number of passed tests */
+   size_t failed_count;                /**< Number of failed tests */
+   size_t skipped_count;               /**< Number of skipped tests */
 } mctf_runner_t;
 
 /**
@@ -212,6 +213,14 @@ mctf_register_test_setup(const char* module, mctf_hook_func_t func);
  */
 void
 mctf_register_test_teardown(const char* module, mctf_hook_func_t func);
+
+/**
+ * Register a global per-test setup hook, called before EVERY test regardless of module.
+ * Runs before any per-module setup hook registered via mctf_register_test_setup.
+ * @param func The setup function
+ */
+void
+mctf_register_global_test_setup(mctf_hook_func_t func);
 
 /**
  * Register a per-module setup hook.

@@ -136,6 +136,7 @@ jobs:
           chown -R runner:runner $GITHUB_WORKSPACE
 
       - name: Run Tests
+        timeout-minutes: 45
         run: |
           export TEST_PG_VERSION=${{ matrix.pg_version }}
           if [ "${{ matrix.compiler }}" = "clang" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
