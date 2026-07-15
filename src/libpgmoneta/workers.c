@@ -44,8 +44,6 @@
 #include <sys/sysinfo.h>
 #endif
 
-static volatile int worker_keepalive;
-
 static int worker_init(struct workers* workers, struct worker** worker);
 static void* worker_do(struct worker* worker);
 static void worker_destroy(struct worker* worker);
@@ -63,8 +61,6 @@ pgmoneta_workers_initialize(int num, struct workers** workers)
 
    *workers = NULL;
 
-   worker_keepalive = 1;
-
    if (num < 1)
    {
       goto error;
@@ -79,6 +75,7 @@ pgmoneta_workers_initialize(int num, struct workers** workers)
 
    w->number_of_alive = 0;
    w->number_of_working = 0;
+   w->keepalive = 1;
    w->outcome = NULL;
 
    if (pgmoneta_deque_create(true, &w->outcome))
@@ -313,7 +310,7 @@ pgmoneta_workers_destroy(struct workers* workers)
    if (workers != NULL)
    {
       worker_total = workers->number_of_alive;
-      worker_keepalive = 0;
+      workers->keepalive = 0;
 
       time(&start);
       while (tpassed < timeout && workers->number_of_alive)
@@ -471,11 +468,11 @@ worker_do(struct worker* worker)
    workers->number_of_alive += 1;
    pthread_mutex_unlock(&workers->worker_lock);
 
-   while (worker_keepalive)
+   while (workers->keepalive)
    {
       semaphore_wait(workers->has_tasks);
 
-      if (worker_keepalive)
+      if (workers->keepalive)
       {
          pthread_mutex_lock(&workers->worker_lock);
          workers->number_of_working++;

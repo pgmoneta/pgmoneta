@@ -71,8 +71,10 @@ static const struct mctf_se_driver* registry[] = {
    [MCTF_BACKEND_SSH]     = &mctf_ssh_driver,
 };
 
-/* Managed-instance state (single active backend). */
-static struct mctf_se storage;
+#define MAX_BACKENDS ((int)(sizeof(registry) / sizeof(registry[0])))
+
+static struct mctf_se storage[MAX_BACKENDS];
+static int n_active = 0;
 static bool storage_active = false;
 static bool atexit_registered = false;
 
@@ -117,19 +119,28 @@ write_confs(void)
    fprintf(f, "base_dir = %s/backup\n", run_dir);
    fprintf(f, "compression = zstd\n");
    fprintf(f, "encryption = none\n");
-   fprintf(f, "storage_engine = %s\n", storage.driver->storage_engine);
+   fprintf(f, "workers = 4\n");
+   fprintf(f, "storage_engine = ");
+   for (int i = 0; i < n_active; i++)
+   {
+      fprintf(f, "%s%s", i > 0 ? ", " : "", storage[i].driver->storage_engine);
+   }
+   fprintf(f, "\n");
    fprintf(f, "log_type = file\n");
    fprintf(f, "log_level = debug5\n");
    fprintf(f, "log_path = %s/pgmoneta.log\n", run_dir);
    fprintf(f, "unix_socket_dir = %s/\n", sock_dir);
    fprintf(f, "pidfile = %s/pgmoneta.pid\n", run_dir);
    fprintf(f, "workspace = %s/workspace\n", run_dir);
-   if (storage.driver->write_global_conf != NULL)
+   for (int i = 0; i < n_active; i++)
    {
-      if (storage.driver->write_global_conf(&storage, f) != MCTF_OK)
+      if (storage[i].driver->write_global_conf != NULL)
       {
-         fclose(f);
-         return MCTF_FAIL;
+         if (storage[i].driver->write_global_conf(&storage[i], f) != MCTF_OK)
+         {
+            fclose(f);
+            return MCTF_FAIL;
+         }
       }
    }
    fprintf(f, "\n");
@@ -139,12 +150,15 @@ write_confs(void)
    fprintf(f, "user = %s\n", primary->username);
    fprintf(f, "wal_slot = mctf_se\n");
    fprintf(f, "create_slot = yes\n");
-   if (storage.driver->write_server_conf != NULL)
+   for (int i = 0; i < n_active; i++)
    {
-      if (storage.driver->write_server_conf(&storage, f) != MCTF_OK)
+      if (storage[i].driver->write_server_conf != NULL)
       {
-         fclose(f);
-         return MCTF_FAIL;
+         if (storage[i].driver->write_server_conf(&storage[i], f) != MCTF_OK)
+         {
+            fclose(f);
+            return MCTF_FAIL;
+         }
       }
    }
    fclose(f);
@@ -241,10 +255,10 @@ signal_cleanup(int sig)
    raise(sig);
 }
 
-int
-mctf_se_up(int backend)
+/* Start n backends, write config, and start the managed daemon. */
+static int
+se_up_common(const int* backends, int n, const char* name)
 {
-   const struct mctf_se_driver* driver;
    const char* uc;
    time_t start;
    int rc;
@@ -257,16 +271,22 @@ mctf_se_up(int backend)
       return MCTF_FAIL;
    }
 
-   if ((size_t)backend >= sizeof(registry) / sizeof(registry[0]) ||
-       registry[backend] == NULL)
+   for (int i = 0; i < n; i++)
    {
-      pgmoneta_log_error("mctf_se: unknown backend %d", backend);
-      return MCTF_FAIL;
+      if ((size_t)backends[i] >= sizeof(registry) / sizeof(registry[0]) ||
+          registry[backends[i]] == NULL)
+      {
+         pgmoneta_log_error("mctf_se: unknown backend %d", backends[i]);
+         return MCTF_FAIL;
+      }
    }
-   driver = registry[backend];
 
-   memset(&storage, 0, sizeof(storage));
-   storage.driver = driver;
+   memset(storage, 0, sizeof(storage));
+   n_active = n;
+   for (int i = 0; i < n; i++)
+   {
+      storage[i].driver = registry[backends[i]];
+   }
 
    /* Requires the full test environment (check.sh); skip otherwise. */
    uc = getenv("PGMONETA_TEST_USER_CONF");
@@ -284,7 +304,7 @@ mctf_se_up(int backend)
       return MCTF_FAIL;
    }
 
-   pgmoneta_snprintf(run_dir, sizeof(run_dir), "%s/se-%s", TEST_BASE_DIR, driver->name);
+   pgmoneta_snprintf(run_dir, sizeof(run_dir), "%s/se-%s", TEST_BASE_DIR, name);
    pgmoneta_snprintf(sock_dir, sizeof(sock_dir), "%s/sock", run_dir);
    pgmoneta_snprintf(conf_path, sizeof(conf_path), "%s/pgmoneta.conf", run_dir);
    pgmoneta_snprintf(cli_conf_path, sizeof(cli_conf_path), "%s/pgmoneta_cli.conf", run_dir);
@@ -307,37 +327,75 @@ mctf_se_up(int backend)
    storage_active = true; /* set early so teardown runs if a later step fails */
 
    start = time(NULL);
-   fprintf(stderr, "  ~ starting %s backend\n", driver->name);
-   fflush(stderr);
 
-   rc = driver->start(&storage);
-   if (rc == MCTF_SKIPPED)
+   for (int i = 0; i < n; i++)
    {
-      fprintf(stderr, "  ~ skipped (no container engine)\n");
+      fprintf(stderr, "  ~ starting %s backend\n", storage[i].driver->name);
       fflush(stderr);
-      storage_active = false;
-      return MCTF_SKIPPED;
+
+      rc = storage[i].driver->start(&storage[i]);
+      if (rc == MCTF_SKIPPED)
+      {
+         fprintf(stderr, "  ~ skipped (no container engine)\n");
+         fflush(stderr);
+         mctf_se_down();
+         return MCTF_SKIPPED;
+      }
+      if (rc != MCTF_OK || !storage[i].container.running)
+      {
+         fprintf(stderr, "  ~ %s backend FAILED\n", storage[i].driver->name);
+         fflush(stderr);
+         mctf_se_down();
+         return MCTF_FAIL;
+      }
    }
-   if (rc != MCTF_OK || !storage.container.running || write_confs() != MCTF_OK)
+
+   if (write_confs() != MCTF_OK)
    {
-      fprintf(stderr, "  ~ %s backend FAILED\n", driver->name);
+      fprintf(stderr, "  ~ %s FAILED\n", name);
       fflush(stderr);
       mctf_se_down();
       return MCTF_FAIL;
    }
    if (daemon_up() != MCTF_OK)
    {
-      fprintf(stderr, "  ~ %s backend FAILED\n", driver->name);
+      fprintf(stderr, "  ~ %s FAILED\n", name);
       fflush(stderr);
       dump_managed_log();
       mctf_se_down();
       return MCTF_FAIL;
    }
 
-   fprintf(stderr, "  ~ %s backend ready (%ds)\n", driver->name, (int)(time(NULL) - start));
+   fprintf(stderr, "  ~ %s ready (%ds)\n", name, (int)(time(NULL) - start));
    fflush(stderr);
 
    return MCTF_OK;
+}
+
+int
+mctf_se_up(int backend)
+{
+   if ((size_t)backend >= sizeof(registry) / sizeof(registry[0]) ||
+       registry[backend] == NULL)
+   {
+      pgmoneta_log_error("mctf_se: unknown backend %d", backend);
+      return MCTF_FAIL;
+   }
+
+   return se_up_common(&backend, 1, registry[backend]->name);
+}
+
+int
+mctf_se_up_all(void)
+{
+   int all[MAX_BACKENDS];
+
+   for (int i = 0; i < MAX_BACKENDS; i++)
+   {
+      all[i] = i;
+   }
+
+   return se_up_common(all, MAX_BACKENDS, "remote");
 }
 
 void
@@ -351,10 +409,15 @@ mctf_se_down(void)
 
    daemon_down();
 
-   if (storage.driver != NULL && storage.driver->stop != NULL)
+   /* Stop in reverse start order */
+   for (int i = n_active - 1; i >= 0; i--)
    {
-      storage.driver->stop(&storage);
+      if (storage[i].driver != NULL && storage[i].driver->stop != NULL)
+      {
+         storage[i].driver->stop(&storage[i]);
+      }
    }
+   n_active = 0;
 }
 
 int
@@ -453,13 +516,33 @@ mctf_se_run_dir(void)
 const struct mctf_se*
 mctf_se_context(void)
 {
-   return storage_active ? &storage : NULL;
+   return storage_active ? &storage[0] : NULL;
+}
+
+const struct mctf_se*
+mctf_se_context_for(int backend)
+{
+   if (!storage_active ||
+       (size_t)backend >= sizeof(registry) / sizeof(registry[0]))
+   {
+      return NULL;
+   }
+
+   for (int i = 0; i < n_active; i++)
+   {
+      if (storage[i].driver == registry[backend])
+      {
+         return &storage[i];
+      }
+   }
+
+   return NULL;
 }
 
 int
 mctf_se_azure_blob_count(void)
 {
-   const struct mctf_se* ctx = mctf_se_context();
+   const struct mctf_se* ctx = mctf_se_context_for(MCTF_BACKEND_AZURITE);
    char utc_date[UTC_TIME_LENGTH];
    char* string_to_sign = NULL;
    char* signing_key = NULL;

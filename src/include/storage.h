@@ -43,6 +43,15 @@ extern "C" {
 #include <libssh/sftp.h>
 
 /**
+ * Storage engine capabilities
+ */
+#define STORAGE_CAP_ATOMIC_RENAME (1 << 0) /**< Atomic rename (SSH) */
+#define STORAGE_CAP_RANGE_GET     (1 << 1) /**< Range reads (S3, Azure) */
+#define STORAGE_CAP_BATCH_DELETE  (1 << 2) /**< Batch delete (S3) */
+#define STORAGE_CAP_MULTIPART     (1 << 3) /**< Multipart upload (S3) */
+#define STORAGE_CAP_PARALLEL_SAFE (1 << 4) /**< Parallel-safe upload (S3, Azure) */
+
+/**
  * Create a workflow for the local storage engine
  * @return The workflow
  */
@@ -95,6 +104,13 @@ pgmoneta_storage_verify_backup(int server, struct backup* backup_info);
  */
 struct workflow*
 pgmoneta_storage_create_azure(void);
+
+/**
+ * Create a workflow for the remote storage engines
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_storage_create_remote(void);
 
 /**
  * Open WAL shipping file in remote ssh server

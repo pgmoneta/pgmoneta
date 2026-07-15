@@ -70,7 +70,7 @@ static int s3_bootstrap(char* s3_root, int server, char* local_root);
 static int s3_download_files(char* s3_root, char* local_root, int server, int compression, int encryption);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, char* file_sha512, int server);
 static int s3_list_objects(char* relative_path, char* s3_list, int server, bool common_prefixes, struct deque** objects);
-static int s3_delete_all_objects(char* relative_path, char* s3_list, int server, struct art*) __attribute__((unused));
+static int s3_delete_all_objects(char* relative_path, char* s3_list, int server, struct art*);
 static int s3_send_list_request(char* relative_path, char* s3_list, int server, char* continuationToken, bool common_prefixes, struct http_response** response);
 static int s3_list_backup_prefixes(int server, struct deque** labels);
 static int s3_verify_backup(int server, struct backup* backup_info);
@@ -533,7 +533,6 @@ s3_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   char* root = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -549,17 +548,6 @@ s3_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("S3 storage engine (teardown): %s/%s", config->common.servers[server].name, label);
-
-   if (!pgmoneta_is_storage_engine_enabled(STORAGE_ENGINE_LOCAL))
-   {
-      root = pgmoneta_get_server_backup_identifier_data(server, label);
-
-      if (root != NULL)
-      {
-         pgmoneta_delete_directory(root);
-         free(root);
-      }
-   }
 
    return 0;
 }
@@ -3233,4 +3221,33 @@ s3_label_from_common_prefix(char* prefix)
    }
 
    return copy;
+}
+
+int
+s3_upload(int server, char* label, int compression, int encryption)
+{
+   char* local_root = NULL;
+   char* s3_root = NULL;
+   int rc;
+
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
+   s3_root = s3_get_basepath(server, label);
+
+   rc = s3_upload_files(local_root, s3_root, server, compression, encryption);
+
+   free(local_root);
+   free(s3_root);
+   return rc;
+}
+
+int
+s3_cleanup(int server, char* label)
+{
+   char* s3_root = NULL;
+   int rc;
+
+   s3_root = s3_get_basepath(server, label);
+   rc = s3_delete_all_objects("", s3_root, server, NULL);
+   free(s3_root);
+   return rc;
 }

@@ -184,7 +184,6 @@ azure_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   char* root = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -198,17 +197,6 @@ azure_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-
-   if (!pgmoneta_is_storage_engine_enabled(STORAGE_ENGINE_LOCAL))
-   {
-      root = pgmoneta_get_server_backup_identifier_data(server, label);
-
-      if (root != NULL)
-      {
-         pgmoneta_delete_directory(root);
-         free(root);
-      }
-   }
 
    pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->common.servers[server].name, label);
 
@@ -682,4 +670,21 @@ azure_add_request_headers(struct http_request* request, char* auth_value, char* 
    }
 
    return 0;
+}
+
+int
+azure_upload(int server, char* label, int compression __attribute__((unused)), int encryption __attribute__((unused)))
+{
+   char* local_root = NULL;
+   char* azure_root = NULL;
+   int rc;
+
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
+   azure_root = azure_get_basepath(server, label);
+
+   rc = azure_upload_files(local_root, azure_root, "");
+
+   free(local_root);
+   free(azure_root);
+   return rc;
 }

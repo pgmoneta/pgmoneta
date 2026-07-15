@@ -251,6 +251,8 @@ mctf_container_start(struct mctf_container* c, int kind)
 {
    int rc;
 
+   static bool swept = false;
+
    memset(c, 0, sizeof(*c));
 
    rc = mctf_container_engine(c->engine, sizeof(c->engine));
@@ -259,7 +261,11 @@ mctf_container_start(struct mctf_container* c, int kind)
       return rc; /* MCTF_SKIPPED */
    }
 
-   mctf_container_sweep(c->engine);
+   if (!swept)
+   {
+      mctf_container_sweep(c->engine);
+      swept = true;
+   }
 
    switch (kind)
    {

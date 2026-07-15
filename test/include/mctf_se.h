@@ -125,7 +125,14 @@ int
 mctf_se_up(int backend);
 
 /**
- * Tear down the managed pgmoneta instance and the backend. Idempotent.
+ * Bring up all backends and one pgmoneta instance with every storage engine.
+ * @return MCTF_OK, MCTF_SKIPPED, or MCTF_FAIL (as mctf_se_up)
+ */
+int
+mctf_se_up_all(void);
+
+/**
+ * Tear down the managed pgmoneta instance and all active backends. Idempotent.
  */
 void
 mctf_se_down(void);
@@ -205,6 +212,14 @@ mctf_se_run_dir(void);
  */
 const struct mctf_se*
 mctf_se_context(void);
+
+/**
+ * The context of one specific backend (multi-backend runs). In single-backend
+ * runs this returns the active context when @p backend matches it.
+ * NULL if that backend is not active.
+ */
+const struct mctf_se*
+mctf_se_context_for(int backend);
 
 /**
  * Count the number of blobs in the active Azurite container by querying

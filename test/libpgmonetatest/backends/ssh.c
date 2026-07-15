@@ -127,11 +127,9 @@ ssh_stop(struct mctf_se* s)
    }
 }
 
-/* SSH config keys are global-only, so reopen [pgmoneta] after [primary]. */
 static int
-ssh_write_server_conf(struct mctf_se* s, FILE* f)
+ssh_write_global_conf(struct mctf_se* s, FILE* f)
 {
-   fprintf(f, "\n[pgmoneta]\n");
    fprintf(f, "ssh_hostname = %s\n", s->endpoint);
    fprintf(f, "ssh_port = %d\n", s->port);
    fprintf(f, "ssh_username = %s\n", s->access_key);
@@ -146,5 +144,6 @@ const struct mctf_se_driver mctf_ssh_driver = {
    .storage_engine = "ssh",
    .start = ssh_start,
    .stop = ssh_stop,
-   .write_server_conf = ssh_write_server_conf,
+   .write_global_conf = ssh_write_global_conf,
+   .write_server_conf = NULL,
 };
