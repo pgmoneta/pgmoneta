@@ -48,13 +48,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define ENV_VAR_CONF_PATH        "PGMONETA_TEST_CONF"
-#define ENV_VAR_CONF_SAMPLE_PATH "PGMONETA_TEST_CONF_SAMPLE"
-#define ENV_VAR_USER_CONF        "PGMONETA_TEST_USER_CONF"
-#define ENV_VAR_RESTORE_DIR      "PGMONETA_TEST_RESTORE_DIR"
-#define ENV_VAR_RETROSPECT_DIR   "PGMONETA_TEST_RETROSPECT_DIR"
-#define ENV_VAR_HOT_STANDBY_DIR  "PGMONETA_TEST_HOT_STANDBY_DIR"
-#define ENV_VAR_EXECUTABLE_DIR   "PGMONETA_TEST_EXECUTABLE_DIR"
+#define ENV_VAR_CONF_PATH            "PGMONETA_TEST_CONF"
+#define ENV_VAR_CONF_SAMPLE_PATH     "PGMONETA_TEST_CONF_SAMPLE"
+#define ENV_VAR_USER_CONF            "PGMONETA_TEST_USER_CONF"
+#define ENV_VAR_RESTORE_DIR          "PGMONETA_TEST_RESTORE_DIR"
+#define ENV_VAR_RETROSPECT_DIR       "PGMONETA_TEST_RETROSPECT_DIR"
+#define ENV_VAR_HOT_STANDBY_DIR      "PGMONETA_TEST_HOT_STANDBY_DIR"
+#define ENV_VAR_EXECUTABLE_DIR       "PGMONETA_TEST_EXECUTABLE_DIR"
+
+#define RESTORED_BACKUP_WAIT_SECONDS 30
 
 char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 char TEST_RESTORE_DIR[MAX_PATH];
@@ -87,7 +89,6 @@ pgmoneta_test_environment_create(void)
 
    conf_path = getenv(ENV_VAR_CONF_PATH);
    assert(conf_path != NULL);
-   // Create the shared memory for the configuration
    size = sizeof(struct main_configuration);
    ret = pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem);
    assert(!ret);
@@ -95,17 +96,14 @@ pgmoneta_test_environment_create(void)
    ret = pgmoneta_init_main_configuration(shmem);
    assert(!ret);
 
-   // Try reading configuration from the configuration path
    ret = pgmoneta_read_main_configuration(shmem, conf_path);
    assert(!ret);
 
-   // Validate the configuration is valid
    ret = pgmoneta_test_validate_configuration(shmem);
    assert(!ret);
 
    config = (struct main_configuration*)shmem;
 
-   // some validations just to be safe
    memcpy(&config->common.configuration_path[0], conf_path, MIN(strlen(conf_path), MAX_PATH - 1));
    assert(config->common.number_of_servers > 0);
    assert(pgmoneta_compare_string(config->common.servers[0].name, "primary"));
@@ -135,7 +133,6 @@ pgmoneta_test_environment_create(void)
 
    pgmoneta_start_logging();
 
-   // Try reading the users configuration path
    ret = pgmoneta_read_users_configuration(shmem, user_conf_path);
    assert(!ret);
 }
@@ -166,14 +163,12 @@ pgmoneta_test_validate_configuration(void* shmem)
       return 1;
    }
 
-   // Use the existing validation function for comprehensive checks
    return pgmoneta_validate_main_configuration(shmem);
 }
 
 int
 pgmoneta_test_add_backup(void)
 {
-   /* Ensure server is online before backup */
    if (pgmoneta_tsclient_mode("primary", "online", 0))
    {
       return 1;
@@ -189,7 +184,6 @@ pgmoneta_test_add_backup(void)
 int
 pgmoneta_test_add_backup_chain(void)
 {
-   /* Ensure server is online before backup */
    if (pgmoneta_tsclient_mode("primary", "online", 0))
    {
       return 1;
@@ -220,7 +214,6 @@ pgmoneta_test_basedir_cleanup(void)
    char* wal_dir = NULL;
    bool restart = false;
    struct main_configuration* config;
-   int ret = 0;
 
    config = (struct main_configuration*)shmem;
 
@@ -321,7 +314,6 @@ pgmoneta_test_config_restore(void)
 int
 pgmoneta_test_backup(const char* server_name, const char* backup_name)
 {
-   /* Cast const away as pgmoneta_tsclient_backup doesn't modify the strings */
    return pgmoneta_tsclient_backup((char*)server_name, (char*)backup_name, 0);
 }
 
@@ -331,7 +323,6 @@ pgmoneta_test_execute_query(int srv, SSL* ssl, int skt, char* query, struct quer
    struct message* msg = NULL;
    struct query_response* response = NULL;
 
-   /* create and execute the query */
    pgmoneta_create_query_message(query, &msg);
    if (pgmoneta_query_execute(ssl, skt, msg, &response) || response == NULL)
    {
@@ -409,20 +400,19 @@ pgmoneta_test_resolve_binary_path(const char* binary_name, char* out)
    }
    self[len] = '\0';
 
-   /* Fallback when check.sh env vars are unavailable: derive .../build from .../build/test/pgmoneta-test */
    slash = strrchr(self, '/');
    if (slash == NULL)
    {
       return 1;
    }
-   *slash = '\0'; /* .../build/test */
+   *slash = '\0';
 
    slash = strrchr(self, '/');
    if (slash == NULL)
    {
       return 1;
    }
-   *slash = '\0'; /* .../build */
+   *slash = '\0';
 
    pgmoneta_snprintf(out, MAX_PATH, "%s/src/%s", self, binary_name);
 
@@ -569,9 +559,7 @@ pgmoneta_test_setup_encryption_env(struct test_encryption_env* env)
    {
       return 1;
    }
-   /* Base64 encoded "pgmoneta-test-password" */
    fprintf(f, "cGdtb25ldGEtdGVzdC1wYXNzd29yZA==\n");
-   /* Base64 encoded 16-byte zero salt */
    fprintf(f, "AAAAAAAAAAAAAAAAAAAAAA==\n");
    fclose(f);
    chmod(master_key_file, 0600);
@@ -624,4 +612,426 @@ pgmoneta_test_teardown_encryption_env(struct test_encryption_env* env)
    }
 
    pgmoneta_clear_aes_cache();
+}
+
+static int
+ensure_restore_subdir(const char* restore_dir, const char* subdir)
+{
+   char path[MAX_PATH];
+
+   if (restore_dir == NULL || subdir == NULL)
+   {
+      return 1;
+   }
+
+   if (pgmoneta_snprintf(path, sizeof(path), "%s/%s", restore_dir, subdir) <= 0)
+   {
+      return 1;
+   }
+
+   return pgmoneta_mkdir(path);
+}
+
+static char active_restore_path[MAX_PATH] = {0};
+static char active_container_name[256] = {0};
+
+/*
+ * Return true when the restored backup should be started locally with pg_ctl
+ * (CI or explicit opt-in), false when a container should be used instead.
+ */
+static bool
+is_local_restore(void)
+{
+   const char* ci_env = getenv("CI");
+   const char* local_env = getenv("PGMONETA_TEST_LOCAL_RESTORE");
+
+   if (ci_env != NULL && strcmp(ci_env, "true") == 0)
+   {
+      return true;
+   }
+
+   if (local_env != NULL && strcmp(local_env, "1") == 0)
+   {
+      return true;
+   }
+
+   return false;
+}
+
+/*
+ * Detect the container engine available on the host.
+ * Returns "podman" or "docker" (with optional sudo prefix).
+ */
+static const char*
+detect_container_engine(void)
+{
+   if (access("/usr/bin/podman", X_OK) == 0 || access("/usr/local/bin/podman", X_OK) == 0)
+   {
+      return "podman";
+   }
+
+   if (access("/usr/bin/docker", X_OK) == 0 || access("/usr/local/bin/docker", X_OK) == 0)
+   {
+      return "docker";
+   }
+
+   return "podman";
+}
+
+/*
+ * We need write_restore_postgresql_conf even though a restored backup already
+ * contains a copy of the postgresql.conf from the backup. This is because the
+ * original cluster's postgresql.conf is configured with the primary server's port
+ * (e.g. 6432 or 5432) and listen_addresses. To start the restored backup locally,
+ * we must override listen_addresses to '*' and change the port to a non-conflicting
+ * port (e.g. 15432) so that it starts successfully alongside the primary.
+ * In container mode, the port inside the container is always 5432.
+ * We open the file in append ("a") mode because PostgreSQL overrides earlier settings
+ * with later ones, preserving all other configuration.
+ */
+static int
+write_restore_postgresql_conf(const char* restore_dir, int port)
+{
+   char path[MAX_PATH];
+   FILE* f = NULL;
+
+   if (restore_dir == NULL)
+   {
+      return 1;
+   }
+
+   if (pgmoneta_snprintf(path, sizeof(path), "%s/postgresql.conf", restore_dir) <= 0)
+   {
+      return 1;
+   }
+
+   f = fopen(path, "a");
+   if (f == NULL)
+   {
+      return 1;
+   }
+
+   fprintf(f, "\n# pgmoneta test overrides\n");
+   fprintf(f, "listen_addresses = '*'\n");
+   fprintf(f, "port = %d\n", port);
+   fprintf(f, "shared_preload_libraries = ''\n");
+
+   fclose(f);
+   return 0;
+}
+
+int
+pgmoneta_start_restored_backup(const char* restore_dir, int port)
+{
+   const char* subdirs[] = {
+      "pg_wal",
+      "pg_xact",
+      "pg_subtrans",
+      "pg_multixact",
+      "pg_multixact/members",
+      "pg_multixact/offsets",
+      "pg_serial",
+      "pg_snapshots",
+      "pg_stat",
+      "pg_stat_tmp",
+      "pg_tblspc",
+      "pg_twophase",
+      "pg_replslot",
+      "pg_commit_ts",
+      "pg_dynshmem",
+      "pg_notify",
+      "pg_logical",
+      "pg_logical/snapshots",
+      "pg_logical/mappings"};
+   const size_t subdir_count = sizeof(subdirs) / sizeof(subdirs[0]);
+   char command[2048];
+   char pgdata[MAX_PATH];
+   char pg_version_path[MAX_PATH];
+   char pgdata_candidate[MAX_PATH];
+   char* output = NULL;
+   int exit_code = 0;
+   const char* version_env = NULL;
+   const char* version = NULL;
+   char recovery_path[MAX_PATH];
+   char standby_path[MAX_PATH];
+   char pg_ctl[MAX_PATH];
+   char pg_isready[MAX_PATH];
+   size_t i;
+   bool local_mode = is_local_restore();
+   const char* container_engine = NULL;
+   int conf_port;
+
+   if (restore_dir == NULL || restore_dir[0] == '\0')
+   {
+      return -1;
+   }
+
+   if (port <= 0)
+   {
+      port = RESTORED_BACKUP_DEFAULT_PORT;
+   }
+
+   pgmoneta_stop_restored_backup();
+
+   pgmoneta_snprintf(pgdata, sizeof(pgdata), "%s", restore_dir);
+   if (pgmoneta_snprintf(pg_version_path, sizeof(pg_version_path), "%s/PG_VERSION", pgdata) <= 0)
+   {
+      return -1;
+   }
+   if (!pgmoneta_exists(pg_version_path))
+   {
+      if (pgmoneta_snprintf(pgdata_candidate, sizeof(pgdata_candidate), "%s/data", restore_dir) <= 0)
+      {
+         return -1;
+      }
+      if (pgmoneta_snprintf(pg_version_path, sizeof(pg_version_path), "%s/PG_VERSION", pgdata_candidate) > 0 &&
+          pgmoneta_exists(pg_version_path))
+      {
+         pgmoneta_snprintf(pgdata, sizeof(pgdata), "%s", pgdata_candidate);
+      }
+   }
+
+   for (i = 0; i < subdir_count; i++)
+   {
+      if (ensure_restore_subdir(pgdata, subdirs[i]))
+      {
+         return -1;
+      }
+   }
+
+   /* In container mode port inside container is 5432, mapped to host port */
+   conf_port = local_mode ? port : 5432;
+
+   if (write_restore_postgresql_conf(pgdata, conf_port))
+   {
+      return -1;
+   }
+
+   if (pgmoneta_snprintf(recovery_path, sizeof(recovery_path), "%s/recovery.signal", pgdata) <= 0 ||
+       pgmoneta_snprintf(standby_path, sizeof(standby_path), "%s/standby.signal", pgdata) <= 0)
+   {
+      return -1;
+   }
+
+   {
+      const char* recovery_env = getenv("PGMONETA_TEST_RECOVERY_SIGNAL");
+
+      if (recovery_env != NULL && strcmp(recovery_env, "1") == 0)
+      {
+         if (!pgmoneta_exists(recovery_path))
+         {
+            FILE* rf = fopen(recovery_path, "a");
+            if (rf == NULL)
+            {
+               return -1;
+            }
+            fclose(rf);
+         }
+      }
+      else if (recovery_env != NULL && strcmp(recovery_env, "0") == 0)
+      {
+         if (pgmoneta_exists(recovery_path))
+         {
+            pgmoneta_delete_file(recovery_path, NULL);
+         }
+         if (pgmoneta_exists(standby_path))
+         {
+            pgmoneta_delete_file(standby_path, NULL);
+         }
+      }
+   }
+
+   pgmoneta_snprintf(active_restore_path, sizeof(active_restore_path), "%s", pgdata);
+
+   version_env = getenv("TEST_PG_VERSION");
+   version = (version_env != NULL && version_env[0] != '\0') ? version_env : "17";
+
+   if (local_mode)
+   {
+      /* --- Local pg_ctl path (CI or PGMONETA_TEST_LOCAL_RESTORE=1) --- */
+      pgmoneta_snprintf(pg_ctl, sizeof(pg_ctl), "/usr/pgsql-%s/bin/pg_ctl", version);
+      if (access(pg_ctl, X_OK) != 0)
+      {
+         pgmoneta_snprintf(pg_ctl, sizeof(pg_ctl), "pg_ctl");
+      }
+
+      pgmoneta_snprintf(pg_isready, sizeof(pg_isready), "/usr/pgsql-%s/bin/pg_isready", version);
+      if (access(pg_isready, X_OK) != 0)
+      {
+         pgmoneta_snprintf(pg_isready, sizeof(pg_isready), "pg_isready");
+      }
+
+      if (pgmoneta_snprintf(command, sizeof(command),
+                            "%s -D %s -l %s/postgresql.log -o \"-p %d\" start",
+                            pg_ctl, pgdata, pgdata, port) <= 0)
+      {
+         return -1;
+      }
+
+      if (pgmoneta_test_exec_command(command, &output, &exit_code) || exit_code != 0)
+      {
+         pgmoneta_log_error("pgmoneta_start_restored_backup: pg_ctl start failed (exit=%d): %s",
+                            exit_code, output ? output : "(null)");
+         free(output);
+         active_restore_path[0] = '\0';
+         return -1;
+      }
+      pgmoneta_log_info("pgmoneta_start_restored_backup: pg_ctl started, pgdata=%s", pgdata);
+      free(output);
+      output = NULL;
+
+      {
+         int i2;
+         for (i2 = 0; i2 < RESTORED_BACKUP_WAIT_SECONDS; i2++)
+         {
+            if (pgmoneta_snprintf(command, sizeof(command),
+                                  "%s -h localhost -p %d",
+                                  pg_isready, port) <= 0)
+            {
+               break;
+            }
+
+            if (pgmoneta_test_exec_command(command, &output, &exit_code) == 0 && exit_code == 0)
+            {
+               free(output);
+               return port;
+            }
+
+            free(output);
+            output = NULL;
+            sleep(1);
+         }
+      }
+
+      pgmoneta_log_error("pgmoneta_start_restored_backup: pg_isready timed out after %d seconds, last: %s",
+                         RESTORED_BACKUP_WAIT_SECONDS, output ? output : "(null)");
+      free(output);
+      pgmoneta_stop_restored_backup();
+      return -1;
+   }
+   else
+   {
+      /* --- Container path (local dev with podman/docker) --- */
+      container_engine = detect_container_engine();
+
+      pgmoneta_snprintf(active_container_name, sizeof(active_container_name),
+                        "pgmoneta-test-restored-backup");
+
+      /* Remove any stale container */
+      pgmoneta_snprintf(command, sizeof(command), "%s rm -f %s",
+                        container_engine, active_container_name);
+      pgmoneta_test_exec_command(command, &output, &exit_code);
+      free(output);
+      output = NULL;
+
+      {
+         char image[MAX_PATH];
+         const char* uidmap_args = (strcmp(container_engine, "podman") == 0)
+                                      ? "--uidmap +26:0:1 --gidmap +26:0:1 "
+                                      : "";
+
+         pgmoneta_snprintf(image, sizeof(image),
+                           "pgmoneta-test-postgresql%s-rocky10", version);
+
+         pgmoneta_snprintf(command, sizeof(command),
+                           "%s run -d --name %s %s"
+                           "-p %d:5432 "
+                           "-v \"%s:/pgdata:Z\" "
+                           "-e PGDATA=/pgdata "
+                           "%s "
+                           "/usr/pgsql-%s/bin/postgres -D /pgdata",
+                           container_engine, active_container_name, uidmap_args,
+                           port, pgdata, image, version);
+      }
+
+      if (pgmoneta_test_exec_command(command, &output, &exit_code) || exit_code != 0)
+      {
+         pgmoneta_log_error("pgmoneta_start_restored_backup: container start failed (exit=%d): %s",
+                            exit_code, output ? output : "(null)");
+         free(output);
+         active_restore_path[0] = '\0';
+         active_container_name[0] = '\0';
+         return -1;
+      }
+      pgmoneta_log_info("pgmoneta_start_restored_backup: container %s started", active_container_name);
+      free(output);
+      output = NULL;
+
+      {
+         int i2;
+         for (i2 = 0; i2 < RESTORED_BACKUP_WAIT_SECONDS; i2++)
+         {
+            pgmoneta_snprintf(command, sizeof(command),
+                              "%s exec %s /usr/pgsql-%s/bin/pg_isready -h localhost -p 5432",
+                              container_engine, active_container_name, version);
+
+            if (pgmoneta_test_exec_command(command, &output, &exit_code) == 0 && exit_code == 0)
+            {
+               free(output);
+               return port;
+            }
+
+            free(output);
+            output = NULL;
+            sleep(1);
+         }
+      }
+
+      pgmoneta_log_error("pgmoneta_start_restored_backup: container pg_isready timed out after %d seconds",
+                         RESTORED_BACKUP_WAIT_SECONDS);
+      free(output);
+      pgmoneta_stop_restored_backup();
+      return -1;
+   }
+}
+
+void
+pgmoneta_stop_restored_backup(void)
+{
+   char command[1024];
+   char* output = NULL;
+   int exit_code = 0;
+   char pg_ctl[MAX_PATH];
+   char version[32];
+   const char* version_env = getenv("TEST_PG_VERSION");
+   pgmoneta_snprintf(version, sizeof(version), "%s", version_env ? version_env : "17");
+
+   if (active_container_name[0] != '\0')
+   {
+      /* Container path: stop and remove the container */
+      const char* container_engine = detect_container_engine();
+
+      pgmoneta_snprintf(command, sizeof(command), "%s stop %s",
+                        container_engine, active_container_name);
+      pgmoneta_test_exec_command(command, &output, &exit_code);
+      free(output);
+      output = NULL;
+
+      pgmoneta_snprintf(command, sizeof(command), "%s rm -f %s",
+                        container_engine, active_container_name);
+      pgmoneta_test_exec_command(command, &output, &exit_code);
+      free(output);
+
+      active_container_name[0] = '\0';
+      active_restore_path[0] = '\0';
+      return;
+   }
+
+   if (active_restore_path[0] == '\0')
+   {
+      return;
+   }
+
+   pgmoneta_snprintf(pg_ctl, sizeof(pg_ctl), "/usr/pgsql-%s/bin/pg_ctl", version);
+   if (access(pg_ctl, X_OK) != 0)
+   {
+      pgmoneta_snprintf(pg_ctl, sizeof(pg_ctl), "pg_ctl");
+   }
+
+   pgmoneta_snprintf(command, sizeof(command), "%s stop -D %s -m fast",
+                     pg_ctl, active_restore_path);
+   pgmoneta_test_exec_command(command, &output, &exit_code);
+   free(output);
+
+   active_restore_path[0] = '\0';
 }
