@@ -79,6 +79,7 @@ struct workers
    struct worker** worker;         /**< The list of workers */
    volatile int number_of_alive;   /**< The number of alive workers */
    volatile int number_of_working; /**< The number of workers */
+   volatile int keepalive;         /**< The keep-alive flag */
    pthread_mutex_t worker_lock;    /**< The worker lock */
    pthread_cond_t worker_all_idle; /**< Are workers idle */
    struct deque* outcome;          /**< Aggregated failures */

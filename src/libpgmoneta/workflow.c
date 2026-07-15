@@ -584,20 +584,13 @@ wf_backup(void)
    {
       current->next = pgmoneta_create_sha256();
       current = current->next;
-
-      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
    }
 
-   if (config->storage_engine & STORAGE_ENGINE_S3)
+   if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
+       (config->storage_engine & STORAGE_ENGINE_S3) ||
+       (config->storage_engine & STORAGE_ENGINE_AZURE))
    {
-      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_AZURE)
-   {
-      current->next = pgmoneta_storage_create_azure();
+      current->next = pgmoneta_storage_create_remote();
       current = current->next;
    }
 
@@ -785,20 +778,13 @@ wf_post_rollup(struct backup* backup)
    {
       current->next = pgmoneta_create_sha256();
       current = current->next;
-
-      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
    }
 
-   if (config->storage_engine & STORAGE_ENGINE_S3)
+   if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
+       (config->storage_engine & STORAGE_ENGINE_S3) ||
+       (config->storage_engine & STORAGE_ENGINE_AZURE))
    {
-      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_AZURE)
-   {
-      current->next = pgmoneta_storage_create_azure();
+      current->next = pgmoneta_storage_create_remote();
       current = current->next;
    }
 
@@ -879,20 +865,13 @@ wf_incremental_backup(void)
    {
       current->next = pgmoneta_create_sha256();
       current = current->next;
-
-      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
    }
 
-   if (config->storage_engine & STORAGE_ENGINE_S3)
+   if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
+       (config->storage_engine & STORAGE_ENGINE_S3) ||
+       (config->storage_engine & STORAGE_ENGINE_AZURE))
    {
-      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_AZURE)
-   {
-      current->next = pgmoneta_storage_create_azure();
+      current->next = pgmoneta_storage_create_remote();
       current = current->next;
    }
 
