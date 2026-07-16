@@ -230,7 +230,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    tag = pgmoneta_append(tag, "pgmoneta_");
    tag = pgmoneta_append(tag, label);
 
-   progress_enabled = pgmoneta_is_progress_enabled(server);
+   progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    pgmoneta_create_base_backup_message(config->common.servers[server].version, false, tag, true,
                                        max_rate,

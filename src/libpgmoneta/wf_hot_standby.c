@@ -324,7 +324,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
          if (config->common.encryption != ENCRYPTION_NONE)
          {
-            if (pgmoneta_decrypt_directory(destination, workers, NULL))
+            if (pgmoneta_decrypt_directory(-1, destination, workers, NULL))
             {
                error = true;
                goto cleanup;
@@ -343,7 +343,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
          if (COMPRESSION_ALGORITHM(config->compression_type) != COMPRESSION_ALG_NONE)
          {
-            if (pgmoneta_decompress_directory(destination, config->compression_type, workers, NULL))
+            if (pgmoneta_decompress_directory(-1, destination, config->compression_type, workers, NULL))
             {
                error = true;
                goto cleanup;
@@ -367,7 +367,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             pgmoneta_log_debug("hot_standby_overrides source:      %s", config->common.servers[server].hot_standby_overrides[i]);
             pgmoneta_log_debug("hot_standby_overrides destination: %s", destination);
 
-            pgmoneta_copy_directory(config->common.servers[server].hot_standby_overrides[i],
+            pgmoneta_copy_directory(-1, config->common.servers[server].hot_standby_overrides[i],
                                     destination,
                                     NULL,
                                     workers);

@@ -70,7 +70,7 @@ pgmoneta_create_cleanup(int type)
 static char*
 cleanup_name(void)
 {
-   return "Cleanup";
+   return PHASE_NAME_CLEANUP;
 }
 
 static int

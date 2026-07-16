@@ -165,7 +165,7 @@ Nota: Si `host` comienza con un `/`, representa una ruta y `pgmoneta` se conecta
 | Propiedad | Predeterminado | Unidad | Requerido | Descripción |
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | 0 | Int | No | La velocidad máxima de transferencia de backup en bytes por segundo. Usa 0 para desactivar |
-| progress | off | Bool | No | Habilitar seguimiento del progreso de backup |
+| progress | off | Bool | No | Habilitar seguimiento del progreso de operaciones de backup y restore |
 | blocking_timeout | 30 | String | No | El número de segundos que el proceso se bloqueará esperando una conexión. Si este valor se especifica sin unidades, se toma como segundos. Establecer este parámetro a 0 lo desactiva. Soporta los siguientes sufijos de unidades: 'S' para segundos (por defecto), 'M' para minutos, 'H' para horas, 'D' para días y 'W' para semanas. |
 | keep_alive | on | Bool | No | Tener `SO_KEEPALIVE` en sockets |
 | nodelay | on | Bool | No | Tener `TCP_NODELAY` en sockets |
@@ -241,7 +241,7 @@ tener acceso a la base de datos `postgres` para obtener los parámetros de confi
 | Propiedad | Predeterminado | Unidad | Requerido | Descripción |
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | -1 | Int | No | La velocidad máxima de transferencia de backup en bytes por segundo. Usa 0 para desactivar, -1 significa usar la configuración global |
-| progress | -1 | Int | No | Habilitar seguimiento del progreso de backup. Usa 1 para habilitar, 0 para desactivar, -1 significa usar la configuración global |
+| progress | -1 | Int | No | Habilitar seguimiento del progreso de operaciones de backup y restore. Usa 1 para habilitar, 0 para desactivar, -1 significa usar la configuración global |
 
 
 **S3**

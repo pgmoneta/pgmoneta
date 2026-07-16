@@ -42,6 +42,8 @@
 #include <string.h>
 #include <time.h>
 
+static void calculate_restore_fallback_weights(int*, int, int*);
+
 static void
 normalize_weights(int n_phases, int* weights)
 {
@@ -54,6 +56,79 @@ normalize_weights(int n_phases, int* weights)
    {
       int diff = 100 - total_weight;
       weights[n_phases - 1] += diff;
+   }
+}
+
+static void
+calculate_restore_adaptive_weights(void* info, int* phases, int n_phases, int* weights)
+{
+   struct backup* prev = (struct backup*)info;
+   double compression_time = prev->compression_zstd_elapsed_time +
+                             prev->compression_gzip_elapsed_time +
+                             prev->compression_lz4_elapsed_time +
+                             prev->compression_bzip2_elapsed_time;
+
+   double encryption_time = prev->encryption_elapsed_time;
+
+   if (compression_time > 0 && encryption_time > 0)
+   {
+      /* Get the expected ratio, give compression and encryption 60 percent of the work*/
+      double encryption_weight_f = 0;
+      double compression_weight_f = 0;
+      double ratio = compression_time / encryption_time;
+      if (ratio < 1)
+      {
+         ratio = 1.0 / ratio;
+         encryption_weight_f = (60.0 * ratio) / (ratio + 1.0);
+         compression_weight_f = 60.0 - encryption_weight_f;
+      }
+      else
+      {
+         compression_weight_f = (60.0 * ratio) / (ratio + 1.0);
+         encryption_weight_f = 60.0 - compression_weight_f;
+      }
+
+      int compression_weight = (int)(compression_weight_f + 0.5);
+      int encryption_weight = 60 - compression_weight;
+
+      for (int i = 0; i < n_phases; i++)
+      {
+         switch (phases[i])
+         {
+            case PHASE_RESTORE:
+               weights[i] = 20;
+               break;
+            case PHASE_COMPRESSION:
+               weights[i] = compression_weight;
+               break;
+            case PHASE_ENCRYPTION:
+               weights[i] = encryption_weight;
+               break;
+            case PHASE_COPY_WAL:
+               weights[i] = 1;
+               break;
+            case PHASE_RECOVERY_INFO:
+               weights[i] = 1;
+               break;
+            case PHASE_EXCLUDED_FILES:
+               weights[i] = 15;
+               break;
+            case PHASE_PERMISSIONS:
+               weights[i] = 1;
+               break;
+            case PHASE_CLEANUP:
+               weights[i] = 1;
+               break;
+            default:
+               weights[i] = 1;
+               break;
+         }
+      }
+   }
+   else
+   {
+      /* Fallback to default weights */
+      calculate_restore_fallback_weights(phases, n_phases, weights);
    }
 }
 
@@ -126,11 +201,139 @@ calculate_adaptive_weights(int workflow_type, void* info, int* phases, int n_pha
          }
          break;
       }
+
+      case WORKFLOW_TYPE_RESTORE:
+         calculate_restore_adaptive_weights(info, phases, n_phases, weights);
+         break;
       default:
          break;
    }
 
    normalize_weights(n_phases, weights);
+}
+
+static void
+calculate_restore_fallback_weights(int* phases, int n_phases, int* weights)
+{
+   /* Numbers are based on multiple test restore runs */
+   bool has_compression = false;
+   bool has_encryption = false;
+   for (int i = 0; i < n_phases; i++)
+   {
+      switch (phases[i])
+      {
+         case PHASE_RESTORE:
+            weights[i] = 20;
+            break;
+         case PHASE_ENCRYPTION:
+            weights[i] = 14;
+            has_encryption = true;
+            break;
+         case PHASE_COMPRESSION:
+            weights[i] = 46;
+            has_compression = true;
+            break;
+         case PHASE_COPY_WAL:
+            weights[i] = 1;
+            break;
+         case PHASE_RECOVERY_INFO:
+            weights[i] = 1;
+            break;
+         case PHASE_EXCLUDED_FILES:
+            weights[i] = 15;
+            break;
+         case PHASE_PERMISSIONS:
+            weights[i] = 1;
+            break;
+         case PHASE_CLEANUP:
+            weights[i] = 1;
+            break;
+         default:
+            weights[i] = 1;
+            break;
+      }
+   }
+
+   if (!has_compression && !has_encryption)
+   {
+      for (int i = 0; i < n_phases; i++)
+      {
+         if (phases[i] == PHASE_RESTORE)
+         {
+            weights[i] = 50;
+         }
+         else if (phases[i] == PHASE_EXCLUDED_FILES)
+         {
+            weights[i] = 45;
+            break;
+         }
+      }
+   }
+   else if (has_compression && !has_encryption)
+   {
+      for (int i = 0; i < n_phases; i++)
+      {
+         if (phases[i] == PHASE_RESTORE)
+         {
+            weights[i] = 25;
+         }
+         else if (phases[i] == PHASE_COMPRESSION)
+         {
+            weights[i] = 50;
+         }
+         else if (phases[i] == PHASE_EXCLUDED_FILES)
+         {
+            weights[i] = 20;
+            break;
+         }
+      }
+   }
+   else if (!has_compression && has_encryption)
+   {
+      for (int i = 0; i < n_phases; i++)
+      {
+         if (phases[i] == PHASE_RESTORE)
+         {
+            weights[i] = 35;
+         }
+         else if (phases[i] == PHASE_ENCRYPTION)
+         {
+            weights[i] = 30;
+         }
+         else if (phases[i] == PHASE_EXCLUDED_FILES)
+         {
+            weights[i] = 30;
+            break;
+         }
+      }
+   }
+}
+
+static void
+calculate_combine_fallback_weights(int* phases, int n_phases, int* weights)
+{
+   if (n_phases == 1 && phases[0] == PHASE_COMBINE_INCREMENTAL)
+   {
+      weights[0] = 100;
+   }
+   else
+   {
+      for (int i = 0; i < n_phases; i++)
+      {
+         switch (phases[i])
+         {
+            case PHASE_COMBINE_INCREMENTAL:
+               weights[i] = 90;
+               break;
+            case PHASE_CLEANUP:
+               weights[i] = 1;
+               break;
+            default:
+               weights[i] = 3;
+               break;
+         }
+      }
+   }
 }
 
 static void
@@ -196,10 +399,14 @@ calculate_fallback_weights(int workflow_type, int* phases, int n_phases, int* we
          break;
       }
       case WORKFLOW_TYPE_RESTORE:
-         /* TODO: Implement fallback weights for restore */
+         calculate_restore_fallback_weights(phases, n_phases, weights);
          break;
       case WORKFLOW_TYPE_ARCHIVE:
          /* TODO: Implement fallback weights for archive */
+         break;
+      case WORKFLOW_TYPE_COMBINE:
+      case WORKFLOW_TYPE_COMBINE_AS_IS:
+         calculate_combine_fallback_weights(phases, n_phases, weights);
          break;
       case WORKFLOW_TYPE_VERIFY:
          weights[0] = 100;
@@ -241,8 +448,8 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
 {
    int phase = -1;
    int n_phases = 0;
-   int phases[8];
-   int weights[8];
+   int phases[MAX_PHASES];
+   int weights[MAX_PHASES];
    int cumulative = 0;
    char* server_backup = NULL;
    struct backup* prev = NULL;
@@ -271,7 +478,7 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
                break;
             }
          }
-         if (!found && n_phases < 8)
+         if (!found && n_phases < MAX_PHASES)
          {
             phases[n_phases++] = phase;
          }
@@ -304,7 +511,24 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
          break;
       }
       case WORKFLOW_TYPE_RESTORE:
-         /* TODO: Implement adaptive/fallback weights for restore */
+      {
+         /* Try adaptive weights using data from previous full backup, if not, then fallback to default weights */
+         struct backup* prev_backup = NULL;
+         assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+         prev_backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+         if (prev_backup != NULL && prev_backup->total_elapsed_time > 0)
+         {
+            calculate_adaptive_weights(workflow_type, prev_backup, phases, n_phases, weights);
+         }
+         else
+         {
+            calculate_fallback_weights(workflow_type, phases, n_phases, weights);
+         }
+         break;
+      }
+      case WORKFLOW_TYPE_COMBINE:
+      case WORKFLOW_TYPE_COMBINE_AS_IS:
+         calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
       case WORKFLOW_TYPE_ARCHIVE:
          /* TODO: Implement adaptive/fallback weights for archive */
@@ -560,6 +784,30 @@ pgmoneta_progress_phase_from_workflow_name(char* name)
    {
       return PHASE_VERIFY;
    }
+   if (pgmoneta_compare_string(name, PHASE_NAME_COPY_WAL))
+   {
+      return PHASE_COPY_WAL;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_RECOVERY_INFO))
+   {
+      return PHASE_RECOVERY_INFO;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_EXCLUDED_FILES))
+   {
+      return PHASE_EXCLUDED_FILES;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_PERMISSIONS))
+   {
+      return PHASE_PERMISSIONS;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_CLEANUP))
+   {
+      return PHASE_CLEANUP;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_COMBINE_INCREMENTAL))
+   {
+      return PHASE_COMBINE_INCREMENTAL;
+   }
    return -1;
 }
 
@@ -588,6 +836,18 @@ pgmoneta_progress_limit_node_key(int phase)
          return NODE_PROGRESS_LIMIT_RESTORE;
       case PHASE_VERIFY:
          return NODE_PROGRESS_LIMIT_VERIFY;
+      case PHASE_COPY_WAL:
+         return NODE_PROGRESS_LIMIT_COPY_WAL;
+      case PHASE_RECOVERY_INFO:
+         return NODE_PROGRESS_LIMIT_RECOVERY_INFO;
+      case PHASE_EXCLUDED_FILES:
+         return NODE_PROGRESS_LIMIT_EXCLUDED_FILES;
+      case PHASE_COMBINE_INCREMENTAL:
+         return NODE_PROGRESS_LIMIT_COMBINE_INCREMENTAL;
+      case PHASE_PERMISSIONS:
+         return NODE_PROGRESS_LIMIT_PERMISSIONS;
+      case PHASE_CLEANUP:
+         return NODE_PROGRESS_LIMIT_CLEANUP;
       default:
          return NULL;
    }
