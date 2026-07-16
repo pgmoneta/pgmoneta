@@ -122,7 +122,7 @@ MCTF_TEST(test_streamer)
          if (!same)
          {
             /* save the test input to retrospect/ for inspection */
-            pgmoneta_copy_directory(dir, retrospect_dir, NULL, NULL);
+            pgmoneta_copy_directory(-1, dir, retrospect_dir, NULL, NULL);
          }
 
          MCTF_ASSERT(same, cleanup, "Mismatch original file %s and retored file %s", bigfile, restore_dest);

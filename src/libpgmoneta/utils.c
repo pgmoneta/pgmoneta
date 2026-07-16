@@ -2417,13 +2417,14 @@ do_delete_file(struct worker_common* wc)
 }
 
 int
-pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, struct workers* workers)
+pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_files_names, struct workers* workers)
 {
    DIR* d = opendir(from);
    char* from_buffer;
    char* to_buffer;
    struct dirent* entry;
    struct stat statbuf;
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    pgmoneta_mkdir(to);
 
@@ -2451,7 +2452,7 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
          {
             if (S_ISDIR(statbuf.st_mode))
             {
-               pgmoneta_copy_directory(from_buffer, to_buffer, restore_last_files_names, workers);
+               pgmoneta_copy_directory(server, from_buffer, to_buffer, restore_last_files_names, workers);
             }
             else
             {
@@ -2465,11 +2466,19 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
                   if (!file_is_excluded)
                   {
                      pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                     if (progress_enabled)
+                     {
+                        pgmoneta_progress_increment(server, 1);
+                     }
                   }
                }
                else
                {
                   pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  if (progress_enabled)
+                  {
+                     pgmoneta_progress_increment(server, 1);
+                  }
                }
             }
          }
@@ -3280,17 +3289,24 @@ error:
 }
 
 int
-pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* workers)
+pgmoneta_copy_wal_files(int server, char* from, char* to, char* start, struct workers* workers)
 {
    struct deque* wal_files = NULL;
    struct deque_iterator* it = NULL;
    char* basename = NULL;
    char* ff = NULL;
    char* tf = NULL;
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    if (pgmoneta_get_wal_files(from, &wal_files))
    {
       goto error;
+   }
+
+   if (progress_enabled && wal_files != NULL)
+   {
+      int total_files = pgmoneta_deque_size(wal_files);
+      pgmoneta_progress_set_total(server, total_files);
    }
 
    pgmoneta_deque_iterator_create(wal_files, &it);
@@ -3362,6 +3378,11 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
       free(basename);
       free(ff);
       free(tf);
+
+      if (progress_enabled)
+      {
+         pgmoneta_progress_increment(server, 1);
+      }
 
       basename = NULL;
       ff = NULL;

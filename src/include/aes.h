@@ -134,10 +134,10 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, size_t
 
 /**
  * Encrypt a directory
+ * @param server The server index for progress tracking, or -1 to disable
  * @param d The directory
  * @param workers The optional workers
  * @param excludes The optional excludes
- * @param server The server index for progress tracking, or -1 to disable
  * @return 0 upon success, otherwise 1
  */
 int
@@ -158,13 +158,14 @@ pgmoneta_set_master_salt(unsigned char* salt);
 
 /**
  * Decrypt a directory
+ * @param server The server index for progress tracking, or -1 to disable
  * @param d The directory
  * @param workers The optional workers
  * @param excludes The optional excludes
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt_directory(char* d, struct workers* workers, struct deque* excludes);
+pgmoneta_decrypt_directory(int server, char* d, struct workers* workers, struct deque* excludes);
 
 /**
  * Encrypt a single file, also remove the original file

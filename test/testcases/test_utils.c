@@ -1865,7 +1865,7 @@ MCTF_TEST(test_utils_missing_wal)
    MCTF_ASSERT_PTR_NONNULL(to_dir, cleanup, "append to_dir failed");
    pgmoneta_mkdir(to_dir);
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_copy_wal_files(dir, to_dir, "000000000000000000000000", NULL), 0, cleanup, "copy_wal_files failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_copy_wal_files(-1, dir, to_dir, "000000000000000000000000", NULL), 0, cleanup, "copy_wal_files failed");
    check_file = pgmoneta_append(NULL, to_dir);
    MCTF_ASSERT_PTR_NONNULL(check_file, cleanup, "append check_file base failed");
    check_file = pgmoneta_append(check_file, "/000000010000000000000001");
