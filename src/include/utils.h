@@ -767,6 +767,7 @@ pgmoneta_delete_file(char* file, struct workers* workers);
 
 /**
  * Copy a directory
+ * @param server The server identifier for progress tracking, -1 to disable progress tracking
  * @param from The from directory
  * @param to The to directory
  * @param restore_last_paths The string array of file names that should be excluded from being copied in this round
@@ -774,7 +775,7 @@ pgmoneta_delete_file(char* file, struct workers* workers);
  * @return The result
  */
 int
-pgmoneta_copy_directory(char* from, char* to, char** restore_last_paths, struct workers* workers);
+pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_paths, struct workers* workers);
 
 /**
  * List a directory
@@ -929,6 +930,7 @@ pgmoneta_is_symlink_valid(char* path);
 
 /**
  * Copy WAL files
+ * @param server The server identifier
  * @param from The from directory
  * @param to The to directory
  * @param start The start file
@@ -936,7 +938,7 @@ pgmoneta_is_symlink_valid(char* path);
  * @return The result
  */
 int
-pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* workers);
+pgmoneta_copy_wal_files(int server, char* from, char* to, char* start, struct workers* workers);
 
 /**
  * Get the number of WAL files

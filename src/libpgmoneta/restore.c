@@ -262,8 +262,8 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
 static int
 file_base_name(char* file, char** basename);
 
-static int copy_tablespaces_restore(char* from, char* to, char* base,
-                                    char* server, char* id,
+static int copy_tablespaces_restore(int server, char* from, char* to,
+                                    char* base, char* id,
                                     struct backup* backup,
                                     struct workers* workers);
 static int copy_tablespaces_hotstandby(int server,
@@ -271,6 +271,12 @@ static int copy_tablespaces_hotstandby(int server,
                                        char* tblspc_mappings,
                                        struct backup* backup,
                                        struct workers* workers);
+
+int
+pgmoneta_get_restore_last_files_num(void)
+{
+   return sizeof(restore_last_files_names) / sizeof(restore_last_files_names[0]);
+}
 
 int
 pgmoneta_get_restore_last_files_names(char*** output)
@@ -860,6 +866,20 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
       goto error;
    }
 
+   if (server >= 0 && pgmoneta_is_progress_enabled(server))
+   {
+      /* Round 1 for base data directory files*/
+      int nfiles = pgmoneta_count_files(input_dir);
+      /* Round 2 for each tablespace */
+      for (uint64_t i = 0; i < bck->number_of_tablespaces; i++)
+      {
+         memset(itblspc_dir, 0, MAX_PATH);
+         pgmoneta_snprintf(itblspc_dir, MAX_PATH, "%s/%s/%u", input_dir, "pg_tblspc", parse_oid(bck->tablespaces_oids[i]));
+         nfiles += pgmoneta_count_files(itblspc_dir);
+      }
+      pgmoneta_progress_set_total(server, nfiles);
+   }
+
    config = (struct main_configuration*)shmem;
 
    number_of_workers = pgmoneta_get_number_of_workers(server);
@@ -1124,9 +1144,17 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    }
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_POST_ROLLUP, tmp_backup);
+
+   pgmoneta_progress_setup(server, workflow, nodes, WORKFLOW_TYPE_POST_ROLLUP);
+
    if (carry_out_workflow(workflow, nodes) != RESTORE_OK)
    {
       goto error;
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
    }
 
    pgmoneta_workflow_destroy(workflow);
@@ -1139,6 +1167,10 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    return 0;
 
 error:
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
+   }
    if (pgmoneta_exists(tmp_backup_root))
    {
       pgmoneta_delete_directory(tmp_backup_root);
@@ -1223,7 +1255,7 @@ error:
 }
 
 int
-pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers)
+pgmoneta_copy_postgresql_restore(int server, char* from, char* to, char* base, char* id, struct backup* backup, struct workers* workers)
 {
    DIR* d = opendir(from);
    char* from_buffer = NULL;
@@ -1231,6 +1263,7 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
    struct dirent* entry;
    struct stat statbuf;
    char** restore_last_files_names = NULL;
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
    {
@@ -1256,6 +1289,12 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
    }
 
    pgmoneta_mkdir(to);
+
+   if (progress_enabled)
+   {
+      int n_files = pgmoneta_count_files(from);
+      pgmoneta_progress_set_total(server, n_files);
+   }
 
    if (d)
    {
@@ -1286,11 +1325,11 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
             {
                if (pgmoneta_compare_string(entry->d_name, "pg_tblspc"))
                {
-                  copy_tablespaces_restore(from, to, base, server, id, backup, workers);
+                  copy_tablespaces_restore(server, from, to, base, id, backup, workers);
                }
                else
                {
-                  pgmoneta_copy_directory(from_buffer, to_buffer, restore_last_files_names, workers);
+                  pgmoneta_copy_directory(server, from_buffer, to_buffer, restore_last_files_names, workers);
                }
             }
             else
@@ -1305,11 +1344,19 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
                   if (!file_is_excluded)
                   {
                      pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                     if (progress_enabled)
+                     {
+                        pgmoneta_progress_increment(server, 1);
+                     }
                   }
                }
                else
                {
                   pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  if (progress_enabled)
+                  {
+                     pgmoneta_progress_increment(server, 1);
+                  }
                }
             }
          }
@@ -1394,7 +1441,7 @@ pgmoneta_copy_postgresql_hotstandby(int server, char* from, char* to, char* tbls
                }
                else
                {
-                  pgmoneta_copy_directory(from_buffer, to_buffer, NULL, workers);
+                  pgmoneta_copy_directory(-1, from_buffer, to_buffer, NULL, workers);
                }
             }
             else
@@ -1692,6 +1739,7 @@ reconstruct_backup_file(int server,
    struct value_config rfile_config = {.destroy_data = rfile_destroy_cb, .to_string = NULL};
    struct json* file = NULL;
    bool full_file_found = false;
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    config = (struct main_configuration*)shmem;
 
@@ -1889,6 +1937,10 @@ reconstruct_backup_file(int server,
 
    pgmoneta_deque_destroy(sources);
    pgmoneta_deque_iterator_destroy(label_iter);
+   if (progress_enabled)
+   {
+      pgmoneta_progress_increment(server, 1);
+   }
    free(source_map);
    free(offset_map);
    free(base_file_name);
@@ -2494,9 +2546,17 @@ restore_backup_full(struct art* nodes)
    }
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, backup);
+
+   pgmoneta_progress_setup(server, workflow, nodes, WORKFLOW_TYPE_RESTORE);
+
    if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
    {
       goto error;
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
    }
 
    free(target_root);
@@ -2507,6 +2567,11 @@ restore_backup_full(struct art* nodes)
    return RESTORE_OK;
 
 error:
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
+   }
+
    free(target_root);
    free(target_base);
    free(wal_root);
@@ -2624,15 +2689,22 @@ restore_backup_incremental(struct art* nodes)
    if (!combine_as_is)
    {
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE, backup);
+      pgmoneta_progress_setup(server, workflow, nodes, WORKFLOW_TYPE_COMBINE);
    }
    else
    {
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE_AS_IS, backup);
+      pgmoneta_progress_setup(server, workflow, nodes, WORKFLOW_TYPE_COMBINE_AS_IS);
    }
 
    if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
    {
       goto error;
+   }
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
    }
 
    // rename the excluded files
@@ -2667,6 +2739,11 @@ restore_backup_incremental(struct art* nodes)
    return RESTORE_OK;
 
 error:
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_teardown(server);
+   }
+
    pgmoneta_delete_server_workspace(server, (char*)pgmoneta_art_search(nodes, NODE_LABEL));
    cleanup_workspaces(server, labels);
 
@@ -2708,6 +2785,11 @@ carry_out_workflow(struct workflow* workflow, struct art* nodes)
 {
    struct workflow* current = NULL;
    int ret = RESTORE_OK;
+   int server = -1;
+   int phase = -1;
+   char* key = NULL;
+   bool progress_enabled = false;
+
    current = workflow;
    while (current != NULL)
    {
@@ -2720,16 +2802,55 @@ carry_out_workflow(struct workflow* workflow, struct art* nodes)
       current = current->next;
    }
 
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   if (pgmoneta_art_contains_key(nodes, NODE_SERVER_ID))
+   {
+      server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+      progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
+   }
+
    current = workflow;
    while (current != NULL)
    {
+      if (progress_enabled)
+      {
+         phase = pgmoneta_progress_phase_from_workflow_name(current->name());
+         if (phase != -1)
+         {
+            key = pgmoneta_progress_limit_node_key(phase);
+            if (key != NULL && pgmoneta_art_contains_key(nodes, key))
+            {
+               pgmoneta_progress_next_phase(server, phase, nodes);
+            }
+         }
+      }
+
       if (current->execute(current->name(), nodes))
       {
          ret = RESTORE_MISSING_LABEL;
          pgmoneta_log_error("execute/%s", current->name());
          goto error;
       }
+
+      if (progress_enabled)
+      {
+         if (phase != -1)
+         {
+            if (key != NULL && pgmoneta_art_contains_key(nodes, key))
+            {
+               int limit = (int)(uintptr_t)pgmoneta_art_search(nodes, key);
+               atomic_store(&config->common.servers[server].progress.percentage, limit);
+               atomic_store(&config->common.servers[server].progress.current_phase, phase);
+            }
+         }
+      }
       current = current->next;
+   }
+
+   if (progress_enabled)
+   {
+      atomic_store(&config->common.servers[server].progress.percentage, 100);
+      atomic_store(&config->common.servers[server].progress.current_phase, PHASE_NONE);
    }
 
    current = workflow;
@@ -3006,7 +3127,7 @@ file_base_name(char* file, char** basename)
 }
 
 static int
-copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers)
+copy_tablespaces_restore(int server, char* from, char* to, char* base, char* id, struct backup* backup, struct workers* workers)
 {
    char* from_tblspc = NULL;
    char* to_tblspc = NULL;
@@ -3014,6 +3135,9 @@ copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* i
    DIR* d = NULL;
    ssize_t size;
    struct dirent* entry;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
 
    from_tblspc = pgmoneta_append(from_tblspc, from);
    if (!pgmoneta_ends_with(from_tblspc, "/"))
@@ -3096,7 +3220,7 @@ copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* i
 
             to_directory = pgmoneta_append(to_directory, base);
             to_directory = pgmoneta_append(to_directory, "/");
-            to_directory = pgmoneta_append(to_directory, server);
+            to_directory = pgmoneta_append(to_directory, config->common.servers[server].name);
             to_directory = pgmoneta_append(to_directory, "-");
             to_directory = pgmoneta_append(to_directory, id);
             to_directory = pgmoneta_append(to_directory, "-");
@@ -3104,7 +3228,7 @@ copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* i
             to_directory = pgmoneta_append(to_directory, "/");
 
             relative_directory = pgmoneta_append(relative_directory, "../../");
-            relative_directory = pgmoneta_append(relative_directory, server);
+            relative_directory = pgmoneta_append(relative_directory, config->common.servers[server].name);
             relative_directory = pgmoneta_append(relative_directory, "-");
             relative_directory = pgmoneta_append(relative_directory, id);
             relative_directory = pgmoneta_append(relative_directory, "-");
@@ -3115,7 +3239,7 @@ copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* i
             pgmoneta_mkdir(to_directory);
             pgmoneta_symlink_at_file(to_oid, relative_directory);
 
-            pgmoneta_copy_directory(link, to_directory, NULL, workers);
+            pgmoneta_copy_directory(server, link, to_directory, NULL, workers);
 
             free(to_oid);
             free(to_directory);
@@ -3268,7 +3392,7 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
             }
          }
 
-         pgmoneta_copy_directory(src, dst, NULL, workers);
+         pgmoneta_copy_directory(-1, src, dst, NULL, workers);
 
          free(src);
          free(dst);

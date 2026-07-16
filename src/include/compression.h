@@ -141,11 +141,11 @@ pgmoneta_compress_file(char* from, char* to, int type, struct workers* workers);
 
 /**
  * Compress a directory recursively using the selected compression method.
+ * @param server The server index for progress tracking, or -1 to disable
  * @param directory The directory path
  * @param type The compression type
  * @param workers Optional worker pool. If NULL, runs synchronously.
  * @param excludes Excluded file patterns
- * @param server The server index for progress tracking, or -1 to disable
  * @return 0 on success, otherwise 1
  */
 int
@@ -165,6 +165,7 @@ pgmoneta_decompress_file(char* from, char* to, int type, struct workers* workers
 
 /**
  * Decompress a directory using the appropriate decompression method.
+ * @param server The server identifier
  * @param directory The directory
  * @param type The compression type. If algorithm is
  *             COMPRESSION_ALG_NONE, decompression is auto-detected per file suffix.
@@ -172,7 +173,7 @@ pgmoneta_decompress_file(char* from, char* to, int type, struct workers* workers
  * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_decompress_directory(char* directory, int type, struct workers* workers, struct deque* excludes);
+pgmoneta_decompress_directory(int server, char* directory, int type, struct workers* workers, struct deque* excludes);
 
 /**
  * Is the file compressed

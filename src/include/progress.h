@@ -41,19 +41,27 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
-#define WORKFLOW_PROGRESS_NONE          0 /* Not reporting progress */
-#define WORKFLOW_PROGRESS_RUNNING       1 /* Reporting progress */
+#define WORKFLOW_PROGRESS_NONE                  0 /* Not reporting progress */
+#define WORKFLOW_PROGRESS_RUNNING               1 /* Reporting progress */
 
-#define NODE_PROGRESS_LIMIT_BACKUP      "progress_limit_backup"      /* Backup phase limit */
-#define NODE_PROGRESS_LIMIT_COMPRESSION "progress_limit_compression" /* Compression phase limit */
-#define NODE_PROGRESS_LIMIT_ENCRYPTION  "progress_limit_encryption"  /* Encryption phase limit */
-#define NODE_PROGRESS_LIMIT_LINK        "progress_limit_link"        /* Link phase limit */
-#define NODE_PROGRESS_LIMIT_MANIFEST    "progress_limit_manifest"    /* Manifest phase limit */
-#define NODE_PROGRESS_LIMIT_SHA512      "progress_limit_sha512"      /* SHA512 phase limit */
-#define NODE_PROGRESS_LIMIT_DELETE      "progress_limit_delete"      /* Delete phase limit */
-#define NODE_PROGRESS_LIMIT_INFO        "progress_limit_info"        /* Info phase limit */
-#define NODE_PROGRESS_LIMIT_RESTORE     "progress_limit_restore"     /* Restore phase limit */
-#define NODE_PROGRESS_LIMIT_VERIFY      "progress_limit_verify"      /* Verify phase limit */
+#define NODE_PROGRESS_LIMIT_BACKUP              "progress_limit_backup"              /* Backup phase limit */
+#define NODE_PROGRESS_LIMIT_COMPRESSION         "progress_limit_compression"         /* Compression phase limit */
+#define NODE_PROGRESS_LIMIT_ENCRYPTION          "progress_limit_encryption"          /* Encryption phase limit */
+#define NODE_PROGRESS_LIMIT_LINK                "progress_limit_link"                /* Link phase limit */
+#define NODE_PROGRESS_LIMIT_MANIFEST            "progress_limit_manifest"            /* Manifest phase limit */
+#define NODE_PROGRESS_LIMIT_SHA512              "progress_limit_sha512"              /* SHA512 phase limit */
+#define NODE_PROGRESS_LIMIT_DELETE              "progress_limit_delete"              /* Delete phase limit */
+#define NODE_PROGRESS_LIMIT_INFO                "progress_limit_info"                /* Info phase limit */
+#define NODE_PROGRESS_LIMIT_RESTORE             "progress_limit_restore"             /* Restore phase limit */
+#define NODE_PROGRESS_LIMIT_VERIFY              "progress_limit_verify"              /* Verify phase limit */
+#define NODE_PROGRESS_LIMIT_PERMISSIONS         "progress_limit_permissions"         /* Permissions phase limit */
+#define NODE_PROGRESS_LIMIT_CLEANUP             "progress_limit_cleanup"             /* Cleanup phase limit */
+#define NODE_PROGRESS_LIMIT_COPY_WAL            "progress_limit_copy_wal"            /* Copy WAL phase limit */
+#define NODE_PROGRESS_LIMIT_RECOVERY_INFO       "progress_limit_recovery_info"       /* Recovery Info phase limit */
+#define NODE_PROGRESS_LIMIT_EXCLUDED_FILES      "progress_limit_excluded_files"      /* Excluded Files phase limit */
+#define NODE_PROGRESS_LIMIT_COMBINE_INCREMENTAL "progress_limit_combine_incremental" /* Combine incremental phase limit */
+
+#define MAX_PHASES                              10 /**< Maximum number of tracked phases */
 
 struct workflow;
 

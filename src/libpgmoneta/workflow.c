@@ -333,7 +333,7 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
    if (pgmoneta_art_contains_key(nodes, NODE_SERVER_ID))
    {
       server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-      progress_enabled = pgmoneta_is_progress_enabled(server);
+      progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
    }
 
    current = workflow;
@@ -503,6 +503,18 @@ pgmoneta_phase_name(int phase)
          return PHASE_NAME_VERIFY;
       case PHASE_DELETE:
          return PHASE_NAME_DELETE;
+      case PHASE_COPY_WAL:
+         return PHASE_NAME_COPY_WAL;
+      case PHASE_RECOVERY_INFO:
+         return PHASE_NAME_RECOVERY_INFO;
+      case PHASE_EXCLUDED_FILES:
+         return PHASE_NAME_EXCLUDED_FILES;
+      case PHASE_PERMISSIONS:
+         return PHASE_NAME_PERMISSIONS;
+      case PHASE_COMBINE_INCREMENTAL:
+         return PHASE_NAME_COMBINE_INCREMENTAL;
+      case PHASE_CLEANUP:
+         return PHASE_NAME_CLEANUP;
       default:
          return PHASE_NAME_UNKNOWN;
    }

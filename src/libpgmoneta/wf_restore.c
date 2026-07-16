@@ -169,7 +169,7 @@ pgmoneta_restore_excluded_files(void)
 static char*
 restore_name(void)
 {
-   return WORKFLOW_NAME_RESTORE;
+   return PHASE_NAME_RESTORE;
 }
 
 static int
@@ -219,7 +219,7 @@ restore_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (pgmoneta_copy_postgresql_restore(from, to, directory, config->common.servers[server].name, label, backup, workers))
+   if (pgmoneta_copy_postgresql_restore(server, from, to, directory, label, backup, workers))
    {
       pgmoneta_log_error("Restore: Could not restore %s/%s", config->common.servers[server].name, label);
       goto error;
@@ -258,7 +258,7 @@ error:
 static char*
 combine_incremental_name(void)
 {
-   return "Combine incremental";
+   return PHASE_NAME_COMBINE_INCREMENTAL;
 }
 
 static int
@@ -357,7 +357,7 @@ error:
 static char*
 recovery_info_name(void)
 {
-   return "Recovery info";
+   return PHASE_NAME_RECOVERY_INFO;
 }
 
 static int
@@ -717,7 +717,7 @@ error:
 static char*
 copy_wal_name(void)
 {
-   return "Copy WAL";
+   return PHASE_NAME_COPY_WAL;
 }
 
 static int
@@ -772,7 +772,7 @@ copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
    waltarget = pgmoneta_append(waltarget, label);
    waltarget = pgmoneta_append(waltarget, "/pg_wal/");
 
-   pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
+   pgmoneta_copy_wal_files(server, waldir, waltarget, &backup->wal[0], workers);
 
    pgmoneta_workers_wait(workers);
    if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
@@ -801,7 +801,7 @@ error:
 static char*
 restore_excluded_files_name(void)
 {
-   return "Recovery excluded files";
+   return PHASE_NAME_EXCLUDED_FILES;
 }
 
 static int
@@ -843,6 +843,13 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
    from = pgmoneta_append(from, (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA));
    to = pgmoneta_append(to, (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
 
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
+   if (progress_enabled)
+   {
+      int number_of_elements = pgmoneta_get_restore_last_files_num();
+      pgmoneta_progress_set_total(server, number_of_elements);
+   }
+
    for (int i = 0; restore_last_files_names[i] != NULL; i++)
    {
       char* from_file = NULL;
@@ -868,6 +875,11 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
 
       free(from_file);
       free(to_file);
+
+      if (progress_enabled)
+      {
+         pgmoneta_progress_increment(server, 1);
+      }
    }
 
    for (int i = 0; restore_last_files_names[i] != NULL; i++)
