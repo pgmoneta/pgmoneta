@@ -624,3 +624,346 @@ MCTF_TEST(test_aes_is_encrypted)
 cleanup:
    MCTF_FINISH();
 }
+
+/*
+ * Reference vectors generated with the OpenSSL CLI, which produces the same
+ * envelope pgBackRest uses (EVP_BytesToKey, one round, "Salted__" header):
+ *
+ *   printf '%s' "$PLAINTEXT" | openssl enc -aes-256-cbc -md sha1 -pass pass:test-cipher-pass
+ */
+static const char* cbc_vector_plaintext = "pgmoneta-migration-test: pgBackRest stores backups as OpenSSL Salted__ AES-256-CBC";
+static const char* cbc_vector_passphrase = "test-cipher-pass";
+
+/* openssl enc -aes-256-cbc -md sha1 (the pgBackRest scheme) */
+static const char* cbc_vector_sha1 =
+   "53616c7465645f5f176443bd7ab461f798ef6533f0f46d40517da2183d3fce87"
+   "f68817a15a1c7afb56355d609743269e8ab3ece0f18ad026ca64f4f5c1b9db4b"
+   "48b44c6ee71c50b899933fbc1bf082bdaa5750c43eb46215adb1743f9395e607"
+   "198a55266ccf6de00aae1bcbf793fa1e";
+
+/* openssl enc -aes-256-cbc -md sha256 */
+static const char* cbc_vector_sha256 =
+   "53616c7465645f5fc438b2add6847776390d852d2f6d6f24c7e6ac39796b1859"
+   "1153eabaa86e064424f9ae532ba9397ecd02093c4ff125606f50e0cd634dc088"
+   "7be037384bdd38340d6ef9609508681d32599a9f566dda8aa5b503fb81811f86"
+   "f5522e850480b2b7cb00277beb3ce061";
+
+static int
+hex_decode(const char* hex, unsigned char** data, size_t* size)
+{
+   size_t length = strlen(hex);
+   unsigned char* d = NULL;
+
+   if (length % 2 != 0)
+   {
+      return 1;
+   }
+
+   d = malloc(length / 2);
+   if (d == NULL)
+   {
+      return 1;
+   }
+
+   for (size_t i = 0; i < length / 2; i++)
+   {
+      unsigned int byte = 0;
+      if (sscanf(hex + 2 * i, "%2x", &byte) != 1)
+      {
+         free(d);
+         return 1;
+      }
+      d[i] = (unsigned char)byte;
+   }
+
+   *data = d;
+   *size = length / 2;
+
+   return 0;
+}
+
+/**
+ * Test: decrypt an OpenSSL "Salted__" AES-256-CBC envelope with the SHA-1
+ * derivation default — the exact format pgBackRest produces.
+ */
+MCTF_TEST(test_aes_cbc_salted_sha1)
+{
+   unsigned char* envelope = NULL;
+   size_t envelope_size = 0;
+   unsigned char* plaintext = NULL;
+   size_t plaintext_size = 0;
+
+   MCTF_ASSERT(hex_decode(cbc_vector_sha1, &envelope, &envelope_size) == 0, cleanup, "Failed to decode vector");
+
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer(NULL, false,
+                                                  (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                  envelope, envelope_size,
+                                                  &plaintext, &plaintext_size) == 0,
+               cleanup, "Salted decrypt should succeed");
+   MCTF_ASSERT(plaintext_size == strlen(cbc_vector_plaintext), cleanup, "Plaintext size should match");
+   MCTF_ASSERT(memcmp(plaintext, cbc_vector_plaintext, plaintext_size) == 0, cleanup, "Plaintext should match");
+
+cleanup:
+   free(envelope);
+   free(plaintext);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: the digest parameter is honored (openssl enc -md sha256).
+ */
+MCTF_TEST(test_aes_cbc_salted_sha256)
+{
+   unsigned char* envelope = NULL;
+   size_t envelope_size = 0;
+   unsigned char* plaintext = NULL;
+   size_t plaintext_size = 0;
+
+   MCTF_ASSERT(hex_decode(cbc_vector_sha256, &envelope, &envelope_size) == 0, cleanup, "Failed to decode vector");
+
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer("sha256", false,
+                                                  (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                  envelope, envelope_size,
+                                                  &plaintext, &plaintext_size) == 0,
+               cleanup, "Salted decrypt with sha256 should succeed");
+   MCTF_ASSERT(plaintext_size == strlen(cbc_vector_plaintext), cleanup, "Plaintext size should match");
+   MCTF_ASSERT(memcmp(plaintext, cbc_vector_plaintext, plaintext_size) == 0, cleanup, "Plaintext should match");
+
+cleanup:
+   free(envelope);
+   free(plaintext);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: pgBackRest "raw" framing — a bare 8-byte salt with no "Salted__"
+ * magic, as used for bundled backup files, manifests and block deltas.
+ */
+MCTF_TEST(test_aes_cbc_raw_header)
+{
+   unsigned char* envelope = NULL;
+   size_t envelope_size = 0;
+   unsigned char* plaintext = NULL;
+   size_t plaintext_size = 0;
+
+   MCTF_ASSERT(hex_decode(cbc_vector_sha1, &envelope, &envelope_size) == 0, cleanup, "Failed to decode vector");
+
+   /* Strip the magic so the input starts directly with the salt */
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer(NULL, true,
+                                                  (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                  envelope + AES_CBC_SALTED_MAGIC_SIZE,
+                                                  envelope_size - AES_CBC_SALTED_MAGIC_SIZE,
+                                                  &plaintext, &plaintext_size) == 0,
+               cleanup, "Raw-framed decrypt should succeed");
+   MCTF_ASSERT(plaintext_size == strlen(cbc_vector_plaintext), cleanup, "Plaintext size should match");
+   MCTF_ASSERT(memcmp(plaintext, cbc_vector_plaintext, plaintext_size) == 0, cleanup, "Plaintext should match");
+
+cleanup:
+   free(envelope);
+   free(plaintext);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: the fully-explicit path — derive the key/IV from the salt and
+ * passphrase, then decrypt the ciphertext with the explicit key/IV.
+ * This is the flow where the caller extracts the metadata themselves.
+ */
+MCTF_TEST(test_aes_cbc_explicit_key_iv)
+{
+   unsigned char* envelope = NULL;
+   size_t envelope_size = 0;
+   unsigned char* plaintext = NULL;
+   size_t plaintext_size = 0;
+   unsigned char salt[AES_CBC_SALT_SIZE];
+   unsigned char key[EVP_MAX_KEY_LENGTH];
+   unsigned char iv[EVP_MAX_IV_LENGTH];
+   size_t header = AES_CBC_SALTED_MAGIC_SIZE + AES_CBC_SALT_SIZE;
+
+   MCTF_ASSERT(hex_decode(cbc_vector_sha1, &envelope, &envelope_size) == 0, cleanup, "Failed to decode vector");
+
+   memcpy(salt, envelope + AES_CBC_SALTED_MAGIC_SIZE, AES_CBC_SALT_SIZE);
+
+   MCTF_ASSERT(pgmoneta_cbc_derive_key_iv(NULL, salt,
+                                          (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                          key, iv) == 0,
+               cleanup, "Key derivation should succeed");
+
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_buffer(key, iv,
+                                           envelope + header, envelope_size - header,
+                                           &plaintext, &plaintext_size) == 0,
+               cleanup, "Explicit key/IV decrypt should succeed");
+   MCTF_ASSERT(plaintext_size == strlen(cbc_vector_plaintext), cleanup, "Plaintext size should match");
+   MCTF_ASSERT(memcmp(plaintext, cbc_vector_plaintext, plaintext_size) == 0, cleanup, "Plaintext should match");
+
+cleanup:
+   free(envelope);
+   free(plaintext);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: file based decryption, both the salted envelope and the explicit
+ * key/IV variant. The source file must be kept.
+ */
+MCTF_TEST(test_aes_cbc_decrypt_files)
+{
+   unsigned char* envelope = NULL;
+   size_t envelope_size = 0;
+   unsigned char key[EVP_MAX_KEY_LENGTH];
+   unsigned char iv[EVP_MAX_IV_LENGTH];
+   unsigned char salt[AES_CBC_SALT_SIZE];
+   char dir[] = "/tmp/test_aes_cbc_XXXXXX";
+   char from[MAX_PATH] = {0};
+   char to[MAX_PATH] = {0};
+   char raw_from[MAX_PATH] = {0};
+   char raw_to[MAX_PATH] = {0};
+   char* content = NULL;
+   size_t content_size = 0;
+   FILE* f = NULL;
+   size_t header = AES_CBC_SALTED_MAGIC_SIZE + AES_CBC_SALT_SIZE;
+
+   MCTF_ASSERT(hex_decode(cbc_vector_sha1, &envelope, &envelope_size) == 0, cleanup, "Failed to decode vector");
+   MCTF_ASSERT_PTR_NONNULL(mkdtemp(dir), cleanup, "Failed to create temp dir");
+
+   pgmoneta_snprintf(from, MAX_PATH, "%s/backup.enc", dir);
+   pgmoneta_snprintf(to, MAX_PATH, "%s/backup.dec", dir);
+   pgmoneta_snprintf(raw_from, MAX_PATH, "%s/bundle.enc", dir);
+   pgmoneta_snprintf(raw_to, MAX_PATH, "%s/bundle.dec", dir);
+
+   /* Salted envelope file */
+   f = fopen(from, "wb");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "Failed to create encrypted file");
+   MCTF_ASSERT(fwrite(envelope, 1, envelope_size, f) == envelope_size, cleanup, "Failed to write encrypted file");
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_file(NULL, false,
+                                                (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                from, to) == 0,
+               cleanup, "Salted file decrypt should succeed");
+   MCTF_ASSERT(pgmoneta_exists(from), cleanup, "Source file must be kept");
+   MCTF_ASSERT(pgmoneta_exists(to), cleanup, "Destination file should exist");
+
+   f = fopen(to, "rb");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "Failed to open decrypted file");
+   fseek(f, 0, SEEK_END);
+   content_size = (size_t)ftell(f);
+   fseek(f, 0, SEEK_SET);
+   content = malloc(content_size + 1);
+   MCTF_ASSERT_PTR_NONNULL(content, cleanup, "Failed to allocate content");
+   MCTF_ASSERT(fread(content, 1, content_size, f) == content_size, cleanup, "Failed to read decrypted file");
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT(content_size == strlen(cbc_vector_plaintext), cleanup, "Decrypted size should match");
+   MCTF_ASSERT(memcmp(content, cbc_vector_plaintext, content_size) == 0, cleanup, "Decrypted content should match");
+
+   /* Headerless file decrypted with an explicit key/IV */
+   memcpy(salt, envelope + AES_CBC_SALTED_MAGIC_SIZE, AES_CBC_SALT_SIZE);
+   MCTF_ASSERT(pgmoneta_cbc_derive_key_iv(NULL, salt,
+                                          (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                          key, iv) == 0,
+               cleanup, "Key derivation should succeed");
+
+   f = fopen(raw_from, "wb");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "Failed to create headerless file");
+   MCTF_ASSERT(fwrite(envelope + header, 1, envelope_size - header, f) == envelope_size - header, cleanup, "Failed to write headerless file");
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_file(key, iv, raw_from, raw_to) == 0,
+               cleanup, "Explicit key/IV file decrypt should succeed");
+   MCTF_ASSERT(pgmoneta_exists(raw_to), cleanup, "Destination file should exist");
+
+   f = fopen(raw_to, "rb");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "Failed to open decrypted headerless file");
+   fseek(f, 0, SEEK_END);
+   content_size = (size_t)ftell(f);
+   fseek(f, 0, SEEK_SET);
+   MCTF_ASSERT(content_size == strlen(cbc_vector_plaintext), cleanup, "Decrypted headerless size should match");
+
+cleanup:
+   if (f)
+   {
+      fclose(f);
+   }
+
+   if (from[0] != '\0')
+   {
+      remove(from);
+      remove(to);
+      remove(raw_from);
+      remove(raw_to);
+      rmdir(dir);
+   }
+
+   free(envelope);
+   free(content);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: wrong passphrase, wrong digest, invalid magic and truncated input
+ * all fail cleanly.
+ */
+MCTF_TEST_NEGATIVE(test_aes_cbc_decrypt_failures)
+{
+   unsigned char* envelope = NULL;
+   size_t envelope_size = 0;
+   unsigned char* plaintext = NULL;
+   size_t plaintext_size = 0;
+   char* wrong_passphrase = "wrong-cipher-pass";
+
+   MCTF_ASSERT(hex_decode(cbc_vector_sha1, &envelope, &envelope_size) == 0, cleanup, "Failed to decode vector");
+
+   /* Wrong passphrase: padding check must reject */
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer(NULL, false,
+                                                  (unsigned char*)wrong_passphrase, strlen(wrong_passphrase),
+                                                  envelope, envelope_size,
+                                                  &plaintext, &plaintext_size) != 0,
+               cleanup, "Wrong passphrase should fail");
+   MCTF_ASSERT_PTR_NULL(plaintext, cleanup, "Plaintext should be NULL on failure");
+
+   /* Wrong digest: derives a different key, must reject */
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer("sha256", false,
+                                                  (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                  envelope, envelope_size,
+                                                  &plaintext, &plaintext_size) != 0,
+               cleanup, "Wrong digest should fail");
+
+   /* Corrupt the magic */
+   envelope[0] ^= 0xFF;
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer(NULL, false,
+                                                  (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                  envelope, envelope_size,
+                                                  &plaintext, &plaintext_size) != 0,
+               cleanup, "Invalid magic should fail");
+   envelope[0] ^= 0xFF;
+
+   /* Truncated to inside the header */
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer(NULL, false,
+                                                  (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                  envelope, AES_CBC_SALTED_MAGIC_SIZE + 4,
+                                                  &plaintext, &plaintext_size) != 0,
+               cleanup, "Truncated header should fail");
+
+   /* Truncated ciphertext (not a multiple of the block size) */
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer(NULL, false,
+                                                  (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                  envelope, envelope_size - 5,
+                                                  &plaintext, &plaintext_size) != 0,
+               cleanup, "Truncated ciphertext should fail");
+
+   /* Unknown digest is rejected */
+   MCTF_ASSERT(pgmoneta_cbc_decrypt_salted_buffer("no-such-digest", false,
+                                                  (unsigned char*)cbc_vector_passphrase, strlen(cbc_vector_passphrase),
+                                                  envelope, envelope_size,
+                                                  &plaintext, &plaintext_size) != 0,
+               cleanup, "Unknown digest should fail");
+
+cleanup:
+   free(envelope);
+   free(plaintext);
+   MCTF_FINISH();
+}

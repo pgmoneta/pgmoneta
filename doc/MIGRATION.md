@@ -50,9 +50,9 @@ The AES encryption format has been upgraded to use Authenticated Encryption with
 
 Legacy modes (**AES-CBC** and **AES-CTR**) have been **removed** for security and performance reasons. AES-GCM is now the only supported encryption method.
 
-Each encrypted file now starts with a unified 32-byte header:
+Each encrypted file now starts with a unified 28-byte header:
 * `Salt` (16 bytes)
-* `IV` (16 bytes)
+* `IV` (12 bytes)
 
 A unique, random Initialization Vector (IV) is generated for every encryption operation and stored in the header. For **AES-GCM**, an additional **Authentication Tag (16 bytes)** is stored at the **end of the data** (after the ciphertext). This unified format is used for streaming, file-based, and one-shot operations.
 
