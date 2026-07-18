@@ -393,7 +393,7 @@ For example, setting `verification = 3600` or `verification = 1H` will perform i
 By default, the encryption is disabled. To enable this feature, modify `pgmoneta.conf`:
 
 ```
-encryption = aes-256-cbc
+encryption = aes-256-gcm
 ```
 
 Many encryption modes are supported, see the documentation for the `encryption` property for details.

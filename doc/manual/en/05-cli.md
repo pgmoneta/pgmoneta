@@ -436,7 +436,7 @@ Example
 pgmoneta-cli conf reload
 pgmoneta-cli conf ls
 pgmoneta-cli conf get server.primary.host
-pgmoneta-cli conf set encryption aes-256-cbc
+pgmoneta-cli conf set encryption aes-256-gcm
 ```
 **conf get**
 
