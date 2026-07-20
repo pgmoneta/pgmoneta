@@ -879,11 +879,10 @@ password:
          goto password;
       }
 
-      // Check character length
-      size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password, strlen(password));
-      if (char_count == (size_t)-1 || char_count > MAX_PASSWORD_CHARS)
+      // Enforce the password byte-length limit
+      if (strlen(password) >= MAX_PASSWORD_LENGTH)
       {
-         printf("pgmoneta-cli: Invalid password: too many characters (max %d)\n", MAX_PASSWORD_CHARS);
+         printf("pgmoneta-cli: Invalid password: too long (max %d bytes)\n", MAX_PASSWORD_LENGTH - 1);
          goto password;
       }
 

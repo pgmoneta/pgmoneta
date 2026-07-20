@@ -78,7 +78,7 @@
 #define SECURITY_ALL                99
 
 #define NUMBER_OF_SECURITY_MESSAGES 5
-#define SECURITY_BUFFER_SIZE        1024
+#define SECURITY_BUFFER_SIZE        16384 /* Must hold a PasswordMessage carrying a MAX_PASSWORD_LENGTH credential (cloud IAM tokens) */
 
 static signed char has_security;
 static ssize_t security_lengths[NUMBER_OF_SECURITY_MESSAGES];
@@ -1302,6 +1302,12 @@ server_password(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
+   if (password_msg->length > SECURITY_BUFFER_SIZE)
+   {
+      pgmoneta_log_error("Password message too large: %ld", password_msg->length);
+      goto error;
+   }
+
    security_lengths[auth_index] = password_msg->length;
    memcpy(&security_messages[auth_index], password_msg->data, password_msg->length);
    auth_index++;
@@ -2026,7 +2032,6 @@ error:
 static int
 sasl_prep(char* password, char** password_prep)
 {
-   size_t char_count;
    size_t password_len;
 
    if (!password || !password_prep)
@@ -2053,9 +2058,8 @@ sasl_prep(char* password, char** password_prep)
       goto error;
    }
 
-   // Validate the character count in the password
-   char_count = pgmoneta_utf8_char_length((const unsigned char*)password, password_len);
-   if (char_count == (size_t)-1 || char_count > MAX_PASSWORD_CHARS)
+   // Enforce the password byte-length limit
+   if (password_len >= MAX_PASSWORD_LENGTH)
    {
       goto error;
    }
