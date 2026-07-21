@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -116,6 +116,12 @@ struct s3_download_file_context
    size_t bytes_written;
 };
 
+struct s3_upload_file_context
+{
+   struct vfile* file;
+   char* path;
+};
+
 static void do_download_file(struct worker_common* wc);
 static void do_upload_file(struct worker_common* wc);
 static int s3_create_transfer_task(int server, char* s3_root, char* remote_path,
@@ -124,6 +130,7 @@ static int s3_create_transfer_task(int server, char* s3_root, char* remote_path,
 static int s3_upload_one_file(struct s3_transfer_task* task);
 static int s3_download_one_file(struct s3_transfer_task* task);
 static size_t s3_download_write_cb(void* buffer, size_t size, void* userdata);
+static size_t s3_upload_read_cb(void* buffer, size_t size, void* userdata);
 
 struct workflow*
 pgmoneta_storage_create_s3(int workflow_type)
@@ -1455,6 +1462,24 @@ s3_download_write_cb(void* buffer, size_t size, void* userdata)
    return size;
 }
 
+static size_t
+s3_upload_read_cb(void* buffer, size_t size, void* userdata)
+{
+   struct s3_upload_file_context* ctx = (struct s3_upload_file_context*)userdata;
+   if (ctx == NULL || ctx->file == NULL)
+   {
+      return 0;
+   }
+   size_t bytes_read = 0;
+   bool last_chunk = false;
+   if (ctx->file->read(ctx->file, buffer, size, &bytes_read, &last_chunk))
+   {
+      pgmoneta_log_error("S3 upload: failed to read chunk from %s", ctx->path);
+      return 0;
+   }
+   return bytes_read;
+}
+
 static int
 s3_upload_one_file(struct s3_transfer_task* task)
 {
@@ -2586,14 +2611,14 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, cha
    char* local_path = NULL;
    char* request_path = NULL;
    char* file_sha256 = NULL;
-   FILE* file = NULL;
+   char content_length[32];
    struct stat file_info;
-   void* file_data = NULL;
    char* canonical_uri = NULL;
    struct deque* sign_headers = NULL;
    struct http* connection = NULL;
    struct http_request* request = NULL;
    struct http_response* response = NULL;
+   struct s3_upload_file_context upload_ctx = {0};
 
    char* effective_endpoint = s3_get_effective_endpoint(server);
    char* effective_region = s3_get_effective_region(server);
@@ -2667,32 +2692,17 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, cha
    {
       goto error;
    }
-
-   file = fopen(local_path, "rb");
-
-   if (file == NULL)
+   if (stat(local_path, &file_info) != 0)
    {
+      pgmoneta_log_error("s3 upload: local file stat failed");
       goto error;
    }
-
-   if (fstat(fileno(file), &file_info) != 0)
+   if (pgmoneta_vfile_create_local(local_path, "rb", &upload_ctx.file))
    {
+      pgmoneta_log_error("S3 upload: failed to open local file %s", local_path);
       goto error;
    }
-
-   file_data = malloc(file_info.st_size);
-   if (file_data == NULL)
-   {
-      goto error;
-   }
-
-   if (fread(file_data, 1, file_info.st_size, file) != (size_t)file_info.st_size)
-   {
-      goto error;
-   }
-
-   fclose(file);
-   file = NULL;
+   upload_ctx.path = local_path;
 
    int s3_port;
 
@@ -2733,11 +2743,15 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, cha
    {
       goto error;
    }
-
-   if (pgmoneta_http_set_data(request, file_data, file_info.st_size))
+   // manually set the content length
+   pgmoneta_snprintf(content_length, sizeof(content_length), "%ld", file_info.st_size);
+   if (pgmoneta_http_request_add_header(request, "Content-Length", content_length))
    {
+      pgmoneta_log_error("Failed to set content length");
       goto error;
    }
+   request->read_cb = s3_upload_read_cb;
+   request->read_userdata = &upload_ctx;
 
    if (pgmoneta_http_invoke(connection, request, &response))
    {
@@ -2761,12 +2775,13 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, cha
    free(local_path);
    free(s3_path);
    free(auth_value);
-   free(file_data);
    free(canonical_uri);
    pgmoneta_deque_destroy(sign_headers);
    pgmoneta_http_request_destroy(request);
    pgmoneta_http_response_destroy(response);
    pgmoneta_http_destroy(connection);
+   pgmoneta_vfile_destroy(upload_ctx.file);
+   upload_ctx.file = NULL;
 
    return 0;
 
@@ -2778,7 +2793,6 @@ error:
    free(s3_path);
    free(file_sha256);
    free(auth_value);
-   free(file_data);
    free(canonical_uri);
    pgmoneta_deque_destroy(sign_headers);
 
@@ -2797,10 +2811,8 @@ error:
       pgmoneta_http_response_destroy(response);
    }
 
-   if (file != NULL)
-   {
-      fclose(file);
-   }
+   pgmoneta_vfile_destroy(upload_ctx.file);
+   upload_ctx.file = NULL;
 
    return 1;
 }
