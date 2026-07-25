@@ -690,6 +690,20 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (pgmoneta_compare_string(key, "nagios"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->nagios))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (pgmoneta_compare_string(key, "console"))
                {
                   if (pgmoneta_compare_string(section, "pgmoneta"))
@@ -4485,6 +4499,13 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
       else if (pgmoneta_compare_string(key, "metrics"))
       {
          if (as_int(value, &config->metrics))
+         {
+            unknown = true;
+         }
+      }
+      else if (pgmoneta_compare_string(key, "nagios"))
+      {
+         if (as_int(value, &config->nagios))
          {
             unknown = true;
          }

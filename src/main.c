@@ -45,6 +45,7 @@
 #include <memory.h>
 #include <message.h>
 #include <network.h>
+#include <nagios.h>
 #include <prometheus.h>
 #include <remote.h>
 #include <restore.h>
@@ -90,6 +91,7 @@
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
+static void accept_nagios_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents);
@@ -130,6 +132,9 @@ static int unix_management_socket = -1;
 static struct accept_io io_metrics[MAX_FDS];
 static int* metrics_fds = NULL;
 static int metrics_fds_length = -1;
+static struct accept_io io_nagios[MAX_FDS];
+static int* nagios_fds = NULL;
+static int nagios_fds_length = -1;
 static struct accept_io io_console[MAX_FDS];
 static int* console_fds = NULL;
 static int console_fds_length = -1;
@@ -190,6 +195,29 @@ shutdown_metrics(void)
    }
 }
 
+static void
+start_nagios(void)
+{
+   for (int i = 0; i < nagios_fds_length; i++)
+   {
+      int sockfd = *(nagios_fds + i);
+      memset(&io_nagios[i], 0, sizeof(struct accept_io));
+      ev_io_init((struct ev_io*)&io_nagios[i], accept_nagios_cb, sockfd, EV_READ);
+      io_nagios[i].socket = sockfd;
+      io_nagios[i].argv = argv_ptr;
+      ev_io_start(main_loop, (struct ev_io*)&io_nagios[i]);
+   }
+}
+static void
+shutdown_nagios(void)
+{
+   for (int i = 0; i < nagios_fds_length; i++)
+   {
+      ev_io_stop(main_loop, (struct ev_io*)&io_nagios[i]);
+      pgmoneta_disconnect(io_nagios[i].socket);
+      errno = 0;
+   }
+}
 static void
 start_console(void)
 {
@@ -969,6 +997,7 @@ main(int argc, char** argv)
 
    shutdown_management(true);
    shutdown_metrics();
+   shutdown_nagios();
    shutdown_console(true);
    shutdown_mgt(true);
 
@@ -980,6 +1009,7 @@ main(int argc, char** argv)
    ev_loop_destroy(main_loop);
 
    free(metrics_fds);
+   free(nagios_fds);
    free(console_fds);
    free(management_fds);
 
@@ -1012,6 +1042,7 @@ error:
    if (metrics_started)
    {
       shutdown_metrics();
+      shutdown_nagios();
    }
 
    if (console_started)
@@ -1025,6 +1056,7 @@ error:
    }
 
    free(metrics_fds);
+   free(nagios_fds);
    free(console_fds);
    free(management_fds);
 
@@ -2153,6 +2185,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pgmoneta_log_warn("Restarting listening port due to: %s (%d)", strerror(errno), watcher->fd);
 
          shutdown_metrics();
+         shutdown_nagios();
 
          free(metrics_fds);
          metrics_fds = NULL;
@@ -2220,6 +2253,65 @@ child_error:
    pgmoneta_disconnect(client_fd);
 }
 
+static void
+accept_nagios_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
+{
+   struct sockaddr_in6 client_addr;
+   socklen_t client_addr_length;
+   int client_fd;
+   struct main_configuration* config;
+
+   if (EV_ERROR & revents)
+   {
+      pgmoneta_log_debug("accept_nagios_cb: invalid event: %s", strerror(errno));
+      errno = 0;
+      return;
+   }
+
+   config = (struct main_configuration*)shmem;
+
+   memset(&client_addr, 0, sizeof(client_addr));
+   client_addr_length = sizeof(client_addr);
+   client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
+   if (client_fd == -1)
+   {
+      if (accept_fatal(errno) && keep_running)
+      {
+         pgmoneta_log_warn("Restarting Nagios listening port due to: %s (%d)", strerror(errno), watcher->fd);
+         shutdown_nagios();
+         free(nagios_fds);
+         nagios_fds = NULL;
+         nagios_fds_length = 0;
+         if (pgmoneta_bind(config->host, config->nagios, &nagios_fds, &nagios_fds_length))
+         {
+            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->nagios);
+            exit(1);
+         }
+         if (nagios_fds_length > MAX_FDS)
+         {
+            pgmoneta_log_fatal("Too many descriptors %d", nagios_fds_length);
+            exit(1);
+         }
+         start_nagios();
+      }
+      else
+      {
+         pgmoneta_log_debug("accept: %s (%d)", strerror(errno), watcher->fd);
+      }
+      errno = 0;
+      return;
+   }
+
+   if (!fork())
+   {
+      ev_loop_fork(loop);
+      shutdown_ports(false);
+      pgmoneta_nagios(NULL, client_fd);
+      exit(0);
+   }
+
+   pgmoneta_disconnect(client_fd);
+}
 static void
 accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 {
@@ -2430,6 +2522,7 @@ reload_services_only(void)
    config = (struct main_configuration*)shmem;
 
    shutdown_metrics();
+   shutdown_nagios();
 
    free(metrics_fds);
    metrics_fds = NULL;
@@ -2782,6 +2875,7 @@ reload_configuration(bool* restart)
    if (old_metrics != config->metrics)
    {
       shutdown_metrics();
+      shutdown_nagios();
 
       free(metrics_fds);
       metrics_fds = NULL;
@@ -3252,6 +3346,7 @@ shutdown_ports(bool remove)
    if (config->metrics > 0)
    {
       shutdown_metrics();
+      shutdown_nagios();
    }
 
    if (config->management > 0)
