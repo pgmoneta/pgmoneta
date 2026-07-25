@@ -26,6 +26,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | unix_socket_dir | | String | Yes | The Unix Domain Socket location. Can interpolate environment variables (e.g., `$HOME`) |
 | base_dir | | String | Yes | The base directory for the backup. Can interpolate environment variables (e.g., `$HOME`) |
 | metrics | 0 | Int | No | The metrics port (disable = 0) |
+| nagios | 0 | Int | No | The Nagios port (disable = 0). When enabled, pgmoneta fetches metrics from the Prometheus endpoint and serves them in Nagios passive check format |
 | metrics_cache_max_age | 0 | String | No | The duration to keep a Prometheus (metrics) response in cache. If set to zero, the caching will be disabled. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
 | metrics_cache_max_size | 256k | String | No | The maximum amount of data to keep in cache when serving Prometheus responses. Changes require restart. This parameter determines the size of memory allocated for the cache even if `metrics_cache_max_age` or `metrics` are disabled. Its value, however, is taken into account only if `metrics_cache_max_age` is set to a non-zero value. Supports suffixes: 'B' (bytes), the default if omitted, 'K' or 'KB' (kilobytes), 'M' or 'MB' (megabytes), 'G' or 'GB' (gigabytes).|
 | management | 0 | Int | No | The remote management port (disable = 0) |
