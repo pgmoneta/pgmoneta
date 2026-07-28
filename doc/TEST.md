@@ -35,7 +35,7 @@ MCTF (Minimal C Test Framework) is pgmoneta's custom test framework designed for
 - **Test filtering** - Run tests by name pattern (`-t`) or by module (`-m`)
 - **Test skipping** - Skip tests conditionally using `MCTF_SKIP()` when prerequisites aren't met
 - **Per-test pgmoneta log slicing and validation** - Captures each test's log window to `/tmp/pgmoneta-test/log/<module>__<test_name>.pgmoneta.log`; positive tests fail on unexpected `ERROR` lines, while `MCTF_TEST_NEGATIVE` is used for expected-error scenarios
-- **Maximum runtime (performance gate)** - `MCTF_TEST_MAX(name, seconds)` fails the test if it runs longer than the limit; `MCTF_TEST_MAX_NEGATIVE(name, seconds)` adds a time limit to a negative test. Use to catch performance regressions (e.g. after OpenSSL changes).
+- **Maximum runtime (performance gate)** - `MCTF_TEST_MAX(name, seconds)` fails the test if it runs longer than the limit; `MCTF_TEST_MAX_NEGATIVE(name, seconds)` adds a time limit to a negative test. Use to catch performance regressions (e.g. after OpenSSL changes). This is a fixed upper bound, not a comparison: to measure whether a change actually made pgmoneta faster or slower, see [BENCHMARK.md](https://github.com/pgmoneta/pgmoneta/blob/main/doc/BENCHMARK.md).
 - **Lifecycle hooks** – Automatic per-test and per-module setup/teardown via `MCTF_TEST_SETUP`, `MCTF_TEST_TEARDOWN`, `MCTF_MODULE_SETUP`, `MCTF_MODULE_TEARDOWN`
 - **Config snapshot/restore** – `pgmoneta_test_config_save()` / `pgmoneta_test_config_restore()` to isolate shared-memory config changes between tests
 - **Cleanup pattern** - Structured cleanup using goto labels for resource management
@@ -353,3 +353,10 @@ and replace `pgmoneta_test_generate_check_point_shutdown_v17` with the function 
 If the record type you are adding has differences between versions of PostgreSQL (13-19), you will need to implement a generate function per version (`generate_rec_x` -> `generate_rec_x_v16`, `generate_rec_x_v17`, etc.).
 
 For the sake of simplicity, please create one test suite per postgres version where the implementation resides in `test/libpgmonetatest/tswalutils/tswalutils_<version>.c` and the testcases in `test/testcases/test_wal_utils.c` and add testcase per record type within this version. You can take a look at [this testcase](../../../test/testcases/test_wal_utils.c) for reference.
+**Measuring performance**
+
+Tests answer *pass or fail*; they do not tell you whether a change made pgmoneta faster or slower.
+`MCTF_TEST_MAX` is a fixed upper bound, not a comparison, so it cannot confirm an improvement either.
+
+To measure the performance impact of a change, and to compare a branch against `main` before raising a
+PR, see [BENCHMARK.md](https://github.com/pgmoneta/pgmoneta/blob/main/doc/BENCHMARK.md).

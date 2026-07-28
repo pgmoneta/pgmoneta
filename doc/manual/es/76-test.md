@@ -35,7 +35,7 @@ MCTF (Minimal C Test Framework) es el test framework personalizado de pgmoneta d
 - **Filtrado de pruebas** - Ejecuta pruebas por patrón de nombre (`-t`) o por módulo (`-m`)
 - **Omisión de pruebas** - Omite tests condicionalmente usando `MCTF_SKIP()` cuando los requisitos previos no se cumplen
 - **Corte de registro de pgmoneta por prueba y validación** - Captura la ventana de registro de cada prueba en `/tmp/pgmoneta-test/log/<module>__<test_name>.pgmoneta.log`; las pruebas positivas fallan en líneas `ERROR` inesperadas, mientras que `MCTF_TEST_NEGATIVE` se usa para escenarios de error esperado
-- **Tiempo de ejecución máximo (puerta de rendimiento)** - `MCTF_TEST_MAX(name, seconds)` falla el test si se ejecuta más tiempo del límite; `MCTF_TEST_MAX_NEGATIVE(name, seconds)` agrega un límite de tiempo a una prueba negativa. Usa para detectar regresiones de rendimiento (p. ej., después de cambios de OpenSSL).
+- **Tiempo de ejecución máximo (puerta de rendimiento)** - `MCTF_TEST_MAX(name, seconds)` falla el test si se ejecuta más tiempo del límite; `MCTF_TEST_MAX_NEGATIVE(name, seconds)` agrega un límite de tiempo a una prueba negativa. Usa para detectar regresiones de rendimiento (p. ej., después de cambios de OpenSSL). Es un límite superior fijo, no una comparación: para medir si un cambio realmente hizo pgmoneta más rápido o más lento, consulta [BENCHMARK.md](https://github.com/pgmoneta/pgmoneta/blob/main/doc/BENCHMARK.md).
 - **Hooks del ciclo de vida** – Configuración/desmontaje automático por prueba y por módulo a través de `MCTF_TEST_SETUP`, `MCTF_TEST_TEARDOWN`, `MCTF_MODULE_SETUP`, `MCTF_MODULE_TEARDOWN`
 - **Instantánea de configuración/restauración** – `pgmoneta_test_config_save()` / `pgmoneta_test_config_restore()` para aislar cambios de configuración de memoria compartida entre pruebas
 - **Patrón de limpieza** - Limpieza estructurada usando etiquetas goto para gestión de recursos
@@ -349,3 +349,12 @@ y reemplaza `pgmoneta_test_generate_check_point_shutdown_v17` con la función qu
 Si el tipo de registro que estás agregando tiene diferencias entre versiones de PostgreSQL (13-17), necesitarás implementar una función de generación por versión (`generate_rec_x` -> `generate_rec_x_v16`, `generate_rec_x_v17`, etc.).
 
 Para simplicidad, por favor crea un conjunto de pruebas por versión de postgres donde la implementación reside en `test/libpgmonetatest/tswalutils/tswalutils_<version>.c` y los casos de prueba en `test/testcases/test_wal_utils.c` y agrega caso de prueba por tipo de registro dentro de esta versión. Puedes ver [este caso de prueba](../../../../../test/testcases/test_wal_utils.c) como referencia.
+
+**Medir el rendimiento**
+
+Los tests responden *pasa o falla*; no te dicen si un cambio hizo pgmoneta más rápido o más lento.
+`MCTF_TEST_MAX` es un límite superior fijo, no una comparación, así que tampoco puede confirmar una
+mejora.
+
+Para medir el impacto de un cambio en el rendimiento, y para comparar una rama con `main` antes de
+abrir un PR, consulta [BENCHMARK.md](https://github.com/pgmoneta/pgmoneta/blob/main/doc/BENCHMARK.md).

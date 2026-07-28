@@ -450,6 +450,10 @@ Now that we've attempted our first backup, take a moment to relax. There are a f
 
 See `doc/TEST.md` for adding test cases and running test suites. It is recommended that you **ALWAYS** run tests before raising PR.
 
+## Benchmarking
+
+See `doc/BENCHMARK.md` for measuring performance and comparing a branch against `main`. It is recommended that you run benchmarks before raising a PR that claims a performance improvement, and attach the `compare` output to the PR description.
+
 ## C programming
 
 [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) is developed using the [C programming language](https://en.wikipedia.org/wiki/C_(programming_language)) so it is a good
