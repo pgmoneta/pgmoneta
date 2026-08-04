@@ -44,6 +44,12 @@ extern "C" {
 #include <stdlib.h>
 
 /**
+ * Get the number of files
+ */
+int
+pgmoneta_get_restore_last_files_num(void);
+
+/**
  * Fill the passed arugment with the last files names to restore
  * @param output The string array that will be filled with the last files names to restore
  * @return integer showing the status of the operation
@@ -121,18 +127,18 @@ pgmoneta_extract_incremental_backup(int server, char* label, char** root, char**
 
 /**
  * Copy a PostgreSQL installation
+ * @param server The server identifier for progress tracking, -1 to disable progress tracking
  * @param from The from directory
  * @param to The to directory
  * @param base The base directory
- * @param server The server name
  * @param id The identifier
  * @param backup The backup
  * @param workers The optional workers
  * @return The result
  */
 int
-pgmoneta_copy_postgresql_restore(char* from, char* to, char* base,
-                                 char* server, char* id,
+pgmoneta_copy_postgresql_restore(int server, char* from, char* to,
+                                 char* base, char* id,
                                  struct backup* backup,
                                  struct workers* workers);
 

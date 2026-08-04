@@ -145,7 +145,7 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_deque_add(excludes, "backup.sha512.tmp", 0, ValueString);
       pgmoneta_deque_add(excludes, "backup.sha256", 0, ValueString);
 
-      if (pgmoneta_is_progress_enabled(server))
+      if (server >= 0 && pgmoneta_is_progress_enabled(server))
       {
          int file_count = pgmoneta_count_files(backup_base);
          pgmoneta_progress_set_total(server, file_count);
@@ -292,7 +292,13 @@ bzip2_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (pgmoneta_decompress_directory(base, COMPRESSION_CLIENT_BZIP2, workers, NULL))
+   if (server >= 0 && pgmoneta_is_progress_enabled(server))
+   {
+      int file_count = pgmoneta_count_files(base);
+      pgmoneta_progress_set_total(server, file_count);
+   }
+
+   if (pgmoneta_decompress_directory(server, base, COMPRESSION_CLIENT_BZIP2, workers, NULL))
    {
       goto error;
    }

@@ -35,6 +35,7 @@
 #include <deque.h>
 #include <mctf.h>
 #include <progress.h>
+#include <restore.h>
 #include <shmem.h>
 #include <storage.h>
 #include <tscommon.h>
@@ -529,6 +530,68 @@ MCTF_TEST(test_progress_setup_s3_workflows)
                       cleanup, "s3 restore should reserve 100 percent for restore");
    MCTF_ASSERT_INT_EQ((int)atomic_load(&p->current_phase), PHASE_RESTORE,
                       cleanup, "s3 restore should start in restore phase");
+
+cleanup:
+   if (workflow != NULL)
+   {
+      pgmoneta_workflow_destroy(workflow);
+   }
+   if (nodes != NULL)
+   {
+      pgmoneta_art_destroy(nodes);
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_progress_setup_combine_restore_workflows)
+{
+   struct art* nodes = NULL;
+   struct main_configuration* config;
+   struct workflow* workflow = NULL;
+   struct progress* p;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_load_conf(TEST_CONF_DIR "/progress/02.conf"), 0,
+                      cleanup, "failed to read 02.conf");
+
+   config = (struct main_configuration*)shmem;
+   config->common.servers[0].progress_enabled = true;
+   p = &config->common.servers[0].progress;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_art_create(&nodes), 0,
+                      cleanup, "failed to create art");
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE_AS_IS, NULL);
+   MCTF_ASSERT_PTR_NONNULL(workflow, cleanup, "failed to create combine-as-is workflow");
+   pgmoneta_progress_setup(0, workflow, nodes, WORKFLOW_TYPE_COMBINE_AS_IS);
+
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_COMBINE_INCREMENTAL), 100,
+                      cleanup, "combine-as-is should reserve 100 percent for combine");
+   MCTF_ASSERT_INT_EQ((int)atomic_load(&p->current_phase), PHASE_COMBINE_INCREMENTAL,
+                      cleanup, "combine-as-is should start in combine incremental phase");
+
+   pgmoneta_progress_teardown(0);
+   pgmoneta_workflow_destroy(workflow);
+   workflow = NULL;
+   pgmoneta_art_destroy(nodes);
+   nodes = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_art_create(&nodes), 0,
+                      cleanup, "failed to recreate art");
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE, NULL);
+   MCTF_ASSERT_PTR_NONNULL(workflow, cleanup, "failed to create combine workflow");
+   pgmoneta_progress_setup(0, workflow, nodes, WORKFLOW_TYPE_COMBINE);
+
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_COMBINE_INCREMENTAL), 90,
+                      cleanup, "restore combine should reserve 90 percent for combine");
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_COPY_WAL), 93,
+                      cleanup, "restore combine should include copy WAL after combine");
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_RECOVERY_INFO), 96,
+                      cleanup, "restore combine should include recovery info after copy WAL");
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_PERMISSIONS), 99,
+                      cleanup, "restore combine should include permissions after recovery info");
+   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_CLEANUP), 100,
+                      cleanup, "restore combine should finish with cleanup at 100 percent");
 
 cleanup:
    if (workflow != NULL)

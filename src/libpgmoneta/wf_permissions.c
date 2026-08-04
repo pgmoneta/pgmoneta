@@ -84,7 +84,7 @@ pgmoneta_create_permissions(int type)
 static char*
 permissions_name(void)
 {
-   return "Permissions";
+   return PHASE_NAME_PERMISSIONS;
 }
 
 static int
@@ -195,7 +195,7 @@ permissions_execute_restore(char* name __attribute__((unused)), struct art* node
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (pgmoneta_is_progress_enabled(server))
+   if (path != NULL && server >= 0 && pgmoneta_is_progress_enabled(server))
    {
       int file_count = pgmoneta_count_files(path);
       pgmoneta_progress_set_total(server, file_count);
@@ -301,7 +301,7 @@ do_set_permissions(struct worker_common* wc)
    struct worker_input* wi = (struct worker_input*)wc;
    pgmoneta_permission(wi->from, 6, 0, 0);
 
-   if (pgmoneta_is_progress_enabled(wi->level))
+   if (wi->level >= 0 && pgmoneta_is_progress_enabled(wi->level))
    {
       pgmoneta_progress_increment(wi->level, 1);
    }

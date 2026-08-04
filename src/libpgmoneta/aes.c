@@ -62,7 +62,7 @@ static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 static int get_key_length(int mode);
 static int encrypt_file(char* from, char* to, int enc);
 static int pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque* excludes);
-static int decrypt_data(char* d, struct workers* workers, struct deque* excludes);
+static int decrypt_data(int server, char* d, struct workers* workers, struct deque* excludes);
 static int dispatch_aes_operation(int server, char* from, char* to, int enc, struct workers* workers);
 static void do_aes_operation(struct worker_common* wc);
 
@@ -516,8 +516,9 @@ pgmoneta_decrypt_file(char* from, char* to, struct workers* workers)
 }
 
 static int
-decrypt_data(char* d, struct workers* workers, struct deque* excludes)
+decrypt_data(int server, char* d, struct workers* workers, struct deque* excludes)
 {
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;
@@ -542,7 +543,7 @@ decrypt_data(char* d, struct workers* workers, struct deque* excludes)
          }
 
          pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-         decrypt_data(path, workers, excludes);
+         decrypt_data(server, path, workers, excludes);
       }
       else
       {
@@ -600,6 +601,10 @@ decrypt_data(char* d, struct workers* workers, struct deque* excludes)
             to = NULL;
          }
       }
+      if (progress_enabled)
+      {
+         pgmoneta_progress_increment(server, 1);
+      }
    }
 
    closedir(dir);
@@ -616,9 +621,9 @@ error:
 }
 
 int
-pgmoneta_decrypt_directory(char* d, struct workers* workers, struct deque* excludes)
+pgmoneta_decrypt_directory(int server, char* d, struct workers* workers, struct deque* excludes)
 {
-   int ret = decrypt_data(d, workers, excludes);
+   int ret = decrypt_data(server, d, workers, excludes);
 
    return ret;
 }
