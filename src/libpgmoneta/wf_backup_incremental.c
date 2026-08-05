@@ -93,8 +93,8 @@ static int parse_relation_file(char* backup_data, char* rel_file_path, struct re
  * Create standard directories inside data directory of backup, returns a set of paths of all the files
  * inside server data directory
  */
-static int create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** paths, int* count);
-static char** get_paths(char* backup_data, struct query_response* data, int* count);
+static int create_standard_directories(SSL* ssl, int socket, char* backup_base, struct tablespace* tb, char*** paths, int* count);
+static char** get_paths(char* backup_base, struct tablespace* tb, struct query_response* data, int* count);
 /**
  * free an array of string
  */
@@ -106,14 +106,20 @@ static int add_incremental_label_fields(char* label_file_path, char* prev_data);
 /**
  * Serialize the incremental blocks for a relation file
  */
-static int write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
+static int write_incremental_file(int server, SSL* ssl, int socket, char* base,
                                   char* relative_filename, uint32_t num_incr_blocks,
                                   block_number* incr_blocks, uint32_t truncation_block_length, bool empty);
 /**
  * Serialize all the blocks for a relation file
  */
-static int write_full_file(int server, SSL* ssl, int socket, char* backup_data,
+static int write_full_file(int server, SSL* ssl, int socket, char* base,
                            char* relative_filename, size_t expected_size);
+
+/**
+ * Returns the actual backup file path in the base directory
+ */
+static int get_backup_file_path(char* basedir, char* rel_file_name, bool incremental, char** fp);
+
 /**
  * Append padding (0 bytes) to the file stream
  */
@@ -211,7 +217,11 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    struct backup* backup = NULL;
    struct main_configuration* config;
 
+   struct tablespace* tablespaces = NULL;
+   struct tablespace* current_tablespace = NULL;
+
    struct message* msg = NULL;
+   struct tuple* tup = NULL;
    struct query_response* response = NULL;
    char** server_files = NULL;
    int num_of_server_files = 0;
@@ -290,6 +300,43 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    rel_seg_size = config->common.servers[server].relseg_size;
    wal_segment_size = config->common.servers[server].wal_size;
 
+   /* Get the metadata of all the tablespace from the cluster like oid, name and absolute path */
+   pgmoneta_create_query_message("SELECT oid, spcname, pg_tablespace_location(oid) FROM pg_tablespace;", &msg);
+   if (pgmoneta_query_execute(ssl, socket, msg, &response) || response == NULL)
+   {
+      pgmoneta_log_error("Failed to execute the query to get tablespace information");
+      goto error;
+   }
+
+   tup = response->tuples;
+   while (tup != NULL)
+   {
+      char* tablespace_name = tup->data[1];
+      char* tablespace_path = tup->data[2];
+
+      if (tablespace_name != NULL && tablespace_path != NULL)
+      {
+         if (tablespaces == NULL)
+         {
+            pgmoneta_create_tablespace(tablespace_name, tablespace_path, &tablespaces);
+            tablespaces->oid = pgmoneta_atoi(tup->data[0]);
+         }
+         else
+         {
+            struct tablespace* append = NULL;
+
+            pgmoneta_create_tablespace(tablespace_name, tablespace_path, &append);
+            append->oid = pgmoneta_atoi(tup->data[0]);
+            pgmoneta_append_tablespace(&tablespaces, append);
+         }
+      }
+      tup = tup->next;
+   }
+   pgmoneta_free_message(msg);
+   pgmoneta_free_query_response(response);
+   msg = NULL;
+   response = NULL;
+
    /* Get the checkpoint information of the preceding backup using backup_label */
    prev_backup_data = pgmoneta_get_server_backup_identifier_data(server, incremental_label);
    pgmoneta_read_checkpoint_info(prev_backup_data, &chkpt_lsn);
@@ -316,8 +363,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       goto error;
    }
 
-   pgmoneta_mkdir(backup_data);
-   if (create_standard_directories(ssl, socket, backup_data, &server_files, &num_of_server_files))
+   if (create_standard_directories(ssl, socket, backup_base, tablespaces, &server_files, &num_of_server_files))
    {
       pgmoneta_log_error("Incremental backup: Failed to creating standard directories");
       goto error;
@@ -333,10 +379,10 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       }
 
       /* handle other files and directories */
-      if (!pgmoneta_starts_with(server_files[i], "base") && !pgmoneta_starts_with(server_files[i], "global"))
+      if (!pgmoneta_starts_with(server_files[i], "base") && !pgmoneta_starts_with(server_files[i], "global") && !pgmoneta_starts_with(server_files[i], "pg_tblspc"))
       {
          // full backup
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], 0))
+         if (write_full_file(server, ssl, socket, backup_base, server_files[i], 0))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of: %s", server_files[i]);
             goto error;
@@ -344,7 +390,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
          continue;
       }
 
-      /* handle base and global directories */
+      /* handle base, global or tablespace directories */
       if (pgmoneta_ends_with(server_files[i], "pg_internal.init")) // ignore this file for backup
       {
          continue;
@@ -353,7 +399,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       if (pgmoneta_ends_with(server_files[i], "pg_filenode.map") || pgmoneta_ends_with(server_files[i], "PG_VERSION") || pgmoneta_ends_with(server_files[i], "pg_control"))
       {
          /* undergo full backup */
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], 0))
+         if (write_full_file(server, ssl, socket, backup_base, server_files[i], 0))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of: %s", server_files[i]);
             goto error;
@@ -378,7 +424,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       /* file size is not multiple of block size */
       if (fs.size % block_size != 0)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+         if (write_full_file(server, ssl, socket, backup_base, server_files[i], fs.size))
          {
             pgmoneta_log_error("Incremental backup: Error doing backup of %s", server_files[i]);
             goto error;
@@ -392,7 +438,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
        */
       if (frk == FSM_FORKNUM)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+         if (write_full_file(server, ssl, socket, backup_base, server_files[i], fs.size))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
             goto error;
@@ -416,7 +462,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       {
          if (fs.size == 0)
          {
-            if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+            if (write_full_file(server, ssl, socket, backup_base, server_files[i], fs.size))
             {
                pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
                goto error;
@@ -426,7 +472,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
 
          num_incr_blocks = 0;
          truncation_block_length = fs.size / block_size;
-         if (write_incremental_file(server, ssl, socket, backup_data, server_files[i],
+         if (write_incremental_file(server, ssl, socket, backup_base, server_files[i],
                                     num_incr_blocks, NULL, truncation_block_length, true))
          {
             goto error;
@@ -442,7 +488,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
        */
       if (limit_block <= segno * rel_seg_size)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+         if (write_full_file(server, ssl, socket, backup_base, server_files[i], fs.size))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
             goto error;
@@ -494,7 +540,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       }
 
       /* serialize the incremental changes */
-      if (write_incremental_file(server, ssl, socket, backup_data, server_files[i],
+      if (write_incremental_file(server, ssl, socket, backup_base, server_files[i],
                                  num_incr_blocks, incr_blocks, truncation_block_length, false))
       {
          goto error;
@@ -558,8 +604,8 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   size = pgmoneta_directory_size(backup_data);
-   biggest_file_size = pgmoneta_biggest_file(backup_data);
+   size = pgmoneta_directory_size(backup_base);
+   biggest_file_size = pgmoneta_biggest_file(backup_base);
 
    pgmoneta_log_debug("Incremental: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
@@ -586,6 +632,19 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    pgmoneta_snprintf(backup->parent_label, sizeof(backup->parent_label), "%s", incremental_label);
    sscanf(lf.checkpoint_lsn, "%X/%X", &backup->checkpoint_lsn_hi32, &backup->checkpoint_lsn_lo32);
 
+   current_tablespace = tablespaces;
+   while (current_tablespace != NULL && backup->number_of_tablespaces < MAX_NUMBER_OF_TABLESPACES)
+   {
+      int i = backup->number_of_tablespaces;
+
+      pgmoneta_snprintf(backup->tablespaces[i], sizeof(backup->tablespaces[i]), "tblspc_%s", current_tablespace->name);
+      pgmoneta_snprintf(backup->tablespaces_oids[i], sizeof(backup->tablespaces_oids[i]), "%u", current_tablespace->oid);
+      pgmoneta_snprintf(backup->tablespaces_paths[i], sizeof(backup->tablespaces_paths[i]), "%s", current_tablespace->path);
+
+      backup->number_of_tablespaces++;
+      current_tablespace = current_tablespace->next;
+   }
+
    if (pgmoneta_save_info(server_backup, backup))
    {
       pgmoneta_log_error("Incremental backup: Could not save backup %s", label);
@@ -610,6 +669,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    free(prev_backup_data);
    pgmoneta_free_message(msg);
    pgmoneta_free_query_response(response);
+   pgmoneta_free_tablespaces(tablespaces);
    pgmoneta_brt_destroy(summarized_brt);
    pgmoneta_memory_destroy();
    return 0;
@@ -644,6 +704,7 @@ error:
    free(prev_backup_data);
    pgmoneta_free_message(msg);
    pgmoneta_free_query_response(response);
+   pgmoneta_free_tablespaces(tablespaces);
    pgmoneta_brt_destroy(summarized_brt);
    pgmoneta_memory_destroy();
    return 1;
@@ -1094,9 +1155,12 @@ compare_block_numbers(const void* a, const void* b)
 }
 
 static int
-create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** p, int* c)
+create_standard_directories(SSL* ssl, int socket, char* backup_base, struct tablespace* tb, char*** p, int* c)
 {
    struct query_response* qr = NULL;
+   struct tablespace* tblspc = NULL;
+   char link_path[MAX_PATH];
+   char directory[MAX_PATH];
    char** paths = NULL;
    int count = 0;
 
@@ -1104,12 +1168,34 @@ create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** p, 
    pgmoneta_ext_get_files(ssl, socket, ".", &qr);
    if (qr != NULL && qr->number_of_columns == 3)
    {
-      paths = get_paths(backup_data, qr, &count);
+      paths = get_paths(backup_base, tb, qr, &count);
    }
    else
    {
       pgmoneta_log_warn("Retrieving extra files: Query failed");
       goto error;
+   }
+
+   /* create symlinks for tablespaces */
+   tblspc = tb;
+   while (tblspc != NULL)
+   {
+      memset(link_path, 0, sizeof(link_path));
+      memset(directory, 0, sizeof(directory));
+
+      if (pgmoneta_ends_with(backup_base, "/"))
+      {
+         pgmoneta_snprintf(link_path, sizeof(link_path), "%sdata/pg_tblspc/%d", backup_base, tblspc->oid);
+         pgmoneta_snprintf(directory, sizeof(directory), "%stblspc_%s/", backup_base, tblspc->name);
+      }
+      else
+      {
+         pgmoneta_snprintf(link_path, sizeof(link_path), "%s/data/pg_tblspc/%d", backup_base, tblspc->oid);
+         pgmoneta_snprintf(directory, sizeof(directory), "%s/tblspc_%s/", backup_base, tblspc->name);
+      }
+      unlink(link_path);
+      pgmoneta_symlink_file(link_path, directory);
+      tblspc = tblspc->next;
    }
 
    *p = paths;
@@ -1292,6 +1378,12 @@ parse_relation_file(char* backup_data, char* rel_file_path, struct rel_file_loca
       rlocator.dbOid = 0;
       relation_file = pgmoneta_append(relation_file, results[1]);
    }
+   else if (pgmoneta_compare_string(results[0], "pg_tblspc"))
+   {
+      rlocator.spcOid = pgmoneta_atoi(results[1]);
+      rlocator.dbOid = pgmoneta_atoi(results[3]);
+      relation_file = pgmoneta_append(relation_file, results[4]);
+   }
    else
    {
       // do nothing
@@ -1380,7 +1472,7 @@ error:
 }
 
 static int
-write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
+write_incremental_file(int server, SSL* ssl, int socket, char* base,
                        char* relative_filename, uint32_t num_incr_blocks,
                        block_number* incr_blocks, uint32_t truncation_block_length, bool empty)
 {
@@ -1388,8 +1480,6 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
    size_t expected_file_size;
    uint32_t magic = INCREMENTAL_MAGIC;
    char* filepath = NULL;
-   char* file_name = NULL;
-   char* rel_path = NULL;
    size_t padding_length = 0;
    size_t padding_bytes = 0;
    block_number blkno;
@@ -1397,19 +1487,11 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
    uint8_t* binary_data = NULL;
    int binary_data_length = 0;
 
-   /* preprocessing of incremental filename */
-   rel_path = pgmoneta_append(rel_path, relative_filename);
-   rel_path = dirname(rel_path);
-   file_name = pgmoneta_append(file_name, rel_path + strlen(rel_path) + 1);
-
-   filepath = pgmoneta_append(filepath, backup_data);
-   filepath = pgmoneta_append(filepath, rel_path);
-   if (!pgmoneta_ends_with(filepath, "/"))
+   if (get_backup_file_path(base, relative_filename, true, &filepath))
    {
-      filepath = pgmoneta_append(filepath, "/");
+      pgmoneta_log_error("Couldn't get backup file path corresponding to the relative file: %s", relative_filename);
+      goto error;
    }
-   filepath = pgmoneta_append(filepath, INCREMENTAL_PREFIX);
-   filepath = pgmoneta_append(filepath, file_name);
 
    /* Open the file in write mode, if not present create one */
    file = fopen(filepath, "w+");
@@ -1501,8 +1583,6 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
 
 done:
    free(filepath);
-   free(file_name);
-   free(rel_path);
    fflush(file);
    fclose(file);
    return 0;
@@ -1510,8 +1590,6 @@ done:
 error:
    free(binary_data);
    free(filepath);
-   free(file_name);
-   free(rel_path);
    if (file != NULL)
    {
       fflush(file);
@@ -1521,7 +1599,7 @@ error:
 }
 
 static int
-write_full_file(int server, SSL* ssl, int socket, char* backup_data,
+write_full_file(int server, SSL* ssl, int socket, char* base,
                 char* relative_filename, size_t expected_size)
 {
    FILE* file = NULL;
@@ -1538,13 +1616,17 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
       goto error;
    }
 
-   filepath = pgmoneta_append(filepath, backup_data);
-   filepath = pgmoneta_append(filepath, relative_filename);
+   if (get_backup_file_path(base, relative_filename, false, &filepath))
+   {
+      pgmoneta_log_error("Couldn't get backup file path corresponding to the relative file: %s", relative_filename);
+      goto error;
+   }
+
    /* Open the file in write mode, if not present create one */
    file = fopen(filepath, "w+");
    if (file == NULL)
    {
-      pgmoneta_log_error("Write full file: failed to open the file at %s", relative_filename);
+      pgmoneta_log_error("Write full file: failed to open the file at %s", filepath);
       goto error;
    }
 
@@ -1590,6 +1672,110 @@ error:
 }
 
 static int
+get_backup_file_path(char* basedir, char* rel_file_name, bool incremental, char** fp)
+{
+   char* filepath = NULL;
+   char* target_dir = NULL;
+   char** results = NULL;
+   char* rel_path = NULL;
+   char* tmp_rel_path = NULL;
+   char* file_name = NULL;
+   int count = 0;
+   int oid = 0;
+
+   tmp_rel_path = pgmoneta_append(tmp_rel_path, rel_file_name);
+   rel_path = dirname(tmp_rel_path);
+
+   if (pgmoneta_compare_string(rel_path, "."))
+   {
+      filepath = pgmoneta_append(filepath, basedir);
+      if (!pgmoneta_ends_with(filepath, "/"))
+      {
+         filepath = pgmoneta_append_char(filepath, '/');
+      }
+      filepath = pgmoneta_append(filepath, "data");
+      filepath = pgmoneta_append_char(filepath, '/');
+      filepath = pgmoneta_append(filepath, rel_file_name);
+      goto done;
+   }
+
+   file_name = pgmoneta_append(file_name, rel_path + strlen(rel_path) + 1);
+
+   if (pgmoneta_starts_with(rel_path, "pg_tblspc"))
+   {
+      if (pgmoneta_split(rel_path, &results, &count, '/'))
+      {
+         pgmoneta_log_error("Failed to split the string: %s", rel_file_name);
+         goto error;
+      }
+
+      oid = pgmoneta_atoi(results[1]);
+      filepath = pgmoneta_append(filepath, basedir);
+      if (!pgmoneta_ends_with(filepath, "/"))
+      {
+         filepath = pgmoneta_append_char(filepath, '/');
+      }
+      filepath = pgmoneta_append(filepath, "data");
+      filepath = pgmoneta_append_char(filepath, '/');
+      filepath = pgmoneta_append(filepath, "pg_tblspc");
+      filepath = pgmoneta_append_char(filepath, '/');
+      filepath = pgmoneta_append_int(filepath, oid);
+
+      if (!pgmoneta_is_symlink_valid(filepath))
+      {
+         pgmoneta_log_error("Encountered an invalid symlink in pg_tblspc: %s", filepath);
+         goto error;
+      }
+
+      target_dir = pgmoneta_get_symlink(filepath);
+
+      free(filepath);
+      filepath = NULL;
+
+      filepath = pgmoneta_append(filepath, target_dir);
+      for (int i = 2; i < count; i++)
+      {
+         filepath = pgmoneta_append_char(filepath, '/');
+         filepath = pgmoneta_append(filepath, results[i]);
+      }
+      free(target_dir);
+      free_string_array(results, count);
+   }
+   else
+   {
+      filepath = pgmoneta_append(filepath, basedir);
+      if (!pgmoneta_ends_with(filepath, "/"))
+      {
+         filepath = pgmoneta_append_char(filepath, '/');
+      }
+      filepath = pgmoneta_append(filepath, "data");
+      filepath = pgmoneta_append_char(filepath, '/');
+      filepath = pgmoneta_append(filepath, rel_path);
+   }
+
+   filepath = pgmoneta_append_char(filepath, '/');
+   if (incremental)
+   {
+      filepath = pgmoneta_append(filepath, INCREMENTAL_PREFIX);
+   }
+
+   filepath = pgmoneta_append(filepath, file_name);
+
+done:
+   *fp = filepath;
+
+   free(file_name);
+   free(tmp_rel_path);
+   return 0;
+error:
+   free(filepath);
+   free(file_name);
+   free(tmp_rel_path);
+   free_string_array(results, count);
+   return 1;
+}
+
+static int
 write_padding(FILE* file, size_t padding_length, size_t* bw)
 {
    size_t bytes_written = 0;
@@ -1622,20 +1808,26 @@ error:
 }
 
 static char**
-get_paths(char* backup_data, struct query_response* response, int* c)
+get_paths(char* backup_base, struct tablespace* tb, struct query_response* response, int* c)
 {
    char** paths = NULL;
    int count = 0;
    int idx = 0;
    char* dest_path = NULL;
+   char* rel_path = NULL;
+   int oid;
    struct tuple* tuple = NULL;
+
+   struct tablespace* tblspc = NULL;
+   char** path_split_results = NULL;
+   int path_split_count = 0;
 
    if (response == NULL || response->number_of_columns != 3)
    {
       goto error;
    }
 
-   /* count the number of server file and create any directory along the way */
+   /* count the number of server files */
    tuple = response->tuples;
    while (tuple != NULL)
    {
@@ -1643,53 +1835,89 @@ get_paths(char* backup_data, struct query_response* response, int* c)
       {
          count++;
       }
-      else
-      {
-         /* create the directory */
-         dest_path = pgmoneta_append(dest_path, backup_data);
-
-         if (pgmoneta_starts_with(tuple->data[0], "./"))
-         {
-            dest_path = pgmoneta_append(dest_path, tuple->data[0] + 2);
-         }
-         else
-         {
-            dest_path = pgmoneta_append(dest_path, tuple->data[0]);
-         }
-
-         if (pgmoneta_mkdir(dest_path))
-         {
-            pgmoneta_log_error("error creating directory: %s", dest_path);
-            goto error;
-         }
-
-         free(dest_path);
-         dest_path = NULL;
-      }
       tuple = tuple->next;
    }
 
    paths = (char**)calloc(count + 1, sizeof(char*));
 
-   /* get the server files */
    tuple = response->tuples;
-   while (tuple != NULL && idx < count)
+   while (tuple != NULL)
    {
-      if (pgmoneta_compare_string(tuple->data[1], "f"))
+      /* create the directory */
+      dest_path = pgmoneta_append(dest_path, backup_base);
+
+      if (pgmoneta_starts_with(tuple->data[0], "./"))
       {
-         if (pgmoneta_starts_with(tuple->data[0], "./"))
+         rel_path = pgmoneta_append(rel_path, tuple->data[0] + 2);
+      }
+      else
+      {
+         rel_path = pgmoneta_append(rel_path, tuple->data[0]);
+      }
+
+      if (pgmoneta_starts_with(rel_path, "pg_tblspc") && !pgmoneta_compare_string(rel_path, "pg_tblspc"))
+      {
+         /* extract oid from path */
+         tblspc = tb;
+
+         // split the file path
+         if (pgmoneta_split(rel_path, &path_split_results, &path_split_count, '/'))
          {
-            dest_path = pgmoneta_append(dest_path, tuple->data[0] + 2);
-         }
-         else
-         {
-            dest_path = pgmoneta_append(dest_path, tuple->data[0]);
+            pgmoneta_log_error("Cannot split the file: %s with delimiter '/'", rel_path);
+            goto error;
          }
 
-         paths[idx++] = dest_path;
-         dest_path = NULL;
+         oid = pgmoneta_atoi(path_split_results[1]);
+
+         while (tblspc != NULL)
+         {
+            if ((unsigned int)oid == tblspc->oid)
+            {
+               dest_path = pgmoneta_append_char(dest_path, '/');
+               dest_path = pgmoneta_append(dest_path, "tblspc_");
+               dest_path = pgmoneta_append(dest_path, tblspc->name);
+               break;
+            }
+            tblspc = tblspc->next;
+         }
+
+         for (int i = 2; i < path_split_count; i++)
+         {
+            dest_path = pgmoneta_append_char(dest_path, '/');
+            dest_path = pgmoneta_append(dest_path, path_split_results[i]);
+         }
+
+         free_string_array(path_split_results, path_split_count);
       }
+      else
+      {
+         dest_path = pgmoneta_append_char(dest_path, '/');
+         dest_path = pgmoneta_append(dest_path, "data");
+         dest_path = pgmoneta_append_char(dest_path, '/');
+         dest_path = pgmoneta_append(dest_path, rel_path);
+      }
+
+      /* create directory */
+      if (pgmoneta_compare_string(tuple->data[1], "t"))
+      {
+         if (pgmoneta_mkdir(dest_path))
+         {
+            pgmoneta_log_error("error creating directory: %s", dest_path);
+            goto error;
+         }
+      }
+      else
+      {
+         paths[idx] = pgmoneta_append(paths[idx], rel_path);
+         idx++;
+      }
+
       tuple = tuple->next;
+
+      free(dest_path);
+      free(rel_path);
+      rel_path = NULL;
+      dest_path = NULL;
    }
 
    *c = count;
@@ -1697,6 +1925,7 @@ get_paths(char* backup_data, struct query_response* response, int* c)
    return paths;
 error:
    free(dest_path);
+   free(rel_path);
    return NULL;
 }
 
