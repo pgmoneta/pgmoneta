@@ -4406,13 +4406,14 @@ get_server_basepath(int server)
 int
 pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date)
 {
+   struct tm tm_buffer;
    time_t now = time(&now);
    if (now == -1)
    {
       return 1;
    }
 
-   struct tm* ptm = gmtime(&now);
+   struct tm* ptm = gmtime_r(&now, &tm_buffer);
    if (ptm == NULL)
    {
       return 1;
@@ -4434,13 +4435,14 @@ pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date)
 int
 pgmoneta_get_timestamp_UTC_format(char* utc_date)
 {
+   struct tm tm_buffer;
    time_t now = time(&now);
    if (now == -1)
    {
       return 1;
    }
 
-   struct tm* ptm = gmtime(&now);
+   struct tm* ptm = gmtime_r(&now, &tm_buffer);
    if (ptm == NULL)
    {
       return 1;

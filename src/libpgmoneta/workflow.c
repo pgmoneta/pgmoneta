@@ -586,6 +586,9 @@ wf_backup(void)
       current = current->next;
    }
 
+   current->next = pgmoneta_create_sha512();
+   current = current->next;
+
    if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
        (config->storage_engine & STORAGE_ENGINE_S3) ||
        (config->storage_engine & STORAGE_ENGINE_AZURE))
@@ -593,9 +596,6 @@ wf_backup(void)
       current->next = pgmoneta_storage_create_remote();
       current = current->next;
    }
-
-   current->next = pgmoneta_create_sha512();
-   current = current->next;
 
 #ifdef DEBUG
    current = head;
@@ -780,6 +780,9 @@ wf_post_rollup(struct backup* backup)
       current = current->next;
    }
 
+   current->next = pgmoneta_create_sha512();
+   current = current->next;
+
    if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
        (config->storage_engine & STORAGE_ENGINE_S3) ||
        (config->storage_engine & STORAGE_ENGINE_AZURE))
@@ -787,9 +790,6 @@ wf_post_rollup(struct backup* backup)
       current->next = pgmoneta_storage_create_remote();
       current = current->next;
    }
-
-   current->next = pgmoneta_create_sha512();
-   current = current->next;
 
 #ifdef DEBUG
    current = head;
@@ -867,6 +867,9 @@ wf_incremental_backup(void)
       current = current->next;
    }
 
+   current->next = pgmoneta_create_sha512();
+   current = current->next;
+
    if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
        (config->storage_engine & STORAGE_ENGINE_S3) ||
        (config->storage_engine & STORAGE_ENGINE_AZURE))
@@ -874,9 +877,6 @@ wf_incremental_backup(void)
       current->next = pgmoneta_storage_create_remote();
       current = current->next;
    }
-
-   current->next = pgmoneta_create_sha512();
-   current = current->next;
 
 #ifdef DEBUG
    current = head;
