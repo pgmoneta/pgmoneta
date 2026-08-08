@@ -35,8 +35,15 @@ int
 pgmoneta_csv_reader_init(char* path, struct csv_reader** reader)
 {
    struct csv_reader* r = malloc(sizeof(struct csv_reader));
+
+   if (r == NULL)
+   {
+      goto error;
+   }
+
    r->file = fopen(path, "r");
    memset(r->line, 0, sizeof(r->line));
+   r->saveptr = NULL;
    if (r->file == NULL)
    {
       goto error;
@@ -44,7 +51,7 @@ pgmoneta_csv_reader_init(char* path, struct csv_reader** reader)
    *reader = r;
    return 0;
 error:
-   if (r->file != NULL)
+   if (r != NULL && r->file != NULL)
    {
       fclose(r->file);
    }
@@ -64,23 +71,34 @@ pgmoneta_csv_next_row(struct csv_reader* reader, int* num_col, char*** cols)
       goto error;
    }
    memset(reader->line, 0, sizeof(reader->line));
+   reader->saveptr = NULL;
    if (fgets(reader->line, sizeof(reader->line), reader->file) == NULL)
    {
       goto error;
    }
-   col = strtok(reader->line, ",");
+   col = strtok_r(reader->line, ",", &reader->saveptr);
    while (col != NULL)
    {
       cs = realloc(cs, (num + 1) * sizeof(char*));
       cs[num] = col;
       num++;
-      col = strtok(NULL, ",");
+      col = strtok_r(NULL, ",", &reader->saveptr);
    }
-   // trim the new line from the last token
    if (num > 0)
    {
+      size_t len;
+
       last_tok = cs[num - 1];
-      last_tok[strlen(last_tok) - 1] = '\0';
+      len = strlen(last_tok);
+      if (len > 0 && last_tok[len - 1] == '\n')
+      {
+         last_tok[len - 1] = '\0';
+         len--;
+      }
+      if (len > 0 && last_tok[len - 1] == '\r')
+      {
+         last_tok[len - 1] = '\0';
+      }
    }
    *cols = cs;
    *num_col = num;
@@ -113,6 +131,7 @@ pgmoneta_csv_reader_reset(struct csv_reader* reader)
       goto error;
    }
    rewind(reader->file);
+   reader->saveptr = NULL;
    return 0;
 error:
    return 1;
