@@ -40,6 +40,7 @@
 #include <utils.h>
 
 /* system */
+#include <ctype.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -539,8 +540,43 @@ mctf_se_context_for(int backend)
    return NULL;
 }
 
-int
-mctf_se_azure_blob_count(void)
+/*
+ * Percent-encode a value for use in a query string. A blob prefix contains
+ * '/' and may contain other reserved characters, and is signed decoded but
+ * sent encoded.
+ */
+static void
+azure_urlencode(const char* in, char* out, size_t size)
+{
+   static const char* hex = "0123456789ABCDEF";
+   size_t o = 0;
+
+   for (size_t i = 0; in[i] != '\0' && o + 4 < size; i++)
+   {
+      unsigned char c = (unsigned char)in[i];
+
+      if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+      {
+         out[o++] = (char)c;
+      }
+      else
+      {
+         out[o++] = '%';
+         out[o++] = hex[c >> 4];
+         out[o++] = hex[c & 0x0F];
+      }
+   }
+
+   out[o] = '\0';
+}
+
+/*
+ * Fetch one page of list-blobs XML, restricted to @p prefix ("" for the whole
+ * container). At most 5000 blobs come back; see azure_list_blobs_xml for why
+ * the harness does not page past that.
+ */
+static int
+azure_list_blobs_page(const char* prefix, char** xml)
 {
    const struct mctf_se* ctx = mctf_se_context_for(MCTF_BACKEND_AZURITE);
    char utc_date[UTC_TIME_LENGTH];
@@ -557,8 +593,9 @@ mctf_se_azure_blob_count(void)
    struct http_response* response = NULL;
    char request_path[512];
    char* body = NULL;
-   char* p = NULL;
-   int count = -1;
+   int rc = 1;
+
+   *xml = NULL;
 
    if (ctx == NULL || ctx->driver == NULL)
    {
@@ -576,6 +613,8 @@ mctf_se_azure_blob_count(void)
     * Content-Length is empty (not "0") for GET requests.
     * Canonical resource uses the account name twice for path-style URLs:
     *   /{account}/{account}/{container}\ncomp:list\nrestype:container
+    * Query parameters are signed in alphabetical order, so marker sits
+    * between comp and restype, and is signed decoded but sent encoded.
     */
    string_to_sign = pgmoneta_append(string_to_sign, "GET\n\n\n\n\n\n\n\n\n\n\n\n");
    string_to_sign = pgmoneta_append(string_to_sign, "x-ms-date:");
@@ -586,7 +625,13 @@ mctf_se_azure_blob_count(void)
    string_to_sign = pgmoneta_append(string_to_sign, ctx->access_key);
    string_to_sign = pgmoneta_append(string_to_sign, "/");
    string_to_sign = pgmoneta_append(string_to_sign, ctx->bucket);
-   string_to_sign = pgmoneta_append(string_to_sign, "\ncomp:list\nrestype:container");
+   string_to_sign = pgmoneta_append(string_to_sign, "\ncomp:list");
+   if (prefix != NULL && prefix[0] != '\0')
+   {
+      string_to_sign = pgmoneta_append(string_to_sign, "\nprefix:");
+      string_to_sign = pgmoneta_append(string_to_sign, (char*)prefix);
+   }
+   string_to_sign = pgmoneta_append(string_to_sign, "\nrestype:container");
 
    if (pgmoneta_base64_decode((char*)ctx->secret_key, strlen(ctx->secret_key), (void**)&signing_key, &signing_key_length))
    {
@@ -619,6 +664,16 @@ mctf_se_azure_blob_count(void)
                      "/%s/%s?restype=container&comp=list",
                      ctx->access_key, ctx->bucket);
 
+   if (prefix != NULL && prefix[0] != '\0')
+   {
+      char encoded[1024];
+      char tail[1100];
+
+      azure_urlencode(prefix, encoded, sizeof(encoded));
+      pgmoneta_snprintf(tail, sizeof(tail), "&prefix=%s", encoded);
+      strncat(request_path, tail, sizeof(request_path) - strlen(request_path) - 1);
+   }
+
    if (pgmoneta_http_request_create(PGMONETA_HTTP_GET, request_path, &request))
    {
       goto done;
@@ -638,7 +693,6 @@ mctf_se_azure_blob_count(void)
       goto done;
    }
 
-   /* Count <Blob> tags in the XML response to determine how many blobs exist. */
    body = malloc(response->payload.data_size + 1);
    if (body == NULL)
    {
@@ -647,13 +701,9 @@ mctf_se_azure_blob_count(void)
    memcpy(body, response->payload.data, response->payload.data_size);
    body[response->payload.data_size] = '\0';
 
-   count = 0;
-   p = body;
-   while ((p = strstr(p, "<Blob>")) != NULL)
-   {
-      count++;
-      p += 6;
-   }
+   *xml = body;
+   body = NULL;
+   rc = 0;
 
 done:
    free(body);
@@ -666,5 +716,111 @@ done:
    pgmoneta_http_response_destroy(response);
    pgmoneta_http_destroy(connection);
 
+   return rc;
+}
+
+/*
+ * Fetch the listing for @p prefix.
+ *
+ * This deliberately reads a single page and does not follow NextMarker.
+ * Every question the harness asks is about one backup, and a prefix of
+ * "<base>/<server>/backup/<label>/" selects roughly a thousand blobs — well
+ * inside the 5000 a page holds — so paging would buy nothing. It would also
+ * cost something real: Azurite issues a fresh marker on each request, so a
+ * continuation loop cannot recognise that it is being handed the same page
+ * again and grows without bound.
+ *
+ * The unscoped listing used by mctf_se_azure_blob_count is therefore capped
+ * at 5000. That is fine for "is anything there at all", which is all it is
+ * asked; a caller that needs an exact number must pass a prefix.
+ */
+static int
+azure_list_blobs_xml(const char* prefix, char** xml)
+{
+   return azure_list_blobs_page(prefix, xml);
+}
+
+int
+mctf_se_azure_blob_count(void)
+{
+   char* xml = NULL;
+   char* p = NULL;
+   int count = -1;
+
+   if (azure_list_blobs_xml("", &xml))
+   {
+      goto done;
+   }
+
+   /* Count <Blob> tags in the XML response to determine how many blobs exist. */
+   count = 0;
+   p = xml;
+   while ((p = strstr(p, "<Blob>")) != NULL)
+   {
+      count++;
+      p += 6;
+   }
+
+done:
+   free(xml);
+
    return count;
+}
+
+int
+mctf_se_azure_blob_count_prefix(const char* prefix)
+{
+   char* xml = NULL;
+   char* p = NULL;
+   int count = -1;
+
+   /* The server does the filtering, so the response holds only the wanted
+    * blobs and stays within one page for a single backup.
+    */
+   if (prefix == NULL || azure_list_blobs_xml(prefix, &xml))
+   {
+      goto done;
+   }
+
+   count = 0;
+   p = xml;
+   while ((p = strstr(p, "<Blob>")) != NULL)
+   {
+      count++;
+      p += 6;
+   }
+
+done:
+   free(xml);
+
+   return count;
+}
+
+bool
+mctf_se_azure_blob_exists(const char* name)
+{
+   char* xml = NULL;
+   char* needle = NULL;
+   bool found = false;
+
+   /* Listing with the full name as the prefix returns at most this one blob. */
+   if (name == NULL || azure_list_blobs_xml(name, &xml))
+   {
+      goto done;
+   }
+
+   /* Match the element rather than a bare substring, so that a blob named
+    * "x/backup.info" does not answer for "backup.info".
+    */
+   needle = pgmoneta_append(needle, "<Name>");
+   needle = pgmoneta_append(needle, (char*)name);
+   needle = pgmoneta_append(needle, "</Name>");
+
+   found = strstr(xml, needle) != NULL;
+
+done:
+   free(needle);
+   free(xml);
+
+   return found;
 }

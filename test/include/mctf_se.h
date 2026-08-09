@@ -231,6 +231,28 @@ mctf_se_context_for(int backend);
 int
 mctf_se_azure_blob_count(void);
 
+/**
+ * Count the blobs in the active Azurite container whose name starts with
+ * @p prefix. Scoping by prefix keeps a count meaningful when the container
+ * holds more than one backup.
+ *
+ * @param prefix The blob-name prefix, e.g. "pgmoneta/primary/backup/<label>/"
+ * @return Number of matching blobs (>= 0), or -1 on error / no active backend
+ */
+int
+mctf_se_azure_blob_count_prefix(const char* prefix);
+
+/**
+ * Whether a blob with exactly this name exists in the active Azurite
+ * container.
+ *
+ * @param name The blob name, relative to the container, e.g.
+ *             "primary/<label>/backup.info"
+ * @return true when the blob exists, otherwise false
+ */
+bool
+mctf_se_azure_blob_exists(const char* name);
+
 #ifdef __cplusplus
 }
 #endif

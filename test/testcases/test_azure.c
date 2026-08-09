@@ -46,6 +46,8 @@
 #include <mctf_container.h>
 #include <mctf_se.h>
 #include <tscommon.h>
+#include <deque.h>
+#include <manifest.h>
 #include <utils.h>
 
 #include <stdlib.h>
@@ -185,6 +187,95 @@ MCTF_INTEGRATION_TEST(test_azure_second_backup_succeeds)
       mctf_sh(NULL, "grep -q 'STATUS=1' %s/backup/primary/backup/%s/backup.info",
               mctf_se_run_dir(), label2) == 0,
       cleanup, "second backup.info does not contain STATUS=1");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+/*
+ * The upload is driven by backup.manifest and runs one file per worker task,
+ * so the blobs for a label must be exactly the manifest entries plus the three
+ * metadata files. A count is what catches a dropped file: a worker whose
+ * failure is swallowed, or a task freed before its request is sent, still
+ * leaves a backup that reports STATUS=1 and a container that is not empty.
+ */
+static int
+manifest_entry_count(const char* label)
+{
+   char manifest_path[MAX_PATH];
+   struct deque* paths = NULL;
+   int count = -1;
+
+   snprintf(manifest_path, sizeof(manifest_path), "%s/backup/primary/backup/%s/backup.manifest",
+            mctf_se_run_dir(), label);
+
+   if (pgmoneta_manifest_get_paths(manifest_path, &paths))
+   {
+      return -1;
+   }
+
+   count = (int)pgmoneta_deque_size(paths);
+
+   pgmoneta_deque_destroy(paths);
+
+   return count;
+}
+
+MCTF_INTEGRATION_TEST(test_azure_uploads_every_manifest_file)
+{
+   char prefix[MAX_PATH];
+   int entries;
+   int blobs;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   entries = manifest_entry_count(shared_label);
+   MCTF_ASSERT(entries > 0, cleanup, "could not read backup.manifest");
+
+   snprintf(prefix, sizeof(prefix), "pgmoneta/primary/backup/%s/", shared_label);
+   blobs = mctf_se_azure_blob_count_prefix(prefix);
+
+   /* backup.manifest, backup.sha512 and backup.info are uploaded after the
+    * worker pool drains, and are not themselves manifest entries.
+    */
+   MCTF_ASSERT(blobs == entries + 3, cleanup,
+               "Azurite holds %d blobs under %s (%d in the container overall) but the "
+               "manifest has %d entries (expected %d) — the parallel upload dropped "
+               "or duplicated files",
+               blobs, prefix, mctf_se_azure_blob_count_prefix(""), entries, entries + 3);
+
+cleanup:
+   MCTF_FINISH();
+}
+
+/*
+ * The three metadata files are the commit marker: they are uploaded only once
+ * every data blob has landed, so a reader that sees backup.info can rely on
+ * the rest being there. This pins that ordering contract.
+ */
+MCTF_INTEGRATION_TEST(test_azure_uploads_metadata_commit_markers)
+{
+   const char* metadata[] = {"backup.manifest", "backup.sha512", "backup.info"};
+   char name[MAX_PATH];
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   for (int i = 0; i < 3; i++)
+   {
+      snprintf(name, sizeof(name), "pgmoneta/primary/backup/%s/%s", shared_label, metadata[i]);
+      MCTF_ASSERT(mctf_se_azure_blob_exists(name), cleanup,
+                  "%s was not uploaded to Azure", metadata[i]);
+   }
 
 cleanup:
    MCTF_FINISH();
