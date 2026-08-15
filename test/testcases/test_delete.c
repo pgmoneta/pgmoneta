@@ -43,7 +43,7 @@ MCTF_TEST(test_pgmoneta_delete_full)
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) == 0, cleanup, "delete failed");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", false, 0) == 0, cleanup, "delete failed");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -57,7 +57,7 @@ MCTF_TEST_NEGATIVE(test_pgmoneta_delete_retained_backup_rejects_delete)
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", false, 0) != 0, cleanup, "delete should fail for retained backup");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -82,7 +82,7 @@ MCTF_TEST(test_pgmoneta_delete_retained_backup)
    response = NULL;
 
    MCTF_ASSERT(!pgmoneta_tsclient_expunge("primary", "oldest", false, 0), cleanup, "failed to expunge backup");
-   MCTF_ASSERT(!pgmoneta_tsclient_delete("primary", "oldest", 0), cleanup, "failed to delete after expunge");
+   MCTF_ASSERT(!pgmoneta_tsclient_delete("primary", "oldest", false, 0), cleanup, "failed to delete after expunge");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed after delete");
    num_backups = pgmoneta_tsclient_get_backup_count(response);
@@ -106,7 +106,7 @@ MCTF_TEST_NEGATIVE(test_pgmoneta_delete_force_retained_backup_rejects_regular_de
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", false, 0) != 0, cleanup, "delete should fail for retained backup");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -164,7 +164,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_last)
    pgmoneta_json_destroy(response_before);
    response_before = NULL;
 
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "newest", 0) == 0, cleanup, "delete operation failed");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "newest", false, 0) == 0, cleanup, "delete operation failed");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_after, 0), cleanup, "list backup after failed");
    num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);
@@ -210,7 +210,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_middle)
    label_to_delete = pgmoneta_tsclient_get_backup_label(backup_target);
    MCTF_ASSERT_PTR_NONNULL(label_to_delete, cleanup, "label is null");
 
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", label_to_delete, 0) == 0, cleanup, "delete operation failed");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", label_to_delete, false, 0) == 0, cleanup, "delete operation failed");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_after, 0), cleanup, "list backup after failed");
    num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);
@@ -259,7 +259,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_root)
    num_bck_before = pgmoneta_tsclient_get_backup_count(response_before);
    MCTF_ASSERT_INT_EQ(num_bck_before, 3, cleanup, "expected 3 backups before deletion");
 
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) == 0, cleanup, "delete operation failed");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", false, 0) == 0, cleanup, "delete operation failed");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_after, 0), cleanup, "list backup after failed");
    num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);

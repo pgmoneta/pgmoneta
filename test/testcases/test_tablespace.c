@@ -127,7 +127,7 @@ MCTF_TEST(test_pgmoneta_tablespace_restore)
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "Backup of a cluster with tablespaces failed");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore of a cluster with tablespaces failed");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "Restore of a cluster with tablespaces failed");
    MCTF_ASSERT(count_restored_tablespace_links() >= 2, cleanup, "Restored cluster does not contain the two tablespaces");
 
 cleanup:
@@ -172,7 +172,7 @@ MCTF_TEST(test_pgmoneta_tablespace_backup_incremental)
    MCTF_ASSERT(append_tablespace_rows(ssl, socket) == 0, cleanup, "Failed to add rows to the tablespace tables");
    pgmoneta_test_cleanup_connection(&ssl, &socket);
 
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0, cleanup, "Incremental backup of a cluster with tablespaces failed");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0) == 0, cleanup, "Incremental backup of a cluster with tablespaces failed");
 
    MCTF_ASSERT(pgmoneta_tsclient_list_backup("primary", NULL, &response, 0) == 0, cleanup, "List backup failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_tsclient_get_backup_count(response), 2, cleanup, "Expected one full plus one incremental backup");
@@ -230,9 +230,9 @@ MCTF_TEST(test_pgmoneta_tablespace_restore_incremental)
    MCTF_ASSERT(append_tablespace_rows(ssl, socket) == 0, cleanup, "Failed to add rows to the tablespace tables");
    pgmoneta_test_cleanup_connection(&ssl, &socket);
 
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0, cleanup, "Incremental backup of a cluster with tablespaces failed");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0) == 0, cleanup, "Incremental backup of a cluster with tablespaces failed");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore of an incremental backup with tablespaces failed");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "Restore of an incremental backup with tablespaces failed");
    MCTF_ASSERT(count_restored_tablespace_links() >= 2, cleanup, "Restored cluster does not contain the two tablespaces");
 
 cleanup:
