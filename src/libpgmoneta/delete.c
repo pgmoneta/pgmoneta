@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <deque.h>
 #include <logging.h>
+#include <management.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -38,6 +39,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /**
  * Delete wal files older than the given srv_wal file under the base directory
@@ -52,11 +54,14 @@ delete_wal_older_than(int srv, char* srv_wal, char* base);
 int
 pgmoneta_delete(int srv, char* label)
 {
+   bool active = false;
+   bool locked = false;
    int ec = -1;
    char* en = NULL;
    struct workflow* workflow = NULL;
    struct art* nodes = NULL;
    struct backup* backup = NULL; /* owned by nodes */
+   struct main_configuration* config = (struct main_configuration*)shmem;
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, NULL);
 
@@ -70,10 +75,30 @@ pgmoneta_delete(int srv, char* label)
       goto error;
    }
 
+   if (!atomic_compare_exchange_strong(&config->common.servers[srv].repository, &active, true))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_BACKUP_ACTIVE;
+      pgmoneta_log_info("Delete: Server %s is active", config->common.servers[srv].name);
+      pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
+                         config->common.servers[srv].active_backup ? "Yes" : "No",
+                         config->common.servers[srv].active_restore ? "Yes" : "No",
+                         config->common.servers[srv].active_archive ? "Yes" : "No",
+                         config->common.servers[srv].active_delete ? "Yes" : "No",
+                         config->common.servers[srv].active_retention ? "Yes" : "No");
+      goto error;
+   }
+   config->common.servers[srv].active_delete = true;
+   locked = true;
+   config->common.servers[srv].repository_pid = getpid();
+
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;
    }
+
+   config->common.servers[srv].active_delete = false;
+   config->common.servers[srv].repository_pid = 0;
+   atomic_store(&config->common.servers[srv].repository, false);
 
    pgmoneta_art_destroy(nodes);
 
@@ -84,6 +109,13 @@ pgmoneta_delete(int srv, char* label)
 error:
 
    pgmoneta_log_error("Delete: %s (%d)", en, ec);
+
+   if (locked)
+   {
+      config->common.servers[srv].active_delete = false;
+      config->common.servers[srv].repository_pid = 0;
+      atomic_store(&config->common.servers[srv].repository, false);
+   }
 
    pgmoneta_art_destroy(nodes);
 
