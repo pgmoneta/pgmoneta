@@ -284,7 +284,7 @@ MCTF_TEST(test_pgmoneta_hot_standby_incremental)
    f = NULL;
 
    MCTF_ASSERT(run_queries(added_queries) == 0, cleanup, "failed to create the first incremental relation");
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0, cleanup, "first incremental backup failed");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0) == 0, cleanup, "first incremental backup failed");
 
    pgmoneta_snprintf(override_dst, sizeof(override_dst), "%s/override_marker_inc.txt", standby_dir);
    MCTF_ASSERT(standby_has(standby_dir, "hs_incremental_marker"), cleanup, "hot standby was not updated by the first incremental backup");
@@ -292,7 +292,7 @@ MCTF_TEST(test_pgmoneta_hot_standby_incremental)
    MCTF_ASSERT(relation_in_standby(standby_dir, "hs_incremental_added") == 0, cleanup, "relation added after the full backup is missing or has the wrong size in hot standby");
 
    MCTF_ASSERT(run_queries(second_added_queries) == 0, cleanup, "failed to create the second incremental relation");
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0, cleanup, "second incremental backup failed");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0) == 0, cleanup, "second incremental backup failed");
    MCTF_ASSERT(relation_in_standby(standby_dir, "hs_incremental_added2") == 0, cleanup, "relation added before the second incremental backup is missing or has the wrong size in hot standby");
 
    MCTF_ASSERT(check_files_recursive(standby_dir, &found_files) == 0, cleanup, "Found encrypted or compressed files in hot standby (incremental)");
@@ -425,7 +425,7 @@ MCTF_TEST_NEGATIVE(test_pgmoneta_hot_standby_reset)
    MCTF_ASSERT(pgmoneta_delete_directory(global_dir) == 0, cleanup, "failed to delete %s", global_dir);
    MCTF_ASSERT(create_file(standby_dir, "global") == 0, cleanup, "failed to create %s", global_dir);
 
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, MANAGEMENT_ERROR_BACKUP_EXECUTE) == 0, cleanup, "second backup did not fail");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, false, NULL, MANAGEMENT_ERROR_BACKUP_EXECUTE) == 0, cleanup, "second backup did not fail");
    MCTF_ASSERT(!pgmoneta_exists(standby_dir), cleanup, "failed hot standby was not removed");
 
    /* The next backup takes the full copy path */

@@ -323,6 +323,8 @@ compression = zstd
 
 encryption = aes-256-gcm
 
+progress = on
+
 retention = 7
 retention_interval = 3600 # 1h
 
@@ -714,4 +716,3 @@ fi
 detect_container_engine
 trap cleanup EXIT SIGINT
 run_tests
-

@@ -170,6 +170,8 @@ extern "C" {
 
 #define INCREMENTAL_PREFIX           "INCREMENTAL."
 
+#define JOBS_DIR                     "jobs"
+
 #define likely(x)                    __builtin_expect(!!(x), 1)
 #define unlikely(x)                  __builtin_expect(!!(x), 0)
 
@@ -309,6 +311,25 @@ struct gcs_configuration
    char credentials_file[MAX_PATH]; /**< Path to a GCS service account JSON key; blank for unauthenticated (emulator) use */
 } __attribute__((aligned(64)));
 
+/** @struct job
+ * Defines an asynchronous job
+ */
+struct job
+{
+   char id[MISC_LENGTH]; /**< The job identifier */
+   int server_id;        /**< The server index */
+   pid_t owner_pid;      /**< The process that owns the job */
+
+   int workflow_type;        /**< The workflow type */
+   atomic_int current_phase; /**< The current workflow phase */
+
+   atomic_int state; /**< The job state */
+
+   struct tm started_at;  /**< The start time */
+   struct tm updated_at;  /**< The last update time */
+   struct tm finished_at; /**< The finish time */
+};
+
 /** @struct server
  * Defines a server
  */
@@ -374,6 +395,7 @@ struct server
    struct s3_configuration s3;                                    /**< The S3 configuration */
    struct gcs_configuration gcs;                                  /**< The GCS configuration */
    struct progress progress;                                      /**< The progress */
+   struct job job;                                                /**< The asynchronous job currently running */
 } __attribute__((aligned(64)));
 
 /** @struct user
