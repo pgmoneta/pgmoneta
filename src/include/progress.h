@@ -83,14 +83,6 @@ struct progress
 };
 
 /**
- * Map a workflow step display name to a progress phase
- * @param name The step name from the workflow
- * @return The phase constant, or -1 if not tracked
- */
-int
-pgmoneta_progress_phase_from_workflow_name(char* name);
-
-/**
  * ART node key storing the cumulative percentage limit for a phase
  * @param phase The phase constant
  * @return The key string, or NULL if unknown

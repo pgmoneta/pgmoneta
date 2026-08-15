@@ -87,6 +87,7 @@
 #define COMMAND_STATUS_DETAILS "status-details"
 #define COMMAND_VERIFY         "verify"
 #define COMMAND_S3             "s3"
+#define COMMAND_JOB            "job"
 
 #define OUTPUT_FORMAT_JSON     "json"
 #define OUTPUT_FORMAT_TEXT     "text"
@@ -114,6 +115,7 @@ static void help_conf(void);
 static void help_clear(void);
 static void help_info(void);
 static void help_annotate(void);
+static void help_job(void);
 static void help_mode(void);
 static void help_progress(void);
 static void display_helper(char* command);
@@ -143,6 +145,12 @@ static int encrypt_data_server(SSL* ssl, int socket, char* path, uint8_t compres
 static int decompress_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int compress_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int job_request(SSL* ssl, int socket, char* job_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int job_remove_request(SSL* ssl, int socket, char* job_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int job_status_request(SSL* ssl, int socket, char* server, char* operation, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int job_list_all_request(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int job_list_server_request(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int job_list_status_request(SSL* ssl, int socket, char* status, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int progress(SSL* ssl, int socket, char* server, char* command, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -228,6 +236,16 @@ usage(void)
    printf("  encrypt                  Encrypt a file using master-key\n");
    printf("  expunge                  Expunge a backup from a server\n");
    printf("  info                     Information about a backup\n");
+   printf("  job <action>             Manage jobs, with:\n");
+   printf("                           - '<job_id>' to retrieve a job\n");
+   printf("                           - 'status <server> <command>' to retrieve the latest job status\n");
+   printf("  job-remove <action>      Remove persisted jobs, with:\n");
+   printf("                           - 'job <job_id>' to remove one job\n");
+   printf("                           - 'all' to remove all jobs\n");
+   printf("  job-list <action>        List jobs, with:\n");
+   printf("                           - 'all' to list all jobs\n");
+   printf("                           - 'server <server>' to list a server's jobs\n");
+   printf("                           - 'status <status>' to filter by job status\n");
    printf("  list-backup              List the backups for a server\n");
    printf("  mode                     Switch the mode for a server\n");
    printf("  ping                     Check if pgmoneta is alive\n");
@@ -416,7 +434,54 @@ struct pgmoneta_command command_table[] = {
     .accepted_argument_count = {2},
     .action = MANAGEMENT_PROGRESS,
     .deprecated = false,
-    .log_message = "<progress> [%s] [%s]"}};
+    .log_message = "<progress> [%s] [%s]"},
+   {.command = "job",
+    .subcommand = "",
+    .accepted_argument_count = {1},
+    .action = MANAGEMENT_JOB,
+    .deprecated = false,
+    .log_message = "<job> [%s]"},
+   {.command = "job",
+    .subcommand = "status",
+    .accepted_argument_count = {2},
+    .action = MANAGEMENT_JOB_STATUS,
+    .deprecated = false,
+    .log_message = "<job status> [%s] [%s]"},
+   {.command = "job-remove",
+    .subcommand = "job",
+    .accepted_argument_count = {1},
+    .action = MANAGEMENT_JOB_REMOVE_JOB,
+    .deprecated = false,
+    .log_message = "<job-removejob> [%s]"},
+   {.command = "job-remove",
+    .subcommand = "all",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_JOB_REMOVE_ALL,
+    .deprecated = false,
+    .log_message = "<job-remove all>"},
+   {.command = "job-list",
+    .subcommand = "all",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_JOB_LIST_ALL,
+    .deprecated = false,
+    .log_message = "<job-list all>"},
+   {
+      .command = "job-list",
+      .subcommand = "server",
+      .accepted_argument_count = {1},
+      .action = MANAGEMENT_JOB_LIST_SERVER,
+      .deprecated = false,
+      .log_message = "<job-list server> [%s]",
+   },
+   {
+      .command = "job-list",
+      .subcommand = "status",
+      .accepted_argument_count = {1},
+      .action = MANAGEMENT_JOB_LIST_STATUS,
+      .deprecated = false,
+      .log_message = "<job-list status> [%s]",
+   },
+};
 
 int
 main(int argc, char** argv)
@@ -450,6 +515,7 @@ main(int argc, char** argv)
    int num_results = 0;
    bool cascade = false;
    bool force = false;
+   bool async = false;
    char* sort_option = NULL;
    char port_buf[16] = {0};
 
@@ -468,6 +534,7 @@ main(int argc, char** argv)
       {"s", "sort", true},
       {"", "cascade", false},
       {"", "force", false},
+      {"", "async", false},
       {"?", "help", false}};
 
    // Disable stdout buffering (i.e. write to stdout immediatelly).
@@ -622,6 +689,10 @@ main(int argc, char** argv)
       {
          force = true;
       }
+      else if (pgmoneta_compare_string(optname, "async"))
+      {
+         async = true;
+      }
       else if (pgmoneta_compare_string(optname, "?") || pgmoneta_compare_string(optname, "help"))
       {
          usage();
@@ -662,6 +733,15 @@ main(int argc, char** argv)
       }
       exit_code = 1;
       goto done;
+   }
+
+   if (async && parsed.cmd->action != MANAGEMENT_BACKUP &&
+       parsed.cmd->action != MANAGEMENT_DELETE &&
+       parsed.cmd->action != MANAGEMENT_ARCHIVE &&
+       parsed.cmd->action != MANAGEMENT_RESTORE)
+   {
+      warnx("pgmoneta-cli: --async is only supported for backup, delete, archive, and restore");
+      exit(1);
    }
 
    need_server_conn = parsed.cmd->action != MANAGEMENT_COMPRESS && parsed.cmd->action != MANAGEMENT_DECOMPRESS && parsed.cmd->action != MANAGEMENT_ENCRYPT && parsed.cmd->action != MANAGEMENT_DECRYPT;
@@ -904,6 +984,10 @@ password:
    }
 
 execute:
+
+   /* Set the asynchronous flag for async management requests */
+   pgmoneta_management_set_async(async);
+
    if (parsed.cmd->action == MANAGEMENT_BACKUP)
    {
       if (parsed.args[1])
@@ -1055,6 +1139,34 @@ execute:
    else if (parsed.cmd->action == MANAGEMENT_ANNOTATE)
    {
       exit_code = annotate(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], parsed.args[4], compression, encryption, output_format);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_JOB)
+   {
+      exit_code = job_request(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_JOB_STATUS)
+   {
+      exit_code = job_status_request(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_JOB_REMOVE_JOB)
+   {
+      exit_code = job_remove_request(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_JOB_REMOVE_ALL)
+   {
+      exit_code = job_remove_request(s_ssl, socket, NULL, compression, encryption, output_format);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_JOB_LIST_ALL)
+   {
+      exit_code = job_list_all_request(s_ssl, socket, compression, encryption, output_format);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_JOB_LIST_SERVER)
+   {
+      exit_code = job_list_server_request(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_JOB_LIST_STATUS)
+   {
+      exit_code = job_list_status_request(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_MODE)
    {
@@ -1267,6 +1379,19 @@ help_annotate(void)
 }
 
 static void
+help_job(void)
+{
+   printf("Manage jobs\n");
+   printf("  pgmoneta-cli job <job_id>                              Retrieve a job\n");
+   printf("  pgmoneta-cli job status <server> <command>              Retrieve the latest job status\n");
+   printf("  pgmoneta-cli job-remove job <job_id>                    Remove one persisted job\n");
+   printf("  pgmoneta-cli job-remove all                             Remove persisted jobs\n");
+   printf("  pgmoneta-cli job-list all                               List all jobs\n");
+   printf("  pgmoneta-cli job-list server <server>                   List jobs for a server\n");
+   printf("  pgmoneta-cli job-list status <running|completed|failed> List jobs by status\n");
+}
+
+static void
 help_mode(void)
 {
    printf("Switch mode of a server\n");
@@ -1362,6 +1487,10 @@ display_helper(char* command)
    else if (pgmoneta_compare_string(command, COMMAND_ANNOTATE))
    {
       help_annotate();
+   }
+   else if (pgmoneta_compare_string(command, COMMAND_JOB))
+   {
+      help_job();
    }
    else if (pgmoneta_compare_string(command, COMMAND_MODE))
    {
@@ -1939,6 +2068,102 @@ annotate(SSL* ssl, int socket, char* server, char* backup, char* action, char* k
 error:
 
    return 1;
+}
+
+static int
+job_request(SSL* ssl, int socket, char* job_id, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_job(ssl, socket, job_id, compression, encryption, output_format))
+   {
+      return 1;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+job_remove_request(SSL* ssl, int socket, char* job_id, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_job_remove(ssl, socket, job_id, compression, encryption, output_format))
+   {
+      return 1;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+job_status_request(SSL* ssl, int socket, char* server, char* operation, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_job_status(ssl, socket, server, operation, compression, encryption, output_format))
+   {
+      return 1;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+job_list_all_request(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_job_list_all(ssl, socket, compression, encryption, output_format))
+   {
+      return 1;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+job_list_server_request(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_job_list_server(ssl, socket, server, compression, encryption, output_format))
+   {
+      return 1;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+job_list_status_request(SSL* ssl, int socket, char* status, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_job_list_status(ssl, socket, status, compression, encryption, output_format))
+   {
+      return 1;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      return 1;
+   }
+
+   return 0;
 }
 
 static int
@@ -3242,6 +3467,8 @@ translate_json_object(struct json* j)
    struct json_iterator* server_it = NULL;
    struct json_iterator* backup_it = NULL;
 
+   bool async = false;
+
    // Translate arguments of header
    header = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_HEADER);
 
@@ -3275,6 +3502,8 @@ translate_json_object(struct json* j)
          pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)translated_encryption, ValueString);
       }
 
+      async = (bool)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_ASYNC);
+
       free(translated_command);
       free(translated_out_format);
       free(translated_compression);
@@ -3299,7 +3528,10 @@ translate_json_object(struct json* j)
             case MANAGEMENT_EXPUNGE:
             case MANAGEMENT_INFO:
             case MANAGEMENT_ANNOTATE:
-               translate_backup_argument(response);
+               if (!async)
+               {
+                  translate_backup_argument(response);
+               }
                break;
             case MANAGEMENT_STATUS:
                translate_response_argument(response);

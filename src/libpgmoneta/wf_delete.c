@@ -81,7 +81,6 @@ static int
 delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
-   bool active = false;
    bool force = false;
    int backup_index = -1;
    char* label = NULL;
@@ -105,21 +104,6 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
    force = (bool)pgmoneta_art_search(nodes, NODE_FORCE);
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->common.servers[server].name, label);
-
-   if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
-   {
-      pgmoneta_log_info("Delete: Server %s is active", config->common.servers[server].name);
-      pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
-                         config->common.servers[server].active_backup ? "Yes" : "No",
-                         config->common.servers[server].active_restore ? "Yes" : "No",
-                         config->common.servers[server].active_archive ? "Yes" : "No",
-                         config->common.servers[server].active_delete ? "Yes" : "No",
-                         config->common.servers[server].active_retention ? "Yes" : "No");
-      pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_ACTIVE, ValueInt32);
-      goto error;
-   }
-
-   config->common.servers[server].active_delete = true;
 
    d = pgmoneta_get_server_backup(server);
    if (pgmoneta_load_infos(d, &number_of_backups, &backups))
@@ -223,10 +207,6 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    free(child);
 
-   config->common.servers[server].active_delete = false;
-   atomic_store(&config->common.servers[server].repository, false);
-   pgmoneta_log_trace("Delete is ready for %s", config->common.servers[server].name);
-
    return 0;
 
 error:
@@ -239,10 +219,6 @@ error:
    free(d);
 
    free(child);
-
-   config->common.servers[server].active_delete = false;
-   atomic_store(&config->common.servers[server].repository, false);
-   pgmoneta_log_trace("Delete is ready for %s", config->common.servers[server].name);
 
    return 1;
 }

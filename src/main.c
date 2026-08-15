@@ -38,6 +38,7 @@
 #include <delete.h>
 #include <gzip_compression.h>
 #include <info.h>
+#include <job.h>
 #include <keep.h>
 #include <logging.h>
 #include <lz4_compression.h>
@@ -2132,6 +2133,198 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_set_proc_title(1, ai->argv, "progress", NULL);
          pgmoneta_progress(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_JOB)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Job: No fork (%d)", MANAGEMENT_ERROR_JOB_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports(false);
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "job", NULL);
+         pgmoneta_job_rq(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_JOB_STATUS)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+
+      srv = -1;
+
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      {
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
+         {
+            srv = i;
+         }
+      }
+
+      if (srv != -1)
+      {
+         pid = fork();
+         if (pid == -1)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_log_error("Job: No fork (%d)", MANAGEMENT_ERROR_JOB_NOFORK);
+            goto error;
+         }
+         else if (pid == 0)
+         {
+            struct json* pyl = NULL;
+
+            shutdown_ports(false);
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "job status", NULL);
+            pgmoneta_job_status_rq(NULL, client_fd, compression, encryption, pyl);
+         }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Job: No server %s (%d)", server, MANAGEMENT_ERROR_JOB_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_JOB_REMOVE_JOB || id == MANAGEMENT_JOB_REMOVE_ALL)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Job: No fork (%d)", MANAGEMENT_ERROR_JOB_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports(false);
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         if (id == MANAGEMENT_JOB_REMOVE_JOB)
+         {
+            pgmoneta_set_proc_title(1, ai->argv, "job remove job", NULL);
+         }
+         else
+         {
+            pgmoneta_set_proc_title(1, ai->argv, "job remove all", NULL);
+         }
+
+         pgmoneta_job_remove_rq(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_JOB_LIST_ALL)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Job: No fork (%d)", MANAGEMENT_ERROR_JOB_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports(false);
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "job list all", NULL);
+         pgmoneta_job_list_rq(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_JOB_LIST_SERVER)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+
+      srv = -1;
+
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      {
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
+         {
+            srv = i;
+         }
+      }
+      if (srv != -1)
+      {
+         pid = fork();
+         if (pid == -1)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_log_error("Job: No fork (%d)", MANAGEMENT_ERROR_JOB_NOFORK);
+            goto error;
+         }
+         else if (pid == 0)
+         {
+            struct json* pyl = NULL;
+
+            shutdown_ports(false);
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "job list server", NULL);
+            pgmoneta_job_list_rq(NULL, client_fd, compression, encryption, pyl);
+         }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Job List: No server %s (%d)", server, MANAGEMENT_ERROR_JOB_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_JOB_LIST_STATUS)
+   {
+      char* status = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_JOB_STATE);
+      bool valid = false;
+
+      if (pgmoneta_compare_string(status, "Running") || pgmoneta_compare_string(status, "Completed") || pgmoneta_compare_string(status, "Failed") || pgmoneta_compare_string(status, "Started"))
+      {
+         valid = true;
+      }
+
+      if (valid)
+      {
+         pid = fork();
+         if (pid == -1)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_log_error("Job: No fork (%d)", MANAGEMENT_ERROR_JOB_NOFORK);
+            goto error;
+         }
+         else if (pid == 0)
+         {
+            struct json* pyl = NULL;
+
+            shutdown_ports(false);
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "job list status", NULL);
+            pgmoneta_job_list_rq(NULL, client_fd, compression, encryption, pyl);
+         }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_LIST_STATUS_INVALID, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Job List: Invalid status %s (%d)", status, MANAGEMENT_ERROR_JOB_LIST_STATUS_INVALID);
+         goto error;
       }
    }
    else

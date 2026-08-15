@@ -49,6 +49,9 @@ extern "C" {
 int
 pgmoneta_tsclient_backup(char* server, char* incremental, int expected_error);
 
+int
+pgmoneta_tsclient_async_backup(char* server, struct json** response, int expected_error);
+
 /**
  * Execute list-backup command on the server
  * @param server the server
@@ -115,6 +118,24 @@ pgmoneta_tsclient_delete(char* server, char* backup_id, int expected_error);
  */
 int
 pgmoneta_tsclient_force_delete(char* server, char* backup_id, int expected_error);
+
+int
+pgmoneta_tsclient_job(char* job_id, struct json** response, int expected_error);
+
+int
+pgmoneta_tsclient_job_status(char* server, char* command, struct json** response, int expected_error);
+
+int
+pgmoneta_tsclient_job_list_all(struct json** response, int expected_error);
+
+int
+pgmoneta_tsclient_job_list_server(char* server, struct json** response, int expected_error);
+
+int
+pgmoneta_tsclient_job_list_status(char* status, struct json** response, int expected_error);
+
+int
+pgmoneta_tsclient_job_remove(char* job_id, int expected_error);
 
 /**
  * Execute retain command on the server

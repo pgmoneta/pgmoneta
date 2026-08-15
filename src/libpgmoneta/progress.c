@@ -466,7 +466,7 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
    struct workflow* current = workflow;
    while (current != NULL)
    {
-      phase = pgmoneta_progress_phase_from_workflow_name(current->name());
+      phase = pgmoneta_phase_from_workflow_name(current->name());
       if (phase > 0)
       {
          bool found = false;
@@ -739,76 +739,6 @@ pgmoneta_progress_teardown(int server)
    atomic_store(&p->total, 0);
    atomic_store(&p->prev_phase_limit, 0);
    atomic_store(&p->phase_limit, 0);
-}
-
-int
-pgmoneta_progress_phase_from_workflow_name(char* name)
-{
-   if (pgmoneta_compare_string(name, PHASE_NAME_BASEBACKUP) || pgmoneta_compare_string(name, PHASE_NAME_INCREMENTAL_BACKUP))
-   {
-      return PHASE_BASEBACKUP;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_MANIFEST))
-   {
-      return PHASE_MANIFEST;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_SHA512))
-   {
-      return PHASE_SHA512;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_LINK))
-   {
-      return PHASE_LINKING;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_ZSTD) || pgmoneta_compare_string(name, PHASE_NAME_GZIP) || pgmoneta_compare_string(name, PHASE_NAME_LZ4) || pgmoneta_compare_string(name, PHASE_NAME_BZIP2))
-   {
-      return PHASE_COMPRESSION;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_ENCRYPTION))
-   {
-      return PHASE_ENCRYPTION;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_DELETE))
-   {
-      return PHASE_DELETE;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_INFO))
-   {
-      return PHASE_INFO;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_RESTORE))
-   {
-      return PHASE_RESTORE;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_VERIFY))
-   {
-      return PHASE_VERIFY;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_COPY_WAL))
-   {
-      return PHASE_COPY_WAL;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_RECOVERY_INFO))
-   {
-      return PHASE_RECOVERY_INFO;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_EXCLUDED_FILES))
-   {
-      return PHASE_EXCLUDED_FILES;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_PERMISSIONS))
-   {
-      return PHASE_PERMISSIONS;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_CLEANUP))
-   {
-      return PHASE_CLEANUP;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_COMBINE_INCREMENTAL))
-   {
-      return PHASE_COMBINE_INCREMENTAL;
-   }
-   return -1;
 }
 
 char*
