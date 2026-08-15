@@ -38,6 +38,7 @@
 #include <delete.h>
 #include <gzip_compression.h>
 #include <info.h>
+#include <job.h>
 #include <keep.h>
 #include <logging.h>
 #include <lz4_compression.h>
@@ -2132,6 +2133,27 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_set_proc_title(1, ai->argv, "progress", NULL);
          pgmoneta_progress(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_JOB)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Job: No fork (%d)", MANAGEMENT_ERROR_JOB_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports(false);
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "job", NULL);
+         pgmoneta_job_request(NULL, client_fd, compression, encryption, pyl);
       }
    }
    else

@@ -174,7 +174,7 @@ MCTF_TEST(test_cli_backup)
 
    /* Ensure server is online before backup */
    MCTF_ASSERT(pgmoneta_tsclient_mode("primary", "online", 0) == 0, cleanup, "Mode online failed");
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, 0) == 0, cleanup, "Backup primary failed");
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, false, NULL, 0) == 0, cleanup, "Backup primary failed");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -236,7 +236,7 @@ MCTF_TEST(test_cli_archive)
    pgmoneta_snprintf(path, sizeof(path), "%s/archive_test", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
 
-   MCTF_ASSERT(pgmoneta_tsclient_archive("primary", "newest", NULL, path, 0) == 0, cleanup, "Archive newest failed");
+   MCTF_ASSERT(pgmoneta_tsclient_archive("primary", "newest", NULL, path, false, 0) == 0, cleanup, "Archive newest failed");
 
    pgmoneta_delete_directory(path);
 
@@ -251,7 +251,7 @@ MCTF_TEST(test_cli_restore)
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore newest failed");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "Restore newest failed");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -318,7 +318,7 @@ MCTF_TEST(test_cli_backup_verify_restore_aes)
                "Verify newest failed");
    MCTF_ASSERT_INT_EQ(get_failed_verify_count(verify_response), 0, cleanup, "Verify reported failed files");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore newest failed");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "Restore newest failed");
 
    pgmoneta_snprintf(restore_path, sizeof(restore_path), "%s/primary-%s", TEST_RESTORE_DIR, label);
    MCTF_ASSERT_INT_EQ(assert_restored_output_is_plaintext(restore_path), 0, cleanup,
@@ -483,7 +483,7 @@ MCTF_TEST(test_cli_backup_verify_restore_aes_chain)
    memset(verify_path, 0, sizeof(verify_path));
 
    /* Restore the newest backup and confirm plaintext output. */
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", newest_label, "current", 0) == 0, cleanup_chain,
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", newest_label, "current", false, 0) == 0, cleanup_chain,
                "Restore newest failed");
 
    pgmoneta_snprintf(restore_path, sizeof(restore_path), "%s/primary-%s", TEST_RESTORE_DIR, newest_label);
@@ -574,7 +574,7 @@ MCTF_TEST(test_cli_delete)
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) == 0, cleanup, "Delete oldest failed");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", false, 0) == 0, cleanup, "Delete oldest failed");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -642,7 +642,7 @@ MCTF_TEST_NEGATIVE(test_cli_negative)
    pgmoneta_test_setup();
 
    /* Backup invalid server */
-   MCTF_ASSERT(pgmoneta_tsclient_backup("invalid_server", NULL, MANAGEMENT_ERROR_BACKUP_NOSERVER) == 0, cleanup,
+   MCTF_ASSERT(pgmoneta_tsclient_backup("invalid_server", NULL, false, NULL, MANAGEMENT_ERROR_BACKUP_NOSERVER) == 0, cleanup,
                "Backup invalid_server should fail with NOSERVER");
 
    /* List backup invalid server */
@@ -650,7 +650,7 @@ MCTF_TEST_NEGATIVE(test_cli_negative)
                "List backup invalid_server should fail with NOSERVER");
 
    /* Delete invalid server */
-   MCTF_ASSERT(pgmoneta_tsclient_delete("invalid_server", "oldest", MANAGEMENT_ERROR_DELETE_NOSERVER) == 0, cleanup,
+   MCTF_ASSERT(pgmoneta_tsclient_delete("invalid_server", "oldest", false, MANAGEMENT_ERROR_DELETE_NOSERVER) == 0, cleanup,
                "Delete invalid_server should fail with NOSERVER");
 
    /* Retain invalid server */
@@ -676,12 +676,12 @@ MCTF_TEST_NEGATIVE(test_cli_negative)
    /* Archive invalid server */
    pgmoneta_snprintf(path, sizeof(path), "%s/archive_test_neg", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
-   MCTF_ASSERT(pgmoneta_tsclient_archive("invalid_server", "newest", NULL, path, MANAGEMENT_ERROR_ARCHIVE_NOSERVER) == 0, cleanup,
+   MCTF_ASSERT(pgmoneta_tsclient_archive("invalid_server", "newest", NULL, path, false, MANAGEMENT_ERROR_ARCHIVE_NOSERVER) == 0, cleanup,
                "Archive invalid_server should fail with NOSERVER");
    pgmoneta_delete_directory(path);
 
    /* Restore invalid server */
-   MCTF_ASSERT(pgmoneta_tsclient_restore("invalid_server", "newest", "current", MANAGEMENT_ERROR_RESTORE_NOSERVER) == 0, cleanup,
+   MCTF_ASSERT(pgmoneta_tsclient_restore("invalid_server", "newest", "current", false, MANAGEMENT_ERROR_RESTORE_NOSERVER) == 0, cleanup,
                "Restore invalid_server should fail with NOSERVER");
 
    /* Encrypt/Decrypt with non-existent file */
