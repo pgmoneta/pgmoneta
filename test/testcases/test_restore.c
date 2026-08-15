@@ -45,7 +45,7 @@ MCTF_TEST(test_pgmoneta_restore_full)
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "restore operation failed");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "restore operation failed");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -58,7 +58,7 @@ MCTF_TEST(test_pgmoneta_restore_incremental_chain)
 
    MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup, "backup chain failed during setup - check server is online and backup configuration");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "restore operation failed");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "restore operation failed");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -91,7 +91,7 @@ MCTF_TEST_NEGATIVE(test_pgmoneta_restore_no_workers_copy_failure)
    label_file = pgmoneta_append(label_file, "backup_label");
    MCTF_ASSERT(chmod(label_file, 0) == 0, cleanup, "failed to make backup_label unreadable");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", MANAGEMENT_ERROR_RESTORE_NOBACKUP) == 0, cleanup, "restore must fail when a file cannot be copied");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, MANAGEMENT_ERROR_RESTORE_NOBACKUP) == 0, cleanup, "restore must fail when a file cannot be copied");
 
 cleanup:
    for (int i = 0; i < number_of_backups; i++)
