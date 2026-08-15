@@ -27,6 +27,7 @@ Options:
   -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
   -s, --sort asc|desc                             Sort result (for list-backup)
       --cascade                                   Cascade a retain/expunge backup
+      --async                                     Run a supported operation asynchronously
   -?, --help                                      Display help
 
 Commands:
@@ -51,6 +52,7 @@ Commands:
   encrypt                  Encrypt a file using master-key
   expunge                  Expunge a backup from a server
   info                     Information about a backup
+  job <action>             Retrieve, list, or remove jobs
   list-backup              List the backups for a server
   mode                     Switch the mode for a server
   ping                     Check if pgmoneta is alive
@@ -91,6 +93,10 @@ Example
 ```sh
 pgmoneta-cli backup primary 20250101120000
 ```
+
+Backup, restore, archive, and delete can be started asynchronously with
+`--async`. See [Asynchronous operations](ASYNC.md) for job lookup, listing, and
+removal commands.
 
 ## list-backup
 
@@ -350,6 +356,125 @@ Example
 ```sh
 pgmoneta-cli progress primary backup
 ```
+
+## job
+
+Retrieve a job by its identifier. The command returns an active job from memory
+or a completed or failed job from persistent storage.
+
+Command
+
+```sh
+pgmoneta-cli job <job_id>
+```
+
+Example
+
+```sh
+pgmoneta-cli job s0-backup-20260826143022
+```
+
+### job status
+
+Retrieve the current job for an operation on a server. If no matching job is
+running, the latest persisted job for that server and operation is returned.
+
+Command
+
+```sh
+pgmoneta-cli job status <server> <backup|restore|archive|delete>
+```
+
+Examples
+
+```sh
+pgmoneta-cli job status primary backup
+pgmoneta-cli job status primary restore
+pgmoneta-cli job status primary archive
+pgmoneta-cli job status primary delete
+```
+
+When progress tracking is enabled for the server, an active job
+response includes the live fields `ProgressState`, `Done`, `Total`, `Elapsed`,
+`Percentage`, and `Remaining`. These fields are not persisted with completed or
+failed job records.
+
+## job list
+
+List active and persisted jobs.
+
+### job list all
+
+List all jobs for all configured servers.
+
+```sh
+pgmoneta-cli job list all
+```
+
+### job list server
+
+List all jobs belonging to one server.
+
+Command
+
+```sh
+pgmoneta-cli job list server <server>
+```
+
+Example
+
+```sh
+pgmoneta-cli job list server primary
+```
+
+### job list status
+
+List jobs having a specific lifecycle state.
+
+Command
+
+```sh
+pgmoneta-cli job list status <Running|Completed|Failed>
+```
+
+Examples
+
+```sh
+pgmoneta-cli job list status Running
+pgmoneta-cli job list status Completed
+pgmoneta-cli job list status Failed
+```
+
+## job remove
+
+Remove persisted job records. Active jobs cannot be removed.
+
+### job remove by identifier
+
+Remove one persisted job by identifier.
+
+Command
+
+```sh
+pgmoneta-cli job remove <job_id>
+```
+
+Example
+
+```sh
+pgmoneta-cli job remove s0-backup-20260826143022
+```
+
+### job remove all
+
+Remove all persisted job records.
+
+```sh
+pgmoneta-cli job remove all
+```
+
+Removing a job record does not delete a backup, cancel an active job, or undo a
+completed operation.
 
 ## mode
 

@@ -31,6 +31,7 @@
 #include <achv.h>
 #include <backup.h>
 #include <files.h>
+#include <job.h>
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
@@ -40,6 +41,7 @@
 #include <security.h>
 #include <stream.h>
 #include <utils.h>
+#include <value.h>
 #include <vfile.h>
 #include <workflow.h>
 
@@ -58,6 +60,7 @@ void
 pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
+   bool locked = false;
    char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
@@ -76,7 +79,10 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    struct art* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
+   struct json* hdr = NULL;
    struct main_configuration* config;
+   enum value_type async_type = ValueBool;
+   bool async = false;
 
    pgmoneta_start_logging();
 
@@ -102,8 +108,10 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    }
 
    config->common.servers[server].active_archive = true;
+   locked = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   hdr = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_HEADER);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
@@ -163,58 +171,128 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (!pgmoneta_restore_backup(nodes))
+   async = (bool)pgmoneta_json_get_typed(hdr, MANAGEMENT_ARGUMENT_ASYNC, &async_type);
+   if (async)
    {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, backup);
+      int error = 0;
+      struct json* async_response = NULL;
+      struct json* async_payload = NULL;
+      struct timespec job_start_t;
 
-      if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
+      if (pgmoneta_job_init(server, WORKFLOW_TYPE_ARCHIVE))
       {
-         goto error;
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
       }
 
-      if (pgmoneta_management_create_response(payload, server, &response))
+      if (pgmoneta_json_clone(payload, &async_payload) ||
+          pgmoneta_management_create_response(async_payload, server, &async_response))
       {
-         ec = MANAGEMENT_ERROR_ALLOCATION;
-         goto error;
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
       }
 
-      filename = pgmoneta_append(filename, (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE));
+      if (pgmoneta_job_add_async_data(server, async_response))
       {
-         char* suffix = NULL;
-         if (pgmoneta_extraction_get_suffix(config->compression_type, config->common.encryption, &suffix))
-         {
-            goto error;
-         }
-         if (suffix != NULL)
-         {
-            filename = pgmoneta_append(filename, suffix);
-            free(suffix);
-         }
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
       }
-
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)label, ValueString);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)filename, ValueString);
 
 #ifdef HAVE_FREEBSD
-      clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+      clock_gettime(CLOCK_MONOTONIC_FAST, &job_start_t);
 #else
-      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &job_start_t);
 #endif
 
-      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, job_start_t, compression, encryption, async_payload))
       {
-         ec = MANAGEMENT_ERROR_ARCHIVE_NETWORK;
-         pgmoneta_log_error("Archive: Error sending response for %s/%s", config->common.servers[server].name, identifier);
-         goto error;
+         error = MANAGEMENT_ERROR_ARCHIVE_NETWORK;
+         pgmoneta_log_error("Archive: Error sending async response for %s/%s", config->common.servers[server].name, identifier);
+         goto job_error;
       }
 
-      elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
+      pgmoneta_json_destroy(async_payload);
+      pgmoneta_disconnect(client_fd);
+      pgmoneta_job_update_state(server, JOB_STATE_RUNNING);
 
-      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, elapsed);
-
-      free(elapsed);
+job_error:
+      if (error != 0)
+      {
+         async = false;
+         pgmoneta_job_cleanup(server);
+         pgmoneta_json_destroy(async_payload);
+         ec = error;
+         goto error;
+      }
    }
+
+   if (pgmoneta_restore_backup(nodes))
+   {
+      ec = MANAGEMENT_ERROR_ARCHIVE_RESTORE;
+      goto error;
+   }
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, backup);
+
+   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_create_response(payload, server, &response))
+   {
+      ec = MANAGEMENT_ERROR_ALLOCATION;
+      goto error;
+   }
+
+   filename = pgmoneta_append(filename, (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE));
+   {
+      char* suffix = NULL;
+      if (pgmoneta_extraction_get_suffix(config->compression_type, config->common.encryption, &suffix))
+      {
+         goto error;
+      }
+      if (suffix != NULL)
+      {
+         filename = pgmoneta_append(filename, suffix);
+         free(suffix);
+      }
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)label, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)filename, ValueString);
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+   if (async)
+   {
+      struct json* outcome = NULL;
+      pgmoneta_job_update_state(server, JOB_STATE_COMPLETED);
+      pgmoneta_job_update_phase(server, PHASE_NONE);
+      if (pgmoneta_management_create_outcome_success(payload, start_t, end_t, &outcome) ||
+          pgmoneta_job_finish(server, payload))
+      {
+         ec = MANAGEMENT_ERROR_ARCHIVE_ERROR;
+         goto error;
+      }
+   }
+   else if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   {
+      ec = MANAGEMENT_ERROR_ARCHIVE_NETWORK;
+      pgmoneta_log_error("Archive: Error sending response for %s/%s", config->common.servers[server].name, identifier);
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
+
+   pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, elapsed);
+
+   free(elapsed);
 
    pgmoneta_art_destroy(nodes);
 
@@ -222,10 +300,16 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    pgmoneta_workflow_destroy(workflow);
 
-   pgmoneta_disconnect(client_fd);
+   if (!async)
+   {
+      pgmoneta_disconnect(client_fd);
+   }
 
-   config->common.servers[server].active_archive = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   if (locked)
+   {
+      config->common.servers[server].active_archive = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
 
 #ifdef DEBUG
    pgmoneta_log_debug("Archive: Released repository lock");
@@ -252,10 +336,16 @@ error:
 
    pgmoneta_workflow_destroy(workflow);
 
-   pgmoneta_disconnect(client_fd);
+   if (!async)
+   {
+      pgmoneta_disconnect(client_fd);
+   }
 
-   config->common.servers[server].active_archive = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   if (locked)
+   {
+      config->common.servers[server].active_archive = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
 
    pgmoneta_stop_logging();
 
@@ -718,7 +808,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                      pgmoneta_progress_set_total(srv, total);
                   }
 
-                  pgmoneta_progress_report(srv);
+                  pgmoneta_progress_update_done(srv, done);
                }
                break;
             }

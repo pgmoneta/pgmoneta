@@ -30,6 +30,7 @@ Options:
   -s, --sort asc|desc                             Sort result (for list-backup)
       --cascade                                   Cascade a retain/expunge backup
       --force                                     Force delete a backup
+      --async                                     Run a supported operation asynchronously
   -?, --help                                      Display help
 
 Commands:
@@ -55,6 +56,7 @@ Commands:
   encrypt                  Encrypt a file using master-key
   expunge                  Expunge a backup from a server
   info                     Information about a backup
+  job <action>             Retrieve, list, or remove jobs
   list-backup              List the backups for a server
   mode                     Switch the mode for a server
   ping                     Check if pgmoneta is alive

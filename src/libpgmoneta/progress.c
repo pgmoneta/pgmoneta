@@ -32,6 +32,7 @@
 #include <backup.h>
 #include <info.h>
 #include <logging.h>
+#include <management.h>
 #include <progress.h>
 #include <utils.h>
 #include <workflow.h>
@@ -443,6 +444,41 @@ pgmoneta_is_progress_enabled(int server)
    return config->progress;
 }
 
+int
+pgmoneta_progress_add_response(int server, struct json* response)
+{
+   int pct;
+   pgmoneta_time_t remaining;
+   struct main_configuration* config;
+
+   if (server < 0 || server >= NUMBER_OF_SERVERS || response == NULL)
+   {
+      return 1;
+   }
+
+   if (!pgmoneta_is_progress_enabled(server))
+   {
+      return 1;
+   }
+
+   config = (struct main_configuration*)shmem;
+   pct = atomic_load(&config->common.servers[server].progress.percentage);
+   remaining = PGMONETA_TIME_SEC(pgmoneta_progress_remaining(server));
+
+   if (pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_PROGRESS_STATE, (uintptr_t)atomic_load(&config->common.servers[server].progress.state), ValueInt32) ||
+       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DONE, (uintptr_t)atomic_load(&config->common.servers[server].progress.done), ValueInt64) ||
+       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_TOTAL, (uintptr_t)atomic_load(&config->common.servers[server].progress.total), ValueInt64) ||
+       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)atomic_load(&config->common.servers[server].progress.elapsed), ValueInt64) ||
+       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_PERCENTAGE, (uintptr_t)pct, ValueInt32))
+   {
+      return 1;
+   }
+
+   pgmoneta_json_put_time_value(response, MANAGEMENT_ARGUMENT_REMAINING, remaining, FORMAT_TIME_S);
+
+   return 0;
+}
+
 void
 pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes, int workflow_type)
 {
@@ -466,7 +502,7 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
    struct workflow* current = workflow;
    while (current != NULL)
    {
-      phase = pgmoneta_progress_phase_from_workflow_name(current->name());
+      phase = pgmoneta_phase_from_workflow_name(current->name());
       if (phase > 0)
       {
          bool found = false;
@@ -739,76 +775,6 @@ pgmoneta_progress_teardown(int server)
    atomic_store(&p->total, 0);
    atomic_store(&p->prev_phase_limit, 0);
    atomic_store(&p->phase_limit, 0);
-}
-
-int
-pgmoneta_progress_phase_from_workflow_name(char* name)
-{
-   if (pgmoneta_compare_string(name, PHASE_NAME_BASEBACKUP) || pgmoneta_compare_string(name, PHASE_NAME_INCREMENTAL_BACKUP))
-   {
-      return PHASE_BASEBACKUP;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_MANIFEST))
-   {
-      return PHASE_MANIFEST;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_SHA512))
-   {
-      return PHASE_SHA512;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_LINK))
-   {
-      return PHASE_LINKING;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_ZSTD) || pgmoneta_compare_string(name, PHASE_NAME_GZIP) || pgmoneta_compare_string(name, PHASE_NAME_LZ4) || pgmoneta_compare_string(name, PHASE_NAME_BZIP2))
-   {
-      return PHASE_COMPRESSION;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_ENCRYPTION))
-   {
-      return PHASE_ENCRYPTION;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_DELETE))
-   {
-      return PHASE_DELETE;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_INFO))
-   {
-      return PHASE_INFO;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_RESTORE))
-   {
-      return PHASE_RESTORE;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_VERIFY))
-   {
-      return PHASE_VERIFY;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_COPY_WAL))
-   {
-      return PHASE_COPY_WAL;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_RECOVERY_INFO))
-   {
-      return PHASE_RECOVERY_INFO;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_EXCLUDED_FILES))
-   {
-      return PHASE_EXCLUDED_FILES;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_PERMISSIONS))
-   {
-      return PHASE_PERMISSIONS;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_CLEANUP))
-   {
-      return PHASE_CLEANUP;
-   }
-   if (pgmoneta_compare_string(name, PHASE_NAME_COMBINE_INCREMENTAL))
-   {
-      return PHASE_COMBINE_INCREMENTAL;
-   }
-   return -1;
 }
 
 char*

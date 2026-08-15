@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <extraction.h>
 #include <files.h>
+#include <job.h>
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
@@ -38,6 +39,7 @@
 #include <restore.h>
 #include <security.h>
 #include <utils.h>
+#include <value.h>
 #include <workers.h>
 #include <workflow.h>
 
@@ -393,7 +395,10 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    struct art* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
+   struct json* hdr = NULL;
    struct main_configuration* config;
+   enum value_type async_type = ValueBool;
+   bool async = false;
 
    pgmoneta_start_logging();
 
@@ -422,6 +427,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    locked = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   hdr = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_HEADER);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
@@ -632,6 +638,61 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
+   async = (bool)pgmoneta_json_get_typed(hdr, MANAGEMENT_ARGUMENT_ASYNC, &async_type);
+   if (async)
+   {
+      int error = 0;
+      struct json* async_response = NULL;
+      struct json* async_payload = NULL;
+      struct timespec job_start_t;
+
+      if (pgmoneta_job_init(server, WORKFLOW_TYPE_RESTORE))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+      if (pgmoneta_json_clone(payload, &async_payload) ||
+          pgmoneta_management_create_response(async_payload, server, &async_response))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+      if (pgmoneta_job_add_async_data(server, async_response))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+#ifdef HAVE_FREEBSD
+      clock_gettime(CLOCK_MONOTONIC_FAST, &job_start_t);
+#else
+      clock_gettime(CLOCK_MONOTONIC_RAW, &job_start_t);
+#endif
+
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, job_start_t, compression, encryption, async_payload))
+      {
+         error = MANAGEMENT_ERROR_RESTORE_NETWORK;
+         pgmoneta_log_error("Restore: Error sending async response for %s/%s", config->common.servers[server].name, label);
+         goto job_error;
+      }
+
+      pgmoneta_json_destroy(async_payload);
+      pgmoneta_disconnect(client_fd);
+      pgmoneta_job_update_state(server, JOB_STATE_RUNNING);
+
+job_error:
+      if (error != 0)
+      {
+         async = false;
+         pgmoneta_job_cleanup(server);
+         pgmoneta_json_destroy(async_payload);
+         ec = error;
+         goto error;
+      }
+   }
+
    ret = pgmoneta_restore_backup(nodes);
    if (ret == RESTORE_OK)
    {
@@ -660,7 +721,19 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+      if (async)
+      {
+         struct json* outcome = NULL;
+         pgmoneta_job_update_state(server, JOB_STATE_COMPLETED);
+         pgmoneta_job_update_phase(server, PHASE_NONE);
+         if (pgmoneta_management_create_outcome_success(payload, start_t, end_t, &outcome) ||
+             pgmoneta_job_finish(server, payload))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_ERROR;
+            goto error;
+         }
+      }
+      else if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
          ec = MANAGEMENT_ERROR_RESTORE_NETWORK;
          pgmoneta_log_error("Restore: Error sending response for %s", config->common.servers[server].name);
@@ -682,12 +755,18 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   config->common.servers[server].active_restore = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   if (locked)
+   {
+      config->common.servers[server].active_restore = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
 
    pgmoneta_json_destroy(payload);
 
-   pgmoneta_disconnect(client_fd);
+   if (!async)
+   {
+      pgmoneta_disconnect(client_fd);
+   }
 
    pgmoneta_stop_logging();
 
@@ -702,12 +781,15 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 error:
 
    pgmoneta_management_response_error_with_nodes(ssl, client_fd, config->common.servers[server].name,
-                                                 ec != -1 ? ec : MANAGEMENT_ERROR_ANNOTATE_ERROR, en != NULL ? en : NAME,
+                                                 ec != -1 ? ec : MANAGEMENT_ERROR_RESTORE_ERROR, en != NULL ? en : NAME,
                                                  compression, encryption, payload, nodes);
 
    pgmoneta_json_destroy(payload);
 
-   pgmoneta_disconnect(client_fd);
+   if (!async)
+   {
+      pgmoneta_disconnect(client_fd);
+   }
 
    pgmoneta_stop_logging();
 
@@ -2789,6 +2871,7 @@ carry_out_workflow(struct workflow* workflow, struct art* nodes)
    int phase = -1;
    char* key = NULL;
    bool progress_enabled = false;
+   bool async_job = false;
 
    current = workflow;
    while (current != NULL)
@@ -2807,14 +2890,21 @@ carry_out_workflow(struct workflow* workflow, struct art* nodes)
    {
       server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
       progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
+      async_job = pgmoneta_job_is_active(server);
    }
 
    current = workflow;
    while (current != NULL)
    {
+      phase = pgmoneta_phase_from_workflow_name(current->name());
+
+      if (async_job && phase != -1)
+      {
+         pgmoneta_job_update_phase(server, phase);
+      }
+
       if (progress_enabled)
       {
-         phase = pgmoneta_progress_phase_from_workflow_name(current->name());
          if (phase != -1)
          {
             key = pgmoneta_progress_limit_node_key(phase);
