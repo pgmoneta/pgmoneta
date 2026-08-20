@@ -29,6 +29,8 @@
 #include <walfile/rm_commit_ts.h>
 #include <utils.h>
 
+#include <inttypes.h>
+
 struct xl_commit_ts_truncate*
 create_xl_commit_ts_truncate()
 {
@@ -86,10 +88,16 @@ pgmoneta_wal_commit_ts_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == COMMIT_TS_ZEROPAGE)
    {
-      int64_t pageno;
+      int64_t pageno = 0;
+      size_t pageno_len = server_config->version >= 17 ? sizeof(int64_t) : sizeof(int);
 
-      memcpy(&pageno, rec, server_config->version >= 17 ? sizeof(int) : sizeof(int64_t));
-      buf = pgmoneta_format_and_append(buf, "%d", pageno);
+      /* Never read beyond the decoded payload (real PG16 stores a 4-byte pageno). */
+      if (pageno_len > XLOG_REC_GET_DATA_LEN(record))
+      {
+         pageno_len = XLOG_REC_GET_DATA_LEN(record);
+      }
+      memcpy(&pageno, rec, pageno_len);
+      buf = pgmoneta_format_and_append(buf, "%" PRId64, pageno);
    }
    else if (info == COMMIT_TS_TRUNCATE)
    {

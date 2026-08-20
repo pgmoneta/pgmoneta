@@ -30,6 +30,7 @@
 #include <walfile/rm_clog.h>
 #include <utils.h>
 
+#include <inttypes.h>
 #include <string.h>
 
 struct xl_clog_truncate*
@@ -94,10 +95,16 @@ pgmoneta_wal_clog_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == CLOG_ZEROPAGE)
    {
-      int64_t pageno;
+      int64_t pageno = 0;
+      size_t pageno_len = server_config->version >= 17 ? sizeof(int64_t) : sizeof(int);
 
-      memcpy(&pageno, rec, server_config->version >= 17 ? sizeof(int) : sizeof(int64_t));
-      buf = pgmoneta_format_and_append(buf, "page %d", pageno);
+      /* Never read beyond the decoded payload (real PG16 stores a 4-byte pageno). */
+      if (pageno_len > XLOG_REC_GET_DATA_LEN(record))
+      {
+         pageno_len = XLOG_REC_GET_DATA_LEN(record);
+      }
+      memcpy(&pageno, rec, pageno_len);
+      buf = pgmoneta_format_and_append(buf, "page %" PRId64, pageno);
    }
    else if (info == CLOG_TRUNCATE)
    {

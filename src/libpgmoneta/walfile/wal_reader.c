@@ -44,6 +44,7 @@
 #include <walfile/rm_storage.h>
 #include <walfile/rm_xact.h>
 #include <walfile/wal_reader.h>
+#include <walbridge/wal_store.h>
 
 /* system */
 #include <assert.h>
@@ -89,6 +90,34 @@ static void summarize_xact_record_l15(struct decoded_xlog_record* record, block_
 static void summarize_xact_record_ge15(struct decoded_xlog_record* record, block_ref_table* brt);
 static void summarize_smgr_record(struct decoded_xlog_record* record, block_ref_table* brt);
 static void summarize_dbase_record(struct decoded_xlog_record* record, block_ref_table* brt);
+
+/*
+ * Return the file offset immediately following continuation data that starts
+ * after first_header_size bytes in a WAL page.  xlp_rem_len counts record
+ * bytes, not the short page headers inserted between those bytes.
+ */
+static uint32_t
+continuation_end_offset(uint32_t rem_len, uint32_t block_size, uint32_t first_header_size)
+{
+   uint64_t offset = first_header_size;
+   uint32_t remaining = rem_len;
+
+   while (remaining > 0)
+   {
+      uint32_t in_page = offset % block_size;
+      uint32_t available = block_size - in_page;
+      uint32_t consumed = MIN(remaining, available);
+
+      offset += consumed;
+      remaining -= consumed;
+      if (remaining > 0)
+      {
+         offset += SIZE_OF_XLOG_SHORT_PHD;
+      }
+   }
+
+   return MAXALIGN(offset);
+}
 
 bool
 is_bimg_apply(uint8_t bimg_info)
@@ -293,9 +322,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    xlog_rec_ptr base;
    int wal_segz_bytes = DEFAULT_WAL_SEGZ_BYTES;
    char* temp_buffer = NULL;
-   u_int32_t temp_next_record = 0;
    bool initialized = false;
-   bool header_split = false;
    int idx = 0;
    struct deque_iterator* iter = NULL;
    xlog_rec_ptr* lsn_array = NULL;
@@ -306,16 +333,12 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    /* Allocate partial_record if not already allocated */
    if (partial_record == NULL)
    {
-      partial_record = malloc(sizeof(struct partial_xlog_record));
+      partial_record = calloc(1, sizeof(struct partial_xlog_record));
       if (partial_record == NULL)
       {
          pgmoneta_log_fatal("Error: Could not allocate memory for partial_record");
          goto error;
       }
-      partial_record->data_buffer = NULL;
-      partial_record->xlog_record = NULL;
-      partial_record->data_buffer_bytes_read = 0;
-      partial_record->xlog_record_bytes_read = 0;
    }
 
    lsn_array = malloc(lsn_array_capacity * sizeof(xlog_rec_ptr));
@@ -364,6 +387,16 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       goto error;
    }
 
+   /*
+    * The segment size on disk is authoritative and is recorded in the long
+    * page header; the file itself may be a partial (still-growing) segment,
+    * so its size cannot be used to derive the base LSN of the segment.
+    */
+   if (long_header->xlp_seg_size > 0)
+   {
+      wal_segz_bytes = long_header->xlp_seg_size;
+   }
+
    pgmoneta_log_trace("Valid PostgreSQL WAL magic number: 0x%04X (PostgreSQL %d) in file %s",
                       long_header->std.xlp_magic, pg_version, path);
 
@@ -378,7 +411,10 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    }
 
    uint32_t next_record;
+   xlog_rec_ptr rec_start = 0;
+   xlog_rec_ptr partial_lsn = 0;
    int page_number = 0;
+   unsigned long iter_count = 0;
    wal_file->long_phd = long_header;
    read_all_page_headers(file, wal_file->long_phd, wal_file);
 
@@ -389,10 +425,41 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    }
    XLOG_SEG_NO_OFFEST_TO_REC_PTR(logSegNo, 0, wal_segz_bytes, base);
 
+   /*
+    * A single XLOG record can physically span a segment boundary: PostgreSQL
+    * writes the tail of such a record at the end of segment N and continues it
+    * on the first page of segment N+1 (XLP_FIRST_IS_CONTRECORD). The previous
+    * parse call saved that torn tail in partial_record so the immediate
+    * successor segment can reconstruct the record. Consume the saved bytes only
+    * when parsing the successor; anything else is stale state from a different
+    * stream (or a torn, still-growing segment) and must be discarded.
+    */
+   if (partial_record->xlog_record != NULL || partial_record->data_buffer != NULL)
+   {
+      if (logSegNo == 0 || partial_record->from_seg != (logSegNo - 1))
+      {
+         free(partial_record->data_buffer);
+         free(partial_record->xlog_record);
+         partial_record->data_buffer = NULL;
+         partial_record->xlog_record = NULL;
+         partial_record->data_buffer_bytes_read = 0;
+         partial_record->xlog_record_bytes_read = 0;
+      }
+   }
+
    if (long_header->std.xlp_rem_len > 0)
    {
-      next_record = MAXALIGN(SIZE_OF_XLOG_LONG_PHD + long_header->std.xlp_rem_len);
-
+      next_record = continuation_end_offset(long_header->std.xlp_rem_len,
+                                            long_header->xlp_xlog_blcksz,
+                                            SIZE_OF_XLOG_LONG_PHD);
+      /*
+       * The continuation data of a record from the previous segment starts
+       * right after this segment's long page header, i.e. at file offset
+       * SIZE_OF_XLOG_LONG_PHD, NOT at ftell(): read_all_page_headers() has
+       * already moved the file cursor (to the segment end when a torn page is
+       * present), so a cursor-relative offset would skip every record that
+       * follows the continuation on page 0.
+       */
       if (partial_record->xlog_record_bytes_read == 0)
       {
          decoded = malloc(sizeof(struct decoded_xlog_record));
@@ -412,7 +479,6 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       }
       else
       {
-         temp_next_record = next_record;
          next_record = SIZE_OF_XLOG_LONG_PHD;
       }
    }
@@ -424,6 +490,18 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    fseek(file, next_record, SEEK_SET);
    while (true)
    {
+      /*
+       * Safety valve: a well-formed segment has far fewer than 1M records; an
+       * infinite loop here is a parse bug, so log the last position and bail.
+       */
+      if (++iter_count > 1000000)
+      {
+         pgmoneta_log_error("wal_reader: parse loop detected after %lu iterations "
+                            "next_record=%X page_number=%d feof=%d ferror=%d ftell=%ld",
+                            (unsigned long)iter_count, next_record, page_number,
+                            feof(file), ferror(file), ftell(file));
+         goto finish;
+      }
       // Check if next record is beyond the current page
       if (next_record >= (wal_file->long_phd->xlp_xlog_blcksz * (page_number + 1)))
       {
@@ -468,12 +546,11 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          continue;
       }
       fseek(file, next_record, SEEK_SET);
-      header_split = false;
+      rec_start = next_record;
 
       // Check if record crosses the page boundary
       if (ftell(file) + SIZE_OF_XLOG_RECORD > wal_file->long_phd->xlp_xlog_blcksz * (page_number + 1))
       {
-         header_split = true;
          MALLOC(temp_buffer, SIZE_OF_XLOG_RECORD);
          uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
          bytes_read = fread(temp_buffer, 1, end_of_page - ftell(file), file);
@@ -487,6 +564,8 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
             MALLOC(partial_record->xlog_record, SIZE_OF_XLOG_RECORD);
             memcpy(partial_record->xlog_record, temp_buffer, bytes_read);
             partial_record->xlog_record_bytes_read = bytes_read;
+            partial_record->from_seg = logSegNo;
+            partial_record->lsn = rec_start + base;
             free(temp_buffer);
             temp_buffer = NULL;
             decoded = NULL;
@@ -511,6 +590,14 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
             free(partial_record->xlog_record);
             partial_record->xlog_record = NULL;
             partial_record->xlog_record_bytes_read = 0;
+            /*
+             * The record began in the previous segment; use its true absolute
+             * start LSN (saved when the tail was found) rather than deriving
+             * one from this segment's offset.
+             */
+            partial_lsn = partial_record->lsn;
+            partial_record->from_seg = 0;
+            partial_record->lsn = 0;
             initialized = true;
          }
          else
@@ -519,6 +606,17 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
             bytes_read = fread(record, SIZE_OF_XLOG_RECORD, 1, file);
             if (bytes_read < 1)
             {
+               /*
+                * Not enough bytes remain for a complete record header: this is
+                * the tail of a partial/incomplete segment (still being written),
+                * so stop gracefully rather than failing the whole parse.
+                */
+               free(record);
+               record = NULL;
+               if (feof(file))
+               {
+                  goto finish;
+               }
                pgmoneta_log_error("Error: Failed to read the complete data");
                goto error;
             }
@@ -532,9 +630,8 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          break;
       }
       uint32_t data_length = record->xl_tot_len - SIZE_OF_XLOG_RECORD;
-      /* A header split by a page boundary has the next page's header in between */
-      xlog_rec_ptr lsn = ftell(file) + base - SIZE_OF_XLOG_RECORD - (header_split ? SIZE_OF_XLOG_SHORT_PHD : 0);
       next_record = ftell(file) + MAXALIGN(record->xl_tot_len - SIZE_OF_XLOG_RECORD);
+      xlog_rec_ptr lsn = initialized ? partial_lsn : rec_start + base;
       uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
 
       MALLOC(buffer, data_length);
@@ -562,6 +659,8 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
                   memcpy(partial_record->data_buffer, buffer, total_bytes_read);
                   partial_record->data_buffer_bytes_read = total_bytes_read;
                }
+               partial_record->from_seg = logSegNo;
+               partial_record->lsn = rec_start + base;
                free(record);
                record = NULL;
                decoded = NULL;
@@ -570,6 +669,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
                goto finish;
             }
             fseek(file, SIZE_OF_XLOG_SHORT_PHD, SEEK_CUR);
+            page_number++;
             bytes_read = fread(buffer + total_bytes_read, 1,
                                MIN(remaining_data_length, wal_file->long_phd->xlp_xlog_blcksz - SIZE_OF_XLOG_SHORT_PHD), file);
             remaining_data_length -= bytes_read;
@@ -581,15 +681,37 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       {
          if (partial_record->data_buffer_bytes_read != 0)
          {
-            /* Copy partial data from previous file */
-            memcpy(buffer, partial_record->data_buffer, partial_record->data_buffer_bytes_read);
-            free(partial_record->data_buffer);
-            partial_record->data_buffer = NULL;
+            if (partial_record->data_buffer_bytes_read > data_length)
+            {
+               /*
+                * Stale partial data from a previously parsed (torn) segment
+                * tail: the current record is not its continuation, so the
+                * saved bytes cannot belong to this record and would overflow
+                * the (smaller) data buffer. Discard them and read fresh.
+                */
+               free(partial_record->data_buffer);
+               partial_record->data_buffer = NULL;
+               partial_record->data_buffer_bytes_read = 0;
 
-            uint32_t bytes_needed = data_length - partial_record->data_buffer_bytes_read;
-            bytes_read = fread(buffer + partial_record->data_buffer_bytes_read, 1, bytes_needed, file);
+               bytes_read = fread(buffer, 1, data_length, file);
+               if (bytes_read != data_length)
+               {
+                  pgmoneta_log_error("Error: Actual bytes read do not match the expected length");
+                  goto error;
+               }
+            }
+            else
+            {
+               /* Copy partial data from previous file */
+               memcpy(buffer, partial_record->data_buffer, partial_record->data_buffer_bytes_read);
+               free(partial_record->data_buffer);
+               partial_record->data_buffer = NULL;
 
-            partial_record->data_buffer_bytes_read = 0;
+               uint32_t bytes_needed = data_length - partial_record->data_buffer_bytes_read;
+               bytes_read = fread(buffer + partial_record->data_buffer_bytes_read, 1, bytes_needed, file);
+
+               partial_record->data_buffer_bytes_read = 0;
+            }
          }
          else
          {
@@ -600,11 +722,78 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
                goto error;
             }
          }
-         if (initialized)
+      }
+
+      /*
+       * Validate the record's CRC before accepting it. PostgreSQL pre-extends
+       * new WAL segments to their full size, so a segment that is still being
+       * written (parsed as *.partial) reads back as zeros, not EOF, beyond the
+       * live write position. A record whose data reaches into that unwritten
+       * region decodes "successfully" here with zeroed bytes, gets fed
+       * downstream with corrupt content, and is then never re-read because
+       * consumed-LSN tracking skips its corrected copy from the sealed
+       * re-parse. A CRC mismatch identifies exactly that case: stop the parse
+       * so the sealed segment supplies the real record instead.
+       *
+       * A stored CRC of zero marks a record that carries no CRC at all: the
+       * unit suite crafts byte streams by hand (cross-segment reassembly
+       * fixtures) and leaves xl_crc at its zeroed default. PostgreSQL always
+       * computes a real record CRC (independent of data checksums) and so do
+       * pgmoneta's store and encoder, so a zero xl_crc cannot appear in a
+       * production stream - and the growing-tail corruption above always
+       * presents the record's genuine (nonzero) xl_crc against zeroed data,
+       * so it still fails the check here.
+       */
+      {
+         char* crc_buf = NULL;
+         uint32_t total_len = record->xl_tot_len;
+
+         if (record->xl_crc != 0)
          {
-            next_record = temp_next_record;
-            initialized = false;
+            MALLOC(crc_buf, total_len);
+            memcpy(crc_buf, record, SIZE_OF_XLOG_RECORD);
+            memcpy(crc_buf + SIZE_OF_XLOG_RECORD, buffer, data_length);
+            uint32_t computed_crc = pgmoneta_wal_store_compute_crc(crc_buf, total_len);
+            free(crc_buf);
+
+            if (computed_crc != record->xl_crc)
+            {
+               pgmoneta_log_warn("wal_reader: record at %X/%X in %s failed CRC validation (stored %08X, computed %08X); unwritten tail of a growing segment, deferring to a later parse",
+                                 LSN_FORMAT_ARGS(lsn), path, record->xl_crc, computed_crc);
+               free(record);
+               record = NULL;
+               free(buffer);
+               buffer = NULL;
+               decoded = NULL;
+               goto finish;
+            }
          }
+      }
+
+      /*
+       * The next record starts at the 8-byte aligned position following the
+       * record data. For a record that crosses a page boundary this differs
+       * from lsn + MAXALIGN(total_len) because each continuation page header
+       * occupies LSNs of its own; MAXALIGN(ftell) accounts for those headers
+       * since ftell is the physical end of the record data.
+       */
+      next_record = MAXALIGN(ftell(file));
+      initialized = false;
+
+      /*
+       * Reading a record can traverse several continuation pages.  Keep the
+       * page cursor in lockstep with its physical end; otherwise the next
+       * iteration re-enters a page already consumed as record data and treats
+       * its continuation header as the start of another record.
+       *
+       * A record positioned exactly at a page boundary needs one special
+       * case: leave page_number on the preceding page so the normal page
+       * transition below consumes that page's short header first.
+       */
+      page_number = next_record / wal_file->long_phd->xlp_xlog_blcksz;
+      if (next_record > 0 && next_record % wal_file->long_phd->xlp_xlog_blcksz == 0)
+      {
+         page_number--;
       }
 
       decoded = calloc(1, sizeof(struct decoded_xlog_record));
@@ -659,12 +848,12 @@ finish:
    while (pgmoneta_deque_iterator_next(iter))
    {
       decoded = (struct decoded_xlog_record*)iter->value->data;
-      decoded->next_lsn = lsn_array[idx++];
-   }
-
-   if (decoded != NULL)
-   {
-      decoded->next_lsn = 0; // Handle last record
+      if (decoded == NULL || decoded->partial)
+      {
+         continue;
+      }
+      decoded->next_lsn = (idx + 1 < (int)lsn_array_size) ? lsn_array[idx + 1] : 0;
+      idx++;
    }
 
    pgmoneta_deque_iterator_destroy(iter);
@@ -838,7 +1027,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
                  blk->bimg_len == block_size))
             {
                pgmoneta_log_fatal(
-                  "BKPIMAGE_HAS_HOLE set, but hole offset %u length %u block image length %u at %X/%X");
+                  "BKPIMAGE_HAS_HOLE set, but hole offset %u length %u block image length %u at %X/%X",
+                  blk->hole_offset, blk->hole_length, blk->bimg_len, LSN_FORMAT_ARGS(lsn));
                goto err;
             }
 
@@ -849,7 +1039,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
             if (!(blk->bimg_info & BKPIMAGE_HAS_HOLE) &&
                 (blk->hole_offset != 0 || blk->hole_length != 0))
             {
-               pgmoneta_log_fatal("BKPIMAGE_HAS_HOLE not set, but hole offset %u length %u at %X/%X");
+               pgmoneta_log_fatal("BKPIMAGE_HAS_HOLE not set, but hole offset %u length %u at %X/%X",
+                                  blk->hole_offset, blk->hole_length, LSN_FORMAT_ARGS(lsn));
                goto err;
             }
 
@@ -859,7 +1050,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
             if (pgmoneta_wal_is_bkp_image_compressed(magic_value, blk->bimg_info) &&
                 blk->bimg_len == block_size)
             {
-               pgmoneta_log_fatal("BKPIMAGE_COMPRESSED set, but block image length %u at %X/%X");
+               pgmoneta_log_fatal("BKPIMAGE_COMPRESSED set, but block image length %u at %X/%X",
+                                  blk->bimg_len, LSN_FORMAT_ARGS(lsn));
                goto err;
             }
 
@@ -872,7 +1064,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
                 blk->bimg_len != block_size)
             {
                pgmoneta_log_fatal(
-                  "neither BKPIMAGE_HAS_HOLE nor BKPIMAGE_COMPRESSED set, but block image length is %u at %X/%X");
+                  "neither BKPIMAGE_HAS_HOLE nor BKPIMAGE_COMPRESSED set, but block image length is %u at %X/%X",
+                  blk->bimg_len, LSN_FORMAT_ARGS(lsn));
                goto err;
             }
          }
@@ -885,7 +1078,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
          {
             if (rlocator == NULL)
             {
-               pgmoneta_log_fatal("BKPBLOCK_SAME_REL set but no previous rel at %X/%X");
+               pgmoneta_log_fatal("BKPBLOCK_SAME_REL set but no previous rel at %X/%X",
+                                  LSN_FORMAT_ARGS(lsn));
                goto err;
             }
 
@@ -895,7 +1089,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
       }
       else
       {
-         pgmoneta_log_fatal("Invalid block_id %u at %X/%X");
+         pgmoneta_log_fatal("Invalid block_id %u at %X/%X",
+                            block_id, LSN_FORMAT_ARGS(lsn));
          goto err;
       }
    }
@@ -2341,6 +2536,9 @@ pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t ma
    struct decoded_bkp_block* blk = NULL;
 
    record = decoded->header;
+   record.xl_pad[0] = 0;
+   record.xl_pad[1] = 0;
+   record.xl_crc = 0;
    total_length = SIZE_OF_XLOG_RECORD;
 
    if (decoded->record_origin != INVALID_REP_ORIGIN_ID)

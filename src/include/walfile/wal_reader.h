@@ -73,7 +73,11 @@ typedef int64_t timestamp_tz;
 #define WAL_MAGIC_V16             0xD113 /**< PostgreSQL 16 WAL magic number */
 #define WAL_MAGIC_V17             0xD116 /**< PostgreSQL 17 WAL magic number */
 #define WAL_MAGIC_V18             0xD118 /**< PostgreSQL 18 WAL magic number */
-#define WAL_MAGIC_V19             0xD121 /**< PostgreSQL 19 WAL magic number */
+
+#define PG19_TARGET_BETA3         1
+#define PG19_TARGET               PG19_TARGET_BETA3
+#define WAL_MAGIC_V19             0xD121 /**< PostgreSQL 19 beta3 WAL magic number */
+
 #define InvalidOid                ((oid)0)
 #define FLEXIBLE_ARRAY_MEMBER     /* empty */
 #define INVALID_REP_ORIGIN_ID     0
@@ -98,7 +102,7 @@ typedef int64_t timestamp_tz;
 #define SIZE_OF_XLOG_SHORT_PHD    MAXALIGN(sizeof(struct xlog_page_header_data))
 #define SIZE_OF_XLOG_RECORD       (offsetof(struct xlog_record, xl_crc) + sizeof(pg_crc32c))
 
-#define DEFAULT_WAL_SEGZ_BYTES    16 * 1024 * 1024
+#define DEFAULT_WAL_SEGZ_BYTES    (16 * 1024 * 1024)
 
 /* #define macros */
 #define MAXALIGN(x)              (((x) + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1))
@@ -112,11 +116,24 @@ typedef int64_t timestamp_tz;
 /* This flag indicates a "long" page header */
 #define XLP_LONG_HEADER 0x0002
 
-/* Replaces a missing contrecord; see CreateOverwriteContrecordRecord */
+/* Replaces a missing contrecord; see CreateOverwriteContrecordRecord.
+ * Note: in PostgreSQL 18 this bit was 0x0008; PostgreSQL 19 reused 0x0004.
+ * The macros directly below (without a suffix) describe the PostgreSQL 19
+ * wiring, i.e. the encoding the walbridge emits downstream. */
 #define XLP_FIRST_IS_OVERWRITE_CONTRECORD 0x0004
 
 /* All defined flag bits in xlp_info (used for validity checking of header) */
 #define XLP_ALL_FLAGS 0x0007
+
+/* PostgreSQL 18 (host input side of the walbridge):
+ * - XLP_BKP_REMOVABLE (0x0004) existed in 18 and was removed in 19.
+ * - XLP_FIRST_IS_OVERWRITE_CONTRECORD lived at 0x0008 in 18.
+ * Store/encode build fresh page headers, so upstream page flags never reach
+ * the downstream stream; these constants exist for the explicit remap used
+ * when inspecting/forwarding upstream page headers. */
+#define XLP_BKP_REMOVABLE_V18                 0x0004
+#define XLP_FIRST_IS_OVERWRITE_CONTRECORD_V18 0x0008
+#define XLP_ALL_FLAGS_V18                     0x000F
 
 #define XLogRecHasBlockRef(record, block_id) \
    ((record->max_block_id >= (block_id)) &&  \
@@ -224,6 +241,7 @@ struct xlog_record
    xlog_rec_ptr xl_prev;  /**< Pointer to the previous record in the log. */
    uint8_t xl_info;       /**< Flag bits for the record. */
    rmgr_id xl_rmid;       /**< Resource manager ID for this record. */
+   uint8_t xl_pad[2];     /**< 2 bytes of padding to match PostgreSQL's layout. */
    pg_crc32c xl_crc;      /**< CRC for this record. */
 };
 
@@ -247,6 +265,8 @@ struct partial_xlog_record
    char* xlog_record;               /**< Pointer to the xlog record. */
    uint32_t data_buffer_bytes_read; /**< Length of the total data read in data_buffer. */
    uint32_t xlog_record_bytes_read; /**< Length of the total data read in xlog_record buffer. */
+   xlog_seg_no from_seg;            /**< Segment whose parse produced this partial record. */
+   xlog_rec_ptr lsn;                /**< Absolute LSN (record start) of the partial record. */
 };
 
 /**

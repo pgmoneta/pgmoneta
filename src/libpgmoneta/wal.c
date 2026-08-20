@@ -97,6 +97,7 @@ pgmoneta_wal(int srv, char** argv)
    char cmd[MISC_LENGTH];
    size_t xlogpos_size = 0;
    size_t xlogptr = 0;
+   size_t durable_lsn = 0;
    size_t segno;
    size_t xlogoff;
    size_t curr_xlogoff = 0;
@@ -128,6 +129,13 @@ pgmoneta_wal(int srv, char** argv)
    signal(SIGPIPE, SIG_IGN);
 
    pgmoneta_set_proc_title(1, argv, "wal", config->common.servers[srv].name);
+
+   /* This wal stream is the arbiter of primary reachability: it and only it
+    * talks to the primary. Re-assert the shared online flag before every
+    * (re)start - a previous stream's error path clears it, and without this
+    * a re-forked client (wal_receiver.c re-forks on any client exit) would
+    * silently refuse to start forever, leaving the bridge streaming-dead. */
+   pgmoneta_server_set_online(srv, true);
 
    if (msg == NULL)
    {
@@ -484,6 +492,7 @@ pgmoneta_wal(int srv, char** argv)
                            wal_file = NULL;
                            goto error;
                         }
+                        durable_lsn = xlogptr;
                         if (sftp_wal_file != NULL)
                         {
                            pgmoneta_sftp_wal_close(srv, filename, false, &sftp_wal_file);
@@ -559,14 +568,14 @@ pgmoneta_wal(int srv, char** argv)
                   // update LSN after a message data is written to the segment
                   update_wal_lsn(srv, xlogptr);
 
-                  wal_send_status_report(ssl, socket, xlogptr, xlogptr, 0);
+                  wal_send_status_report(ssl, socket, enable_translation ? durable_lsn : xlogptr, enable_translation ? durable_lsn : xlogptr, 0);
                   break;
                }
                case 'k':
                {
                   // keep alive request
                   update_wal_lsn(srv, xlogptr);
-                  wal_send_status_report(ssl, socket, xlogptr, xlogptr, 0);
+                  wal_send_status_report(ssl, socket, enable_translation ? durable_lsn : xlogptr, enable_translation ? durable_lsn : xlogptr, 0);
                   break;
                }
                default:
@@ -1115,10 +1124,24 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
       pgmoneta_snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
    }
 
-   /* fclose() writes the last buffer; keep the .partial name if that fails */
+   /* Flush and durably sync before giving up the stream. */
+   if (fflush(file) != 0)
+   {
+      pgmoneta_log_error("Could not flush WAL file %s: %s", tmp_file_path, strerror(errno));
+      goto error;
+   }
+
+   if (fsync(fileno(file)) != 0)
+   {
+      pgmoneta_log_error("Could not fsync WAL segment %s: %s", tmp_file_path, strerror(errno));
+      goto error;
+   }
+
+   /* fclose() releases file; do not use FILE * after this point. */
    if (fclose(file) != 0)
    {
-      pgmoneta_log_error("Could not write WAL file %s: %s", tmp_file_path, strerror(errno));
+      file = NULL;
+      pgmoneta_log_error("Could not close WAL file %s: %s", tmp_file_path, strerror(errno));
       return 1;
    }
    file = NULL;

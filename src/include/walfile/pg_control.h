@@ -51,7 +51,7 @@ typedef int64_t pg_time_t;
 #define XLOG_FPI_FOR_HINT         0xA0 /**< XLOG record type for a full-page image for hint bits */
 #define XLOG_FPI                  0xB0 /**< XLOG record type for a full-page image */
 #define XLOG_OVERWRITE_CONTRECORD 0xD0 /**< XLOG record type for overwriting a continuation record */
-#define XLOG_CHECKPOINT_REDO      0x0E /**< XLOG record type for a redo point */
+#define XLOG_CHECKPOINT_REDO      0xE0 /**< XLOG record type for a redo point */
 
 #define MOCK_AUTH_NONCE_LEN       32
 #define PG_CONTROL_MAX_SAFE_SIZE  512
@@ -100,7 +100,13 @@ struct check_point_v13
 
 /**
  * @struct check_point_v17
- * @brief Represents a checkpoint record for version 17.
+ * @brief Represents a checkpoint record for PostgreSQL 17 and 18.
+ *
+ * The field order and widths below mirror the real on-disk CheckPoint layout
+ * (checked against REL_18_STABLE pg_control.h): 17 fields, 88 bytes on the
+ * wire. Note that next_oid comes right after next_xid and before the
+ * multi/oldest fields, matching PostgreSQL exactly - the struct can be
+ * memcpy'd directly from WAL data.
  *
  * Fields:
  * - redo: The next available RecPtr when the checkpoint was created (i.e., REDO start point).
