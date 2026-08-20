@@ -397,9 +397,11 @@ En el archivo header `rmgr.h`, los resource managers se declaran como un enum, c
 
 Cada resource manager implementa la función `rm_desc`, que proporciona una descripción del tipo de record asociado con ese resource manager. En el futuro, serán extendidos para implementar la función `rm_redo` que aplica los cambios a otro servidor.
 
-**Soportando varias estructuras WAL en versiones de PostgreSQL 13 a 17**
+**Soportando varias estructuras WAL en versiones de PostgreSQL 13 a 19**
 
-La estructura WAL ha evolucionado a través de versiones de PostgreSQL 13 a 17, requiriendo manejo diferente para cada versión. Para acomodar estas diferencias, hemos implementado un approach basado en wrappers, como el factory pattern, para manejar estructuras WAL variables.
+La estructura WAL ha evolucionado a través de las versiones de PostgreSQL 13 a 19, requiriendo un manejo diferente para cada versión. Para acomodar estas diferencias, hemos implementado un enfoque basado en wrappers, como el factory pattern, para manejar estructuras WAL variables.
+
+**Soporte para PostgreSQL 19**: pgmoneta soporta el formato oficial de WAL de PostgreSQL 19, identificado por el magic `0xD121`. Los valores magic de WAL de PostgreSQL 19 exclusivos de desarrollo no están soportados.
 
 Abajo están los commit hashes para los magic values oficialmente soportados en cada versión de PostgreSQL:
 
@@ -409,6 +411,7 @@ Abajo están los commit hashes para los magic values oficialmente soportados en 
 4. PostgreSQL 16 - [0xD113][D113]
 5. PostgreSQL 17 - [0xD116][D116]
 6. PostgreSQL 18 - [0xD118][D118]
+7. PostgreSQL 19 - [0xD121][D121]
 
 
 `xl_end_of_recovery` es un ejemplo de cómo manejamos diferentes versiones de estructuras con un wrapper struct y el factory pattern.
@@ -1004,6 +1007,24 @@ typedef struct xl_xact_parsed_commit
 	TimestampTz origin_timestamp;
 } xl_xact_parsed_commit;
 ```
+
+**xl_running_xacts**
+
+El formato oficial de WAL `0xD121` de PostgreSQL 19 utiliza el mismo diseño de registro de transacciones en ejecución (*running transactions*) que PostgreSQL 18:
+
+```c
+struct xl_running_xacts_v18 {
+   int xcnt;                                   /* Number of transaction IDs in xids[] */
+   int subxcnt;                                /* Number of subtransaction IDs in xids[] */
+   bool subxid_overflow;                       /* Indicates if snapshot overflowed and subxids are missing */
+   transaction_id next_xid;                    /* Next transaction ID from TransamVariables->next_xid */
+   transaction_id oldest_running_xid;          /* Oldest running transaction ID (not oldestXmin) */
+   transaction_id latest_completed_xid;        /* Latest completed transaction ID to set xmax */
+   transaction_id xids[FLEXIBLE_ARRAY_MEMBER]; /* Array of transaction IDs */
+};
+```
+
+Las actualizaciones del WAL de heap en D121 pueden registrar bloques de mapa de visibilidad además de bloques de heap. pgmoneta maneja esto a través de sus rutas genéricas de decodificación de bloques registrados y resumen de WAL (*WAL summary*).
 
 **xl_xact_parsed_abort**
 
