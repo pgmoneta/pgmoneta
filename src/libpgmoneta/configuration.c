@@ -768,6 +768,20 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (pgmoneta_compare_string(key, "walbridge"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->walbridge))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (pgmoneta_compare_string(key, "tls"))
                {
                   if (pgmoneta_compare_string(section, "pgmoneta"))
