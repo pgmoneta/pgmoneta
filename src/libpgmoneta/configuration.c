@@ -285,7 +285,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   max = MISC_LENGTH - 1;
                }
                memcpy(&section, trimmed_line + 1, max);
-               if (strcmp(section, "pgmoneta"))
+               if (strcmp(section, "pgmoneta") && strcmp(section, "pgmoneta-walbridge"))
                {
                   if (idx_server > 0 && idx_server <= NUMBER_OF_SERVERS)
                   {
@@ -353,6 +353,15 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      }
                      memcpy(config->host, value, max);
                   }
+                  else if (pgmoneta_compare_string(section, "pgmoneta-walbridge"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->walbridge_host, value, max);
+                  }
                   else if (strlen(section) > 0)
                   {
                      max = strlen(section);
@@ -375,7 +384,14 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                }
                else if (pgmoneta_compare_string(key, "port"))
                {
-                  if (strlen(section) > 0)
+                  if (pgmoneta_compare_string(section, "pgmoneta-walbridge"))
+                  {
+                     if (as_int(value, &config->walbridge))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
                   {
                      if (as_int(value, &srv.port))
                      {

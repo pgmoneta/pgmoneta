@@ -102,6 +102,55 @@ int
 pgmoneta_get_master_key(char** masterkey, size_t* masterkey_length, unsigned char** master_salt, size_t* master_salt_length);
 
 /**
+ * SASLprep a password per RFC 4013
+ * @param password The password
+ * @param password_prep The prepared password
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_sasl_prep(char* password, char** password_prep);
+
+/**
+ * Generate a SCRAM nonce
+ * @param nounce The generated nonce
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_generate_nounce(char** nounce);
+
+/**
+ * Generate a SCRAM salt
+ * @param salt The generated salt
+ * @param size The salt size
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_generate_salt(char** salt, int* size);
+
+/**
+ * Compute the SCRAM-SHA-256 client proof
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_client_proof(char* password, char* salt, int salt_length, int iterations,
+                      char* client_first_message_bare, size_t client_first_message_bare_length,
+                      char* server_first_message, size_t server_first_message_length,
+                      char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
+                      unsigned char** result, size_t* result_length);
+
+/**
+ * Compute the SCRAM-SHA-256 server signature
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_server_signature(char* password, char* salt, int salt_length, int iterations,
+                          char* server_key, int server_key_length,
+                          char* client_first_message_bare, size_t client_first_message_bare_length,
+                          char* server_first_message, size_t server_first_message_length,
+                          char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
+                          unsigned char** result, size_t* result_length);
+
+/**
  * Clear the security cache
  */
 void

@@ -1591,6 +1591,14 @@ pgmoneta_time_is_valid(pgmoneta_time_t t);
 int
 pgmoneta_time_format(pgmoneta_time_t t, enum pgmoneta_time_format_t fmt, char** output);
 
+/**
+ * fsync the directory containing file_path
+ * @param file_path Full path to a file whose parent directory should be fsynced
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_fsync_directory(const char* file_path);
+
 #ifdef __cplusplus
 }
 #endif

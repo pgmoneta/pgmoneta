@@ -72,8 +72,6 @@ static sftp_session sftp = NULL;
 
 static struct art* tree_map = NULL;
 
-static bool is_error = false;
-
 static char* latest_remote_root = NULL;
 
 struct workflow*
@@ -253,8 +251,6 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   is_error = false;
-
    ssh_string_free_char(hexa);
    ssh_clean_pubkey_hash(&srv_pubkey_hash);
    ssh_key_free(srv_pubkey);
@@ -264,8 +260,6 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
    return 0;
 
 error:
-
-   is_error = true;
 
    ssh_string_free_char(hexa);
    ssh_clean_pubkey_hash(&srv_pubkey_hash);
@@ -366,8 +360,6 @@ ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes
       goto error;
    }
 
-   is_error = false;
-
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
@@ -386,8 +378,6 @@ ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes
    return 0;
 
 error:
-
-   is_error = true;
 
    for (int i = 0; i < number_of_backups; i++)
    {
@@ -438,14 +428,12 @@ ssh_storage_wal_shipping_execute(char* name __attribute__((unused)), struct art*
       pgmoneta_log_error("could not create the wal-shipping directory: %s in the remote server: %s", remote_root, ssh_get_error(session));
       goto error;
    }
-   is_error = false;
 
    free(remote_root);
    free(local_root);
 
    return 0;
 error:
-   is_error = true;
 
    free(remote_root);
    free(local_root);

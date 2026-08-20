@@ -6127,3 +6127,37 @@ pgmoneta_get_lsn(uint32_t hi, uint32_t lo)
 {
    return ((uint64_t)hi << 32) | lo;
 }
+
+int
+pgmoneta_fsync_directory(const char* file_path)
+{
+   char dir[PATH_MAX];
+   char* last_slash;
+   int fd;
+
+   pgmoneta_snprintf(dir, sizeof(dir), "%s", file_path);
+   last_slash = strrchr(dir, '/');
+   if (last_slash)
+   {
+      *last_slash = '\0';
+   }
+   else
+   {
+      pgmoneta_snprintf(dir, sizeof(dir), ".");
+   }
+
+   fd = open(dir, O_RDONLY);
+   if (fd == -1)
+   {
+      pgmoneta_log_error("could not open directory %s for fsync: %m", dir);
+      return 1;
+   }
+   if (fsync(fd) != 0)
+   {
+      pgmoneta_log_error("could not fsync directory %s: %m", dir);
+      close(fd);
+      return 1;
+   }
+   close(fd);
+   return 0;
+}
