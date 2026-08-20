@@ -501,6 +501,18 @@ target_link_libraries(pgmoneta-walinfo-bin pgmoneta)
 
 install(TARGETS pgmoneta-walinfo-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+# Build pgmoneta-walbridge
+#
+add_executable(pgmoneta-walbridge-bin walbridge.c)
+if (CMAKE_C_LINK_PIE_SUPPORTED)
+  set_target_properties(pgmoneta-walbridge-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-walbridge POSITION_INDEPENDENT_CODE TRUE)
+else()
+  set_target_properties(pgmoneta-walbridge-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-walbridge POSITION_INDEPENDENT_CODE FALSE)
+endif()
+target_link_libraries(pgmoneta-walbridge-bin pgmoneta)
+
+install(TARGETS pgmoneta-walbridge-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 # Build walfilter
 add_executable(pgmoneta-walfilter-bin walfilter.c ${RESOURCE_OBJECT})
 if (CMAKE_C_LINK_PIE_SUPPORTED)

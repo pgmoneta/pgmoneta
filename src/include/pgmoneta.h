@@ -458,6 +458,7 @@ struct main_configuration
    pgmoneta_time_t metrics_cache_max_age; /**< Cache duration for Prometheus response */
    int metrics_cache_max_size;            /**< Number of bytes max to cache the Prometheus response */
    int management;                        /**< The management port */
+   int walbridge;                         /**< The walbridge port */
 
    char base_dir[MAX_PATH]; /**< The base directory */
 

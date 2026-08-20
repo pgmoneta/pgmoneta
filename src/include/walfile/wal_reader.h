@@ -224,6 +224,7 @@ struct xlog_record
    xlog_rec_ptr xl_prev;  /**< Pointer to the previous record in the log. */
    uint8_t xl_info;       /**< Flag bits for the record. */
    rmgr_id xl_rmid;       /**< Resource manager ID for this record. */
+   uint8_t xl_pad[2];     /**< 2 bytes of padding to match PostgreSQL's layout. */
    pg_crc32c xl_crc;      /**< CRC for this record. */
 };
 
