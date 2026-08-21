@@ -4083,7 +4083,8 @@ pgmoneta_read_checkpoint_info(char* directory, char** chkptpos)
    {
       if (pgmoneta_starts_with(buffer, "CHECKPOINT LOCATION"))
       {
-         numfields = sscanf(buffer, "CHECKPOINT LOCATION: %s\n", chkpt);
+         /* chkpt holds MISC_LENGTH bytes */
+         numfields = sscanf(buffer, "CHECKPOINT LOCATION: %127s\n", chkpt);
          if (numfields != 1)
          {
             pgmoneta_log_error("Error parsing checkpoint wal location");
