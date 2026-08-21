@@ -21,6 +21,7 @@ jobs:
         run: |
           sudo apt update -y
           sudo apt install -y cppcheck
+          cppcheck --version
 
       - name: Run cppcheck against the known baseline
         run: |
@@ -30,7 +31,7 @@ jobs:
           cppcheck --enable=warning --inline-suppr --quiet \
                    --template='{id}:{file}:{line}' \
                    -I src/include src/ 2>&1 \
-            | grep -E '^[a-zA-Z]+:' | sed 's/:[0-9]*$//' | sort | uniq -c \
+            | grep -E '^[a-zA-Z]+:src/' | sed 's/:[0-9]*$//' | sort | uniq -c \
             | awk '{printf "%s %s\n", $2, $1}' | sort > /tmp/cppcheck-current.txt || true
 
           grep -v '^#' .github/cppcheck-baseline.txt | grep -E '^[a-zA-Z]+:' | sort > /tmp/cppcheck-baseline.txt

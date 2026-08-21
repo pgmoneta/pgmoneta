@@ -62,9 +62,12 @@ nullPointerOutOfResources:src/libpgmoneta/se_ssh.c 1
 nullPointerRedundantCheck:src/cli.c 2
 nullPointerRedundantCheck:src/libpgmoneta/archive.c 2
 nullPointerRedundantCheck:src/libpgmoneta/console.c 1
+nullPointerRedundantCheck:src/libpgmoneta/info.c 7
 nullPointerRedundantCheck:src/libpgmoneta/restore.c 1
 nullPointerRedundantCheck:src/libpgmoneta/utils.c 6
 nullPointerRedundantCheck:src/libpgmoneta/walfile.c 2
+nullPointerRedundantCheck:src/libpgmoneta/wf_restore.c 1
+nullPointerRedundantCheck:src/libpgmoneta/wf_sha512.c 1
 pointerSize:src/libpgmoneta/walfile/rm_gist.c 2
 pointerSize:src/libpgmoneta/walfile/rm_xact.c 15
 pointerSize:src/libpgmoneta/wf_retention.c 1
