@@ -37,6 +37,7 @@
 #include <configuration.h>
 #include <delete.h>
 #include <gzip_compression.h>
+#include <health.h>
 #include <info.h>
 #include <keep.h>
 #include <logging.h>
@@ -104,6 +105,7 @@ static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static bool accept_fatal(int error);
 static void reload_configuration(bool* restart);
+static void manage_health_check_worker(void);
 static void service_reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void reload_set_configuration(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 static bool reload_services_only(void);
@@ -932,6 +934,12 @@ main(int argc, char** argv)
    ev_periodic_init(&verification, verification_cb, 0., pgmoneta_time_convert(config->verification, FORMAT_TIME_S), 0);
    ev_periodic_start(main_loop, &verification);
 
+   /* Start the health check worker */
+   if (config->health_check)
+   {
+      pgmoneta_health_check(argc, argv);
+   }
+
    pgmoneta_log_info("Started on %s", config->host);
    pgmoneta_log_debug("Management: %d", unix_management_socket);
    for (int i = 0; i < metrics_fds_length; i++)
@@ -994,6 +1002,8 @@ main(int argc, char** argv)
 #ifdef HAVE_SYSTEMD
    sd_notify(0, "STOPPING=1");
 #endif
+
+   pgmoneta_health_check_stop();
 
    shutdown_management(true);
    shutdown_metrics();
@@ -2857,6 +2867,25 @@ accept_fatal(int error)
 }
 
 static void
+manage_health_check_worker(void)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   /* Health check was running and is now disabled: stop the worker */
+   if (config->health_check_pid != 0 && !config->health_check)
+   {
+      pgmoneta_health_check_stop();
+   }
+   /* Health check is enabled but no worker is running: start one */
+   else if (config->health_check && config->health_check_pid == 0)
+   {
+      pgmoneta_health_check(1, argv_ptr);
+   }
+}
+
+static void
 reload_configuration(bool* restart)
 {
    int old_metrics;
@@ -2871,6 +2900,9 @@ reload_configuration(bool* restart)
    old_management = config->management;
 
    pgmoneta_reload_configuration(restart);
+
+   /* Start or stop the health check worker to match the reloaded configuration */
+   manage_health_check_worker();
 
    if (old_metrics != config->metrics)
    {

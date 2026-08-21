@@ -248,6 +248,15 @@ Indicates if the PostgreSQL server is online and reachable (1=online, 0=offline)
 | :-------- | :---------- | :----- |
 | name | The configured name/identifier for the PostgreSQL server. | 1: Server is online and accessible, 0: Server is offline or unreachable |
 
+**pgmoneta_server_health**
+
+The health state of the PostgreSQL server as determined by the periodic health check worker (requires `health_check = on`).
+
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: UP, 0: DOWN, 2: UNKNOWN (initial state or pending first check) |
+| auth | The authentication method used during the last probe. | `trust`, `scram-sha-256`, `error` or `unknown` |
+
 **pgmoneta_server_primary**
 
 Indicates if the PostgreSQL server is operating as a primary (1) or standby (0).
