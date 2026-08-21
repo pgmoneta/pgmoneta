@@ -1124,6 +1124,13 @@ pgmoneta_mkdir(char* dir)
 {
    char* p;
 
+   /* dir + 1 would run past the terminator for an empty string, and callers
+    * pass allocations that can be NULL. */
+   if (dir == NULL || dir[0] == '\0')
+   {
+      return 1;
+   }
+
    for (p = dir + 1; *p; p++)
    {
       if (*p == '/')
