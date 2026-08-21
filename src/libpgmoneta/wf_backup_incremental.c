@@ -264,6 +264,13 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
          usr = i;
       }
    }
+
+   if (usr == -1)
+   {
+      pgmoneta_log_error("User not found for server: %d", server);
+      goto error;
+   }
+
    // establish a connection, with replication flag set
    if (pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {
@@ -743,6 +750,13 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
          usr = i;
       }
    }
+
+   if (usr == -1)
+   {
+      pgmoneta_log_error("User not found for server: %d", server);
+      goto error;
+   }
+
    // establish a connection, with replication flag set
    if (pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {

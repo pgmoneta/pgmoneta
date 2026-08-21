@@ -2713,8 +2713,14 @@ valid_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribut
             {
                if (pgmoneta_compare_string(config->common.servers[i].username, config->common.users[j].username))
                {
-                  usr = i;
+                  usr = j;
                }
+            }
+
+            if (usr == -1)
+            {
+               pgmoneta_log_error("User not found for server: %s", config->common.servers[i].name);
+               continue;
             }
 
             auth = pgmoneta_server_authenticate(i, "postgres",

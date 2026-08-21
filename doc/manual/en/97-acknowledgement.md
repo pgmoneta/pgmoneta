@@ -64,6 +64,7 @@ Harshit Shaw <shawharshit116@gmail.com>
 Ahmed Kamal <ahmedkamal200427@gmail.com>
 Rohan Mishra <kmrrohan29@gmail.com>
 Mostafa Mahmoud <mm1471800@gmail.com>
+R Sai Pranav <rajasaipranav0@gmail.com>
 ```
 
 ## Committers

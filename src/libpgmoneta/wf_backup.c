@@ -162,6 +162,13 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
          usr = i;
       }
    }
+
+   if (usr == -1)
+   {
+      pgmoneta_log_error("User not found for server: %d", server);
+      goto error;
+   }
+
    // establish a connection, with replication flag set
    if (pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {
