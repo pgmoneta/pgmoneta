@@ -62,6 +62,7 @@ bool
 pgmoneta_csv_next_row(struct csv_reader* reader, int* num_col, char*** cols)
 {
    char** cs = NULL;
+   char** tmp = NULL;
    char* col = NULL;
    char* last_tok = NULL;
    int num = 0;
@@ -78,7 +79,12 @@ pgmoneta_csv_next_row(struct csv_reader* reader, int* num_col, char*** cols)
    col = strtok_r(reader->line, ",", &reader->saveptr);
    while (col != NULL)
    {
-      cs = realloc(cs, (num + 1) * sizeof(char*));
+      tmp = realloc(cs, (num + 1) * sizeof(char*));
+      if (tmp == NULL)
+      {
+         goto error;
+      }
+      cs = tmp;
       cs[num] = col;
       num++;
       col = strtok_r(NULL, ",", &reader->saveptr);
