@@ -5132,6 +5132,7 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
    if (!temp)
    {
       free(temp_results);
+      temp_results = NULL;
       goto error;
    }
 

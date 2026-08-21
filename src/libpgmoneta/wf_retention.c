@@ -228,7 +228,9 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
       }
 
       free(retention_keep);
+      retention_keep = NULL;
       free(d);
+      d = NULL;
    }
 
    return 0;

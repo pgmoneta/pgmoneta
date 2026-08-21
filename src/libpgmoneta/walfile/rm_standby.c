@@ -161,7 +161,9 @@ pgmoneta_wal_standby_desc(char* buf, struct decoded_xlog_record* record)
                                           relname);
 
          free(dbname);
+         dbname = NULL;
          free(relname);
+         relname = NULL;
       }
    }
    else if (info == XLOG_RUNNING_XACTS)
