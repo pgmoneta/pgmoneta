@@ -430,7 +430,10 @@ wal_get_known_values_for_field(struct ui_state* state, int field, const char* pa
             // Apply bound filtering for End LSN (field 2)
             if (field == 2 && field_inputs != NULL && wal_input_has_content(field_inputs[1]))
             {
-               uint64_t start_lsn_val = pgmoneta_string_to_lsn(field_inputs[1]);
+               uint64_t start_lsn_val = 0;
+
+               /* A malformed bound leaves the value at 0, which disables the filter */
+               pgmoneta_string_to_lsn(field_inputs[1], &start_lsn_val);
                if (start_lsn_val != 0 && *dynamic_array_out != NULL)
                {
                   char** results = *dynamic_array_out;
@@ -438,7 +441,9 @@ wal_get_known_values_for_field(struct ui_state* state, int field, const char* pa
 
                   for (int i = 0; results[i] != NULL; i++)
                   {
-                     uint64_t cand_lsn = pgmoneta_string_to_lsn(results[i]);
+                     uint64_t cand_lsn = 0;
+
+                     pgmoneta_string_to_lsn(results[i], &cand_lsn);
                      if (cand_lsn > start_lsn_val)
                      {
                         if (valid_count != i)
@@ -459,7 +464,10 @@ wal_get_known_values_for_field(struct ui_state* state, int field, const char* pa
             // Apply reciprocal bound filtering for Start LSN (field 1)
             if (field == 1 && field_inputs != NULL && wal_input_has_content(field_inputs[2]))
             {
-               uint64_t end_lsn_val = pgmoneta_string_to_lsn(field_inputs[2]);
+               uint64_t end_lsn_val = 0;
+
+               /* A malformed bound leaves the value at 0, which disables the filter */
+               pgmoneta_string_to_lsn(field_inputs[2], &end_lsn_val);
                if (end_lsn_val != 0 && *dynamic_array_out != NULL)
                {
                   char** results = *dynamic_array_out;
@@ -467,7 +475,9 @@ wal_get_known_values_for_field(struct ui_state* state, int field, const char* pa
 
                   for (int i = 0; results[i] != NULL; i++)
                   {
-                     uint64_t cand_lsn = pgmoneta_string_to_lsn(results[i]);
+                     uint64_t cand_lsn = 0;
+
+                     pgmoneta_string_to_lsn(results[i], &cand_lsn);
                      if (cand_lsn < end_lsn_val)
                      {
                         if (valid_count != i)
@@ -3721,14 +3731,18 @@ handle_search_input(struct ui_state* state)
 
    if (strlen(start_lsn_input) > 0)
    {
-      criteria.start_lsn = pgmoneta_string_to_lsn(start_lsn_input);
-      criteria.has_start_lsn = true;
+      if (!pgmoneta_string_to_lsn(start_lsn_input, &criteria.start_lsn))
+      {
+         criteria.has_start_lsn = true;
+      }
    }
 
    if (strlen(end_lsn_input) > 0)
    {
-      criteria.end_lsn = pgmoneta_string_to_lsn(end_lsn_input);
-      criteria.has_end_lsn = true;
+      if (!pgmoneta_string_to_lsn(end_lsn_input, &criteria.end_lsn))
+      {
+         criteria.has_end_lsn = true;
+      }
    }
 
    if (strlen(xid_input) > 0)
@@ -3874,14 +3888,18 @@ handle_filter_input(struct ui_state* state)
 
    if (strlen(start_lsn_input) > 0)
    {
-      state->filters.start_lsn = pgmoneta_string_to_lsn(start_lsn_input);
-      state->filters.has_start_lsn = true;
+      if (!pgmoneta_string_to_lsn(start_lsn_input, &state->filters.start_lsn))
+      {
+         state->filters.has_start_lsn = true;
+      }
    }
 
    if (strlen(end_lsn_input) > 0)
    {
-      state->filters.end_lsn = pgmoneta_string_to_lsn(end_lsn_input);
-      state->filters.has_end_lsn = true;
+      if (!pgmoneta_string_to_lsn(end_lsn_input, &state->filters.end_lsn))
+      {
+         state->filters.has_end_lsn = true;
+      }
    }
 
    if (strlen(xid_input) > 0)

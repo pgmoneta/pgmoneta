@@ -301,7 +301,11 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    prev_backup_data = pgmoneta_get_server_backup_identifier_data(server, incremental_label);
    pgmoneta_read_checkpoint_info(prev_backup_data, &chkpt_lsn);
 
-   prev_backup_chkpt_lsn = pgmoneta_string_to_lsn(chkpt_lsn);
+   if (pgmoneta_string_to_lsn(chkpt_lsn, &prev_backup_chkpt_lsn))
+   {
+      pgmoneta_log_error("Unable to parse checkpoint LSN of the preceding backup");
+      goto error;
+   }
 
    tag = pgmoneta_append(tag, "pgmoneta_");
    tag = pgmoneta_append(tag, label);
@@ -312,7 +316,11 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       pgmoneta_log_error("Incremental backup couldn't start");
       goto error;
    }
-   start_backup_lsn = pgmoneta_string_to_lsn(start_backup_xlog);
+   if (pgmoneta_string_to_lsn(start_backup_xlog, &start_backup_lsn))
+   {
+      pgmoneta_log_error("Unable to parse start backup LSN");
+      goto error;
+   }
 
    wal_dir = pgmoneta_get_server_wal(server);
 

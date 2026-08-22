@@ -486,7 +486,11 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint3
    chkpt_lsn = pgmoneta_query_response_get_data(response, 0);
    timeline = pgmoneta_query_response_get_data(response, 1);
 
-   *c_lsn = pgmoneta_string_to_lsn(chkpt_lsn);
+   if (pgmoneta_string_to_lsn(chkpt_lsn, c_lsn))
+   {
+      pgmoneta_log_error("Unable to parse checkpoint LSN");
+      goto error;
+   }
    *tli = atoi(timeline);
 
    pgmoneta_free_query_response(response);
@@ -1547,7 +1551,8 @@ transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len)
    size_t binary_len = 0;
    uint8_t* binary_out = NULL;
    char* hb = NULL;
-   int hi, lo;
+   unsigned int hi = 0;
+   unsigned int lo = 0;
    char hex_chr_str[2] = {0};
 
    /* check if valid hex bytea string */
@@ -1584,10 +1589,13 @@ transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len)
    for (size_t i = 0; i < binary_len; i++)
    {
       hex_chr_str[0] = hb[2 * i];
-      sscanf(hex_chr_str, "%x", &hi);
+      if (sscanf(hex_chr_str, "%x", &hi) != 1)
+      {
+         pgmoneta_log_error("invalid hex character encountered");
+         goto error;
+      }
       hex_chr_str[0] = hb[2 * i + 1];
-      sscanf(hex_chr_str, "%x", &lo);
-      if (hi == -1 || lo == -1)
+      if (sscanf(hex_chr_str, "%x", &lo) != 1)
       {
          pgmoneta_log_error("invalid hex character encountered");
          goto error;
