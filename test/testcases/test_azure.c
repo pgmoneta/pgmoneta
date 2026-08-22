@@ -164,6 +164,34 @@ cleanup:
    MCTF_FINISH();
 }
 
+/*
+ * Full round trip: back up to Azure, then restore FROM Azure and verify the data
+ * directory was genuinely reconstructed (not just an exit-0 with no files).
+ */
+MCTF_INTEGRATION_TEST(test_azure_backup_restore_roundtrip)
+{
+   char* out = NULL;
+   char cmd[2 * MAX_PATH];
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   snprintf(cmd, sizeof(cmd), "azure restore primary %s %s", shared_label, TEST_RESTORE_DIR);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "azure restore failed");
+
+   mctf_sh(&out, "find %s -name PG_VERSION | head -1 | tr -d '\\n'", TEST_RESTORE_DIR);
+   MCTF_ASSERT_PTR_NONNULL(out, cleanup, "restore produced no output");
+   MCTF_ASSERT(out[0] != '\0', cleanup, "restore produced no PG_VERSION (empty restore)");
+
+cleanup:
+   free(out);
+   MCTF_FINISH();
+}
+
 /* Verify a second consecutive backup also succeeds, guarding against WAL or connection regressions. */
 MCTF_INTEGRATION_TEST(test_azure_second_backup_succeeds)
 {

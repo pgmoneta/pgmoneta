@@ -103,7 +103,7 @@ pgmoneta_storage_verify_backup(int server, struct backup* backup_info);
  * @return The workflow
  */
 struct workflow*
-pgmoneta_storage_create_azure(void);
+pgmoneta_storage_create_azure(int workflow_type);
 
 /**
  * Create a workflow for the remote storage engines

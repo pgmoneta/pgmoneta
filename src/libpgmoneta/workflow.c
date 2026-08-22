@@ -62,6 +62,7 @@ static struct workflow* wf_retention(void);
 static struct workflow* wf_post_rollup(struct backup* backup);
 static struct workflow* wf_list_s3_objects(void);
 static struct workflow* wf_restore_s3_objects(void);
+static struct workflow* wf_restore_azure_objects(void);
 
 static int get_error_code(int type, int flow, struct art* nodes);
 
@@ -102,6 +103,9 @@ pgmoneta_workflow_create(int workflow_type, struct backup* backup)
          break;
       case WORKFLOW_TYPE_S3_RESTORE:
          w = wf_restore_s3_objects();
+         break;
+      case WORKFLOW_TYPE_AZURE_RESTORE:
+         w = wf_restore_azure_objects();
          break;
       case WORKFLOW_TYPE_RETENTION:
          w = wf_retention();
@@ -549,6 +553,8 @@ pgmoneta_workflow_name(int workflow_type)
          return WORKFLOW_NAME_S3_LIST;
       case WORKFLOW_TYPE_S3_RESTORE:
          return WORKFLOW_NAME_S3_RESTORE;
+      case WORKFLOW_TYPE_AZURE_RESTORE:
+         return WORKFLOW_NAME_AZURE_RESTORE;
       default:
          return WORKFLOW_NAME_UNKNOWN;
    }
@@ -1128,6 +1134,34 @@ wf_restore_s3_objects(void)
    return head;
 }
 
+static struct workflow*
+wf_restore_azure_objects(void)
+{
+   struct workflow* head = NULL;
+   struct main_configuration* config = NULL;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->storage_engine & STORAGE_ENGINE_AZURE)
+   {
+      head = pgmoneta_storage_create_azure(WORKFLOW_TYPE_AZURE_RESTORE);
+   }
+
+#ifdef DEBUG
+   struct workflow* current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
+
+   return head;
+}
+
 static int
 get_error_code(int type, int flow, struct art* nodes)
 {
@@ -1316,7 +1350,7 @@ get_error_code(int type, int flow, struct art* nodes)
          return -1;
       }
    }
-   else if (type == WORKFLOW_TYPE_S3_RESTORE)
+   else if (type == WORKFLOW_TYPE_S3_RESTORE || type == WORKFLOW_TYPE_AZURE_RESTORE)
    {
       if (flow == SETUP)
       {
