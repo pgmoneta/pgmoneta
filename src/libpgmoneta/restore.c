@@ -2180,6 +2180,10 @@ write_reconstructed_file_incremental(char* output_file_path,
    }
 
    header = malloc(hdrlen);
+   if (header == NULL)
+   {
+      goto error;
+   }
    memset(header, 0, hdrlen);
 
    memcpy(header + hdrptr, &magic, sizeof(uint32_t));
