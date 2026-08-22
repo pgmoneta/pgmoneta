@@ -716,6 +716,12 @@ username:
       number_of_users++;
    }
 
+   if (ferror(users_file))
+   {
+      warnx("Error reading users file");
+      goto error;
+   }
+
    if (number_of_users > NUMBER_OF_USERS)
    {
       warnx("Too many users");
@@ -868,6 +874,14 @@ password:
    entry = pgmoneta_append(entry, ":");
    entry = pgmoneta_append(entry, encoded);
    entry = pgmoneta_append(entry, "\n");
+
+   /* The stream is open in update mode. The read loop above ended at end of
+    * file, which ferror() confirmed, so reposition before writing rather than
+    * relying on the end-of-file exception in C11 7.21.5.3p7. */
+   if (fseek(users_file, 0, SEEK_END) != 0)
+   {
+      goto error;
+   }
 
    fputs(entry, users_file);
 
