@@ -377,6 +377,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    }
 
    uint32_t next_record;
+   xlog_rec_ptr rec_start = 0;
    int page_number = 0;
    wal_file->long_phd = long_header;
    read_all_page_headers(file, wal_file->long_phd, wal_file);
@@ -470,6 +471,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          continue;
       }
       fseek(file, next_record, SEEK_SET);
+      rec_start = next_record;
 
       // Check if record crosses the page boundary
       if (ftell(file) + SIZE_OF_XLOG_RECORD > wal_file->long_phd->xlp_xlog_blcksz * (page_number + 1))
@@ -532,8 +534,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          break;
       }
       uint32_t data_length = record->xl_tot_len - SIZE_OF_XLOG_RECORD;
-      xlog_rec_ptr lsn = ftell(file) + base - SIZE_OF_XLOG_RECORD;
-      next_record = ftell(file) + MAXALIGN(record->xl_tot_len - SIZE_OF_XLOG_RECORD);
+      xlog_rec_ptr lsn = rec_start + base;
       uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
 
       MALLOC(buffer, data_length);
@@ -569,6 +570,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
                goto finish;
             }
             fseek(file, SIZE_OF_XLOG_SHORT_PHD, SEEK_CUR);
+            page_number++;
             bytes_read = fread(buffer + total_bytes_read, 1,
                                MIN(remaining_data_length, wal_file->long_phd->xlp_xlog_blcksz - SIZE_OF_XLOG_SHORT_PHD), file);
             remaining_data_length -= bytes_read;
@@ -599,11 +601,23 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
                goto error;
             }
          }
-         if (initialized)
-         {
-            next_record = temp_next_record;
-            initialized = false;
-         }
+      }
+
+      /*
+       * The next record starts at the 8-byte aligned position following the
+       * record data. For a record that crosses a page boundary this differs
+       * from lsn + MAXALIGN(total_len) because each continuation page header
+       * occupies LSNs of its own; MAXALIGN(ftell) accounts for those headers
+       * since ftell is the physical end of the record data.
+       */
+      if (initialized)
+      {
+         next_record = temp_next_record;
+         initialized = false;
+      }
+      else
+      {
+         next_record = MAXALIGN(ftell(file));
       }
 
       decoded = calloc(1, sizeof(struct decoded_xlog_record));
@@ -658,12 +672,12 @@ finish:
    while (pgmoneta_deque_iterator_next(iter))
    {
       decoded = (struct decoded_xlog_record*)iter->value->data;
-      decoded->next_lsn = lsn_array[idx++];
-   }
-
-   if (decoded != NULL)
-   {
-      decoded->next_lsn = 0; // Handle last record
+      if (decoded == NULL || decoded->partial)
+      {
+         continue;
+      }
+      decoded->next_lsn = (idx + 1 < (int)lsn_array_size) ? lsn_array[idx + 1] : 0;
+      idx++;
    }
 
    pgmoneta_deque_iterator_destroy(iter);
@@ -2340,6 +2354,9 @@ pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t ma
    struct decoded_bkp_block* blk = NULL;
 
    record = decoded->header;
+   record.xl_pad[0] = 0;
+   record.xl_pad[1] = 0;
+   record.xl_crc = 0;
    total_length = SIZE_OF_XLOG_RECORD;
 
    if (decoded->record_origin != INVALID_REP_ORIGIN_ID)
