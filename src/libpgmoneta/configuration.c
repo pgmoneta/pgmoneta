@@ -1864,6 +1864,7 @@ int
 pgmoneta_validate_main_configuration(void* shm)
 {
    char* buf = NULL;
+   char jobs_dir[MAX_PATH + sizeof(JOBS_DIR) + 1];
    bool found = false;
    struct stat st;
    struct main_configuration* config;
@@ -2094,6 +2095,12 @@ pgmoneta_validate_main_configuration(void* shm)
          return 1;
       }
 
+      if (pgmoneta_compare_string(config->common.servers[i].name, JOBS_DIR))
+      {
+         pgmoneta_log_fatal("'%s' is a reserved word for jobs directory", JOBS_DIR);
+         return 1;
+      }
+
       if (strlen(config->common.servers[i].host) == 0)
       {
          pgmoneta_log_fatal("No host defined for %s", config->common.servers[i].name);
@@ -2152,6 +2159,15 @@ pgmoneta_validate_main_configuration(void* shm)
       pgmoneta_log_fatal("verification cannot be less than 0");
       return 1;
    }
+
+   /* Create jobs directory for async */
+   snprintf(jobs_dir, sizeof(jobs_dir), "%s/%s", config->base_dir, JOBS_DIR);
+   if (pgmoneta_mkdir(jobs_dir))
+   {
+      pgmoneta_log_fatal("Can not create %s", jobs_dir);
+      return 1;
+   }
+
    return 0;
 }
 

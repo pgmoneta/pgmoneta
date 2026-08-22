@@ -465,13 +465,13 @@ cleanup:
 
 MCTF_TEST(test_progress_phase_mapping_for_s3)
 {
-   MCTF_ASSERT_INT_EQ(pgmoneta_progress_phase_from_workflow_name(PHASE_NAME_INFO), PHASE_INFO,
+   MCTF_ASSERT_INT_EQ(pgmoneta_phase_from_workflow_name(PHASE_NAME_INFO), PHASE_INFO,
                       cleanup, "info phase name should map to PHASE_INFO");
-   MCTF_ASSERT_INT_EQ(pgmoneta_progress_phase_from_workflow_name(PHASE_NAME_DELETE), PHASE_DELETE,
+   MCTF_ASSERT_INT_EQ(pgmoneta_phase_from_workflow_name(PHASE_NAME_DELETE), PHASE_DELETE,
                       cleanup, "delete phase name should map to PHASE_DELETE");
-   MCTF_ASSERT_INT_EQ(pgmoneta_progress_phase_from_workflow_name(PHASE_NAME_RESTORE), PHASE_RESTORE,
+   MCTF_ASSERT_INT_EQ(pgmoneta_phase_from_workflow_name(PHASE_NAME_RESTORE), PHASE_RESTORE,
                       cleanup, "restore phase name should map to PHASE_RESTORE");
-   MCTF_ASSERT_INT_EQ(pgmoneta_progress_phase_from_workflow_name(PHASE_NAME_VERIFY), PHASE_VERIFY,
+   MCTF_ASSERT_INT_EQ(pgmoneta_phase_from_workflow_name(PHASE_NAME_VERIFY), PHASE_VERIFY,
                       cleanup, "verify phase name should map to PHASE_VERIFY");
 
    MCTF_ASSERT_STR_EQ(pgmoneta_progress_limit_node_key(PHASE_INFO), NODE_PROGRESS_LIMIT_INFO,

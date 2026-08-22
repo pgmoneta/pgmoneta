@@ -93,6 +93,157 @@ error:
 }
 
 int
+pgmoneta_tsclient_async_backup(char* server, struct json** response, int expected_error)
+{
+   int socket = -1;
+
+   pgmoneta_management_set_async(true);
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_backup(NULL, socket, server, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, NULL, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, response))
+   {
+      goto error;
+   }
+
+   pgmoneta_management_set_async(false);
+   pgmoneta_disconnect(socket);
+   return 0;
+
+error:
+   pgmoneta_management_set_async(false);
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_job(char* job_id, struct json** response, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || job_id == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_job(NULL, socket, job_id, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON) ||
+       check_output_outcome(socket, expected_error, response))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_job_status(char* server, char* command, struct json** response, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL || command == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_job_status(NULL, socket, server, command, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON) ||
+       check_output_outcome(socket, expected_error, response))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_job_list_all(struct json** response, int expected_error)
+{
+   int socket = get_connection();
+
+   if (!pgmoneta_socket_isvalid(socket) ||
+       pgmoneta_management_request_job_list_all(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON) ||
+       check_output_outcome(socket, expected_error, response))
+   {
+      pgmoneta_disconnect(socket);
+      return 1;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+}
+
+int
+pgmoneta_tsclient_job_list_server(char* server, struct json** response, int expected_error)
+{
+   int socket = get_connection();
+
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL ||
+       pgmoneta_management_request_job_list_server(NULL, socket, server, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON) ||
+       check_output_outcome(socket, expected_error, response))
+   {
+      pgmoneta_disconnect(socket);
+      return 1;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+}
+
+int
+pgmoneta_tsclient_job_list_status(char* status, struct json** response, int expected_error)
+{
+   int socket = get_connection();
+
+   if (!pgmoneta_socket_isvalid(socket) || status == NULL ||
+       pgmoneta_management_request_job_list_status(NULL, socket, status, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON) ||
+       check_output_outcome(socket, expected_error, response))
+   {
+      pgmoneta_disconnect(socket);
+      return 1;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+}
+
+int
+pgmoneta_tsclient_job_remove(char* job_id, int expected_error)
+{
+   int socket = get_connection();
+
+   if (!pgmoneta_socket_isvalid(socket) ||
+       pgmoneta_management_request_job_remove(NULL, socket, job_id, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON) ||
+       check_output_outcome(socket, expected_error, NULL))
+   {
+      pgmoneta_disconnect(socket);
+      return 1;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+}
+
+int
 pgmoneta_tsclient_list_backup(char* server, char* sort_order, struct json** response, int expected_error)
 {
    int socket = -1;
