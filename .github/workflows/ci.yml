@@ -12,6 +12,57 @@ on:
   workflow_dispatch:
 
 jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install cppcheck
+        run: |
+          sudo apt update -y
+          sudo apt install -y cppcheck
+          cppcheck --version
+
+      - name: Run cppcheck against the known baseline
+        run: |
+          # The line number is requested and then stripped: cppcheck collapses messages
+          # that format identically, so without it a file reports at most one finding
+          # per kind and this check could never fail.
+          cppcheck --enable=warning --inline-suppr --quiet \
+                   --template='{id}:{file}:{line}' \
+                   -I src/include src/ 2>&1 \
+            | grep -E '^[a-zA-Z]+:src/' | sed 's/:[0-9]*$//' | sort | uniq -c \
+            | awk '{printf "%s %s\n", $2, $1}' | sort > /tmp/cppcheck-current.txt || true
+
+          grep -v '^#' .github/cppcheck-baseline.txt | grep -E '^[a-zA-Z]+:' | sort > /tmp/cppcheck-baseline.txt
+
+          status=0
+          while read -r key count; do
+            was=$(awk -v k="$key" '$1 == k {print $2}' /tmp/cppcheck-baseline.txt)
+            was=${was:-0}
+            if [ "$count" -gt "$was" ]; then
+              echo "$key: $was in the baseline, $count now"
+              status=1
+            fi
+          done < /tmp/cppcheck-current.txt
+
+          if [ "$status" -ne 0 ]; then
+            echo ""
+            echo "This change adds cppcheck findings. Fix them, or if they are false"
+            echo "positives add an inline suppression and say why in the pull request."
+            exit 1
+          fi
+
+          while read -r key count; do
+            now=$(awk -v k="$key" '$1 == k {print $2}' /tmp/cppcheck-current.txt)
+            now=${now:-0}
+            if [ "$now" -lt "$count" ]; then
+              echo "$key: down from $count to $now, please update .github/cppcheck-baseline.txt"
+            fi
+          done < /tmp/cppcheck-baseline.txt
+
+          echo "No new cppcheck findings."
+
   format-check:
     runs-on: ubuntu-latest
     steps:

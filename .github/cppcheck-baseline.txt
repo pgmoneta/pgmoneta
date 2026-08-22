@@ -1,0 +1,76 @@
+# cppcheck findings known to exist on main, as 'id:file count' pairs.
+#
+# CI fails when a file gains findings of a kind it did not have, or gains more of a
+# kind it already had, so new code cannot add to this list.
+#
+# Counts rather than line numbers, so ordinary edits do not churn the file. The
+# line number is asked for and then stripped, because cppcheck collapses messages
+# that format identically - without it every file would report at most one finding
+# per kind and the check could never fail.
+#
+# When a finding is fixed, lower the count or delete the line in the same PR.
+#
+# Regenerate with:
+#   cppcheck --enable=warning --inline-suppr --quiet --template='{id}:{file}:{line}' \
+#       -I src/include src/ 2>&1 | grep -E '^[a-zA-Z]+:' | sed 's/:[0-9]*$//' \
+#       | sort | uniq -c | awk '{printf "%s %s
+#
+", $2, $1}' | sort
+IOWithoutPositioning:src/admin.c 1
+arrayIndexOutOfBoundsCond:src/libpgmoneta/utils.c 2
+ctunullpointer:src/libpgmoneta/message.c 2
+ctunullpointer:src/libpgmoneta/wf_backup_incremental.c 1
+ctunullpointer:src/libpgmoneta/workflow.c 1
+ctunullpointerOutOfMemory:src/libpgmoneta/info.c 1
+ctunullpointerOutOfMemory:src/libpgmoneta/json.c 1
+identicalInnerCondition:src/libpgmoneta/se_ssh.c 1
+identicalInnerCondition:src/libpgmoneta/wf_link.c 1
+invalidscanf:src/libpgmoneta/utils.c 1
+invalidscanf:src/libpgmoneta/wf_backup_incremental.c 2
+memleakOnRealloc:src/libpgmoneta/csv.c 1
+memleakOnRealloc:src/libpgmoneta/network.c 1
+nullPointer:src/libpgmoneta/logging.c 1
+nullPointerArithmeticOutOfMemory:src/libpgmoneta/restore.c 2
+nullPointerArithmeticOutOfMemory:src/libpgmoneta/utils.c 1
+nullPointerOutOfMemory:src/libpgmoneta/art.c 17
+nullPointerOutOfMemory:src/libpgmoneta/brt.c 3
+nullPointerOutOfMemory:src/libpgmoneta/bzip2_compression.c 4
+nullPointerOutOfMemory:src/libpgmoneta/compression.c 4
+nullPointerOutOfMemory:src/libpgmoneta/console.c 1
+nullPointerOutOfMemory:src/libpgmoneta/deque.c 9
+nullPointerOutOfMemory:src/libpgmoneta/gzip_compression.c 4
+nullPointerOutOfMemory:src/libpgmoneta/json.c 9
+nullPointerOutOfMemory:src/libpgmoneta/keep.c 1
+nullPointerOutOfMemory:src/libpgmoneta/lz4_compression.c 6
+nullPointerOutOfMemory:src/libpgmoneta/message.c 13
+nullPointerOutOfMemory:src/libpgmoneta/network.c 1
+nullPointerOutOfMemory:src/libpgmoneta/restore.c 22
+nullPointerOutOfMemory:src/libpgmoneta/rfile.c 3
+nullPointerOutOfMemory:src/libpgmoneta/se_azure.c 5
+nullPointerOutOfMemory:src/libpgmoneta/se_s3.c 1
+nullPointerOutOfMemory:src/libpgmoneta/security.c 19
+nullPointerOutOfMemory:src/libpgmoneta/stream.c 4
+nullPointerOutOfMemory:src/libpgmoneta/utils.c 30
+nullPointerOutOfMemory:src/libpgmoneta/vfile_local.c 5
+nullPointerOutOfMemory:src/libpgmoneta/walfile/rm_standby.c 2
+nullPointerOutOfMemory:src/libpgmoneta/walfile/wal_summary.c 4
+nullPointerOutOfMemory:src/libpgmoneta/wf_bzip2.c 1
+nullPointerOutOfMemory:src/libpgmoneta/wf_sha256.c 5
+nullPointerOutOfMemory:src/libpgmoneta/wf_sha512.c 5
+nullPointerOutOfMemory:src/libpgmoneta/zstandard_compression.c 4
+nullPointerOutOfResources:src/libpgmoneta/se_ssh.c 1
+nullPointerRedundantCheck:src/cli.c 2
+nullPointerRedundantCheck:src/libpgmoneta/archive.c 2
+nullPointerRedundantCheck:src/libpgmoneta/console.c 1
+nullPointerRedundantCheck:src/libpgmoneta/info.c 7
+nullPointerRedundantCheck:src/libpgmoneta/restore.c 1
+nullPointerRedundantCheck:src/libpgmoneta/utils.c 6
+nullPointerRedundantCheck:src/libpgmoneta/walfile.c 2
+nullPointerRedundantCheck:src/libpgmoneta/wf_restore.c 1
+nullPointerRedundantCheck:src/libpgmoneta/wf_sha512.c 1
+pointerSize:src/libpgmoneta/walfile/rm_gist.c 2
+pointerSize:src/libpgmoneta/walfile/rm_xact.c 15
+pointerSize:src/libpgmoneta/wf_retention.c 1
+syntaxError:src/libpgmoneta/walfile/wal_reader.c 1
+uselessAssignmentPtrArg:src/libpgmoneta/message.c 2
+uselessAssignmentPtrArg:src/libpgmoneta/wf_backup_incremental.c 1
