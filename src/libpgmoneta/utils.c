@@ -4998,19 +4998,31 @@ pgmoneta_lsn_to_string(uint64_t lsn)
    return result;
 }
 
-uint64_t
-pgmoneta_string_to_lsn(char* lsn)
+int
+pgmoneta_string_to_lsn(char* lsn, uint64_t* lsn_out)
 {
    uint32_t hi = 0;
    uint32_t lo = 0;
 
-   if (lsn == NULL)
+   if (lsn_out == NULL)
    {
-      return 0;
+      return 1;
    }
 
-   sscanf(lsn, "%X/%X", &hi, &lo);
-   return ((uint64_t)hi << 32) + (uint64_t)lo;
+   *lsn_out = 0;
+
+   if (lsn == NULL)
+   {
+      return 1;
+   }
+
+   if (sscanf(lsn, "%X/%X", &hi, &lo) != 2)
+   {
+      return 1;
+   }
+
+   *lsn_out = ((uint64_t)hi << 32) + (uint64_t)lo;
+   return 0;
 }
 
 bool

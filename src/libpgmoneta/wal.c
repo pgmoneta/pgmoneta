@@ -1158,21 +1158,17 @@ wal_xlog_offset(size_t xlogptr, int segsize)
 static int
 wal_convert_xlogpos(char* xlogpos, int segsize, uint32_t* high32, uint32_t* low32)
 {
-   char* ptr = NULL;
-   int num = 0;
-   if (xlogpos == NULL || !pgmoneta_contains(xlogpos, "/"))
+   uint64_t lsn = 0;
+
+   if (pgmoneta_string_to_lsn(xlogpos, &lsn))
    {
       pgmoneta_log_error("WAL unable to convert xlogpos");
       return 1;
    }
-   ptr = strtok(xlogpos, "/");
-   sscanf(ptr, "%x", &num);
-   *high32 = num;
 
-   ptr = strtok(NULL, "/");
-   sscanf(ptr, "%x", &num);
+   *high32 = (uint32_t)(lsn >> 32);
    // discard in-segment offset
-   *low32 = num & (~(segsize - 1));
+   *low32 = (uint32_t)lsn & ~((uint32_t)segsize - 1);
    return 0;
 }
 

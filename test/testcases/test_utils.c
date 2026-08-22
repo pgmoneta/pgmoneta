@@ -833,13 +833,23 @@ MCTF_TEST(test_utils_string_extras)
    // pgmoneta_lsn_to_string / pgmoneta_string_to_lsn
 
    uint64_t lsn = 0x123456789ABCDEF0;
+   uint64_t parsed_lsn = 0;
+   char truncated_lsn[] = "ABC/";
+
    s = pgmoneta_lsn_to_string(lsn);
    MCTF_ASSERT_PTR_NONNULL(s, cleanup, "lsn_to_string failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(s), lsn, cleanup, "string_to_lsn round-trip failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(s, &parsed_lsn), 0, cleanup, "string_to_lsn failed");
+   MCTF_ASSERT_INT_EQ(parsed_lsn, lsn, cleanup, "string_to_lsn round-trip failed");
    free(s);
    s = NULL;
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(NULL), 0, cleanup, "string_to_lsn NULL should return 0");
+   parsed_lsn = 1;
+   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(NULL, &parsed_lsn), 1, cleanup, "string_to_lsn NULL should fail");
+   MCTF_ASSERT_INT_EQ(parsed_lsn, 0, cleanup, "string_to_lsn NULL should zero the result");
+
+   parsed_lsn = 1;
+   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(truncated_lsn, &parsed_lsn), 1, cleanup, "string_to_lsn should reject a truncated lsn");
+   MCTF_ASSERT_INT_EQ(parsed_lsn, 0, cleanup, "string_to_lsn should zero the result on failure");
 
    // pgmoneta_split
 
