@@ -1188,7 +1188,8 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
          char buf[MAX_PATH];
 
          memset(buf, 0, sizeof(buf));
-         if (sscanf(read_buffer, "START WAL LOCATION: %s\n", buf) != 1)
+         /* buf holds MAX_PATH bytes */
+         if (sscanf(read_buffer, "START WAL LOCATION: %1023s\n", buf) != 1)
          {
             pgmoneta_log_error("Error parsing start wal location");
             goto error;
@@ -1211,7 +1212,8 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
          char buf[MAX_PATH];
 
          memset(buf, 0, sizeof(buf));
-         if (sscanf(read_buffer, "START TIMELINE: %s\n", buf) != 1)
+         /* buf holds MAX_PATH bytes */
+         if (sscanf(read_buffer, "START TIMELINE: %1023s\n", buf) != 1)
          {
             pgmoneta_log_error("Error parsing start timeline");
             goto error;
