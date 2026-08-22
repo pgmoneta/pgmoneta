@@ -2608,6 +2608,7 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
             free(dest_dir);
             free(dest_path);
             free(paths[j]);
+            paths[j] = NULL;
             qr = NULL;
          }
          free(paths);

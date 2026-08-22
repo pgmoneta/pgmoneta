@@ -1215,8 +1215,11 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
       }
 
       free(dbname);
+      dbname = NULL;
       free(spcname);
+      spcname = NULL;
       free(relname);
+      relname = NULL;
    }
 
    return buf;

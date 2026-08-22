@@ -1488,6 +1488,7 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
       if ((size_t)binary_data_length < block_size)
       {
          free(binary_data);
+         binary_data = NULL;
          break;
       }
 
@@ -1500,6 +1501,7 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
       }
 
       free(binary_data);
+      binary_data = NULL;
    }
 
    /* Handle truncation, by padding with 0 */
@@ -1520,6 +1522,7 @@ done:
 
 error:
    free(binary_data);
+   binary_data = NULL;
    free(filepath);
    free(file_name);
    free(rel_path);
@@ -1570,6 +1573,7 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
       if (binary_data_length == 0)
       {
          free(binary_data);
+         binary_data = NULL;
          break;
       }
 
@@ -1582,6 +1586,7 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
 
       offset += binary_data_length;
       free(binary_data);
+      binary_data = NULL;
    }
 
    free(filepath);
@@ -1590,6 +1595,7 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
    return 0;
 error:
    free(binary_data);
+   binary_data = NULL;
    free(filepath);
    if (file != NULL)
    {
