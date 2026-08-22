@@ -853,7 +853,7 @@ pgmoneta_get_password(void)
 
    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 
-   while ((c = getchar()) != '\n' && c != EOF && i < MAX_PASSWORD_LENGTH)
+   while ((c = getchar()) != '\n' && c != EOF && i < MAX_PASSWORD_LENGTH - 1)
    {
       p[i++] = c;
    }
@@ -3095,7 +3095,7 @@ pgmoneta_translate_file_size(uint64_t size)
    char* units[] = {"B", "kB", "MB", "GB", "TB", "PB"};
    int i = 0;
 
-   while (sz >= 1024 && i < 6)
+   while (sz >= 1024 && i < (int)(sizeof(units) / sizeof(units[0])) - 1)
    {
       sz /= 1024.0;
       i++;
