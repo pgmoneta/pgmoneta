@@ -83,6 +83,7 @@ pgmoneta_bind(char* hostname, int port, int** fds, int* length)
              (ifa->ifa_flags & IFF_UP))
          {
             int* new_fds = NULL;
+            int* tmp_fds = NULL;
             int new_length = 0;
 
             memset(addr, 0, sizeof(addr));
@@ -106,13 +107,25 @@ pgmoneta_bind(char* hostname, int port, int** fds, int* length)
 
             if (star_fds == NULL)
             {
-               star_fds = malloc(new_length * sizeof(int));
+               tmp_fds = malloc(new_length * sizeof(int));
+               if (tmp_fds == NULL)
+               {
+                  free(new_fds);
+                  continue;
+               }
+               star_fds = tmp_fds;
                memcpy(star_fds, new_fds, new_length * sizeof(int));
                star_length = new_length;
             }
             else
             {
-               star_fds = realloc(star_fds, (star_length + new_length) * sizeof(int));
+               tmp_fds = realloc(star_fds, (star_length + new_length) * sizeof(int));
+               if (tmp_fds == NULL)
+               {
+                  free(new_fds);
+                  continue;
+               }
+               star_fds = tmp_fds;
                memcpy(star_fds + star_length, new_fds, new_length * sizeof(int));
                star_length += new_length;
             }
