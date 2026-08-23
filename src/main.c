@@ -94,6 +94,18 @@ static void accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int r
 static void accept_nagios_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
+struct accept_io;
+static void http_child_serve(struct ev_loop* loop, int client_fd, struct accept_io* ai,
+                             const char* title,
+                             const char* cert_file, const char* key_file, const char* ca_file,
+                             void (*serve_fn)(SSL* ssl, int fd));
+static void accept_http_cb(struct ev_loop* loop, struct ev_io* watcher, int revents,
+                           void (*serve_fn)(SSL* ssl, int fd),
+                           const char* title,
+                           const char* cert_file, const char* key_file, const char* ca_file,
+                           void (*restart_fn)(void));
+static void restart_metrics(void);
+static void restart_console(void);
 static void shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void coredump_cb(struct ev_loop* loop, ev_signal* w, int revents);
@@ -2157,23 +2169,59 @@ error:
 }
 
 static void
-accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
+http_child_serve(struct ev_loop* loop, int client_fd, struct accept_io* ai, const char* title,
+                 const char* cert_file, const char* key_file, const char* ca_file,
+                 void (*serve_fn)(SSL* ssl, int fd))
+{
+   SSL_CTX* ctx = NULL;
+   SSL* client_ssl = NULL;
+
+   ev_loop_fork(loop);
+
+   shutdown_ports(false);
+
+   if (cert_file != NULL && key_file != NULL &&
+       strlen(cert_file) > 0 && strlen(key_file) > 0)
+   {
+      if (pgmoneta_create_ssl_ctx(false, &ctx))
+      {
+         pgmoneta_log_error("http_child_serve: could not create SSL context for %s", title);
+         exit(1);
+      }
+
+      if (pgmoneta_create_ssl_server(ctx, (char*)key_file, (char*)cert_file, (char*)ca_file,
+                                     client_fd, &client_ssl))
+      {
+         pgmoneta_log_error("http_child_serve: could not create SSL server for %s", title);
+         SSL_CTX_free(ctx);
+         exit(1);
+      }
+   }
+
+   pgmoneta_set_proc_title(1, ai->argv, (char*)title, NULL);
+   serve_fn(client_ssl, client_fd);
+}
+
+static void
+accept_http_cb(struct ev_loop* loop, struct ev_io* watcher, int revents,
+               void (*serve_fn)(SSL* ssl, int fd),
+               const char* title,
+               const char* cert_file, const char* key_file, const char* ca_file,
+               void (*restart_fn)(void))
 {
    struct sockaddr_in6 client_addr;
    socklen_t client_addr_length;
    int client_fd;
-   struct main_configuration* config;
-   SSL_CTX* ctx = NULL;
-   SSL* client_ssl = NULL;
+   struct accept_io* ai;
 
    if (EV_ERROR & revents)
    {
-      pgmoneta_log_debug("accept_metrics_cb: invalid event: %s", strerror(errno));
+      pgmoneta_log_debug("accept_%s_cb: invalid event: %s", title, strerror(errno));
       errno = 0;
       return;
    }
 
-   config = (struct main_configuration*)shmem;
+   ai = (struct accept_io*)watcher;
 
    memset(&client_addr, 0, sizeof(client_addr));
    client_addr_length = sizeof(client_addr);
@@ -2183,32 +2231,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (accept_fatal(errno) && keep_running)
       {
          pgmoneta_log_warn("Restarting listening port due to: %s (%d)", strerror(errno), watcher->fd);
-
-         shutdown_metrics();
-         shutdown_nagios();
-
-         free(metrics_fds);
-         metrics_fds = NULL;
-         metrics_fds_length = 0;
-
-         if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
-         {
-            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
-            exit(1);
-         }
-
-         if (metrics_fds_length > MAX_FDS)
-         {
-            pgmoneta_log_fatal("Too many descriptors %d", metrics_fds_length);
-            exit(1);
-         }
-
-         start_metrics();
-
-         for (int i = 0; i < metrics_fds_length; i++)
-         {
-            pgmoneta_log_debug("Metrics: %d", *(metrics_fds + i));
-         }
+         restart_fn();
       }
       else
       {
@@ -2220,37 +2243,83 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
    if (!fork())
    {
-      ev_loop_fork(loop);
-      shutdown_ports(false);
-      if (strlen(config->metrics_cert_file) > 0 && strlen(config->metrics_key_file) > 0)
-      {
-         if (pgmoneta_create_ssl_ctx(false, &ctx))
-         {
-            pgmoneta_log_error("Could not create metrics SSL context");
-            goto child_error;
-         }
+      http_child_serve(loop, client_fd, ai, title, cert_file, key_file, ca_file, serve_fn);
+   }
 
-         if (pgmoneta_create_ssl_server(ctx, config->metrics_key_file, config->metrics_cert_file, config->metrics_ca_file, client_fd, &client_ssl))
-         {
-            pgmoneta_log_error("Could not create metrics SSL server");
-            goto child_error;
-         }
-      }
-      /* We are leaving the socket descriptor valid such that the client won't reuse it */
-      pgmoneta_prometheus(client_ssl, client_fd);
-      exit(0);
-child_error:
-      if (client_ssl == NULL && ctx != NULL)
-      {
-         SSL_CTX_free(ctx);
-      }
-      pgmoneta_close_ssl(client_ssl);
-      pgmoneta_disconnect(client_fd);
+   pgmoneta_disconnect(client_fd);
+}
+
+static void
+restart_metrics(void)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   shutdown_metrics();
+   shutdown_nagios();
+
+   free(metrics_fds);
+   metrics_fds = NULL;
+   metrics_fds_length = 0;
+
+   if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
+   {
+      pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
       exit(1);
    }
 
-   pgmoneta_close_ssl(client_ssl);
-   pgmoneta_disconnect(client_fd);
+   if (metrics_fds_length > MAX_FDS)
+   {
+      pgmoneta_log_fatal("Too many descriptors %d", metrics_fds_length);
+      exit(1);
+   }
+
+   start_metrics();
+
+   for (int i = 0; i < metrics_fds_length; i++)
+   {
+      pgmoneta_log_debug("Metrics: %d", *(metrics_fds + i));
+   }
+}
+
+static void
+restart_console(void)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   shutdown_console(false);
+
+   free(console_fds);
+   console_fds = NULL;
+   console_fds_length = 0;
+
+   if (pgmoneta_bind(config->host, config->console, &console_fds, &console_fds_length))
+   {
+      pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->console);
+      exit(1);
+   }
+
+   if (console_fds_length > MAX_FDS)
+   {
+      pgmoneta_log_fatal("Too many descriptors %d", console_fds_length);
+      exit(1);
+   }
+
+   start_console();
+
+   for (int i = 0; i < console_fds_length; i++)
+   {
+      pgmoneta_log_debug("Console: %d", *(console_fds + i));
+   }
+}
+
+static void
+accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   accept_http_cb(loop, watcher, revents, pgmoneta_prometheus, "metrics",
+                  config->metrics_cert_file, config->metrics_key_file,
+                  config->metrics_ca_file, restart_metrics);
 }
 
 static void
@@ -2315,71 +2384,8 @@ accept_nagios_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 static void
 accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 {
-   struct sockaddr_in6 client_addr;
-   socklen_t client_addr_length;
-   int client_fd;
-   struct main_configuration* config;
-
-   if (EV_ERROR & revents)
-   {
-      pgmoneta_log_debug("accept_console_cb: invalid event: %s", strerror(errno));
-      errno = 0;
-      return;
-   }
-
-   config = (struct main_configuration*)shmem;
-
-   memset(&client_addr, 0, sizeof(client_addr));
-   client_addr_length = sizeof(client_addr);
-   client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
-   if (client_fd == -1)
-   {
-      if (accept_fatal(errno) && keep_running)
-      {
-         pgmoneta_log_warn("Restarting listening port due to: %s (%d)", strerror(errno), watcher->fd);
-
-         shutdown_console(false);
-
-         free(console_fds);
-         console_fds = NULL;
-         console_fds_length = 0;
-
-         if (pgmoneta_bind(config->host, config->console, &console_fds, &console_fds_length))
-         {
-            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->console);
-            exit(1);
-         }
-
-         if (console_fds_length > MAX_FDS)
-         {
-            pgmoneta_log_fatal("Too many descriptors %d", console_fds_length);
-            exit(1);
-         }
-
-         start_console();
-
-         for (int i = 0; i < console_fds_length; i++)
-         {
-            pgmoneta_log_debug("Console: %d", *(console_fds + i));
-         }
-      }
-      else
-      {
-         pgmoneta_log_debug("accept: %s (%d)", strerror(errno), watcher->fd);
-      }
-      errno = 0;
-      return;
-   }
-
-   if (!fork())
-   {
-      ev_loop_fork(loop);
-      shutdown_ports(false);
-      /* We are leaving the socket descriptor valid such that the client won't reuse it */
-      pgmoneta_console(NULL, client_fd);
-      exit(0);
-   }
-   pgmoneta_disconnect(client_fd);
+   accept_http_cb(loop, watcher, revents, pgmoneta_console, "console",
+                  NULL, NULL, NULL, restart_console);
 }
 
 static void

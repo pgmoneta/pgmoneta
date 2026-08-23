@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <console.h>
 #include <http.h>
+#include <http_server.h>
 #include <logging.h>
 #include <memory.h>
 #include <network.h>
@@ -138,20 +139,10 @@ struct category_candidate
 #define PREFIX_COUNT_INITIAL_CAP       32
 #define CATEGORY_CANDIDATE_INITIAL_CAP 16
 #define CATEGORY_SELECT_INITIAL_CAP    16
-#define TLS_PROBE_SIZE                 5
-#define TLS_HANDSHAKE_BYTE             0x16
-#define TLS_SSL2_BYTE                  0x80
-
-/* Page routing constants */
-#define PAGE_UNKNOWN 0
-#define PAGE_HOME    1
-#define PAGE_API     2
-#define BAD_REQUEST  3
 
 static int build_categories_from_bridge(struct prometheus_bridge* bridge, struct console_page* console);
 static int record_prefix_counts(const char* metric_name, struct prefix_count** counts, int* size, int* capacity);
 static int add_or_increment_prefix(struct prefix_count** counts, int* size, int* capacity, const char* prefix);
-static int send_http_response(SSL* client_ssl, int client_fd, const char* content_type, void* body, size_t body_len, const char* page_name);
 static int count_prefix_depth(const char* prefix);
 static int build_category_candidates(struct prefix_count* counts, int size, struct category_candidate** candidates, int* candidate_count);
 static int compare_candidates_by_score(const void* a, const void* b);
@@ -167,8 +158,6 @@ static int collect_simple_label_columns(struct console_category* category, char*
 static const char* find_metric_label_value(struct console_metric* metric, const char* key);
 static char* generate_metrics_table(struct console_category* category);
 static char* generate_category_tabs(struct console_page* console);
-static int resolve_page(struct message* msg);
-static int badrequest_page(SSL* client_ssl, int client_fd);
 static int home_page(SSL* client_ssl, int client_fd);
 static int api_page(SSL* client_ssl, int client_fd);
 static int console_init(int endpoint, const char* brand_name, const char* metric_prefix, struct console_page** result);
@@ -178,102 +167,12 @@ static int console_generate_html(struct console_page* console, char** html, size
 static int console_generate_json(struct console_page* console, char** json, size_t* json_size);
 static int console_destroy(struct console_page* console);
 
-static int
-resolve_page(struct message* msg)
-{
-   char* from = NULL;
-   int index;
-
-   if (msg->length < 3 || strncmp((char*)msg->data, "GET", 3) != 0)
-   {
-      return BAD_REQUEST;
-   }
-
-   index = 4;
-   from = (char*)msg->data + index;
-
-   while (pgmoneta_read_byte(msg->data + index) != ' ')
-   {
-      index++;
-   }
-
-   pgmoneta_write_byte(msg->data + index, '\0');
-
-   if (pgmoneta_compare_string(from, "/") || pgmoneta_compare_string(from, "/index.html"))
-   {
-      return PAGE_HOME;
-   }
-   else if (pgmoneta_compare_string(from, "/api") || pgmoneta_compare_string(from, "/api/"))
-   {
-      return PAGE_API;
-   }
-   return PAGE_UNKNOWN;
-}
-
-static int
-send_http_response(SSL* client_ssl, int client_fd, const char* content_type, void* body, size_t body_len, const char* page_name)
-{
-   struct message msg;
-   char response_header[512];
-   int header_len;
-   int status = MESSAGE_STATUS_OK;
-
-   memset(&msg, 0, sizeof(struct message));
-   header_len = pgmoneta_snprintf(response_header, sizeof(response_header),
-                                  "HTTP/1.1 200 OK\r\n"
-                                  "Content-Type: %s\r\n"
-                                  "Content-Length: %zu\r\n"
-                                  "Connection: close\r\n"
-                                  "\r\n",
-                                  content_type,
-                                  body_len);
-
-   msg.data = response_header;
-   msg.length = header_len;
-   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
-   if (status != MESSAGE_STATUS_OK)
-   {
-      pgmoneta_log_error("console %s: failed to write header (status=%d, len=%d)", page_name, status, header_len);
-   }
-
-   if (status == MESSAGE_STATUS_OK && body_len > 0)
-   {
-      memset(&msg, 0, sizeof(struct message));
-      msg.data = body;
-      msg.length = body_len;
-      status = pgmoneta_write_message(client_ssl, client_fd, &msg);
-      if (status != MESSAGE_STATUS_OK)
-      {
-         pgmoneta_log_error("console %s: failed to write body (status=%d, len=%zu)", page_name, status, body_len);
-      }
-   }
-
-   return status;
-}
-
-static int
-badrequest_page(SSL* client_ssl, int client_fd)
-{
-   struct message msg;
-   char* data = NULL;
-   int status;
-
-   memset(&msg, 0, sizeof(struct message));
-
-   data = pgmoneta_append(data, "HTTP/1.1 400 Bad Request\r\n");
-   data = pgmoneta_append(data, "Content-Length: 0\r\n");
-   data = pgmoneta_append(data, "Connection: close\r\n\r\n");
-
-   msg.kind = 0;
-   msg.length = strlen(data);
-   msg.data = data;
-
-   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
-
-   free(data);
-
-   return status;
-}
+static struct http_route console_routes[] = {
+   {"/", home_page},
+   {"/index.html", home_page},
+   {"/api", api_page},
+   {"/api/", api_page},
+};
 
 static int
 console_init(int endpoint, const char* brand_name, const char* metric_prefix, struct console_page** result)
@@ -339,28 +238,28 @@ home_page(SSL* client_ssl, int client_fd)
    struct console_page* console = NULL;
    char* html = NULL;
    size_t html_size = 0;
-   int status = 0;
+   int status = MESSAGE_STATUS_OK;
 
    if (console_init(0, "pgmoneta", "pgmoneta_", &console))
    {
       pgmoneta_log_error("Failed to initialize console");
-      status = 1;
-      goto error;
+      status = MESSAGE_STATUS_ERROR;
+      goto done;
    }
 
    if (console_generate_html(console, &html, &html_size))
    {
       pgmoneta_log_error("Failed to generate HTML");
-      status = 1;
-      goto error;
+      status = MESSAGE_STATUS_ERROR;
+      goto done;
    }
 
-   status = send_http_response(client_ssl, client_fd, "text/html; charset=utf-8", html, html_size, "home_page");
+   status = pgmoneta_http_respond_ok(client_ssl, client_fd, "text/html; charset=utf-8", html, html_size);
 
-error:
-   if (status != 0)
+done:
+   if (status != MESSAGE_STATUS_OK)
    {
-      badrequest_page(client_ssl, client_fd);
+      pgmoneta_http_respond_400(client_ssl, client_fd);
    }
    free(html);
    if (console != NULL)
@@ -377,28 +276,28 @@ api_page(SSL* client_ssl, int client_fd)
    struct console_page* console = NULL;
    char* json = NULL;
    size_t json_size = 0;
-   int status = 0;
+   int status = MESSAGE_STATUS_OK;
 
    if (console_init(0, "pgmoneta", "pgmoneta_", &console))
    {
       pgmoneta_log_error("Failed to initialize console for API");
-      status = 1;
-      goto error;
+      status = MESSAGE_STATUS_ERROR;
+      goto done;
    }
 
    if (console_generate_json(console, &json, &json_size))
    {
       pgmoneta_log_error("Failed to generate JSON");
-      status = 1;
-      goto error;
+      status = MESSAGE_STATUS_ERROR;
+      goto done;
    }
 
-   status = send_http_response(client_ssl, client_fd, "application/json; charset=utf-8", json, json_size, "api_page");
+   status = pgmoneta_http_respond_ok(client_ssl, client_fd, "application/json; charset=utf-8", json, json_size);
 
-error:
-   if (status != 0)
+done:
+   if (status != MESSAGE_STATUS_OK)
    {
-      badrequest_page(client_ssl, client_fd);
+      pgmoneta_http_respond_400(client_ssl, client_fd);
    }
    free(json);
    if (console != NULL)
@@ -879,13 +778,13 @@ static int
 console_generate_json(struct console_page* console, char** json, size_t* json_size)
 {
    char* json_buffer = NULL;
-   int status = 0;
+   int status = MESSAGE_STATUS_OK;
 
    if (console == NULL || json == NULL || json_size == NULL)
    {
       pgmoneta_log_error("Invalid parameters for JSON generation");
-      status = 1;
-      goto error;
+      status = MESSAGE_STATUS_ERROR;
+      goto done;
    }
 
    json_buffer = pgmoneta_append(json_buffer, "{\"categories\":[");
@@ -929,7 +828,7 @@ console_generate_json(struct console_page* console, char** json, size_t* json_si
 
    return 0;
 
-error:
+done:
    if (json_buffer != NULL)
    {
       free(json_buffer);
@@ -2203,64 +2102,29 @@ generate_category_tabs(struct console_page* console)
 void
 pgmoneta_console(SSL* client_ssl, int client_fd)
 {
-   struct main_configuration* config = (struct main_configuration*)shmem;
-   struct message* msg = NULL;
-   int page;
+   struct http_server_request* req = NULL;
    int status = MESSAGE_STATUS_OK;
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
 
-   if (client_ssl)
+   if (pgmoneta_http_server_parse(client_ssl, client_fd, &req) != MESSAGE_STATUS_OK)
    {
-      char buffer[TLS_PROBE_SIZE] = {0};
-
-      recv(client_fd, buffer, TLS_PROBE_SIZE, MSG_PEEK);
-
-      if ((unsigned char)buffer[0] == TLS_HANDSHAKE_BYTE || (unsigned char)buffer[0] == TLS_SSL2_BYTE) // SSL/TLS request
-      {
-         if (SSL_accept(client_ssl) <= 0)
-         {
-            pgmoneta_log_error("Failed to accept SSL connection");
-            goto error;
-         }
-      }
+      status = MESSAGE_STATUS_ERROR;
+      goto cleanup;
    }
 
-   status = pgmoneta_read_timeout_message(client_ssl, client_fd,
-                                          (int)pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S),
-                                          &msg);
-   if (status != MESSAGE_STATUS_OK)
-   {
-      goto error;
-   }
+   status = pgmoneta_http_server_dispatch(client_ssl, client_fd, req,
+                                          console_routes,
+                                          sizeof(console_routes) / sizeof(console_routes[0]));
 
-   page = resolve_page(msg);
-
-   if (page == PAGE_HOME)
-   {
-      status = home_page(client_ssl, client_fd);
-   }
-   else if (page == PAGE_API)
-   {
-      status = api_page(client_ssl, client_fd);
-   }
-   else
-   {
-      status = badrequest_page(client_ssl, client_fd);
-   }
-
-error:
+cleanup:
+   pgmoneta_http_server_request_destroy(req);
    pgmoneta_close_ssl(client_ssl);
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
 
-   if (status == MESSAGE_STATUS_OK)
-   {
-      exit(0);
-   }
-
-   exit(1);
+   exit(status == MESSAGE_STATUS_OK ? 0 : 1);
 }

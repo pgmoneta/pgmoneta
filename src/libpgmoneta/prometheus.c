@@ -32,6 +32,7 @@
 #include <backup.h>
 #include <extension.h>
 #include <fips.h>
+#include <http_server.h>
 #include <info.h>
 #include <logging.h>
 #include <network.h>
@@ -51,12 +52,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#define CHUNK_SIZE   32768
-
-#define PAGE_UNKNOWN 0
-#define PAGE_HOME    1
-#define PAGE_METRICS 2
-#define BAD_REQUEST  3
+#define CHUNK_SIZE 32768
 
 /**
  * ART-based metric value with timestamp
@@ -91,18 +87,18 @@ static int add_metric_to_art(struct art* art_tree, char* key, char* value,
 static void output_art_metrics(SSL* client_ssl, int client_fd, struct art* art_tree);
 static void output_all_metrics(SSL* client_ssl, int client_fd, prometheus_metrics_container_t* container);
 
-static int resolve_page(struct message* msg);
-static int unknown_page(SSL* client_ssl, int client_fd);
 static int home_page(SSL* client_ssl, int client_fd);
 static int metrics_page(SSL* client_ssl, int client_fd);
-static int bad_request(SSL* client_ssl, int client_fd);
-static int redirect_page(SSL* client_ssl, int client_fd, char* path);
+
+static struct http_route prometheus_routes[] = {
+   {"/", &home_page},
+   {"/index.html", &home_page},
+   {"/metrics", &metrics_page},
+};
 
 static void general_information(prometheus_metrics_container_t* container);
 static void backup_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
 static void size_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
-
-static int send_chunk(SSL* client_ssl, int client_fd, char* data);
 
 static bool is_metrics_cache_configured(void);
 static bool is_metrics_cache_valid(void);
@@ -115,103 +111,77 @@ void
 pgmoneta_prometheus(SSL* client_ssl, int client_fd)
 {
    int status;
-   int page;
-   struct message* msg = NULL;
-   struct main_configuration* config;
+   int n_routes;
+   struct http_server_request* req = NULL;
+
+   n_routes = sizeof(prometheus_routes) / sizeof(prometheus_routes[0]);
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
 
-   config = (struct main_configuration*)shmem;
-
-   if (client_ssl)
+   status = pgmoneta_http_server_ssl_accept(client_ssl, client_fd);
+   if (status == MESSAGE_STATUS_ERROR)
    {
-      unsigned char buffer[5] = {0};
-      ssize_t peeked;
+      goto error;
+   }
+   else if (status == MESSAGE_STATUS_ZERO)
+   {
+      /* plain HTTP on a TLS-configured socket: redirect to HTTPS */
+      char* path = "/";
+      char* base_url = NULL;
+      struct message* msg = NULL;
+      struct main_configuration* config = (struct main_configuration*)shmem;
 
-      peeked = recv(client_fd, buffer, sizeof(buffer), MSG_PEEK);
-      if (peeked <= 0)
+      if (pgmoneta_read_timeout_message(NULL, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg) != MESSAGE_STATUS_OK)
       {
-         pgmoneta_log_error("Failed to peek client request");
+         pgmoneta_log_error("Failed to read message");
          goto error;
       }
 
-      if (buffer[0] == 0x16 || buffer[0] == 0x80) // SSL/TLS request
+      char* path_start = strstr(msg->data, " ");
+      if (path_start)
       {
-         if (SSL_accept(client_ssl) <= 0)
+         path_start++;
+         char* path_end = strstr(path_start, " ");
+         if (path_end)
          {
-            pgmoneta_log_error("Failed to accept SSL connection");
-            goto error;
+            *path_end = '\0';
+            path = path_start;
          }
       }
-      else
+
+      base_url = pgmoneta_format_and_append(base_url, "https://%s:%d%s", config->host, config->metrics, path);
+
+      if (pgmoneta_http_respond_redirect(NULL, client_fd, base_url) != MESSAGE_STATUS_OK)
       {
-         char* path = "/";
-         char* base_url = NULL;
-
-         if (pgmoneta_read_timeout_message(NULL, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg) != MESSAGE_STATUS_OK)
-         {
-            pgmoneta_log_error("Failed to read message");
-            goto error;
-         }
-
-         char* path_start = strstr(msg->data, " ");
-         if (path_start)
-         {
-            path_start++;
-            char* path_end = strstr(path_start, " ");
-            if (path_end)
-            {
-               *path_end = '\0';
-               path = path_start;
-            }
-         }
-
-         base_url = pgmoneta_format_and_append(base_url, "https://%s:%d%s", config->host, config->metrics, path);
-
-         if (redirect_page(NULL, client_fd, base_url) != MESSAGE_STATUS_OK)
-         {
-            pgmoneta_log_error("Failed to redirect to: %s", base_url);
-            free(base_url);
-            goto error;
-         }
-
-         pgmoneta_close_ssl(client_ssl);
-         pgmoneta_disconnect(client_fd);
-
-         pgmoneta_memory_destroy();
-         pgmoneta_stop_logging();
-
+         pgmoneta_log_error("Failed to redirect to: %s", base_url);
          free(base_url);
-
-         exit(0);
+         goto error;
       }
-   }
-   status = pgmoneta_read_timeout_message(client_ssl, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg);
 
-   if (status != MESSAGE_STATUS_OK)
+      pgmoneta_close_ssl(client_ssl);
+      pgmoneta_disconnect(client_fd);
+
+      pgmoneta_memory_destroy();
+      pgmoneta_stop_logging();
+
+      free(base_url);
+
+      exit(0);
+   }
+
+   if (pgmoneta_http_server_parse(client_ssl, client_fd, &req) != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
-   page = resolve_page(msg);
+   if (pgmoneta_http_server_dispatch(client_ssl, client_fd, req, prometheus_routes, n_routes) != MESSAGE_STATUS_OK)
+   {
+      pgmoneta_http_server_request_destroy(req);
+      goto error;
+   }
 
-   if (page == PAGE_HOME)
-   {
-      home_page(client_ssl, client_fd);
-   }
-   else if (page == PAGE_METRICS)
-   {
-      metrics_page(client_ssl, client_fd);
-   }
-   else if (page == PAGE_UNKNOWN)
-   {
-      unknown_page(client_ssl, client_fd);
-   }
-   else
-   {
-      bad_request(client_ssl, client_fd);
-   }
+   pgmoneta_http_server_request_destroy(req);
 
    pgmoneta_close_ssl(client_ssl);
    pgmoneta_disconnect(client_fd);
@@ -289,151 +259,16 @@ pgmoneta_prometheus_logging(int type)
 }
 
 static int
-resolve_page(struct message* msg)
-{
-   char* from = NULL;
-   int index;
-
-   if (msg->length < 3 || strncmp((char*)msg->data, "GET", 3) != 0)
-   {
-      pgmoneta_log_debug("Promethus: Not a GET request");
-      return BAD_REQUEST;
-   }
-
-   index = 4;
-   from = (char*)msg->data + index;
-
-   while (pgmoneta_read_byte(msg->data + index) != ' ')
-   {
-      index++;
-   }
-
-   pgmoneta_write_byte(msg->data + index, '\0');
-
-   if (pgmoneta_compare_string(from, "/") || pgmoneta_compare_string(from, "/index.html"))
-   {
-      return PAGE_HOME;
-   }
-   else if (pgmoneta_compare_string(from, "/metrics"))
-   {
-      return PAGE_METRICS;
-   }
-
-   return PAGE_UNKNOWN;
-}
-
-static int
-redirect_page(SSL* client_ssl, int client_fd, char* path)
-{
-   char* data = NULL;
-   time_t now;
-   char time_buf[32];
-   int status;
-   struct message msg;
-
-   memset(&msg, 0, sizeof(struct message));
-   memset(&data, 0, sizeof(data));
-
-   now = time(NULL);
-
-   memset(&time_buf, 0, sizeof(time_buf));
-   ctime_r(&now, &time_buf[0]);
-   time_buf[strlen(time_buf) - 1] = 0;
-
-   data = pgmoneta_append(data, "HTTP/1.1 301 Moved Permanently\r\n");
-   data = pgmoneta_append(data, "Location: ");
-   data = pgmoneta_append(data, path);
-   data = pgmoneta_append(data, "\r\n");
-   data = pgmoneta_append(data, "Date: ");
-   data = pgmoneta_append(data, &time_buf[0]);
-   data = pgmoneta_append(data, "\r\n");
-   data = pgmoneta_append(data, "Content-Length: 0\r\n");
-   data = pgmoneta_append(data, "Connection: close\r\n");
-   data = pgmoneta_append(data, "\r\n");
-
-   msg.kind = 0;
-   msg.length = strlen(data);
-   msg.data = data;
-
-   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
-
-   free(data);
-
-   return status;
-}
-
-static int
-unknown_page(SSL* client_ssl, int client_fd)
-{
-   char* data = NULL;
-   time_t now;
-   char time_buf[32];
-   int status;
-   struct message msg;
-
-   memset(&msg, 0, sizeof(struct message));
-   memset(&data, 0, sizeof(data));
-
-   now = time(NULL);
-
-   memset(&time_buf, 0, sizeof(time_buf));
-   ctime_r(&now, &time_buf[0]);
-   time_buf[strlen(time_buf) - 1] = 0;
-
-   data = pgmoneta_append(data, "HTTP/1.1 403 Forbidden\r\n");
-   data = pgmoneta_append(data, "Date: ");
-   data = pgmoneta_append(data, &time_buf[0]);
-   data = pgmoneta_append(data, "\r\n");
-
-   msg.kind = 0;
-   msg.length = strlen(data);
-   msg.data = data;
-
-   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
-
-   free(data);
-
-   return status;
-}
-
-static int
 home_page(SSL* client_ssl, int client_fd)
 {
    char* data = NULL;
-   time_t now;
-   char time_buf[32];
    int status;
-   struct message msg;
 
-   memset(&msg, 0, sizeof(struct message));
-   memset(&data, 0, sizeof(data));
-
-   now = time(NULL);
-
-   memset(&time_buf, 0, sizeof(time_buf));
-   ctime_r(&now, &time_buf[0]);
-   time_buf[strlen(time_buf) - 1] = 0;
-
-   data = pgmoneta_append(data, "HTTP/1.1 200 OK\r\n");
-   data = pgmoneta_append(data, "Content-Type: text/html; charset=utf-8\r\n");
-   data = pgmoneta_append(data, "Date: ");
-   data = pgmoneta_append(data, &time_buf[0]);
-   data = pgmoneta_append(data, "\r\n");
-   data = pgmoneta_append(data, "Transfer-Encoding: chunked\r\n");
-   data = pgmoneta_append(data, "\r\n");
-
-   msg.kind = 0;
-   msg.length = strlen(data);
-   msg.data = data;
-
-   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
+   status = pgmoneta_http_respond_chunked_start(client_ssl, client_fd, "text/html; charset=utf-8");
    if (status != MESSAGE_STATUS_OK)
    {
       goto done;
    }
-
-   free(data);
-   data = NULL;
 
    data = pgmoneta_append(data, "<html>\n");
    data = pgmoneta_append(data, "<head>\n");
@@ -1378,18 +1213,16 @@ home_page(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "</body>\n");
    data = pgmoneta_append(data, "</html>\n");
 
-   send_chunk(client_ssl, client_fd, data);
+   status = pgmoneta_http_respond_chunked_write(client_ssl, client_fd, data);
    free(data);
    data = NULL;
 
-   /* Footer */
-   data = pgmoneta_append(data, "0\r\n\r\n");
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto done;
+   }
 
-   msg.kind = 0;
-   msg.length = strlen(data);
-   msg.data = data;
-
-   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
+   status = pgmoneta_http_respond_chunked_end(client_ssl, client_fd);
 
 done:
    if (data != NULL)
@@ -1517,12 +1350,13 @@ retry_cache_locking:
          }
 
          /* Footer */
-         data = pgmoneta_append(data, "0\r\n\r\n");
-         metrics_cache_append(data);
+         metrics_cache_append("0\r\n\r\n");
 
-         msg.kind = 0;
-         msg.length = strlen(data);
-         msg.data = data;
+         status = pgmoneta_http_respond_chunked_end(client_ssl, client_fd);
+         if (status != MESSAGE_STATUS_OK)
+         {
+            goto error;
+         }
 
          metrics_cache_finalize();
       }
@@ -1544,47 +1378,13 @@ retry_cache_locking:
 
    free(data);
 
-   return 0;
+   return MESSAGE_STATUS_OK;
 
 error:
 
    free(data);
 
-   return 1;
-}
-
-static int
-bad_request(SSL* client_ssl, int client_fd)
-{
-   char* data = NULL;
-   time_t now;
-   char time_buf[32];
-   int status;
-   struct message msg;
-
-   memset(&msg, 0, sizeof(struct message));
-   memset(&data, 0, sizeof(data));
-
-   now = time(NULL);
-
-   memset(&time_buf, 0, sizeof(time_buf));
-   ctime_r(&now, &time_buf[0]);
-   time_buf[strlen(time_buf) - 1] = 0;
-
-   data = pgmoneta_append(data, "HTTP/1.1 400 Bad Request\r\n");
-   data = pgmoneta_append(data, "Date: ");
-   data = pgmoneta_append(data, &time_buf[0]);
-   data = pgmoneta_append(data, "\r\n");
-
-   msg.kind = 0;
-   msg.length = strlen(data);
-   msg.data = data;
-
-   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
-
-   free(data);
-
-   return status;
+   return MESSAGE_STATUS_ERROR;
 }
 
 static void
@@ -4833,44 +4633,6 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
    }
 }
 
-static int
-send_chunk(SSL* client_ssl, int client_fd, char* data)
-{
-   int status;
-   char* m = NULL;
-   struct message msg;
-
-   memset(&msg, 0, sizeof(struct message));
-
-   m = malloc(20);
-
-   if (m == NULL)
-   {
-      goto error;
-   }
-
-   memset(m, 0, 20);
-
-   sprintf(m, "%zX\r\n", strlen(data));
-
-   m = pgmoneta_append(m, data);
-   m = pgmoneta_append(m, "\r\n");
-
-   msg.kind = 0;
-   msg.length = strlen(m);
-   msg.data = m;
-
-   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
-
-   free(m);
-
-   return status;
-
-error:
-
-   return MESSAGE_STATUS_ERROR;
-}
-
 /**
  * Checks if the Prometheus cache configuration setting
  * (`metrics_cache`) has a non-zero value, that means there
@@ -5271,7 +5033,7 @@ output_art_metrics(SSL* client_ssl, int client_fd, struct art* art_tree)
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
+      pgmoneta_http_respond_chunked_write(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
    }
