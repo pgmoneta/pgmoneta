@@ -1696,8 +1696,8 @@ pgmoneta_remove_prefix(char* orig, char* prefix)
 {
    char* res = NULL;
    int idx = 0;
-   int len1 = strlen(orig);
-   int len2 = strlen(prefix);
+   int len1 = 0;
+   int len2 = 0;
    int len = 0;
    if (orig == NULL)
    {
@@ -1709,15 +1709,24 @@ pgmoneta_remove_prefix(char* orig, char* prefix)
       res = pgmoneta_append(res, orig);
       return res;
    }
-   while (idx < len1 && idx < len2)
+   len1 = strlen(orig);
+   len2 = strlen(prefix);
+   while (idx < len1 && idx < len2 && orig[idx] == prefix[idx])
    {
-      if (orig[idx] == prefix[idx])
-      {
-         idx++;
-      }
+      idx++;
+   }
+   if (idx < len2)
+   {
+      // does not start with the prefix
+      res = pgmoneta_append(res, orig);
+      return res;
    }
    len = len1 - idx + 1;
    res = malloc(len);
+   if (res == NULL)
+   {
+      return NULL;
+   }
    res[len - 1] = 0;
    if (len > 1)
    {

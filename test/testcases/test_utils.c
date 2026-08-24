@@ -448,6 +448,30 @@ MCTF_TEST(test_utils_string_manipulation)
    free(res);
    res = NULL;
 
+   // test remove_prefix without a matching prefix
+
+   s = strdup("hello");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
+   res = pgmoneta_remove_prefix(s, "world");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "remove_prefix mismatch failed");
+   MCTF_ASSERT_STR_EQ(res, "hello", cleanup, "remove_prefix mismatch result mismatch");
+   free(s);
+   s = NULL;
+   free(res);
+   res = NULL;
+
+   // test remove_prefix with a partial prefix match
+
+   s = strdup("data/x");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
+   res = pgmoneta_remove_prefix(s, "dat0/");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "remove_prefix partial match failed");
+   MCTF_ASSERT_STR_EQ(res, "data/x", cleanup, "remove_prefix partial match result mismatch");
+   free(s);
+   s = NULL;
+   free(res);
+   res = NULL;
+
    // test remove_suffix
 
    s = strdup("test.txt");
