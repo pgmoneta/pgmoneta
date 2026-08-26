@@ -142,10 +142,7 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
          if (pgmoneta_is_backup_struct_valid(server, backups[j]) &&
              backups[j]->major_version == backups[number_of_backups - 1]->major_version)
          {
-            if (next_newest == -1)
-            {
-               next_newest = j;
-            }
+            next_newest = j;
          }
       }
 

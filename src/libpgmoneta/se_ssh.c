@@ -328,10 +328,7 @@ ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes
       {
          if (pgmoneta_is_backup_struct_valid(server, backups[j]))
          {
-            if (next_newest == -1)
-            {
-               next_newest = j;
-            }
+            next_newest = j;
          }
       }
    }
