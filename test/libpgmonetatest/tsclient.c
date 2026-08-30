@@ -595,7 +595,7 @@ pgmoneta_tsclient_wal_streaming_ready(bool* ready)
    struct json* servers = NULL;
    struct json_iterator* iter = NULL;
 
-   *ready = false;
+   *ready = true;
 
    socket = get_connection();
    if (!pgmoneta_socket_isvalid(socket))
@@ -621,9 +621,9 @@ pgmoneta_tsclient_wal_streaming_ready(bool* ready)
       while (pgmoneta_json_iterator_next(iter))
       {
          struct json* server = (struct json*)pgmoneta_value_data(iter->value);
-         if ((bool)pgmoneta_json_get(server, MANAGEMENT_ARGUMENT_WAL_STREAMING))
+         if (!(bool)pgmoneta_json_get(server, MANAGEMENT_ARGUMENT_WAL_STREAMING))
          {
-            *ready = true;
+            *ready = false;
             break;
          }
       }

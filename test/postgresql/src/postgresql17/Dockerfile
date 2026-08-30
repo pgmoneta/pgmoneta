@@ -77,7 +77,7 @@ RUN chown -R postgres:postgres /tmp/pgmoneta_tblspc
 RUN chmod 777 /tmp/pgmoneta_tblspc
 RUN chmod 700 /tmp/pgmoneta_tblspc/ts1 /tmp/pgmoneta_tblspc/ts2
 
-RUN chmod +x /usr/bin/run-postgresql
+RUN chmod +x /usr/bin/run-postgresql /usr/bin/run-postgresql-replica
 RUN mkdir -p /usr/local/bin
 
 EXPOSE 5432
