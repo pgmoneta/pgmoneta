@@ -38,6 +38,196 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <time.h>
+
+#include "security.h"
+
+static bool
+poll_replica(uint64_t* primary_lsn)
+{
+   uint64_t replay_lsn = 0;
+   SSL* ssl = NULL;
+   int socket = -1;
+   struct query_response* qr = NULL;
+   char* lsn_str = NULL;
+   int timeout = 60; //60s
+   int ret = 1;
+   if (pgmoneta_server_authenticate(REPLICA_SERVER, "mydb", "myuser", "mypass", false, &ssl, &socket) != 0)
+   {
+      goto cleanup;
+   }
+
+   time_t start_time = time(NULL);
+   while (difftime(time(NULL), start_time) < timeout)
+   {
+      if (pgmoneta_test_execute_query(REPLICA_SERVER, ssl, socket, "SELECT pg_last_wal_replay_lsn();", &qr) == 0)
+      {
+         lsn_str = pgmoneta_query_response_get_data(qr, 0);
+         if (lsn_str != NULL && pgmoneta_string_to_lsn(lsn_str, &replay_lsn) == 0)
+         {
+            if (replay_lsn >= *primary_lsn)
+            {
+               ret = 0;
+               pgmoneta_test_cleanup_query_response(&qr);
+               break;
+            }
+         }
+      }
+      pgmoneta_test_cleanup_query_response(&qr);
+      sleep(1);
+   }
+
+cleanup:
+   pgmoneta_test_cleanup_query_response(&qr);
+   pgmoneta_test_cleanup_connection(&ssl, &socket);
+   return ret;
+}
+
+static int
+insert_data_in_primary_server()
+{
+   SSL* ssl = NULL;
+   int socket = -1;
+   int ret = 0;
+   char* statements[] = {
+      "DROP TABLE IF EXISTS test;",
+      "CREATE TABLE test (id integer, payload text);",
+      "INSERT INTO test SELECT g, 'row_' || g FROM generate_series(1, 1000) g;",
+      NULL};
+   struct query_response* qr = NULL;
+   char* lsn_str = NULL;
+   uint64_t primary_lsn = 0;
+
+   if (pgmoneta_test_connect_user(&ssl, &socket) != 0)
+   {
+      ret = 1;
+   }
+
+   for (int i = 0; ret == 0 && statements[i] != NULL; i++)
+   {
+      if (pgmoneta_test_execute_query(PRIMARY_SERVER, ssl, socket, (char*)statements[i], &qr) != 0)
+      {
+         ret = 1;
+      }
+      pgmoneta_test_cleanup_query_response(&qr);
+   }
+
+   if (pgmoneta_test_execute_query(PRIMARY_SERVER, ssl, socket, "CHECKPOINT;", &qr) != 0)
+   {
+      ret = 1;
+   }
+   pgmoneta_test_cleanup_query_response(&qr);
+
+   if (pgmoneta_test_execute_query(PRIMARY_SERVER, ssl, socket, "SELECT pg_current_wal_lsn();", &qr) != 0)
+   {
+      ret = 1;
+   }
+
+   lsn_str = pgmoneta_query_response_get_data(qr, 0);
+   if (lsn_str == NULL || pgmoneta_string_to_lsn(lsn_str, &primary_lsn) != 0)
+   {
+      ret = 1;
+   }
+   pgmoneta_test_cleanup_connection(&ssl, &socket);
+   pgmoneta_test_cleanup_query_response(&qr);
+
+   if (ret == 0)
+   {
+      ret = poll_replica(&primary_lsn);
+   }
+
+   return ret;
+}
+
+static bool
+check_replica_start()
+{
+   struct main_configuration* config;
+   config = (struct main_configuration*)shmem;
+   return pgmoneta_test_has_replica(config);
+}
+
+static int
+verify_restored_backup(const char* restore_path, const char* query, int expected_rows)
+{
+   int restored_port = -1;
+   char command[2048];
+   char* output = NULL;
+   int exit_code = 0;
+   const char* ci_env = NULL;
+   const char* local_env = NULL;
+   const char* version_env = NULL;
+   const char* version = NULL;
+   bool local_mode = false;
+   int ret = 1;
+
+   restored_port = pgmoneta_start_restored_backup(restore_path, RESTORED_BACKUP_DEFAULT_PORT);
+   if (restored_port <= 0)
+   {
+      pgmoneta_log_error("verify_restored_backup: failed to start restored backup at %s", restore_path);
+      goto cleanup;
+   }
+
+   ci_env = getenv("CI");
+   local_env = getenv("PGMONETA_TEST_LOCAL_RESTORE");
+
+   local_mode = (ci_env != NULL && strcmp(ci_env, "true") == 0) ||
+                (local_env != NULL && strcmp(local_env, "1") == 0);
+
+   version_env = getenv("TEST_PG_VERSION");
+   version = (version_env != NULL && version_env[0] != '\0') ? version_env : "17";
+
+   if (local_mode)
+   {
+      pgmoneta_snprintf(command, sizeof(command),
+                        "PGPASSWORD=mypass psql -h 127.0.0.1 -p %d "
+                        "-U myuser -d mydb -tAc "
+                        "\"%s\"",
+                        restored_port, query);
+   }
+   else
+   {
+      const char* container_engine = "podman";
+
+      if (access("/usr/bin/podman", X_OK) != 0 &&
+          access("/usr/local/bin/podman", X_OK) != 0)
+      {
+         container_engine = "docker";
+      }
+
+      pgmoneta_snprintf(command, sizeof(command),
+                        "PGPASSWORD=mypass %s exec %s "
+                        "/usr/pgsql-%s/bin/psql "
+                        "-h localhost -p 5432 -U myuser -d mydb -tAc "
+                        "\"%s\"",
+                        container_engine,
+                        "pgmoneta-test-restored-backup",
+                        version, query);
+   }
+
+   if (pgmoneta_test_exec_command(command, &output, &exit_code) != 0 || exit_code != 0)
+   {
+      pgmoneta_log_error("verify_restored_backup: psql failed (exit=%d): %s",
+                         exit_code, output ? output : "(null)");
+      goto cleanup;
+   }
+
+   if (output == NULL || atoi(output) != expected_rows)
+   {
+      pgmoneta_log_error("verify_restored_backup: expected %d rows, got %s",
+                         expected_rows, output ? output : "(null)");
+      goto cleanup;
+   }
+
+   ret = 0;
+
+cleanup:
+   pgmoneta_stop_restored_backup();
+   free(output);
+
+   return ret;
+}
 
 MCTF_TEST(test_pgmoneta_backup_full)
 {
@@ -87,6 +277,105 @@ cleanup:
    {
       pgmoneta_json_destroy(response);
    }
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_replica_backup_full)
+{
+   if (!check_replica_start())
+   {
+      MCTF_SKIP("This test requires PostgreSQL 17+");
+   }
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_tsclient_mode("replica", "online", 0) == 0,
+               cleanup, "replica mode failed");
+
+   MCTF_ASSERT(pgmoneta_tsclient_backup("replica", NULL, false, NULL, 0) == 0,
+               cleanup, "backup mode failed");
+
+   MCTF_ASSERT(pgmoneta_tsclient_restore("replica", "newest", "current", NULL, 0) == 0,
+               cleanup, "restore full replica backup failed");
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_replica_backup_incremental)
+{
+   struct json* response = NULL;
+   struct json* b0 = NULL;
+   struct json* b1 = NULL;
+
+   char* label = NULL;
+   char restore_path[MAX_PATH] = {0};
+
+   if (!check_replica_start())
+   {
+      MCTF_SKIP("This test requires PostgreSQL 17+");
+   }
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_tsclient_mode("replica", "online", 0) == 0,
+               cleanup, "replica mode failed");
+
+   MCTF_ASSERT(pgmoneta_tsclient_backup("replica", NULL, false, NULL, 0) == 0,
+               cleanup, "backup mode failed");
+
+   MCTF_ASSERT(insert_data_in_primary_server() == 0,
+               cleanup, "insert data in primary failed");
+
+   MCTF_ASSERT(pgmoneta_tsclient_backup("replica", "newest", false, NULL, 0) == 0,
+               cleanup, "incremental replica backup failed");
+
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("replica", NULL, &response, 0),
+               cleanup, "list backup failed");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_tsclient_get_backup_count(response), 2,
+                      cleanup, "backup count mismatch");
+
+   b0 = pgmoneta_tsclient_get_backup(response, 0);
+   b1 = pgmoneta_tsclient_get_backup(response, 1);
+
+   MCTF_ASSERT_PTR_NONNULL(b0, cleanup, "backup 0 null");
+   MCTF_ASSERT_PTR_NONNULL(b1, cleanup, "backup 1 null");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b0), "FULL",
+                      cleanup, "backup 0 type mismatch");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b1), "INCREMENTAL",
+                      cleanup, "backup 1 type mismatch");
+   MCTF_ASSERT(pgmoneta_tsclient_verify_backup_chain(b0, b1),
+               cleanup, "backup 1 parent mismatch (should be b0)");
+
+   MCTF_ASSERT(pgmoneta_tsclient_restore("replica", "newest", "current", NULL, 0) == 0,
+               cleanup, "restore incremental replica backup failed");
+
+   label = pgmoneta_tsclient_get_backup_label(b1);
+   MCTF_ASSERT(label != NULL, cleanup, "failed to get replica backup label");
+
+   label = strdup(label);
+   MCTF_ASSERT(label != NULL, cleanup, "failed to duplicate replica backup label");
+
+   pgmoneta_snprintf(restore_path, sizeof(restore_path),
+                     "%s/replica-%s", TEST_RESTORE_DIR, label);
+
+   MCTF_ASSERT(verify_restored_backup(restore_path,
+                                      "SELECT count(*) FROM test;",
+                                      1000) == 0,
+               cleanup, "failed to verify restored replica backup");
+
+cleanup:
+   free(label);
+
+   if (response != NULL)
+   {
+      pgmoneta_json_destroy(response);
+   }
+
+   pgmoneta_stop_restored_backup();
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }
