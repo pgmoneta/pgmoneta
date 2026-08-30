@@ -231,6 +231,15 @@ pgmoneta_test_basedir_cleanup(void)
    pgmoneta_delete_directory(backup_dir);
    pgmoneta_mkdir(backup_dir);
 
+   free(backup_dir);
+   backup_dir = NULL;
+   if (pgmoneta_test_has_replica(config))
+   {
+      backup_dir = pgmoneta_get_server_backup(REPLICA_SERVER);
+      pgmoneta_delete_directory(backup_dir);
+      pgmoneta_mkdir(backup_dir);
+   }
+
    pgmoneta_delete_directory(TEST_RESTORE_DIR);
    pgmoneta_mkdir(TEST_RESTORE_DIR);
 
@@ -1080,4 +1089,10 @@ pgmoneta_stop_restored_backup(void)
    free(output);
 
    active_restore_path[0] = '\0';
+}
+
+bool
+pgmoneta_test_has_replica(struct main_configuration* config)
+{
+   return config->common.number_of_servers > REPLICA_SERVER;
 }
