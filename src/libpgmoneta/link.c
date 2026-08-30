@@ -90,11 +90,15 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
             struct worker_input* wi = NULL;
             from_file = pgmoneta_remove_prefix(from_entry, base_from);
             from_file_trimmed = trim_suffix(from_file);
-            // file in newer dir is not added nor changed, nor is an incremental file
+            // file in newer dir is not added nor changed, nor is an incremental file.
+            // pg_wal is not part of the backup manifest, so its files cannot be
+            // assumed to be identical to the previous backup - a WAL segment is
+            // typically extended between two backups.
             if (!pgmoneta_art_contains_key(added, from_file_trimmed) &&
                 !pgmoneta_art_contains_key(changed, from_file_trimmed) &&
                 !pgmoneta_is_restore_last_name(from_file_trimmed) &&
-                !pgmoneta_is_incremental_path(from_file_trimmed))
+                !pgmoneta_is_incremental_path(from_file_trimmed) &&
+                !pgmoneta_starts_with(from_file_trimmed, "pg_wal/"))
             {
                to_entry = pgmoneta_append(to_entry, base_to);
                if (!pgmoneta_ends_with(to_entry, "/"))
