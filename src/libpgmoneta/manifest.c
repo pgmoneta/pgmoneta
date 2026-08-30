@@ -115,12 +115,14 @@ pgmoneta_manifest_checksum_verify(char* root, struct art* file_checksums, struct
       if (file_size != file_size_manifest)
       {
          pgmoneta_log_error("File size mismatch, path: %s. getting %lu, should be %lu", file_path, file_size, file_size_manifest);
+         goto error;
       }
       hash = (char*)pgmoneta_art_search(file_checksums, file_path);
       checksum = (char*)pgmoneta_json_get(file, "Checksum");
       if (!pgmoneta_compare_string(hash, checksum))
       {
          pgmoneta_log_error("File checksum mismatch, path: %s. getting %s, should be %s", file_path, hash, checksum);
+         goto error;
       }
       pgmoneta_json_destroy(file);
       file = NULL;
