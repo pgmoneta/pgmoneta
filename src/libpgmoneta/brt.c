@@ -41,7 +41,7 @@ static int brt_insert(block_ref_table* brt, block_ref_table_key key, block_ref_t
 static block_ref_table_entry* brt_lookup(block_ref_table* brt, block_ref_table_key key);
 
 static void brt_set_limit_block(block_ref_table_entry* entry, block_number limit_block);
-static void brt_mark_block_modified(block_ref_table_entry* entry, block_number blocknum);
+static int brt_mark_block_modified(block_ref_table_entry* entry, block_number blocknum);
 
 static void brt_write(FILE* f, block_ref_table_buffer* buffer, void* data, int length);
 static int brt_read(FILE* f, struct block_ref_table_reader* reader, void* data, int length);
@@ -55,8 +55,15 @@ int
 pgmoneta_brt_create_empty(block_ref_table** brt)
 {
    block_ref_table* brtab = (block_ref_table*)malloc(sizeof(block_ref_table));
+
+   if (brtab == NULL)
+   {
+      goto error;
+   }
+
    if (pgmoneta_art_create(&brtab->table))
    {
+      free(brtab);
       goto error;
    }
    *brt = brtab;
@@ -142,7 +149,11 @@ pgmoneta_brt_mark_block_modified(block_ref_table* brt, const struct rel_file_loc
       brt_entry->chunk_data = NULL;
    }
 
-   brt_mark_block_modified(brt_entry, blknum);
+   if (brt_mark_block_modified(brt_entry, blknum))
+   {
+      goto error;
+   }
+
    return 0;
 
 error:
@@ -590,7 +601,7 @@ brt_set_limit_block(block_ref_table_entry* entry, block_number limit_block)
    }
 }
 
-static void
+static int
 brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
 {
    unsigned chunkno;
@@ -630,20 +641,64 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
 
       if (entry->nchunks == 0)
       {
-         entry->chunk_size = (uint16_t*)malloc(sizeof(uint16_t) * max_chunks);
+         uint16_t* new_size = NULL;
+         uint16_t* new_usage = NULL;
+         block_ref_table_chunk* new_data = NULL;
+
+         new_size = (uint16_t*)malloc(sizeof(uint16_t) * max_chunks);
+         new_usage = (uint16_t*)malloc(sizeof(uint16_t) * max_chunks);
+         new_data = (block_ref_table_chunk*)malloc(sizeof(block_ref_table_chunk) * max_chunks);
+
+         if (new_size == NULL || new_usage == NULL || new_data == NULL)
+         {
+            free(new_size);
+            free(new_usage);
+            free(new_data);
+            return 1;
+         }
+
+         entry->chunk_size = new_size;
+         entry->chunk_usage = new_usage;
+         entry->chunk_data = new_data;
+
          memset(&entry->chunk_size[entry->nchunks], 0, sizeof(uint16_t) * max_chunks);
-         entry->chunk_usage = (uint16_t*)malloc(sizeof(uint16_t) * max_chunks);
          memset(&entry->chunk_usage[entry->nchunks], 0, sizeof(uint16_t) * max_chunks);
-         entry->chunk_data = (block_ref_table_chunk*)malloc(sizeof(block_ref_table_chunk) * max_chunks);
          memset(&entry->chunk_data[entry->nchunks], 0, sizeof(block_ref_table_chunk) * max_chunks);
       }
       else
       {
-         entry->chunk_size = (uint16_t*)realloc(entry->chunk_size, sizeof(uint16_t) * max_chunks);
+         uint16_t* new_size = NULL;
+         uint16_t* new_usage = NULL;
+         block_ref_table_chunk* new_data = NULL;
+
+         /* Each result is stored as soon as it succeeds, so entry never keeps
+          * a pointer that realloc has already freed. nchunks is only raised
+          * once all three have grown, so a failure here leaves the entry
+          * consistent, just not yet enlarged.
+          */
+         new_size = (uint16_t*)realloc(entry->chunk_size, sizeof(uint16_t) * max_chunks);
+         if (new_size == NULL)
+         {
+            return 1;
+         }
+         entry->chunk_size = new_size;
+
+         new_usage = (uint16_t*)realloc(entry->chunk_usage, sizeof(uint16_t) * max_chunks);
+         if (new_usage == NULL)
+         {
+            return 1;
+         }
+         entry->chunk_usage = new_usage;
+
+         new_data = (block_ref_table_chunk*)realloc(entry->chunk_data, sizeof(block_ref_table_chunk) * max_chunks);
+         if (new_data == NULL)
+         {
+            return 1;
+         }
+         entry->chunk_data = new_data;
+
          memset(&entry->chunk_size[entry->nchunks], 0, extra_chunks * sizeof(uint16_t));
-         entry->chunk_usage = (uint16_t*)realloc(entry->chunk_usage, sizeof(uint16_t) * max_chunks);
          memset(&entry->chunk_usage[entry->nchunks], 0, extra_chunks * sizeof(uint16_t));
-         entry->chunk_data = (block_ref_table_chunk*)realloc(entry->chunk_data, sizeof(block_ref_table_chunk) * max_chunks);
          memset(&entry->chunk_data[entry->nchunks], 0, extra_chunks * sizeof(block_ref_table_chunk));
       }
       entry->nchunks = max_chunks;
@@ -657,12 +712,19 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
     */
    if (entry->chunk_size[chunkno] == 0)
    {
-      entry->chunk_data[chunkno] = (uint16_t*)malloc(sizeof(uint16_t) * INITIAL_ENTRIES_PER_CHUNK);
-      // memset(&entry->chunk_data[chunkno], 0, sizeof(uint16_t) * INITIAL_ENTRIES_PER_CHUNK);
+      block_ref_table_chunk new_chunk = NULL;
+
+      new_chunk = (uint16_t*)malloc(sizeof(uint16_t) * INITIAL_ENTRIES_PER_CHUNK);
+      if (new_chunk == NULL)
+      {
+         return 1;
+      }
+
+      entry->chunk_data[chunkno] = new_chunk;
       entry->chunk_size[chunkno] = INITIAL_ENTRIES_PER_CHUNK;
       entry->chunk_data[chunkno][0] = chunkoffset;
       entry->chunk_usage[chunkno] = 1;
-      return;
+      return 0;
    }
 
    /*
@@ -675,7 +737,7 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
 
       chunk[chunkoffset / BLOCKS_PER_ENTRY] |=
          1 << (chunkoffset % BLOCKS_PER_ENTRY);
-      return;
+      return 0;
    }
 
    /*
@@ -687,7 +749,7 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
    {
       if (entry->chunk_data[chunkno][i] == chunkoffset)
       {
-         return;
+         return 0;
       }
    }
 
@@ -702,6 +764,10 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
 
       /* Allocate a new chunk. */
       newchunk = (uint16_t*)malloc(MAX_ENTRIES_PER_CHUNK * sizeof(uint16_t));
+      if (newchunk == NULL)
+      {
+         return 1;
+      }
       memset(newchunk, 0, MAX_ENTRIES_PER_CHUNK * sizeof(uint16_t));
 
       /* Set the bit for each existing entry. */
@@ -722,7 +788,7 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
       entry->chunk_data[chunkno] = newchunk;
       entry->chunk_size[chunkno] = MAX_ENTRIES_PER_CHUNK;
       entry->chunk_usage[chunkno] = MAX_ENTRIES_PER_CHUNK;
-      return;
+      return 0;
    }
 
    /*
@@ -733,7 +799,15 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
    if (entry->chunk_usage[chunkno] == entry->chunk_size[chunkno])
    {
       unsigned newsize = entry->chunk_size[chunkno] * 2;
-      entry->chunk_data[chunkno] = (uint16_t*)realloc(entry->chunk_data[chunkno], newsize * sizeof(uint16_t));
+      block_ref_table_chunk new_chunk = NULL;
+
+      new_chunk = (uint16_t*)realloc(entry->chunk_data[chunkno], newsize * sizeof(uint16_t));
+      if (new_chunk == NULL)
+      {
+         return 1;
+      }
+
+      entry->chunk_data[chunkno] = new_chunk;
       entry->chunk_size[chunkno] = newsize;
    }
 
@@ -741,6 +815,8 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
    entry->chunk_data[chunkno][entry->chunk_usage[chunkno]] =
       chunkoffset;
    entry->chunk_usage[chunkno]++;
+
+   return 0;
 }
 
 static bool
