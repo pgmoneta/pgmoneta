@@ -3983,7 +3983,8 @@ show_wal_file_selector(struct ui_state* state)
       int dir_count = 0;
       int file_count = 0;
 
-      strcpy(entries[dir_count].name, "..");
+      pgmoneta_snprintf(entries[dir_count].name, sizeof(entries[dir_count].name),
+                        "%s", "..");
       entries[dir_count].is_dir = true;
       dir_count++;
 
@@ -4008,7 +4009,13 @@ show_wal_file_selector(struct ui_state* state)
          {
             if (S_ISDIR(st.st_mode))
             {
-               strcpy(temp_dirs[temp_dir_idx++], entry->d_name);
+               if (temp_dir_idx < (int)(sizeof(temp_dirs) / sizeof(temp_dirs[0])))
+               {
+                  pgmoneta_snprintf(temp_dirs[temp_dir_idx],
+                                    sizeof(temp_dirs[temp_dir_idx]), "%s",
+                                    entry->d_name);
+                  temp_dir_idx++;
+               }
             }
             else if (S_ISREG(st.st_mode))
             {
@@ -4029,7 +4036,14 @@ show_wal_file_selector(struct ui_state* state)
 
                   if (is_hex)
                   {
-                     strcpy(temp_files[temp_file_idx++], entry->d_name);
+                     if (temp_file_idx <
+                         (int)(sizeof(temp_files) / sizeof(temp_files[0])))
+                     {
+                        pgmoneta_snprintf(temp_files[temp_file_idx],
+                                          sizeof(temp_files[temp_file_idx]),
+                                          "%s", entry->d_name);
+                        temp_file_idx++;
+                     }
                   }
                }
             }
@@ -4044,9 +4058,10 @@ show_wal_file_selector(struct ui_state* state)
             if (strcmp(temp_dirs[i], temp_dirs[j]) > 0)
             {
                char tmp[256];
-               strcpy(tmp, temp_dirs[i]);
-               strcpy(temp_dirs[i], temp_dirs[j]);
-               strcpy(temp_dirs[j], tmp);
+               pgmoneta_snprintf(tmp, sizeof(tmp), "%s", temp_dirs[i]);
+               pgmoneta_snprintf(temp_dirs[i], sizeof(temp_dirs[i]), "%s",
+                                 temp_dirs[j]);
+               pgmoneta_snprintf(temp_dirs[j], sizeof(temp_dirs[j]), "%s", tmp);
             }
          }
       }
@@ -4058,23 +4073,31 @@ show_wal_file_selector(struct ui_state* state)
             if (strcmp(temp_files[i], temp_files[j]) > 0)
             {
                char tmp[256];
-               strcpy(tmp, temp_files[i]);
-               strcpy(temp_files[i], temp_files[j]);
-               strcpy(temp_files[j], tmp);
+               pgmoneta_snprintf(tmp, sizeof(tmp), "%s", temp_files[i]);
+               pgmoneta_snprintf(temp_files[i], sizeof(temp_files[i]), "%s",
+                                 temp_files[j]);
+               pgmoneta_snprintf(temp_files[j], sizeof(temp_files[j]), "%s",
+                                 tmp);
             }
          }
       }
 
-      for (int i = 0; i < temp_dir_idx; i++)
+      int entries_max = (int)(sizeof(entries) / sizeof(entries[0]));
+
+      for (int i = 0; i < temp_dir_idx && dir_count < entries_max; i++)
       {
-         strcpy(entries[dir_count].name, temp_dirs[i]);
+         pgmoneta_snprintf(entries[dir_count].name,
+                           sizeof(entries[dir_count].name), "%s", temp_dirs[i]);
          entries[dir_count].is_dir = true;
          dir_count++;
       }
 
-      for (int i = 0; i < temp_file_idx; i++)
+      for (int i = 0; i < temp_file_idx && dir_count + file_count < entries_max;
+           i++)
       {
-         strcpy(entries[dir_count + file_count].name, temp_files[i]);
+         pgmoneta_snprintf(entries[dir_count + file_count].name,
+                           sizeof(entries[dir_count + file_count].name), "%s",
+                           temp_files[i]);
          entries[dir_count + file_count].is_dir = false;
          file_count++;
       }
