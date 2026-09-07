@@ -631,6 +631,15 @@ char*
 pgmoneta_append_ulong(char* orig, unsigned long l);
 
 /**
+ * Append an unsigned long long
+ * @param orig The original string
+ * @param l The long
+ * @return The resulting string
+ */
+char*
+pgmoneta_append_ullong(char* orig, unsigned long long l);
+
+/**
  * Append a double
  * @param orig The original string
  * @param d The double

@@ -38,6 +38,7 @@
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2343,5 +2344,131 @@ cleanup:
       pgmoneta_delete_directory(tmpdir);
    }
    pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_numbers)
+{
+   char* s = NULL;
+
+   /* The largest value of each type is the corner case: it needs every digit
+      the buffer can hold, so a size argument that is one short truncates it
+      silently rather than overflowing. */
+   s = pgmoneta_append_int(NULL, INT_MIN);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_int returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "-2147483648", cleanup, "append_int truncated INT_MIN");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_int(NULL, INT_MAX);
+   MCTF_ASSERT_STR_EQ(s, "2147483647", cleanup, "append_int wrong for INT_MAX");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_int(NULL, 0);
+   MCTF_ASSERT_STR_EQ(s, "0", cleanup, "append_int wrong for 0");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_ulong(NULL, ULONG_MAX);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_ulong returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "18446744073709551615", cleanup, "append_ulong truncated ULONG_MAX");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_ulong(NULL, 0UL);
+   MCTF_ASSERT_STR_EQ(s, "0", cleanup, "append_ulong wrong for 0");
+   free(s);
+   s = NULL;
+
+   /* Appending onto an existing string must concatenate, not replace */
+   s = pgmoneta_append_int(NULL, 42);
+   s = pgmoneta_append_int(s, 7);
+   MCTF_ASSERT_STR_EQ(s, "427", cleanup, "append_int did not concatenate");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append(NULL, "n=");
+   s = pgmoneta_append_ulong(s, ULONG_MAX);
+   MCTF_ASSERT_STR_EQ(s, "n=18446744073709551615", cleanup, "append_ulong did not concatenate");
+   free(s);
+   s = NULL;
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_null_handling)
+{
+   char* s = NULL;
+
+   /* A NULL original is the empty string, and a NULL addition is a no-op */
+   s = pgmoneta_append(NULL, "abc");
+   MCTF_ASSERT_STR_EQ(s, "abc", cleanup, "append onto NULL failed");
+
+   s = pgmoneta_append(s, NULL);
+   MCTF_ASSERT_STR_EQ(s, "abc", cleanup, "append of NULL changed the string");
+
+   s = pgmoneta_append_char(s, 'd');
+   MCTF_ASSERT_STR_EQ(s, "abcd", cleanup, "append_char failed");
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_format_and_append_long)
+{
+   char* s = NULL;
+   char big[512];
+
+   /* Longer than any fixed buffer the helpers used to rely on */
+   memset(&big[0], 'x', sizeof(big) - 1);
+   big[sizeof(big) - 1] = '\0';
+
+   s = pgmoneta_format_and_append(NULL, "%s", &big[0]);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "format_and_append returned NULL");
+   MCTF_ASSERT_INT_EQ((int)strlen(s), (int)sizeof(big) - 1, cleanup, "format_and_append truncated");
+
+   s = pgmoneta_format_and_append(s, "|%d", INT_MIN);
+   MCTF_ASSERT_INT_EQ((int)strlen(s), (int)sizeof(big) - 1 + 12, cleanup, "format_and_append appended wrong length");
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_double)
+{
+   char* s = NULL;
+
+   /* %lf writes the whole integer part, so a large double needs far more
+      room than any small fixed buffer: 1e19 alone is 20 digits before the
+      six decimals. */
+   s = pgmoneta_append_double(NULL, 1e19);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_double returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "10000000000000000000.000000", cleanup, "append_double truncated 1e19");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double(NULL, 0.5);
+   MCTF_ASSERT_STR_EQ(s, "0.500000", cleanup, "append_double wrong for 0.5");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double_precision(NULL, 1e19, 2);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_double_precision returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "10000000000000000000.00", cleanup, "append_double_precision truncated 1e19");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double_precision(NULL, 3.14159, 3);
+   MCTF_ASSERT_STR_EQ(s, "3.142", cleanup, "append_double_precision wrong for 3.14159");
+   free(s);
+   s = NULL;
+
+cleanup:
+   free(s);
    MCTF_FINISH();
 }

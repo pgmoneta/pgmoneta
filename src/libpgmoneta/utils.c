@@ -1593,53 +1593,37 @@ pgmoneta_append_char(char* orig, char c)
 char*
 pgmoneta_append_int(char* orig, int i)
 {
-   char number[12];
-
-   memset(&number[0], 0, sizeof(number));
-   pgmoneta_snprintf(&number[0], 11, "%d", i);
-   orig = pgmoneta_append(orig, number);
-
-   return orig;
+   return pgmoneta_format_and_append(orig, "%d", i);
 }
 
 char*
 pgmoneta_append_ulong(char* orig, unsigned long l)
 {
-   char number[21];
+   return pgmoneta_format_and_append(orig, "%lu", l);
+}
 
-   memset(&number[0], 0, sizeof(number));
-   pgmoneta_snprintf(&number[0], 20, "%lu", l);
-   orig = pgmoneta_append(orig, number);
-
-   return orig;
+char*
+pgmoneta_append_ullong(char* orig, unsigned long long l)
+{
+   return pgmoneta_format_and_append(orig, "%llu", l);
 }
 
 char*
 pgmoneta_append_double(char* orig, double d)
 {
-   char number[21];
-
-   memset(&number[0], 0, sizeof(number));
-   pgmoneta_snprintf(&number[0], 20, "%lf", d);
-   orig = pgmoneta_append(orig, number);
-
-   return orig;
+   return pgmoneta_format_and_append(orig, "%lf", d);
 }
 
 char*
 pgmoneta_append_double_precision(char* orig, double d, int precision)
 {
-   char number[21];
-
    char* format = NULL;
    format = pgmoneta_append_char(format, '%');
    format = pgmoneta_append_char(format, '.');
    format = pgmoneta_append_int(format, precision);
    format = pgmoneta_append_char(format, 'f');
 
-   memset(&number[0], 0, sizeof(number));
-   pgmoneta_snprintf(&number[0], 20, format, d);
-   orig = pgmoneta_append(orig, number);
+   orig = pgmoneta_format_and_append(orig, format, d);
 
    free(format);
 
@@ -4884,17 +4868,30 @@ char*
 pgmoneta_format_and_append(char* buf, char* format, ...)
 {
    va_list args;
-   va_start(args, format);
+   int len;
+   char* formatted_str = NULL;
 
    // Determine the required buffer size
-   int size_needed = vsnprintf(NULL, 0, format, args) + 1;
+   va_start(args, format);
+   len = vsnprintf(NULL, 0, format, args);
    va_end(args);
 
+   // Leave buf as it is on failure, like pgmoneta_append() does
+   if (len < 0)
+   {
+      return buf;
+   }
+
    // Allocate buffer to hold the formatted string
-   char* formatted_str = malloc(size_needed);
+   formatted_str = malloc((size_t)len + 1);
+
+   if (formatted_str == NULL)
+   {
+      return buf;
+   }
 
    va_start(args, format);
-   vsnprintf(formatted_str, size_needed, format, args);
+   vsnprintf(formatted_str, (size_t)len + 1, format, args);
    va_end(args);
 
    buf = pgmoneta_append(buf, formatted_str);
