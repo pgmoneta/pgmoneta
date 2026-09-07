@@ -101,6 +101,7 @@ guide for first-run configuration once the package is installed.
 - [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
 - [libssh](https://www.libssh.org/)
 - [libarchive](http://www.libarchive.org/)
+- [LibYAML](https://pyyaml.org/wiki/LibYAML)
 - [rst2man](https://docutils.sourceforge.io/) (man pages)
 
 #### Optional dependencies (for building documentation)
@@ -116,7 +117,7 @@ dnf install git gcc clang clang-analyzer clang-tools-extra cmake make \
             systemd systemd-devel zlib zlib-devel \
             libzstd libzstd-devel lz4 lz4-devel \
             libssh libssh-devel python3-docutils libatomic \
-            bzip2 bzip2-devel libarchive libarchive-devel \
+            bzip2 bzip2-devel libarchive libarchive-devel libyaml libyaml-devel \
             libasan libasan-static
 ```
 
