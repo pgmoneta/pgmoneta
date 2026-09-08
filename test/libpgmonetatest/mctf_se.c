@@ -31,6 +31,7 @@
 #include <pgmoneta.h>
 #include <http.h>
 #include <info.h>
+#include <json.h>
 #include <logging.h>
 #include <mctf_container.h>
 #include <mctf_se.h>
@@ -65,11 +66,13 @@
 extern const struct mctf_se_driver mctf_garage_driver;
 extern const struct mctf_se_driver mctf_azurite_driver;
 extern const struct mctf_se_driver mctf_ssh_driver;
+extern const struct mctf_se_driver mctf_fake_gcs_driver;
 
 static const struct mctf_se_driver* registry[] = {
    [MCTF_BACKEND_GARAGE]  = &mctf_garage_driver,
    [MCTF_BACKEND_AZURITE] = &mctf_azurite_driver,
    [MCTF_BACKEND_SSH]     = &mctf_ssh_driver,
+   [MCTF_BACKEND_GCS]     = &mctf_fake_gcs_driver,
 };
 
 #define MAX_BACKENDS ((int)(sizeof(registry) / sizeof(registry[0])))
@@ -823,4 +826,137 @@ done:
    free(xml);
 
    return found;
+}
+
+/*
+ * Percent-encode everything except alnum/-/_/. , matching how se_gcs.c
+ * encodes object names on upload (including '/', which GCS treats as an
+ * opaque part of the name rather than a path separator when addressed
+ * this way) so the prefix filter lines up with what actually got uploaded.
+ */
+static int
+gcs_urlencode_prefix(const char* str, char* out, size_t out_size)
+{
+   size_t out_len = 0;
+
+   if (str == NULL || out == NULL || out_size == 0)
+   {
+      return 1;
+   }
+
+   for (size_t i = 0; str[i] != '\0'; i++)
+   {
+      unsigned char c = (unsigned char)str[i];
+
+      if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
+      {
+         if (out_len + 1 >= out_size)
+         {
+            return 1;
+         }
+         out[out_len++] = (char)c;
+      }
+      else
+      {
+         if (out_len + 3 >= out_size)
+         {
+            return 1;
+         }
+         pgmoneta_snprintf(out + out_len, 4, "%%%02X", c);
+         out_len += 3;
+      }
+   }
+   out[out_len] = '\0';
+
+   return 0;
+}
+
+int
+mctf_se_gcs_object_count_prefix(const char* prefix)
+{
+   const struct mctf_se* ctx = mctf_se_context_for(MCTF_BACKEND_GCS);
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   char request_path[1200];
+   char encoded_prefix[1024];
+   char* body = NULL;
+   struct json* obj = NULL;
+   struct json* items = NULL;
+   struct json_iterator* iter = NULL;
+   int count = -1;
+
+   if (ctx == NULL || ctx->driver == NULL || prefix == NULL)
+   {
+      goto done;
+   }
+
+   if (gcs_urlencode_prefix(prefix, encoded_prefix, sizeof(encoded_prefix)))
+   {
+      goto done;
+   }
+
+   if (pgmoneta_http_create((char*)ctx->endpoint, ctx->port, ctx->use_tls, &connection))
+   {
+      goto done;
+   }
+
+   pgmoneta_snprintf(request_path, sizeof(request_path),
+                     "/storage/v1/b/%s/o?prefix=%s", ctx->bucket, encoded_prefix);
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_GET, request_path, &request))
+   {
+      goto done;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, &response))
+   {
+      goto done;
+   }
+
+   if (response == NULL || response->status_code != 200 || response->payload.data_size == 0)
+   {
+      goto done;
+   }
+
+   body = malloc(response->payload.data_size + 1);
+   if (body == NULL)
+   {
+      goto done;
+   }
+   memcpy(body, response->payload.data, response->payload.data_size);
+   body[response->payload.data_size] = '\0';
+
+   if (pgmoneta_json_parse_string(body, &obj) || obj == NULL)
+   {
+      goto done;
+   }
+
+   count = 0;
+   if (pgmoneta_json_contains_key(obj, "items"))
+   {
+      items = (struct json*)pgmoneta_json_get(obj, "items");
+      if (items != NULL)
+      {
+         if (pgmoneta_json_iterator_create(items, &iter))
+         {
+            count = -1;
+            goto done;
+         }
+         while (pgmoneta_json_iterator_next(iter))
+         {
+            count++;
+         }
+      }
+   }
+
+done:
+   pgmoneta_json_iterator_destroy(iter);
+   pgmoneta_json_destroy(obj);
+   free(body);
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+
+   return count;
 }

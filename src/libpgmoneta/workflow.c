@@ -603,7 +603,8 @@ wf_backup(void)
 
    if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
        (config->storage_engine & STORAGE_ENGINE_S3) ||
-       (config->storage_engine & STORAGE_ENGINE_AZURE))
+       (config->storage_engine & STORAGE_ENGINE_AZURE) ||
+       (config->storage_engine & STORAGE_ENGINE_GCS))
    {
       current->next = pgmoneta_storage_create_remote();
       current = current->next;
@@ -797,7 +798,8 @@ wf_post_rollup(struct backup* backup)
 
    if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
        (config->storage_engine & STORAGE_ENGINE_S3) ||
-       (config->storage_engine & STORAGE_ENGINE_AZURE))
+       (config->storage_engine & STORAGE_ENGINE_AZURE) ||
+       (config->storage_engine & STORAGE_ENGINE_GCS))
    {
       current->next = pgmoneta_storage_create_remote();
       current = current->next;
@@ -884,7 +886,8 @@ wf_incremental_backup(void)
 
    if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
        (config->storage_engine & STORAGE_ENGINE_S3) ||
-       (config->storage_engine & STORAGE_ENGINE_AZURE))
+       (config->storage_engine & STORAGE_ENGINE_AZURE) ||
+       (config->storage_engine & STORAGE_ENGINE_GCS))
    {
       current->next = pgmoneta_storage_create_remote();
       current = current->next;
