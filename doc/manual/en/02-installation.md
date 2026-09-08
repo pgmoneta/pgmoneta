@@ -97,6 +97,7 @@ max_prepared_transactions = 100
 work_mem = 16MB
 dynamic_shared_memory_type = posix
 wal_level = replica
+track_commit_timestamp = on
 wal_log_hints = on
 max_wal_size = 16GB
 min_wal_size = 2GB

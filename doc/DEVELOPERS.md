@@ -231,6 +231,16 @@ i.e This is required only for PostgreSQL version 17 and above.
 summarize_wal = on
 ```
 
+#### Set track_commit_timestamp
+
+Set `track_commit_timestamp` value in `/tmp/pgsql/postgresql.conf` to be `on`
+
+``` sh
+track_commit_timestamp = on
+```
+
+pgmoneta requires `track_commit_timestamp` to be enabled for all PostgreSQL versions. If it is disabled the server is marked invalid, reported as `Online: false` in `pgmoneta-cli status details`, and backups fail.
+
 #### Start PostgreSQL
 
 ``` sh
