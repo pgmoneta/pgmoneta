@@ -35,12 +35,92 @@
 #include <workflow.h>
 
 #include <assert.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 static char* manifest_name(void);
 static int manifest_execute(char*, struct art*);
+static int write_directory_entries(struct csv_writer* writer, char* base, char* relative);
+
+/*
+ * A directory holding no files has no entry of its own in the PostgreSQL
+ * manifest, so it would be lost by anything that reconstructs a backup from the
+ * file list alone. Record every directory with a trailing slash so those
+ * consumers can tell the two apart; the checksum column is not meaningful for a
+ * directory and is written as "-".
+ */
+static int
+write_directory_entries(struct csv_writer* writer, char* base, char* relative)
+{
+   DIR* dir = NULL;
+   struct dirent* entry = NULL;
+   char path[MAX_PATH];
+   char child[MAX_PATH];
+   char row[MAX_PATH];
+   char probe[MAX_PATH];
+   struct stat sb;
+   bool is_dir = false;
+   char* info[MANIFEST_COLUMN_COUNT];
+
+   if (pgmoneta_snprintf(path, sizeof(path), "%s%s%s", base,
+                         strlen(relative) > 0 ? "/" : "", relative) <= 0)
+   {
+      return 1;
+   }
+
+   if (!(dir = opendir(path)))
+   {
+      return 1;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      is_dir = (entry->d_type == DT_DIR);
+
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
+      {
+         continue;
+      }
+
+      /* some filesystems do not populate d_type */
+      if (entry->d_type == DT_UNKNOWN &&
+          pgmoneta_snprintf(probe, sizeof(probe), "%s/%s", path, entry->d_name) > 0 &&
+          stat(probe, &sb) == 0)
+      {
+         is_dir = S_ISDIR(sb.st_mode);
+      }
+
+      if (!is_dir)
+      {
+         continue;
+      }
+
+      if (pgmoneta_snprintf(child, sizeof(child), "%s%s%s",
+                            relative, strlen(relative) > 0 ? "/" : "", entry->d_name) <= 0 ||
+          pgmoneta_snprintf(row, sizeof(row), "%s/", child) <= 0)
+      {
+         closedir(dir);
+         return 1;
+      }
+
+      info[MANIFEST_PATH_INDEX] = row;
+      info[MANIFEST_CHECKSUM_INDEX] = "-";
+      pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);
+
+      if (write_directory_entries(writer, base, child))
+      {
+         closedir(dir);
+         return 1;
+      }
+   }
+
+   closedir(dir);
+
+   return 0;
+}
 
 struct workflow*
 pgmoneta_create_manifest(void)
@@ -182,6 +262,12 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);
       pgmoneta_json_destroy(entry);
       entry = NULL;
+   }
+
+   if (write_directory_entries(writer, backup_data, ""))
+   {
+      pgmoneta_log_error("Could not record directory layout in %s", manifest);
+      goto error;
    }
 
    pgmoneta_permission(manifest, 6, 0, 0);
