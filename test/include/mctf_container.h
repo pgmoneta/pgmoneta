@@ -54,9 +54,10 @@ extern "C" {
 /**
  * Well-known container kinds the framework knows how to start.
  */
-#define MCTF_CONTAINER_GARAGE  0 /**< Garage, an S3-compatible object store */
-#define MCTF_CONTAINER_AZURITE 1 /**< Azurite, a local Azure Blob Storage emulator */
-#define MCTF_CONTAINER_SFTP    2 /**< atmoz/sftp, SSH/SFTP test server */
+#define MCTF_CONTAINER_GARAGE   0 /**< Garage, an S3-compatible object store */
+#define MCTF_CONTAINER_AZURITE  1 /**< Azurite, a local Azure Blob Storage emulator */
+#define MCTF_CONTAINER_SFTP     2 /**< atmoz/sftp, SSH/SFTP test server */
+#define MCTF_CONTAINER_FAKE_GCS 3 /**< fake-gcs-server, a local Google Cloud Storage emulator */
 
 /**
  * A running container handle.

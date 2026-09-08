@@ -2776,6 +2776,9 @@ translate_storage_engine(int32_t storage_engine)
       case STORAGE_ENGINE_AZURE:
          storage_engine_output = pgmoneta_append(storage_engine_output, "azure");
          break;
+      case STORAGE_ENGINE_GCS:
+         storage_engine_output = pgmoneta_append(storage_engine_output, "gcs");
+         break;
       default:
          storage_engine_output = pgmoneta_append(storage_engine_output, "unknown");
          break;
