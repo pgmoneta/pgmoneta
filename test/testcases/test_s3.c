@@ -41,6 +41,7 @@
 #include <tscommon.h>
 #include <utils.h>
 
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -208,5 +209,257 @@ MCTF_INTEGRATION_TEST(test_s3_delete_removes_objects)
 
 cleanup:
    free(listing);
+   MCTF_FINISH();
+}
+
+/*
+ * Directories are recorded in the manifest with a trailing slash. Without them a
+ * restore loses every directory that holds no files.
+ */
+MCTF_INTEGRATION_TEST(test_s3_manifest_has_directory_entries)
+{
+   char manifest[MAX_PATH];
+   char* out = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   snprintf(manifest, sizeof(manifest), "%s/backup/primary/backup/%s/backup.manifest",
+            mctf_se_run_dir(), shared_label);
+
+   mctf_sh(&out, "grep -c '^pg_notify/,' %s | tr -d '\\n'", manifest);
+   MCTF_ASSERT_PTR_NONNULL(out, cleanup, "could not read the manifest");
+   MCTF_ASSERT(out[0] == '1', cleanup,
+               "manifest has no pg_notify/ entry; empty directories will be lost");
+
+cleanup:
+   free(out);
+   MCTF_FINISH();
+}
+
+static int
+run_step(const char* label, const char* fmt, ...)
+{
+   char cmd[2048];
+   char* out = NULL;
+   va_list ap;
+   int rc;
+
+   va_start(ap, fmt);
+   vsnprintf(cmd, sizeof(cmd), fmt, ap);
+   va_end(ap);
+
+   rc = mctf_sh(&out, "%s", cmd);
+   if (rc != 0)
+   {
+      fprintf(stderr, "    step '%s' failed (rc=%d): %s\n", label, rc,
+              out != NULL ? out : "(no output)");
+      fflush(stderr);
+   }
+
+   free(out);
+
+   return rc;
+}
+
+static int
+start_restored_cluster(const char* pgdata)
+{
+   const char* ver = getenv("TEST_PG_VERSION");
+   char engine[64] = {0};
+   char container[128];
+   char bin[128];
+   bool use_container = true;
+
+   if (ver == NULL || ver[0] == '\0')
+   {
+      ver = "17";
+   }
+
+   snprintf(bin, sizeof(bin), "/usr/pgsql-%s/bin", ver);
+   snprintf(container, sizeof(container), "pgmoneta-test-postgresql%s", ver);
+
+   /* CI runs against a local PostgreSQL; otherwise it lives in a container */
+   if (mctf_container_engine(engine, sizeof(engine)) != MCTF_OK ||
+       mctf_sh(NULL, "%s inspect %s >/dev/null 2>&1", engine, container) != 0)
+   {
+      use_container = false;
+   }
+
+   if (use_container)
+   {
+      mctf_sh(NULL, "%s exec -u postgres %s %s/psql -p 5432 -qtAc 'SELECT pg_switch_wal()' "
+                    ">/dev/null 2>&1",
+              engine, container, bin);
+   }
+   else
+   {
+      mctf_sh(NULL, "psql -h /tmp -p 5432 -U postgres -qtAc 'SELECT pg_switch_wal()' "
+                    ">/dev/null 2>&1");
+   }
+
+   if (mctf_sh(NULL,
+               "W=$(awk '/START WAL LOCATION/{gsub(/[()]/,\"\",$6); print $6}' %s/backup_label); "
+               "A=%s/backup/primary/wal; "
+               "[ -n \"$W\" ] || exit 1; "
+               "for i in $(seq 1 20); do [ -f \"$A/$W.zstd\" ] && break; sleep 1; done; "
+               "[ -f \"$A/$W.zstd\" ] || exit 1; "
+               "zstd -d -q -f \"$A/$W.zstd\" -o \"%s/pg_wal/$W\"",
+               pgdata, mctf_se_run_dir(), pgdata))
+   {
+      fprintf(stderr, "    could not stage the WAL segment; recovery will likely fail\n");
+      fflush(stderr);
+   }
+
+   if (!use_container)
+   {
+      char* log = NULL;
+
+      if (run_step("chmod", "chmod 700 %s", pgdata))
+      {
+         return 1;
+      }
+
+      if (run_step("pg_ctl start",
+                   "pg_ctl -D %s -o '-p 5433 -c logging_collector=off' "
+                   "-l %s/../restored.log -w -t 30 start",
+                   pgdata, pgdata))
+      {
+         mctf_sh(&log, "tail -30 %s/../restored.log", pgdata);
+         fprintf(stderr, "    postgres log:\n%s\n", log != NULL ? log : "(empty)");
+         fflush(stderr);
+         free(log);
+         return 1;
+      }
+
+      if (run_step("pg_isready", "pg_isready -h /tmp -p 5433"))
+      {
+         mctf_sh(NULL, "pg_ctl -D %s stop -m immediate", pgdata);
+         return 1;
+      }
+
+      mctf_sh(NULL, "pg_ctl -D %s stop -m immediate", pgdata);
+
+      return 0;
+   }
+
+   if (run_step("rm", "%s exec -u root %s rm -rf /tmp/restored", engine, container) ||
+       run_step("cp", "%s cp %s %s:/tmp/restored", engine, pgdata, container) ||
+       run_step("chown", "%s exec -u root %s chown -R postgres:postgres /tmp/restored",
+                engine, container) ||
+       run_step("chmod", "%s exec -u root %s chmod 700 /tmp/restored", engine, container))
+   {
+      return 1;
+   }
+
+   if (run_step("pg_ctl start",
+                "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored "
+                "-o '-p 5433 -c logging_collector=off' "
+                "-l /tmp/restored.log -w -t 30 start",
+                engine, container, bin))
+   {
+      char* log = NULL;
+
+      mctf_sh(&log, "%s exec -u postgres %s tail -30 /tmp/restored.log", engine, container);
+      fprintf(stderr, "    postgres log:\n%s\n", log != NULL ? log : "(empty)");
+      fflush(stderr);
+      free(log);
+
+      return 1;
+   }
+
+   if (run_step("pg_isready", "%s exec -u postgres %s %s/pg_isready -h /tmp -p 5433",
+                engine, container, bin))
+   {
+      mctf_sh(NULL, "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored stop -m immediate",
+              engine, container, bin);
+      return 1;
+   }
+
+   mctf_sh(NULL, "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored stop -m immediate",
+           engine, container, bin);
+   mctf_sh(NULL, "%s exec -u root %s rm -rf /tmp/restored", engine, container);
+
+   return 0;
+}
+
+/*
+ * These PGDATA subdirectories are normally empty, so they appear nowhere in
+ * backup.manifest and can only return via backup.dirs. PostgreSQL refuses to
+ * start without them, so a restore that omits them looks successful but is not.
+ */
+MCTF_INTEGRATION_TEST(test_s3_restore_recreates_empty_directories)
+{
+   const char* empty_dirs[] = {
+      "pg_notify",
+      "pg_stat_tmp",
+      "pg_serial",
+      "pg_snapshots",
+      "pg_dynshmem",
+      "pg_replslot",
+      "pg_twophase",
+      "pg_tblspc",
+      "pg_subtrans",
+      "pg_stat",
+      "pg_logical/mappings",
+      "pg_logical/snapshots"};
+   const size_t dir_count = sizeof(empty_dirs) / sizeof(empty_dirs[0]);
+   char cmd[2 * MAX_PATH];
+   size_t i;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   snprintf(cmd, sizeof(cmd), "s3 restore primary %s %s", shared_label, TEST_RESTORE_DIR);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "s3 restore failed");
+
+   for (i = 0; i < dir_count; i++)
+   {
+      MCTF_ASSERT(mctf_sh(NULL, "test -d %s/primary-%s/%s",
+                          TEST_RESTORE_DIR, shared_label, empty_dirs[i]) == 0,
+                  cleanup,
+                  "restored data directory is missing %s — PostgreSQL would refuse to start",
+                  empty_dirs[i]);
+   }
+
+cleanup:
+   MCTF_FINISH();
+}
+
+/*
+ * The restore is only usable if PostgreSQL will actually run on it. Structural
+ * checks can all pass on a data directory the server then refuses to open, so
+ * this starts a cluster on the restored files and waits for it to accept
+ * connections.
+ */
+MCTF_INTEGRATION_TEST(test_s3_restored_cluster_starts)
+{
+   char pgdata[MAX_PATH];
+   char cmd[2 * MAX_PATH];
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   snprintf(cmd, sizeof(cmd), "s3 restore primary %s %s", shared_label, TEST_RESTORE_DIR);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "s3 restore failed");
+
+   snprintf(pgdata, sizeof(pgdata), "%s/primary-%s", TEST_RESTORE_DIR, shared_label);
+
+   MCTF_ASSERT(start_restored_cluster(pgdata) == 0, cleanup,
+               "PostgreSQL did not start on the restored data directory");
+
+cleanup:
    MCTF_FINISH();
 }

@@ -835,7 +835,11 @@ pgmoneta_manifest_get_paths(char* manifest_path, struct deque** paths)
          goto error;
       }
 
-      pgmoneta_deque_add(deque, entry[MANIFEST_PATH_INDEX], (uintptr_t)entry[MANIFEST_CHECKSUM_INDEX], ValueString);
+      /* directory rows carry a trailing slash and are not files */
+      if (!pgmoneta_ends_with(entry[MANIFEST_PATH_INDEX], "/"))
+      {
+         pgmoneta_deque_add(deque, entry[MANIFEST_PATH_INDEX], (uintptr_t)entry[MANIFEST_CHECKSUM_INDEX], ValueString);
+      }
       free(entry);
       entry = NULL;
    }
@@ -843,6 +847,64 @@ pgmoneta_manifest_get_paths(char* manifest_path, struct deque** paths)
    pgmoneta_csv_reader_destroy(reader);
 
    *paths = deque;
+
+   return 0;
+
+error:
+
+   pgmoneta_csv_reader_destroy(reader);
+   pgmoneta_deque_destroy(deque);
+
+   return 1;
+}
+
+int
+pgmoneta_manifest_get_directories(char* manifest_path, struct deque** dirs)
+{
+   int cols = 0;
+   char** entry = NULL;
+   char* path = NULL;
+   size_t len = 0;
+   struct csv_reader* reader = NULL;
+   struct deque* deque = NULL;
+
+   *dirs = NULL;
+
+   if (pgmoneta_deque_create(false, &deque))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_csv_reader_init(manifest_path, &reader))
+   {
+      goto error;
+   }
+
+   while (pgmoneta_csv_next_row(reader, &cols, &entry))
+   {
+      if (cols != MANIFEST_COLUMN_COUNT)
+      {
+         pgmoneta_log_error("pgmoneta_manifest_get_directories: incorrect number of columns");
+         free(entry);
+         goto error;
+      }
+
+      path = entry[MANIFEST_PATH_INDEX];
+      len = strlen(path);
+
+      if (len > 1 && path[len - 1] == '/')
+      {
+         path[len - 1] = '\0';
+         pgmoneta_deque_add(deque, path, 0, ValueString);
+      }
+
+      free(entry);
+      entry = NULL;
+   }
+
+   pgmoneta_csv_reader_destroy(reader);
+
+   *dirs = deque;
 
    return 0;
 

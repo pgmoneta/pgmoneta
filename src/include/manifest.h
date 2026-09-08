@@ -139,6 +139,19 @@ pgmoneta_generate_files_manifest(char* path, struct json* files, int server, str
 int
 pgmoneta_manifest_get_paths(char* manifest_path, struct deque** paths);
 
+/**
+ * Get the directories recorded in a manifest.
+ *
+ * Directory entries carry a trailing slash, which is stripped from the result.
+ * They are excluded from pgmoneta_manifest_get_paths.
+ *
+ * @param manifest_path The manifest path
+ * @param dirs The resulting deque of directories
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_manifest_get_directories(char* manifest_path, struct deque** dirs);
+
 #ifdef __cplusplus
 }
 #endif
