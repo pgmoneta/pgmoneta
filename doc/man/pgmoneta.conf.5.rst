@@ -74,7 +74,7 @@ workspace
   Default is /tmp/pgmoneta-workspace/
 
 storage_engine
-  The storage engine type (local, ssh, s3, azure). Default is local
+  The storage engine type (local, ssh, s3, azure, gcs). Default is local
 
 encryption
   The encryption mode. Default is none.
@@ -150,6 +150,24 @@ azure_shared_key
 
 azure_base_dir
   The base directory for the Azure container
+
+gcs_bucket
+  The GCS bucket name
+
+gcs_base_dir
+  The base directory for the GCS bucket
+
+gcs_credentials_file
+  Path to a GCS service account JSON key; blank for unauthenticated (emulator) use
+
+gcs_port
+  The port number for the GCS endpoint
+
+gcs_use_tls
+  Use TLS for GCS connections. Default is off
+
+gcs_endpoint
+  The GCS endpoint override. Default is storage.googleapis.com
 
 retention
   The retention time in days, weeks, months, years. Default is 7, - , - , -

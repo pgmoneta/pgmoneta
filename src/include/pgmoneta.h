@@ -145,6 +145,7 @@ extern "C" {
 #define STORAGE_ENGINE_SSH           1 << 1
 #define STORAGE_ENGINE_S3            1 << 2
 #define STORAGE_ENGINE_AZURE         1 << 3
+#define STORAGE_ENGINE_GCS           1 << 4
 
 #define DEFAULT_BLOCKING_TIMEOUT     30
 
@@ -295,6 +296,19 @@ struct s3_configuration
    char base_dir[MAX_PATH];             /**< The S3 base directory */
 } __attribute__((aligned(64)));
 
+/** @struct gcs_configuration
+ * Defines the Google Cloud Storage configuration
+ */
+struct gcs_configuration
+{
+   int port;                        /**< The GCS port */
+   bool use_tls;                    /**< Use TLS for GCS */
+   char endpoint[MISC_LENGTH];      /**< The GCS endpoint (blank for storage.googleapis.com) */
+   char bucket[MISC_LENGTH];        /**< The GCS bucket */
+   char base_dir[MAX_PATH];         /**< The GCS base directory */
+   char credentials_file[MAX_PATH]; /**< Path to a GCS service account JSON key; blank for unauthenticated (emulator) use */
+} __attribute__((aligned(64)));
+
 /** @struct server
  * Defines a server
  */
@@ -358,6 +372,7 @@ struct server
    char ext_version[MISC_LENGTH];                                 /**< The major version of the extension*/
    struct extension_info extensions[NUMBER_OF_EXTENSIONS];        /**< The extensions */
    struct s3_configuration s3;                                    /**< The S3 configuration */
+   struct gcs_configuration gcs;                                  /**< The GCS configuration */
    struct progress progress;                                      /**< The progress */
 } __attribute__((aligned(64)));
 
@@ -476,7 +491,8 @@ struct main_configuration
    char ssh_private_key_file[MAX_PATH]; /**< The SSH private key path */
    int ssh_port;                        /**< The SSH port (0 = default 22) */
 
-   struct s3_configuration s3; /**< The S3 configuration */
+   struct s3_configuration s3;   /**< The S3 configuration */
+   struct gcs_configuration gcs; /**< The GCS configuration */
 
    char azure_storage_account[MISC_LENGTH]; /**< The Azure storage account name */
    char azure_container[MISC_LENGTH];       /**< The Azure container name */

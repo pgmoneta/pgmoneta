@@ -77,7 +77,7 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
-| storage_engine | local | String | No | The storage engine type (local, ssh, s3, azure) |
+| storage_engine | local | String | No | The storage engine type (local, ssh, s3, azure, gcs) |
 
 **Encryption**
 
@@ -124,6 +124,17 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | azure_container | | String | Yes | The Azure container name |
 | azure_shared_key | | String | Yes | The Azure storage account key |
 | azure_base_dir | | String | Yes | The base directory for the Azure container |
+
+**GCS**
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| gcs_bucket | | String | Yes | The GCS bucket name |
+| gcs_base_dir | | String | Yes | The base directory for the GCS bucket |
+| gcs_credentials_file | | String | No | Path to a GCS service account JSON key; blank for unauthenticated (emulator) use |
+| gcs_port | | Int | No | The port number for the GCS endpoint |
+| gcs_use_tls | `off` | Bool | No | Use TLS for GCS connections |
+| gcs_endpoint | | String | No | The GCS endpoint override (blank for storage.googleapis.com) |
 
 **Retention**
 
@@ -259,6 +270,17 @@ have access to the `postgres` database in order to get the necessary configurati
 | s3_secret_access_key | | String | No | The IAM secret access key. Overrides global setting. |
 | s3_bucket | | String | No | The AWS S3 bucket name. Overrides global setting. |
 | s3_base_dir | | String | No | The base directory for the S3 bucket. Overrides global setting. |
+
+**GCS**
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| gcs_port | | Int | No | The port number for the GCS endpoint. Overrides global setting. |
+| gcs_use_tls | | Bool | No | Use TLS for GCS connections. Overrides global setting. |
+| gcs_endpoint | | String | No | GCS endpoint override. Overrides global setting. |
+| gcs_bucket | | String | No | The GCS bucket name. Overrides global setting. |
+| gcs_base_dir | | String | No | The base directory for the GCS bucket. Overrides global setting. |
+| gcs_credentials_file | | String | No | Path to a GCS service account JSON key. Overrides global setting. |
 
 **Extra**
 
