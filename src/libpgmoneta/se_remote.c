@@ -52,6 +52,7 @@ extern int s3_upload(int server, char* label, int compression, int encryption);
 extern int s3_cleanup(int server, char* label);
 extern int azure_upload(int server, char* label, int compression, int encryption);
 extern int azure_download(int server, char* label, int compression, int encryption);
+extern int gcs_upload(int server, char* label, int compression, int encryption);
 
 /* The contract each remote backend must implement */
 struct storage_engine
@@ -75,6 +76,9 @@ static const struct storage_engine engines[] = {
    {"Azure", STORAGE_ENGINE_AZURE,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
     azure_upload, NULL, azure_download},
+   {"GCS", STORAGE_ENGINE_GCS,
+    STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
+    gcs_upload, NULL, NULL},
 };
 
 #define N_ENGINES ((int)(sizeof(engines) / sizeof(engines[0])))
@@ -346,6 +350,10 @@ remote_upload_execute(char* name __attribute__((unused)), struct art* nodes)
       else if (tasks[i].engine->engine_flag == STORAGE_ENGINE_AZURE)
       {
          bck->remote_azure_elapsed_time = tasks[i].elapsed;
+      }
+      else if (tasks[i].engine->engine_flag == STORAGE_ENGINE_GCS)
+      {
+         bck->remote_gcs_elapsed_time = tasks[i].elapsed;
       }
    }
 
