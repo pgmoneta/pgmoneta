@@ -33,6 +33,7 @@
 #include <backup.h>
 #include <compression.h>
 #include <info.h>
+#include <job.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
@@ -41,11 +42,13 @@
 #include <utils.h>
 #include <wal.h>
 #include <workflow.h>
+#include <value.h>
 
 void
 pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
+   bool locked = false;
    char date_str[128];
    char* date = NULL;
    char* elapsed = NULL;
@@ -72,7 +75,10 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    struct backup* child = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
+   struct json* hdr = NULL;
    struct main_configuration* config;
+   enum value_type async_type = ValueBool;
+   bool async = false;
 
    pgmoneta_start_logging();
 
@@ -106,6 +112,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    }
 
    config->common.servers[server].active_backup = true;
+   locked = true;
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -118,6 +125,8 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    time_info = localtime(&curr_t);
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    incremental = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+
+   hdr = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_HEADER);
 
    strftime(&date_str[0], sizeof(date_str), "%Y%m%d%H%M%S", time_info);
 
@@ -223,12 +232,76 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    pgmoneta_progress_setup(server, workflow, nodes,
                            backup_incremental ? WORKFLOW_TYPE_INCREMENTAL_BACKUP : WORKFLOW_TYPE_BACKUP);
 
+   async = (bool)pgmoneta_json_get_typed(hdr, MANAGEMENT_ARGUMENT_ASYNC, &async_type);
+
+   if (async)
+   {
+      int error = 0;
+      struct json* async_response = NULL;
+      struct json* async_payload = NULL;
+      struct timespec job_start_t;
+
+      if (pgmoneta_job_init(server, backup_incremental ? WORKFLOW_TYPE_INCREMENTAL_BACKUP : WORKFLOW_TYPE_BACKUP))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+      /* Return back the job initialization response */
+
+      if (pgmoneta_json_clone(payload, &async_payload))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+      if (pgmoneta_management_create_response(async_payload, server, &async_response))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+      if (pgmoneta_job_add_async_data(server, async_response))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+#ifdef HAVE_FREEBSD
+      clock_gettime(CLOCK_MONOTONIC_FAST, &job_start_t);
+#else
+      clock_gettime(CLOCK_MONOTONIC_RAW, &job_start_t);
+#endif
+
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, job_start_t, compression, encryption, async_payload))
+      {
+         error = MANAGEMENT_ERROR_BACKUP_NETWORK;
+         pgmoneta_log_error("Backup: Error sending async response for %s", config->common.servers[server].name);
+         goto job_error;
+      }
+
+      pgmoneta_json_destroy(async_payload);
+      pgmoneta_disconnect(client_fd);
+
+      pgmoneta_job_update_state(server, JOB_STATE_RUNNING);
+job_error:
+      if (error != 0)
+      {
+         /* Disable async on error */
+         async = false;
+         pgmoneta_job_cleanup(server);
+         pgmoneta_json_destroy(async_payload);
+         ec = error;
+         goto error;
+      }
+   }
+
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;
    }
 
-   if (pgmoneta_is_progress_enabled(server))
+   if (locked && pgmoneta_is_progress_enabled(server))
    {
       pgmoneta_progress_teardown(server);
    }
@@ -279,7 +352,24 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (async)
+   {
+      struct json* outcome = NULL;
+      pgmoneta_job_update_state(server, JOB_STATE_COMPLETED);
+      pgmoneta_job_update_phase(server, PHASE_NONE);
+      if (pgmoneta_management_create_outcome_success(payload, start_t, end_t, &outcome))
+      {
+         ec = MANAGEMENT_ERROR_BACKUP_ERROR;
+         goto error;
+      }
+      if (pgmoneta_job_finish(server, payload))
+      {
+         ec = MANAGEMENT_ERROR_BACKUP_ERROR;
+         pgmoneta_log_error("Backup: Error writing response for %s", config->common.servers[server].name);
+         goto error;
+      }
+   }
+   else if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_BACKUP_NETWORK;
       pgmoneta_log_error("Backup: Error sending response for %s", config->common.servers[server].name);
@@ -290,8 +380,11 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    pgmoneta_wal_server_compress_encrypt(server, NULL, NULL);
 
-   config->common.servers[server].active_backup = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   if (locked)
+   {
+      config->common.servers[server].active_backup = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
 
    pgmoneta_json_destroy(payload);
 
@@ -311,7 +404,10 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    free(incremental_base);
    free(d);
 
-   pgmoneta_disconnect(client_fd);
+   if (!async)
+   {
+      pgmoneta_disconnect(client_fd);
+   }
 
    pgmoneta_stop_logging();
 
@@ -319,13 +415,16 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
 error:
 
-   if (pgmoneta_is_progress_enabled(server))
+   if (locked && pgmoneta_is_progress_enabled(server))
    {
       pgmoneta_progress_teardown(server);
    }
 
-   config->common.servers[server].active_backup = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   if (locked)
+   {
+      config->common.servers[server].active_backup = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
 
    pgmoneta_management_response_error_with_nodes(NULL, client_fd, config->common.servers[server].name,
                                                  ec != -1 ? ec : MANAGEMENT_ERROR_BACKUP_ERROR,
@@ -354,7 +453,10 @@ error:
    free(incremental_base);
    free(d);
 
-   pgmoneta_disconnect(client_fd);
+   if (!async)
+   {
+      pgmoneta_disconnect(client_fd);
+   }
 
    pgmoneta_stop_logging();
 
@@ -659,6 +761,8 @@ error:
 void
 pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encryption, struct json* payload)
 {
+   bool active = false;
+   bool locked = false;
    char* identifier = NULL;
    char* elapsed = NULL;
    bool force = false;
@@ -669,10 +773,13 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    char* en = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
+   struct json* hdr = NULL;
    struct workflow* workflow = NULL;
    struct art* nodes = NULL;
    struct backup* backup = NULL;
    struct main_configuration* config;
+   enum value_type async_type = ValueBool;
+   bool async = false;
 
    pgmoneta_start_logging();
 
@@ -689,6 +796,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
       goto error;
    }
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   hdr = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_HEADER);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    force = (bool)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_FORCE);
    pgmoneta_art_insert(nodes, NODE_FORCE, (uintptr_t)force, ValueBool);
@@ -697,7 +805,78 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
       goto error;
    }
 
+   if (!atomic_compare_exchange_strong(&config->common.servers[srv].repository, &active, true))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_BACKUP_ACTIVE;
+      pgmoneta_log_info("Delete: Server %s is active", config->common.servers[srv].name);
+      pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
+                         config->common.servers[srv].active_backup ? "Yes" : "No",
+                         config->common.servers[srv].active_restore ? "Yes" : "No",
+                         config->common.servers[srv].active_archive ? "Yes" : "No",
+                         config->common.servers[srv].active_delete ? "Yes" : "No",
+                         config->common.servers[srv].active_retention ? "Yes" : "No");
+      goto error;
+   }
+
+   config->common.servers[srv].active_delete = true;
+   locked = true;
+
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, backup);
+
+   async = (bool)pgmoneta_json_get_typed(hdr, MANAGEMENT_ARGUMENT_ASYNC, &async_type);
+   if (async)
+   {
+      int error = 0;
+      struct json* async_response = NULL;
+      struct json* async_payload = NULL;
+      struct timespec job_start_t;
+
+      if (pgmoneta_job_init(srv, WORKFLOW_TYPE_DELETE_BACKUP))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+      if (pgmoneta_json_clone(payload, &async_payload) ||
+          pgmoneta_management_create_response(async_payload, srv, &async_response))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+      if (pgmoneta_job_add_async_data(srv, async_response))
+      {
+         error = MANAGEMENT_ERROR_ALLOCATION;
+         goto job_error;
+      }
+
+#ifdef HAVE_FREEBSD
+      clock_gettime(CLOCK_MONOTONIC_FAST, &job_start_t);
+#else
+      clock_gettime(CLOCK_MONOTONIC_RAW, &job_start_t);
+#endif
+
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, job_start_t, compression, encryption, async_payload))
+      {
+         error = MANAGEMENT_ERROR_DELETE_NETWORK;
+         pgmoneta_log_error("Delete: Error sending async response for %s", config->common.servers[srv].name);
+         goto job_error;
+      }
+
+      pgmoneta_json_destroy(async_payload);
+      pgmoneta_disconnect(client_fd);
+      pgmoneta_job_update_state(srv, JOB_STATE_RUNNING);
+
+job_error:
+      if (error != 0)
+      {
+         async = false;
+         pgmoneta_job_cleanup(srv);
+         pgmoneta_json_destroy(async_payload);
+         ec = error;
+         goto error;
+      }
+   }
 
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
@@ -718,7 +897,19 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (async)
+   {
+      struct json* outcome = NULL;
+      pgmoneta_job_update_state(srv, JOB_STATE_COMPLETED);
+      pgmoneta_job_update_phase(srv, PHASE_NONE);
+      if (pgmoneta_management_create_outcome_success(payload, start_t, end_t, &outcome) ||
+          pgmoneta_job_finish(srv, payload))
+      {
+         ec = MANAGEMENT_ERROR_DELETE_BACKUP_ERROR;
+         goto error;
+      }
+   }
+   else if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_DELETE_NETWORK;
       pgmoneta_log_error("Delete: Error sending response for %s", config->common.servers[srv].name);
@@ -738,7 +929,16 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    pgmoneta_workflow_destroy(workflow);
 
-   pgmoneta_disconnect(client_fd);
+   if (locked)
+   {
+      config->common.servers[srv].active_delete = false;
+      atomic_store(&config->common.servers[srv].repository, false);
+   }
+
+   if (!async)
+   {
+      pgmoneta_disconnect(client_fd);
+   }
 
    pgmoneta_stop_logging();
 
@@ -756,7 +956,16 @@ error:
 
    pgmoneta_workflow_destroy(workflow);
 
-   pgmoneta_disconnect(client_fd);
+   if (locked)
+   {
+      config->common.servers[srv].active_delete = false;
+      atomic_store(&config->common.servers[srv].repository, false);
+   }
+
+   if (!async)
+   {
+      pgmoneta_disconnect(client_fd);
+   }
 
    pgmoneta_stop_logging();
 

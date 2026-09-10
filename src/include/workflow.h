@@ -177,6 +177,14 @@ struct workflow*
 pgmoneta_workflow_create(int workflow_type, struct backup* backup);
 
 /**
+ * Map a workflow step display name to a progress phase
+ * @param name The step name from the workflow
+ * @return The phase constant, or -1 if not tracked
+ */
+int
+pgmoneta_phase_from_workflow_name(char* name);
+
+/**
  * Create standard workflow nodes
  * @param server The server
  * @param identifier The identifier

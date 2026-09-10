@@ -593,17 +593,11 @@ pgmoneta_progress(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[srv].name, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_PROGRESS_STATE, (uintptr_t)atomic_load(&config->common.servers[srv].progress.state), ValueInt32);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DONE, (uintptr_t)atomic_load(&config->common.servers[srv].progress.done), ValueInt64);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_TOTAL, (uintptr_t)atomic_load(&config->common.servers[srv].progress.total), ValueInt64);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)atomic_load(&config->common.servers[srv].progress.elapsed), ValueInt64);
-
-   int pct = atomic_load(&config->common.servers[srv].progress.percentage);
-   pgmoneta_time_t remaining = PGMONETA_TIME_SEC(pgmoneta_progress_remaining(srv));
-
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_PERCENTAGE, (uintptr_t)pct, ValueInt32);
-   pgmoneta_json_put_time_value(response, MANAGEMENT_ARGUMENT_REMAINING, remaining, FORMAT_TIME_S);
+   if (pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[srv].name, ValueString) ||
+       pgmoneta_progress_add_response(srv, response))
+   {
+      goto error;
+   }
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
