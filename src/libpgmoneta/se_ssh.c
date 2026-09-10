@@ -797,10 +797,6 @@ read_latest_backup_sha256(char* path)
       goto error;
    }
 
-   fclose(file);
-
-   file = fopen(path, "r");
-
    memset(&buffer[0], 0, sizeof(buffer));
 
    while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
@@ -819,10 +815,17 @@ read_latest_backup_sha256(char* path)
 
       ptr = strtok(NULL, ":");
 
+      if (ptr == NULL)
+      {
+         free(file_path);
+         goto error;
+      }
+
       hash = (char*)malloc(strlen(ptr));
 
       if (hash == NULL)
       {
+         free(file_path);
          goto error;
       }
 
