@@ -87,6 +87,7 @@ static int s3_sign_request(char* method, char* canonical_uri, char* query_string
 static int s3_apply_signed_headers(struct http_request* request, struct deque* headers, char* auth_value);
 
 static char* s3_get_host(int server);
+static int s3_restore_directories(char* local_root);
 static char* s3_get_basepath(int server, char* identifier);
 static char* s3_url_encode(char* str);
 static char* s3_label_from_common_prefix(char* prefix);
@@ -864,6 +865,12 @@ s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
+   /* directory rows are excluded from the file list, so recreate them here */
+   if (s3_restore_directories(local_root))
+   {
+      goto error;
+   }
+
    manifest_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
    manifest_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
    sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
@@ -1507,6 +1514,70 @@ do_upload_file(struct worker_common* wc)
    }
 
    free(task);
+}
+
+/*
+ * Directories are recorded in the manifest with a trailing slash and excluded
+ * from the file list, so they are recreated separately. PostgreSQL requires
+ * several that hold no files (pg_notify, pg_stat_tmp, ...) and will not start
+ * without them.
+ */
+static int
+s3_restore_directories(char* local_root)
+{
+   char manifest_path[MAX_PATH];
+   char target[MAX_PATH];
+   struct deque* dirs = NULL;
+   struct deque_iterator* iter = NULL;
+
+   if (pgmoneta_snprintf(manifest_path, sizeof(manifest_path), "%sbackup.manifest.tmp", local_root) <= 0)
+   {
+      return 1;
+   }
+
+   if (pgmoneta_manifest_get_directories(manifest_path, &dirs))
+   {
+      pgmoneta_log_error("S3 restore: could not read directories from %s", manifest_path);
+      return 1;
+   }
+
+   if (pgmoneta_deque_size(dirs) == 0)
+   {
+      pgmoneta_log_warn("S3 restore: no directories recorded in the manifest; "
+                        "PostgreSQL may refuse to start on this backup");
+   }
+
+   pgmoneta_deque_iterator_create(dirs, &iter);
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* d = iter->tag;
+
+      if (strstr(d, "..") != NULL || d[0] == '/')
+      {
+         pgmoneta_log_error("S3 restore: rejecting suspicious directory entry '%s'", d);
+         goto error;
+      }
+
+      if (pgmoneta_snprintf(target, sizeof(target), "%sdata/%s", local_root, d) <= 0 ||
+          pgmoneta_mkdir(target))
+      {
+         pgmoneta_log_error("S3 restore: could not create directory %s", target);
+         goto error;
+      }
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(dirs);
+
+   return 0;
+
+error:
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(dirs);
+
+   return 1;
 }
 
 static int

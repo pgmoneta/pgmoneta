@@ -1663,6 +1663,148 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (pgmoneta_compare_string(key, "gcs_use_tls"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_bool(value, &config->gcs.use_tls))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     if (as_bool(value, &srv.gcs.use_tls))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "gcs_port"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->gcs.port))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     if (as_int(value, &srv.gcs.port))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "gcs_endpoint"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->gcs.endpoint, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.gcs.endpoint, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "gcs_bucket"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->gcs.bucket, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.gcs.bucket, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "gcs_base_dir"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(config->gcs.base_dir, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(srv.gcs.base_dir, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "gcs_credentials_file"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(config->gcs.credentials_file, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(srv.gcs.credentials_file, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (pgmoneta_compare_string(key, "workspace"))
                {
                   if (pgmoneta_compare_string(section, "pgmoneta"))
@@ -3524,6 +3666,14 @@ to_storage_engine(char* where, int value)
       }
       result = pgmoneta_append(result, "azure");
    }
+   if (value & STORAGE_ENGINE_GCS)
+   {
+      if (result)
+      {
+         result = pgmoneta_append(result, "|");
+      }
+      result = pgmoneta_append(result, "gcs");
+   }
    if (!result)
    {
       return 1;
@@ -3751,6 +3901,12 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_STORAGE_ACCOUNT, (uintptr_t)config->azure_storage_account, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_CONTAINER, (uintptr_t)config->azure_container, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_SHARED_KEY, (uintptr_t)config->azure_shared_key, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_USE_TLS, (uintptr_t)config->gcs.use_tls, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_ENDPOINT, (uintptr_t)config->gcs.endpoint, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_PORT, (uintptr_t)config->gcs.port, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_BUCKET, (uintptr_t)config->gcs.bucket, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_BASE_DIR, (uintptr_t)config->gcs.base_dir, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_CREDENTIALS_FILE, (uintptr_t)config->gcs.credentials_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKSPACE, (uintptr_t)config->workspace, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
    pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_LOG_TYPE, config->common.log_type, to_log_type);
@@ -3854,6 +4010,12 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY, (uintptr_t)config->common.servers[i].s3.secret_access_key, ValueString);
       pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BUCKET, (uintptr_t)config->common.servers[i].s3.bucket, ValueString);
       pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BASE_DIR, (uintptr_t)config->common.servers[i].s3.base_dir, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_USE_TLS, (uintptr_t)config->common.servers[i].gcs.use_tls, ValueInt32);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_ENDPOINT, (uintptr_t)config->common.servers[i].gcs.endpoint, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_PORT, (uintptr_t)config->common.servers[i].gcs.port, ValueInt32);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_BUCKET, (uintptr_t)config->common.servers[i].gcs.bucket, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_BASE_DIR, (uintptr_t)config->common.servers[i].gcs.base_dir, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_GCS_CREDENTIALS_FILE, (uintptr_t)config->common.servers[i].gcs.credentials_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_OVERRIDES, (uintptr_t)config->common.servers[i].hot_standby_overrides, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES, (uintptr_t)config->common.servers[i].hot_standby_tablespaces, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
@@ -4810,6 +4972,30 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->s3.base_dir);
                }
+               else if (pgmoneta_compare_string(key_info.key, "gcs_use_tls"))
+               {
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->gcs.use_tls ? "true" : "false");
+               }
+               else if (pgmoneta_compare_string(key_info.key, "gcs_endpoint"))
+               {
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->gcs.endpoint);
+               }
+               else if (pgmoneta_compare_string(key_info.key, "gcs_port"))
+               {
+                  pgmoneta_snprintf(buffer, buffer_size, "%d", srv->gcs.port);
+               }
+               else if (pgmoneta_compare_string(key_info.key, "gcs_bucket"))
+               {
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->gcs.bucket);
+               }
+               else if (pgmoneta_compare_string(key_info.key, "gcs_base_dir"))
+               {
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->gcs.base_dir);
+               }
+               else if (pgmoneta_compare_string(key_info.key, "gcs_credentials_file"))
+               {
+                  pgmoneta_snprintf(buffer, buffer_size, "%s", srv->gcs.credentials_file);
+               }
                else if (pgmoneta_compare_string(key_info.key, "progress"))
                {
                   pgmoneta_snprintf(buffer, buffer_size, "%s", srv->progress_enabled == 1 ? "on" : (srv->progress_enabled == 0 ? "off" : "inherit"));
@@ -5576,6 +5762,10 @@ as_storage_engine(char* str)
       {
          STORAGE_ENGINE_TYPES |= STORAGE_ENGINE_AZURE;
       }
+      else if (!strcasecmp(token, "gcs"))
+      {
+         STORAGE_ENGINE_TYPES |= STORAGE_ENGINE_GCS;
+      }
       token = strtok(NULL, delimiter);
    }
    return STORAGE_ENGINE_TYPES;
@@ -6324,6 +6514,16 @@ copy_server(struct server* dst, struct server* src)
                       src->s3.secret_access_key) ||
        restart_string("s3_bucket", dst->s3.bucket, src->s3.bucket) ||
        restart_string("s3_base_dir", dst->s3.base_dir, src->s3.base_dir))
+   {
+      changed = true;
+   }
+   if (restart_int("gcs_port", dst->gcs.port, src->gcs.port) ||
+       restart_bool("gcs_use_tls", dst->gcs.use_tls, src->gcs.use_tls) ||
+       restart_string("gcs_endpoint", dst->gcs.endpoint, src->gcs.endpoint) ||
+       restart_string("gcs_bucket", dst->gcs.bucket, src->gcs.bucket) ||
+       restart_string("gcs_base_dir", dst->gcs.base_dir, src->gcs.base_dir) ||
+       restart_string("gcs_credentials_file", dst->gcs.credentials_file,
+                      src->gcs.credentials_file))
    {
       changed = true;
    }

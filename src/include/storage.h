@@ -106,6 +106,14 @@ struct workflow*
 pgmoneta_storage_create_azure(void);
 
 /**
+ * Create a workflow for the GCS storage engine
+ * @param workflow_type The workflow type
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_storage_create_gcs(int workflow_type);
+
+/**
  * Create a workflow for the remote storage engines
  * @return The workflow
  */

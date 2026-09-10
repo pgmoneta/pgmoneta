@@ -185,6 +185,14 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
          goto error;
       }
 
+      /* directory rows carry a trailing slash and are not files */
+      if (pgmoneta_ends_with(columns[0], "/"))
+      {
+         free(columns);
+         columns = NULL;
+         continue;
+      }
+
       if (pgmoneta_create_worker_input(NULL, NULL, NULL, server, workers, &payload))
       {
          goto error;
