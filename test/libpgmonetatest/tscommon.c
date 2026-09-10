@@ -237,6 +237,15 @@ pgmoneta_test_basedir_cleanup(void)
    pgmoneta_delete_directory(backup_dir);
    pgmoneta_mkdir(backup_dir);
 
+   free(backup_dir);
+   backup_dir = NULL;
+   if (config->common.number_of_servers > REPLICA_SERVER)
+   {
+      backup_dir = pgmoneta_get_server_backup(REPLICA_SERVER);
+      pgmoneta_delete_directory(backup_dir);
+      pgmoneta_mkdir(backup_dir);
+   }
+
    pgmoneta_delete_directory(TEST_RESTORE_DIR);
    pgmoneta_mkdir(TEST_RESTORE_DIR);
 
