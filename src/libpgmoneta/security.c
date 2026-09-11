@@ -1269,6 +1269,21 @@ error:
    return AUTH_ERROR;
 }
 
+int
+pgmoneta_get_health_auth_type(void)
+{
+   switch (has_security)
+   {
+      case SECURITY_TRUST:
+         return HEALTH_CHECK_AUTH_TRUST;
+      case SECURITY_PASSWORD:
+      case SECURITY_SCRAM256:
+         return HEALTH_CHECK_AUTH_SCRAM;
+      default:
+         return HEALTH_CHECK_AUTH_UNKNOWN;
+   }
+}
+
 static int
 server_trust(void)
 {
