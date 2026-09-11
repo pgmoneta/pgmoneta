@@ -58,25 +58,12 @@ static int count_restored_tablespace_links(void);
 
 MCTF_TEST(test_pgmoneta_tablespace_backup)
 {
-   char* pg_version_str = NULL;
    int pg_version = 0;
    SSL* ssl = NULL;
    int socket = -1;
    struct json* response = NULL;
 
    pgmoneta_test_setup();
-
-   pg_version_str = getenv("TEST_PG_VERSION");
-
-   if (pg_version_str != NULL && strlen(pg_version_str) > 0)
-   {
-      pg_version = atoi(pg_version_str);
-   }
-
-   if (pg_version != 17)
-   {
-      MCTF_SKIP("tablespace backup/restore is set up for PostgreSQL 17 only; TEST_PG_VERSION=%s", pg_version_str != NULL ? pg_version_str : "(unset)");
-   }
 
    MCTF_ASSERT(pgmoneta_test_connect_user(&ssl, &socket) == 0, cleanup, "Failed to connect to %s as the test user", "mydb");
    MCTF_ASSERT(populate_tablespaces(ssl, socket) == 0, cleanup, "Failed to create/populate tables in tablespaces");
@@ -140,7 +127,6 @@ cleanup:
 
 MCTF_TEST(test_pgmoneta_tablespace_backup_incremental)
 {
-   char* pg_version_str = NULL;
    int pg_version = 0;
    SSL* ssl = NULL;
    int socket = -1;
@@ -149,18 +135,6 @@ MCTF_TEST(test_pgmoneta_tablespace_backup_incremental)
    struct json* incremental = NULL;
 
    pgmoneta_test_setup();
-
-   pg_version_str = getenv("TEST_PG_VERSION");
-
-   if (pg_version_str != NULL && strlen(pg_version_str) > 0)
-   {
-      pg_version = atoi(pg_version_str);
-   }
-
-   if (pg_version != 17)
-   {
-      MCTF_SKIP("tablespace backup/restore is set up for PostgreSQL 17 only; TEST_PG_VERSION=%s", pg_version_str != NULL ? pg_version_str : "(unset)");
-   }
 
    MCTF_ASSERT(pgmoneta_test_connect_user(&ssl, &socket) == 0, cleanup, "Failed to connect to %s as the test user", "mydb");
    MCTF_ASSERT(populate_tablespaces(ssl, socket) == 0, cleanup, "Failed to create/populate tables in tablespaces");
