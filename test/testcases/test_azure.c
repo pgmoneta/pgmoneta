@@ -280,3 +280,52 @@ MCTF_INTEGRATION_TEST(test_azure_uploads_metadata_commit_markers)
 cleanup:
    MCTF_FINISH();
 }
+
+/*
+ * Restore a backup that exists only in Azure.
+ *
+ * The module setup ran an azure-only backup, and test_azure_backup_removes_local_data
+ * pins that the local data/ directory is deleted afterwards. So every data file the
+ * restore produces has to have been downloaded from the container by
+ * azure_download_files — there is no local copy left to fall back on.
+ */
+MCTF_INTEGRATION_TEST(test_azure_restore_recovers_data)
+{
+   char target[MAX_PATH];
+   char args[2 * MAX_PATH];
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   snprintf(target, sizeof(target), "%s/restore_azure", mctf_se_run_dir());
+   MCTF_ASSERT(mctf_sh(NULL, "rm -rf %s && mkdir -p %s", target, target) == 0,
+               cleanup, "could not prepare restore target directory");
+
+   pgmoneta_snprintf(args, sizeof(args), "azure restore primary %s %s", shared_label, target);
+   MCTF_ASSERT(mctf_se_cli(args, NULL) == 0, cleanup,
+               "azure restore command failed for %s", shared_label);
+
+   /* Record hard evidence outside the run dir, which the harness tears down */
+   mctf_sh(NULL,
+           "{ echo '--- restored tree ---'; find %s -type f | head -50; "
+           "echo '--- file count ---'; find %s -type f | wc -l; } "
+           "> /tmp/azure-restore-evidence.txt 2>&1",
+           target, target);
+
+   /* PG_VERSION is a data file: it can only be here if the download ran */
+   MCTF_ASSERT(mctf_sh(NULL, "find %s -name PG_VERSION | grep -q .", target) == 0,
+               cleanup,
+               "restored tree has no PG_VERSION — nothing was downloaded from Azure");
+
+   /* Files are staged as .tmp and renamed only on a clean transfer */
+   MCTF_ASSERT(mctf_sh(NULL, "! find %s -name '*.tmp' | grep -q .", target) == 0,
+               cleanup,
+               "restored tree still contains .tmp files — a transfer did not complete");
+
+cleanup:
+   MCTF_FINISH();
+}
