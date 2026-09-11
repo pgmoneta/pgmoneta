@@ -69,6 +69,41 @@ pgmoneta: https://pgmoneta.github.io/
 Report bugs: https://github.com/pgmoneta/pgmoneta/issues
 ```
 
+## Configuration file
+
+The `-c` flag accepts a dedicated `pgmoneta_cli.conf` file — **not** the main `pgmoneta.conf` server configuration file.
+
+Passing `pgmoneta.conf` directly to `pgmoneta-cli` via `-c` will cause the CLI to read the PostgreSQL server port (`5432`) instead of the management port, and the connection will fail.
+
+To connect to a running pgmoneta instance, use one of the following methods:
+
+**Option 1: Use a dedicated CLI config file (`pgmoneta_cli.conf`)**
+
+``` ini
+host = localhost
+port = 5001
+```
+
+Then run:
+
+``` sh
+pgmoneta-cli -c pgmoneta_cli.conf status
+```
+
+**Option 2: Use `-h` and `-p` flags directly**
+
+``` sh
+pgmoneta-cli -h localhost -p 5001 status
+```
+
+**Option 3: Use Unix Domain Socket (local only)**
+
+Set `unix_socket_dir` in `pgmoneta.conf` and run without any flags:
+
+``` sh
+pgmoneta-cli status
+```
+
 ## backup
 
 Backup a server
