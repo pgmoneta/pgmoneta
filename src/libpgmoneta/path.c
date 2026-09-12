@@ -26,37 +26,41 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- /* pgmoneta */
+/* pgmoneta */
 #include <utils.h>
 
 /* system */
 #include <path.h>
 #include <string.h>
 
-
-
 char*
-pgmoneta_path_directory_add(char* path, char* directory){
-    char* result = path;
+pgmoneta_path_directory_add(char* path, char* directory)
+{
+   char* result = path;
 
-    if (path == NULL || directory == NULL)
-    {
-        return path;
-    }
+   if (path == NULL || directory == NULL)
+   {
+      return path;
+   }
 
-    // check what is the directory type (.. , . , dir)
-    if(strcmp(directory, "..") == 0){
-        char* parent = pgmoneta_get_parent_dir(path);
-        result = parent;
-    }else if(strcmp(directory, ".") == 0){
-        result = path;
-    }else{
-        if (!pgmoneta_ends_with(path, "/"))
-        {
-            path = pgmoneta_append(path, "/");
-        }
-        result = pgmoneta_append(path, directory);
-    }
+   // check what is the directory type (.. , . , dir)
+   if (strcmp(directory, "..") == 0)
+   {
+      char* parent = pgmoneta_get_parent_dir(path);
+      result = parent;
+   }
+   else if (strcmp(directory, ".") == 0)
+   {
+      result = path;
+   }
+   else
+   {
+      if (!pgmoneta_ends_with(path, "/"))
+      {
+         path = pgmoneta_append(path, "/");
+      }
+      result = pgmoneta_append(path, directory);
+   }
 
-    return result;
+   return result;
 }

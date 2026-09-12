@@ -33,11 +33,8 @@
 extern "C" {
 #endif
 
-
-
 char*
 pgmoneta_path_directory_add(char* path, char* directory);
-
 
 #ifdef __cplusplus
 }
