@@ -1896,6 +1896,188 @@
             ],
             "title": "Total Server Storage",
             "type": "stat"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 45
+            },
+            "id": 400,
+            "panels": [],
+            "title": "Databases",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+            },
+            "description": "Total size of the databases on this server",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "noValue": "0 B",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1073741824
+                            },
+                            {
+                                "color": "orange",
+                                "value": 10737418240
+                            },
+                            {
+                                "color": "red",
+                                "value": 107374182400
+                            }
+                        ]
+                    },
+                    "unit": "bytes"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 0,
+                "y": 46
+            },
+            "id": 401,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "expr": "sum(pgmoneta_server_database_size{name=\"$server\"})",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Total Database Size",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+            },
+            "description": "Size of each database on this server",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 20,
+                        "gradientMode": "opacity",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "bytes"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 18,
+                "x": 6,
+                "y": 46
+            },
+            "id": 402,
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "lastNotNull"
+                    ],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "expr": "pgmoneta_server_database_size{name=\"$server\"}",
+                    "legendFormat": "{{database}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Database Size",
+            "type": "timeseries"
         }
     ],
     "refresh": "30s",
@@ -1957,6 +2139,6 @@
     "timezone": "browser",
     "title": "pgmoneta Server Details",
     "uid": "pgmoneta-server-details",
-    "version": 1,
+    "version": 2,
     "weekStart": ""
 }
