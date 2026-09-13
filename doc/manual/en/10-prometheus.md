@@ -359,6 +359,15 @@ Provides information about installed PostgreSQL extensions on the server.
 | version | The version of the installed extension. |
 | comment | A description of what the extension does. |
 
+**pgmoneta_server_database_size**
+
+Reports the size in bytes of each database on the PostgreSQL server.
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+
 **pgmoneta_extension_pgmoneta_ext**
 
 Reports the status of the pgmoneta extension on the PostgreSQL server.
