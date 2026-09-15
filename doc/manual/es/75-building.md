@@ -11,7 +11,7 @@ El sistema de compilación principal se define en [CMakeLists.txt][cmake_txt]. L
 Instala las dependencias con
 
 ```sh
-dnf install git gcc clang clang-analyzer clang-tools-extra cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel libasan libasan-static
+dnf install git gcc clang clang-analyzer clang-tools-extra cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel libyaml libyaml-devel libasan libasan-static
 ```
 
 Para construir [**pgmoneta**][pgmoneta] en modo de release:
