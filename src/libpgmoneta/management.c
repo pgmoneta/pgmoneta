@@ -1679,10 +1679,12 @@ read_complete(SSL* ssl, int socket, void* buf, size_t size)
    size_t offset;
    size_t needs;
    int retries;
+   int empty_retries;
 
    offset = 0;
    needs = size;
    retries = 0;
+   empty_retries = 0;
 
 read:
    if (ssl == NULL)
@@ -1699,7 +1701,19 @@ read:
       if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
          errno = 0;
-         goto read;
+
+         /* Nothing to read yet. Sleep before retrying, otherwise this is a
+            busy loop that spins a core for as long as the peer is quiet. */
+         SLEEP(10000000L);
+
+         if (empty_retries < MANAGEMENT_READ_EMPTY_RETRIES)
+         {
+            empty_retries++;
+            goto read;
+         }
+
+         errno = ETIMEDOUT;
+         goto error;
       }
 
       goto error;

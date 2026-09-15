@@ -45,6 +45,14 @@ extern "C" {
 /**
  * Management header
  */
+/**
+ * Number of 10ms retries read_complete() makes while the peer has sent
+ * nothing. 30000 is five minutes, which is long enough for a management
+ * command that takes a while to produce its outcome, and short enough that
+ * an unresponsive peer does not hold the caller forever.
+ */
+#define MANAGEMENT_READ_EMPTY_RETRIES    30000
+
 #define MANAGEMENT_COMPRESSION_UNKNOWN   -1
 #define MANAGEMENT_COMPRESSION_NONE      0
 #define MANAGEMENT_COMPRESSION_GZIP      1
