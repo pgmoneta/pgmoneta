@@ -82,6 +82,7 @@ extern "C" {
 #define NUMBER_OF_ADMINS             8
 #define NUMBER_OF_HOT_STANDBY        8
 #define NUMBER_OF_EXTENSIONS         64
+#define NUMBER_OF_DATABASES          64
 
 #define MAX_NUMBER_OF_COLUMNS        8
 #define MAX_NUMBER_OF_TABLESPACES    64
@@ -279,6 +280,15 @@ struct extension_info
    struct version installed_version; /**< The installed version */
 } __attribute__((aligned(64)));
 
+/** @struct database
+ * Defines information about a PostgreSQL database
+ */
+struct database
+{
+   char name[MISC_LENGTH]; /**< The database name */
+   uint64_t size;          /**< The size of the database */
+} __attribute__((aligned(64)));
+
 /** @struct s3_configuration
  * Defines the S3 configuration
  */
@@ -343,6 +353,7 @@ struct server
    char wal_shipping[MAX_PATH];                                   /**< The WAL shipping directory */
    int number_of_hot_standbys;                                    /**< The number of hot standby directories */
    int number_of_extensions;                                      /**< The number of extensions */
+   int number_of_databases;                                       /**< The number of databases */
    char hot_standby[NUMBER_OF_HOT_STANDBY][MAX_PATH];             /**< The hot standby directories */
    char hot_standby_overrides[NUMBER_OF_HOT_STANDBY][MAX_PATH];   /**< The hot standby overrides directory */
    char hot_standby_tablespaces[NUMBER_OF_HOT_STANDBY][MAX_PATH]; /**< The hot standby tablespaces mappings */
@@ -357,6 +368,7 @@ struct server
    bool has_extension;                                            /**< Does this have pgmoneta_ext */
    char ext_version[MISC_LENGTH];                                 /**< The major version of the extension*/
    struct extension_info extensions[NUMBER_OF_EXTENSIONS];        /**< The extensions */
+   struct database databases[NUMBER_OF_DATABASES];                /**< The databases */
    struct s3_configuration s3;                                    /**< The S3 configuration */
    struct progress progress;                                      /**< The progress */
 } __attribute__((aligned(64)));
