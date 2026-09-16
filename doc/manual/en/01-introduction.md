@@ -42,6 +42,7 @@ through standard tools.
 * WAL shipping support
 * Hot standby
 * Prometheus support
+* Health check
 * Remote management
 * Offline detection
 * Transport Layer Security (TLS) v1.2+ support

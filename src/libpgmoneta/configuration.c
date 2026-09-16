@@ -216,6 +216,12 @@ pgmoneta_init_main_configuration(void* shm)
 
    config->verification = PGMONETA_TIME_DISABLED;
 
+   config->health_check = false;
+   config->health_check_period = PGMONETA_TIME_SEC(DEFAULT_HEALTH_CHECK_PERIOD);
+   config->health_check_timeout = PGMONETA_TIME_SEC(DEFAULT_HEALTH_CHECK_TIMEOUT);
+   memset(config->health_check_user, 0, sizeof(config->health_check_user));
+   config->health_check_pid = 0;
+
 #ifdef DEBUG
    config->link = true;
 #endif
@@ -1799,6 +1805,64 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (pgmoneta_compare_string(key, "health_check"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_bool(value, &config->health_check))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "health_check_period"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_seconds(value, &config->health_check_period, PGMONETA_TIME_SEC(DEFAULT_HEALTH_CHECK_PERIOD)))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "health_check_timeout"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_seconds(value, &config->health_check_timeout, PGMONETA_TIME_SEC(DEFAULT_HEALTH_CHECK_TIMEOUT)))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "health_check_user"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_USERNAME_LENGTH - 1)
+                     {
+                        max = MAX_USERNAME_LENGTH - 1;
+                     }
+                     memcpy(config->health_check_user, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
 #ifdef DEBUG
                else if (pgmoneta_compare_string(key, "link"))
                {
@@ -1917,6 +1981,12 @@ pgmoneta_validate_main_configuration(void* shm)
          pgmoneta_log_fatal("base_dir is not a directory (%s)", config->base_dir);
          return 1;
       }
+   }
+
+   if (config->health_check && strlen(config->health_check_user) == 0)
+   {
+      pgmoneta_log_fatal("health_check is enabled but health_check_user is not defined");
+      return 1;
    }
 
    if (config->retention_years != -1 && config->retention_years < 1)
@@ -3783,6 +3853,10 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)config->common.users_path, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)config->common.admins_path, ValueString);
    pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_VERIFICATION, config->verification, FORMAT_TIME_S);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HEALTH_CHECK, (uintptr_t)config->health_check, ValueBool);
+   pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_HEALTH_CHECK_PERIOD, config->health_check_period, FORMAT_TIME_S);
+   pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_HEALTH_CHECK_TIMEOUT, config->health_check_timeout, FORMAT_TIME_S);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HEALTH_CHECK_USER, (uintptr_t)config->health_check_user, ValueString);
 
    free(ret);
 }
@@ -4587,6 +4661,32 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
             unknown = true;
          }
       }
+      else if (pgmoneta_compare_string(key, "health_check"))
+      {
+         if (as_bool(value, &config->health_check))
+         {
+            unknown = true;
+         }
+      }
+      else if (pgmoneta_compare_string(key, "health_check_period"))
+      {
+         if (as_seconds(value, &config->health_check_period, PGMONETA_TIME_SEC(DEFAULT_HEALTH_CHECK_PERIOD)))
+         {
+            unknown = true;
+         }
+      }
+      else if (pgmoneta_compare_string(key, "health_check_timeout"))
+      {
+         if (as_seconds(value, &config->health_check_timeout, PGMONETA_TIME_SEC(DEFAULT_HEALTH_CHECK_TIMEOUT)))
+         {
+            unknown = true;
+         }
+      }
+      else if (pgmoneta_compare_string(key, "health_check_user"))
+      {
+         memset(config->health_check_user, 0, sizeof(config->health_check_user));
+         memcpy(config->health_check_user, value, MIN(strlen(value), (size_t)(MAX_USERNAME_LENGTH - 1)));
+      }
       else if (pgmoneta_compare_string(key, "blocking_timeout"))
       {
          if (as_seconds(value, &config->blocking_timeout, PGMONETA_TIME_SEC(DEFAULT_BLOCKING_TIMEOUT)))
@@ -4708,6 +4808,22 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
          else if (pgmoneta_compare_string(key_info.key, "verification"))
          {
             pgmoneta_snprintf(buffer, buffer_size, "%" PRId64, pgmoneta_time_convert(config->verification, FORMAT_TIME_S));
+         }
+         else if (pgmoneta_compare_string(key_info.key, "health_check"))
+         {
+            pgmoneta_snprintf(buffer, buffer_size, "%s", config->health_check ? "on" : "off");
+         }
+         else if (pgmoneta_compare_string(key_info.key, "health_check_period"))
+         {
+            pgmoneta_snprintf(buffer, buffer_size, "%" PRId64, pgmoneta_time_convert(config->health_check_period, FORMAT_TIME_S));
+         }
+         else if (pgmoneta_compare_string(key_info.key, "health_check_timeout"))
+         {
+            pgmoneta_snprintf(buffer, buffer_size, "%" PRId64, pgmoneta_time_convert(config->health_check_timeout, FORMAT_TIME_S));
+         }
+         else if (pgmoneta_compare_string(key_info.key, "health_check_user"))
+         {
+            pgmoneta_snprintf(buffer, buffer_size, "%s", config->health_check_user);
          }
          else if (pgmoneta_compare_string(key_info.key, "retention"))
          {
@@ -6260,6 +6376,12 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    config->workers = reload->workers;
    config->progress = reload->progress;
    config->max_rate = reload->max_rate;
+
+   /* health check (worker lifecycle managed by the main process after reload) */
+   config->health_check = reload->health_check;
+   config->health_check_period = reload->health_check_period;
+   config->health_check_timeout = reload->health_check_timeout;
+   memcpy(config->health_check_user, reload->health_check_user, sizeof(config->health_check_user));
 
    /* prometheus */
    atomic_init(&config->common.prometheus.logging_info, 0);
