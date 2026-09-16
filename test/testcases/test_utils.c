@@ -270,6 +270,56 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_strip_extension)
+{
+   char* name = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("backup.tar", &name), 0, cleanup,
+                      "strip_extension failed");
+   MCTF_ASSERT_STR_EQ(name, "backup", cleanup, "extension not stripped");
+   free(name);
+   name = NULL;
+
+   /* Only the last extension goes. */
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("backup.tar.zstd", &name), 0, cleanup,
+                      "strip_extension failed");
+   MCTF_ASSERT_STR_EQ(name, "backup.tar", cleanup, "stripped more than one extension");
+   free(name);
+   name = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("/path/to/backup.tar", &name), 0, cleanup,
+                      "strip_extension failed");
+   MCTF_ASSERT_STR_EQ(name, "/path/to/backup", cleanup, "extension not stripped from a path");
+   free(name);
+   name = NULL;
+
+   /* A file with no extension keeps its name, even when a directory in the
+      path contains a dot. */
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("no_extension", &name), 0, cleanup,
+                      "strip_extension failed");
+   MCTF_ASSERT_STR_EQ(name, "no_extension", cleanup, "name changed without an extension");
+   free(name);
+   name = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("/mnt/backups.old/pgmoneta/000001", &name), 0,
+                      cleanup, "strip_extension failed");
+   MCTF_ASSERT_STR_EQ(name, "/mnt/backups.old/pgmoneta/000001", cleanup,
+                      "a dot in a directory was treated as an extension");
+   free(name);
+   name = NULL;
+
+   /* A real extension is still stripped when the path also has a dotted
+      directory. */
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("/mnt/backups.old/wal/000001.aes", &name), 0,
+                      cleanup, "strip_extension failed");
+   MCTF_ASSERT_STR_EQ(name, "/mnt/backups.old/wal/000001", cleanup,
+                      "extension not stripped below a dotted directory");
+
+cleanup:
+   free(name);
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_get_parent_dir)
 {
    char* parent = NULL;
