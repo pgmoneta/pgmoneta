@@ -2454,6 +2454,8 @@ restore_backup_full(struct art* nodes)
    struct backup* backup = NULL;
    char* target_root = NULL;
    char* target_base = NULL;
+   bool created_target_base = false;
+   bool workflow_started = false;
    uint64_t free_space = 0;
    uint64_t required_space = 0;
    char* wal_root = NULL;
@@ -2497,6 +2499,7 @@ restore_backup_full(struct art* nodes)
          ret = RESTORE_ERROR;
          goto error;
       }
+      created_target_base = true;
    }
 
    pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root, ValueString);
@@ -2548,6 +2551,8 @@ restore_backup_full(struct art* nodes)
 
    pgmoneta_progress_setup(server, workflow, nodes, WORKFLOW_TYPE_RESTORE);
 
+   workflow_started = true;
+
    if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
    {
       goto error;
@@ -2569,6 +2574,29 @@ error:
    if (pgmoneta_is_progress_enabled(server))
    {
       pgmoneta_progress_teardown(server);
+   }
+
+   if (created_target_base || workflow_started)
+   {
+      pgmoneta_delete_directory(target_base);
+   }
+
+   if (workflow_started)
+   {
+      for (uint64_t i = 0; i < backup->number_of_tablespaces; i++)
+      {
+         char tblspc[MAX_PATH];
+
+         memset(tblspc, 0, MAX_PATH);
+         pgmoneta_snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", directory,
+                           config->common.servers[server].name, backup->label,
+                           backup->tablespaces[i]);
+
+         if (pgmoneta_exists(tblspc))
+         {
+            pgmoneta_delete_directory(tblspc);
+         }
+      }
    }
 
    free(target_root);
