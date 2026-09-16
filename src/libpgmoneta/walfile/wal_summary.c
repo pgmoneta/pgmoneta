@@ -41,6 +41,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <libgen.h>
+#include <unistd.h>
 
 static char* summary_file_name(uint64_t s_lsn, uint64_t e_lsn);
 static int summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
