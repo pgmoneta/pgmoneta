@@ -2064,6 +2064,12 @@ sasl_prep(char* password, char** password_prep)
    }
 
    *password_prep = strdup(password);
+
+   if (*password_prep == NULL)
+   {
+      goto error;
+   }
+
    return 0;
 
 error:
