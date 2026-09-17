@@ -55,6 +55,7 @@ extern "C" {
 #define MCTF_BACKEND_GARAGE  0 /**< S3, emulated by Garage */
 #define MCTF_BACKEND_AZURITE 1 /**< Azure Blob Storage, emulated by Azurite */
 #define MCTF_BACKEND_SSH     2 /**< SSH, emulated by atmoz/sftp */
+#define MCTF_BACKEND_GCS     3 /**< GCS, emulated by fake-gcs-server */
 
 /**
  * Shared context for one active backend, filled by the driver's start()
@@ -252,6 +253,20 @@ mctf_se_azure_blob_count_prefix(const char* prefix);
  */
 bool
 mctf_se_azure_blob_exists(const char* name);
+
+/**
+ * Count the objects in the active fake-gcs-server bucket whose name starts
+ * with @p prefix, by querying the GCS JSON API directly (unauthenticated,
+ * matching the emulator convention pgmoneta itself uses when no
+ * gcs_credentials_file is configured). This is independent of any
+ * pgmoneta-cli command, so it verifies a backup actually reached GCS even
+ * when no CLI-level "gcs ls" exists yet.
+ *
+ * @param prefix The object-name prefix, e.g. "pgmoneta/primary/backup/<label>/"
+ * @return Number of matching objects (>= 0), or -1 on error / no active backend
+ */
+int
+mctf_se_gcs_object_count_prefix(const char* prefix);
 
 #ifdef __cplusplus
 }
