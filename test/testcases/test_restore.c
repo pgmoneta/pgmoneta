@@ -40,7 +40,7 @@ MCTF_TEST(test_pgmoneta_restore_full)
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "restore operation failed");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "restore operation failed");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -53,7 +53,7 @@ MCTF_TEST(test_pgmoneta_restore_incremental_chain)
 
    MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup, "backup chain failed during setup - check server is online and backup configuration");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "restore operation failed");
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "restore operation failed");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();

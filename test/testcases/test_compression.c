@@ -269,11 +269,11 @@ MCTF_TEST(test_pgmoneta_server_zstd_backup_restore)
                cleanup, "failed to set server online before backup");
 
    /* Full backup with server-zstd + AES */
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, 0) == 0,
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, false, NULL, 0) == 0,
                cleanup, "backup with server-zstd compression and AES encryption failed");
 
    /* Restore newest backup */
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0,
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0,
                cleanup, "restore of server-zstd compressed backup failed");
 
 cleanup:
@@ -334,7 +334,7 @@ MCTF_TEST(test_not_double_compression_full_backup)
                cleanup, "failed to set server online before backup");
 
    /* Full backup with server-zstd + AES */
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, 0) == 0,
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, false, NULL, 0) == 0,
                cleanup, "backup with server-zstd compression and AES encryption failed");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
@@ -400,9 +400,9 @@ MCTF_TEST(test_not_double_compression_incremental_backup)
    MCTF_ASSERT(pgmoneta_tsclient_mode("primary", "online", 0) == 0,
                cleanup, "failed to set server online before backup");
 
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, 0) == 0,
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, false, NULL, 0) == 0,
                cleanup, "backup with server-zstd compression and AES encryption failed");
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0,
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0) == 0,
                cleanup, "backup with server-zstd compression and AES encryption failed");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
@@ -465,9 +465,9 @@ MCTF_TEST(test_not_double_compression_wal_files)
    MCTF_ASSERT(pgmoneta_tsclient_mode("primary", "online", 0) == 0,
                cleanup, "failed to set server online before backup");
 
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, 0) == 0,
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, false, NULL, 0) == 0,
                cleanup, "backup with server-zstd compression and AES encryption failed");
-   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0,
+   MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0) == 0,
                cleanup, "backup with server-zstd compression and AES encryption failed");
 
    wal_dir = pgmoneta_get_server_wal(PRIMARY_SERVER);

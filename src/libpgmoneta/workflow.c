@@ -33,6 +33,7 @@
 #include <compression.h>
 #include <hot_standby.h>
 #include <info.h>
+#include <job.h>
 #include <logging.h>
 #include <management.h>
 #include <progress.h>
@@ -124,6 +125,76 @@ pgmoneta_workflow_create(int workflow_type, struct backup* backup)
    }
 
    return w;
+}
+
+int
+pgmoneta_phase_from_workflow_name(char* name)
+{
+   if (pgmoneta_compare_string(name, PHASE_NAME_BASEBACKUP) || pgmoneta_compare_string(name, PHASE_NAME_INCREMENTAL_BACKUP))
+   {
+      return PHASE_BASEBACKUP;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_MANIFEST))
+   {
+      return PHASE_MANIFEST;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_SHA512))
+   {
+      return PHASE_SHA512;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_LINK))
+   {
+      return PHASE_LINKING;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_ZSTD) || pgmoneta_compare_string(name, PHASE_NAME_GZIP) || pgmoneta_compare_string(name, PHASE_NAME_LZ4) || pgmoneta_compare_string(name, PHASE_NAME_BZIP2))
+   {
+      return PHASE_COMPRESSION;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_ENCRYPTION))
+   {
+      return PHASE_ENCRYPTION;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_DELETE))
+   {
+      return PHASE_DELETE;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_INFO))
+   {
+      return PHASE_INFO;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_RESTORE))
+   {
+      return PHASE_RESTORE;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_VERIFY))
+   {
+      return PHASE_VERIFY;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_COPY_WAL))
+   {
+      return PHASE_COPY_WAL;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_RECOVERY_INFO))
+   {
+      return PHASE_RECOVERY_INFO;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_EXCLUDED_FILES))
+   {
+      return PHASE_EXCLUDED_FILES;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_PERMISSIONS))
+   {
+      return PHASE_PERMISSIONS;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_CLEANUP))
+   {
+      return PHASE_CLEANUP;
+   }
+   if (pgmoneta_compare_string(name, PHASE_NAME_COMBINE_INCREMENTAL))
+   {
+      return PHASE_COMBINE_INCREMENTAL;
+   }
+   return -1;
 }
 
 int
@@ -314,9 +385,18 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
    bool progress_enabled = false;
    struct workflow* current = NULL;
    struct main_configuration* config = (struct main_configuration*)shmem;
+   bool async_job = false;
 
    *error_name = en;
    *error_code = ec;
+
+   if (pgmoneta_art_contains_key(nodes, NODE_SERVER_ID))
+   {
+      server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+      progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
+   }
+
+   async_job = pgmoneta_job_is_active(server);
 
    current = workflow;
    while (current != NULL)
@@ -330,18 +410,12 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
       current = current->next;
    }
 
-   if (pgmoneta_art_contains_key(nodes, NODE_SERVER_ID))
-   {
-      server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-      progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
-   }
-
    current = workflow;
    while (current != NULL)
    {
+      int phase = pgmoneta_phase_from_workflow_name(current->name());
       if (progress_enabled)
       {
-         int phase = pgmoneta_progress_phase_from_workflow_name(current->name());
          if (phase > 0)
          {
             char* key = pgmoneta_progress_limit_node_key(phase);
@@ -350,6 +424,11 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
                pgmoneta_progress_next_phase(server, phase, nodes);
             }
          }
+      }
+
+      if (async_job && phase != -1)
+      {
+         pgmoneta_job_update_phase(server, phase);
       }
 
       if (current->execute(current->name(), nodes))
@@ -361,7 +440,6 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
 
       if (progress_enabled)
       {
-         int phase = pgmoneta_progress_phase_from_workflow_name(current->name());
          if (phase > 0)
          {
             char* key = pgmoneta_progress_limit_node_key(phase);
