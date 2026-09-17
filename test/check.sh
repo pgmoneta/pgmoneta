@@ -267,14 +267,12 @@ start_postgresql() {
   $SUDO chmod +x /root/usr/bin/run-postgresql-local
   $SUDO mkdir -p /root/usr/local/bin
 
-  if [[ "$PG_VERSION" == "17" ]]; then
-    echo "Setting up tablespace location directories (postgres-owned)"
-    $SUDO rm -Rf "$TABLESPACE_DIR"
-    $SUDO mkdir -p "$TABLESPACE_DIR/ts1" "$TABLESPACE_DIR/ts2"
-    $SUDO chown -R postgres:postgres "$TABLESPACE_DIR"
-    $SUDO chmod 777 "$TABLESPACE_DIR"
-    $SUDO chmod 700 "$TABLESPACE_DIR/ts1" "$TABLESPACE_DIR/ts2"
-  fi
+  echo "Setting up tablespace location directories (postgres-owned)"
+  $SUDO rm -Rf "$TABLESPACE_DIR"
+  $SUDO mkdir -p "$TABLESPACE_DIR/ts1" "$TABLESPACE_DIR/ts2"
+  $SUDO chown -R postgres:postgres "$TABLESPACE_DIR"
+  $SUDO chmod 777 "$TABLESPACE_DIR"
+  $SUDO chmod 700 "$TABLESPACE_DIR/ts1" "$TABLESPACE_DIR/ts2"
 
   echo "Setting up env variables"
   export PG_DATABASE=${PG_DATABASE}
@@ -463,13 +461,12 @@ do_setup() {
   else
     echo "Start PostgreSQL $PG_VERSION container"
     start_postgresql_container
-    if [[ "$PG_VERSION" == "17" ]]; then
-      echo "Preparing host tablespace directory for hot standby copies"
-      chmod -R u+rwx "$TABLESPACE_DIR" 2>/dev/null || true
-      rm -Rf "$TABLESPACE_DIR"
-      mkdir -p "$TABLESPACE_DIR"
-      chmod 777 "$TABLESPACE_DIR"
-    fi
+
+    echo "Preparing host tablespace directory for hot standby copies"
+    chmod -R u+rwx "$TABLESPACE_DIR" 2>/dev/null || true
+    rm -Rf "$TABLESPACE_DIR"
+    mkdir -p "$TABLESPACE_DIR"
+    chmod 777 "$TABLESPACE_DIR"
   fi
 
   echo "Initialize pgmoneta"
