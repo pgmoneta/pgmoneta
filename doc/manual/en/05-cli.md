@@ -197,6 +197,11 @@ pgmoneta-cli s3 restore primary 20260316000957 /tmp
 
 Verify a backup from a server
 
+Each file is checked against the hash recorded when the backup was taken. If the cluster
+was created with data checksums then the pages of its relation files are checked as well,
+which catches a page that was already damaged when the backup was made rather than one
+damaged since. The command fails if any file does not verify.
+
 Command
 
 ``` sh

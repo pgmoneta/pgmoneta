@@ -224,3 +224,51 @@ error:
    }
    return 1;
 }
+
+void
+pgmoneta_control_data_page_layout(struct control_file_data* controldata,
+                                  uint32_t* blcksz, uint32_t* relseg_size,
+                                  uint32_t* data_checksum_version)
+{
+   uint32_t b = 0;
+   uint32_t r = 0;
+   uint32_t c = 0;
+
+   if (controldata != NULL)
+   {
+      switch (controldata->version)
+      {
+         case CONTROL_FILE_V17:
+            b = controldata->data.v17.blcksz;
+            r = controldata->data.v17.relseg_size;
+            c = controldata->data.v17.data_checksum_version;
+            break;
+         case CONTROL_FILE_V18:
+            b = controldata->data.v18.blcksz;
+            r = controldata->data.v18.relseg_size;
+            c = controldata->data.v18.data_checksum_version;
+            break;
+         default:
+            /* 13 through 16 share a layout */
+            b = controldata->data.v13.blcksz;
+            r = controldata->data.v13.relseg_size;
+            c = controldata->data.v13.data_checksum_version;
+            break;
+      }
+   }
+
+   if (blcksz != NULL)
+   {
+      *blcksz = b;
+   }
+
+   if (relseg_size != NULL)
+   {
+      *relseg_size = r;
+   }
+
+   if (data_checksum_version != NULL)
+   {
+      *data_checksum_version = c;
+   }
+}

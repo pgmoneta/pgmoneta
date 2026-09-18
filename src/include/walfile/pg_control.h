@@ -541,4 +541,20 @@ struct control_file_data
 int
 pgmoneta_read_control_data(int server, char* directory, struct control_file_data** controldata);
 
+/**
+ * Get the page geometry of the cluster a control file came from
+ *
+ * The fields are in every version of the structure, but the structure is a
+ * union tagged by version, so reading them means knowing which member to look
+ * at. Versions 13 to 16 share a layout.
+ * @param controldata The control data
+ * @param blcksz [out] The block size, or 0 if not wanted
+ * @param relseg_size [out] The number of blocks in a segment, or 0 if not wanted
+ * @param data_checksum_version [out] Zero when the cluster has no page checksums
+ */
+void
+pgmoneta_control_data_page_layout(struct control_file_data* controldata,
+                                  uint32_t* blcksz, uint32_t* relseg_size,
+                                  uint32_t* data_checksum_version);
+
 #endif // PGMONETA_PG_CONTROL_H
