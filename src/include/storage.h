@@ -159,6 +159,15 @@ pgmoneta_sftp_wal_close(int server, char* filename, bool partial, sftp_file* fil
 bool
 pgmoneta_is_storage_engine_enabled(int engine);
 
+/**
+ * Delete all S3 objects under a backup prefix (S3 storage engine cleanup)
+ * @param server The server index
+ * @param label The backup label (prefix)
+ * @return 0 on success, otherwise 1
+ */
+int
+s3_cleanup(int server, char* label);
+
 #ifdef __cplusplus
 }
 #endif

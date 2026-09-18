@@ -517,12 +517,14 @@ pgmoneta-cli s3 <action> <arguments>
 Subcommand
 
 - `ls` : List all the files in s3
+- `delete` : Delete all files under a remote prefix in s3
 - `restore` : Download a backup from s3 to the local backup directory
 
 Example
 
 ```sh
 pgmoneta-cli s3 ls primary
+pgmoneta-cli s3 delete primary 20260316000957
 pgmoneta-cli s3 restore primary 20260316000957
 ```
 ### s3 ls
@@ -551,6 +553,20 @@ Examples
 
 ```sh
 pgmoneta-cli s3 restore primary 20260316000957 /tmp
+```
+### s3 delete
+
+Delete the S3 copy of a backup.
+
+- With `storage_engine = local, s3` only the S3 copy is removed; the local backup stays intact
+- With `storage_engine = s3` the leftover local metadata is removed as well, so `list` stays clean
+- Refuses to delete a backup that has a dependent live incremental child (use normal `delete` for chain-aware removal); the check applies when the local engine is enabled
+- Refuses when the local catalog cannot be read
+
+Examples
+
+```sh
+pgmoneta-cli s3 delete primary 20260316000957
 ```
 ## clear
 

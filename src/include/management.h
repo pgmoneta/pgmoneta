@@ -106,6 +106,7 @@ extern "C" {
 #define MANAGEMENT_S3_RESTORE     201
 #define MANAGEMENT_AZURE_RESTORE  202
 #define MANAGEMENT_GCS_RESTORE    203
+#define MANAGEMENT_S3_DELETE      204
 
 /**
  * Management categories
@@ -428,6 +429,12 @@ extern "C" {
 #define MANAGEMENT_ERROR_RESTORE_GCS_DOWNLOAD               3302
 #define MANAGEMENT_ERROR_RESTORE_GCS_NETWORK                3303
 #define MANAGEMENT_ERROR_RESTORE_GCS_ERROR                  3304
+#define MANAGEMENT_ERROR_DELETE_S3_NOSERVER                 3400
+#define MANAGEMENT_ERROR_DELETE_S3_NOFORK                   3401
+#define MANAGEMENT_ERROR_DELETE_S3_NETWORK                  3402
+#define MANAGEMENT_ERROR_DELETE_S3_ERROR                    3403
+#define MANAGEMENT_ERROR_DELETE_S3_HAS_CHILD                3404
+#define MANAGEMENT_ERROR_DELETE_S3_UNVERIFIED               3405
 
 /**
  * Output formats
@@ -567,6 +574,20 @@ pgmoneta_management_request_restore_azure_objects(SSL* ssl, int socket, char* se
  */
 int
 pgmoneta_management_request_restore_gcs_objects(SSL* ssl, int socket, char* server, char* label, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a delete s3 objects request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param prefix The prefix to delete under the server backup path
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_delete_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request
