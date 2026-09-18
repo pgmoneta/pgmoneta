@@ -1055,3 +1055,19 @@ done:
 
    return count;
 }
+
+int
+mctf_se_cli_bg(const char* args, const char* outfile)
+{
+   if (!storage_active || cli_bin[0] == '\0')
+   {
+      return MCTF_FAIL;
+   }
+
+   if (args == NULL || outfile == NULL)
+   {
+      return MCTF_FAIL;
+   }
+
+   return mctf_sh(NULL, "( %s -c %s %s > %s 2>&1 & )", cli_bin, cli_conf_path, args, outfile);
+}

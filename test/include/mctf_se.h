@@ -308,6 +308,20 @@ mctf_se_azure_blob_exists(const char* name);
 int
 mctf_se_gcs_object_count_prefix(const char* prefix);
 
+/**
+ * Start a pgmoneta-cli command in the background, writing its full output
+ * (stdout + stderr) to @p outfile. Returns immediately; the caller is
+ * responsible for polling @p outfile for completion. Useful for holding
+ * server-side state (e.g. the repository lock) while another CLI command
+ * runs in the foreground.
+ *
+ * @param args The pgmoneta-cli arguments, e.g. "backup primary"
+ * @param outfile The file the command's output is redirected to
+ * @return MCTF_OK when the command was started, MCTF_FAIL otherwise
+ */
+int
+mctf_se_cli_bg(const char* args, const char* outfile);
+
 #ifdef __cplusplus
 }
 #endif
