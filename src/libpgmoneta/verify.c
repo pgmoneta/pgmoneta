@@ -58,6 +58,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    struct timespec start_t;
    struct timespec end_t;
    double total_seconds;
+   int number_of_failed = 0;
    char* label = NULL;
    struct backup* backup = NULL;
    struct workflow* workflow = NULL;
@@ -202,6 +203,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
       }
 
       pgmoneta_json_append(failed, (uintptr_t)j, ValueJSON);
+      number_of_failed++;
    }
 
    if (files != NULL && !strcasecmp(files, "all"))
@@ -257,6 +259,19 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 #else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
+
+   /* A backup that did not verify is a failed verification, not a successful
+    * run that happens to list the files which did not match. */
+   if (number_of_failed > 0)
+   {
+      pgmoneta_log_error("Verify: %s/%s failed for %d file%s",
+                         config->common.servers[server].name, label,
+                         number_of_failed, number_of_failed == 1 ? "" : "s");
+
+      pgmoneta_management_response_error_with_nodes(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_VERIFY_ERROR, NAME, compression, encryption, payload, nodes);
+
+      goto error;
+   }
 
    if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {

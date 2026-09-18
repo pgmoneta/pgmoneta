@@ -32,10 +32,12 @@
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
+#include <pagechecksum.h>
 #include <progress.h>
 #include <security.h>
 #include <utils.h>
 #include <value.h>
+#include <walfile/pg_control.h>
 #include <workflow.h>
 
 /* system */
@@ -48,6 +50,19 @@ static char* verify_name(void);
 static int verify_execute(char*, struct art*);
 
 static void do_verify(struct worker_common* wc);
+
+/*
+ * What the cluster this backup came from was built with, read from the
+ * backup's own pg_control rather than from the server as it is configured
+ * now, because a backup can be older than the current settings.
+ *
+ * Set before the workers start and only read after that. Verify runs in a
+ * process of its own, since main.c forks for it, so this is not shared with
+ * any other verification.
+ */
+static bool page_checksums = false;
+static size_t page_block_size = 0;
+static uint32_t page_relseg_size = 0;
 
 struct workflow*
 pgmoneta_create_verify(void)
@@ -130,6 +145,48 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_progress_set_total(server, pgmoneta_deque_size(manifest_paths));
       pgmoneta_deque_destroy(manifest_paths);
    }
+   /* Whether the pages in this backup carry checksums at all is a property of
+    * the cluster it was taken from, so it comes out of the backup's own
+    * pg_control. A cluster built without them leaves pd_checksum meaningless
+    * and there is nothing to check. */
+   page_checksums = false;
+   {
+      struct control_file_data* controldata = NULL;
+
+      if (!pgmoneta_read_control_data(server, (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE), &controldata) &&
+          controldata != NULL)
+      {
+         uint32_t blcksz = 0;
+         uint32_t relseg_size = 0;
+         uint32_t checksum_version = 0;
+
+         pgmoneta_control_data_page_layout(controldata, &blcksz, &relseg_size, &checksum_version);
+
+         if (checksum_version != 0 && blcksz > 0 && relseg_size > 0)
+         {
+            page_checksums = true;
+            page_block_size = (size_t)blcksz;
+            page_relseg_size = relseg_size;
+
+            pgmoneta_log_debug("Verify: Page checksums enabled, block size %zu, %u blocks per segment",
+                               page_block_size, page_relseg_size);
+         }
+         else
+         {
+            pgmoneta_log_debug("Verify: Page checksums not enabled for this backup");
+         }
+
+         free(controldata);
+      }
+      else
+      {
+         /* Without pg_control there is no way to know the block size or
+          * whether checksums were on, and guessing either would turn healthy
+          * pages into reported corruption. The hashes are still checked. */
+         pgmoneta_log_warn("Verify: Could not read pg_control, skipping page checksums");
+      }
+   }
+
    if (pgmoneta_deque_create(true, &failed_deque))
    {
       goto error;
@@ -304,6 +361,54 @@ do_verify(struct worker_common* wc)
    else
    {
       goto error;
+   }
+
+   /* The hash says the file is the one that was backed up. The page checksums
+    * say the pages inside it were not already damaged when it was. A file that
+    * failed its hash is reported for that and not checked twice. */
+   if (!failed && page_checksums)
+   {
+      char* relative = (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_FILENAME);
+      uint32_t segno = 0;
+
+      if (pgmoneta_page_checksummable(relative, &segno))
+      {
+         uint32_t blockno = 0;
+         uint16_t computed = 0;
+         uint16_t stored = 0;
+         int number_of_bad = 0;
+
+         if (pgmoneta_page_verify_file(f, page_block_size, page_relseg_size, segno,
+                                       &blockno, &computed, &stored, &number_of_bad))
+         {
+            char status[MISC_LENGTH];
+
+            memset(&status[0], 0, sizeof(status));
+
+            if (number_of_bad > 0)
+            {
+               pgmoneta_log_error("Verify: %s: block %u: calculated checksum %04X but block contains %04X",
+                                  relative, blockno, computed, stored);
+
+               pgmoneta_snprintf(&status[0], sizeof(status),
+                                 "Page checksum failed for %d block%s, first at %u: calculated %04X but block contains %04X",
+                                 number_of_bad, number_of_bad == 1 ? "" : "s", blockno, computed, stored);
+            }
+            else
+            {
+               /* Read the file to verify the hash a moment ago, so this is not
+                * a missing file: it is not a whole number of blocks. */
+               pgmoneta_log_error("Verify: %s: could not be read as whole blocks", relative);
+
+               pgmoneta_snprintf(&status[0], sizeof(status),
+                                 "Page checksums could not be checked: the file is not a whole number of blocks");
+            }
+
+            pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_STATUS, (uintptr_t)&status[0], ValueString);
+
+            failed = true;
+         }
+      }
    }
 
    if (failed)
