@@ -189,6 +189,19 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_is_safe_label)
+{
+   MCTF_ASSERT(pgmoneta_is_safe_label("20260316000957"), cleanup, "timestamp label should be safe");
+   MCTF_ASSERT(!pgmoneta_is_safe_label(NULL), cleanup, "NULL label should be rejected");
+   MCTF_ASSERT(!pgmoneta_is_safe_label(""), cleanup, "empty label should be rejected");
+   MCTF_ASSERT(!pgmoneta_is_safe_label("primary/backup"), cleanup, "slash should be rejected");
+   MCTF_ASSERT(!pgmoneta_is_safe_label(".."), cleanup, "dot segments should be rejected");
+   MCTF_ASSERT(!pgmoneta_is_safe_label("foo.bar"), cleanup, "dot in label should be rejected");
+
+cleanup:
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_compare_string)
 {
    MCTF_ASSERT(pgmoneta_compare_string("abc", "abc"), cleanup, "compare_string positive case failed");
