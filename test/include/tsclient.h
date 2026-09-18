@@ -117,6 +117,16 @@ int
 pgmoneta_tsclient_force_delete(char* server, char* backup_id, int expected_error);
 
 /**
+ * Execute s3 delete command on the server
+ * @param server the server to perform s3 delete on
+ * @param prefix the S3 prefix (backup label) to delete
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_s3_delete(char* server, char* prefix, int expected_error);
+
+/**
  * Execute retain command on the server
  * @param server the server
  * @param backup_id the backup

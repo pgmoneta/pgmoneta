@@ -276,6 +276,39 @@ error:
 }
 
 int
+pgmoneta_tsclient_s3_delete(char* server, char* prefix, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   if (!prefix)
+   {
+      prefix = "oldest";
+   }
+
+   if (pgmoneta_management_request_delete_s3_objects(NULL, socket, server, prefix, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
 pgmoneta_tsclient_retain(char* server, char* backup_id, bool cascade, int expected_error)
 {
    int socket = -1;
