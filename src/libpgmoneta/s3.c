@@ -46,6 +46,8 @@
 
 #define NAME "s3"
 
+extern int s3_cleanup(int server, char* label);
+
 static bool
 s3_is_safe_prefix(char* prefix)
 {
@@ -382,5 +384,88 @@ error:
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
    free(local_data);
+   exit(1);
+}
+
+void
+pgmoneta_delete_s3_objects(int client_fd, int server, char* prefix, uint8_t compression, uint8_t encryption, struct json* payload)
+{
+   char* elapsed = NULL;
+   char* en = NULL;
+   int ec = -1;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
+   if (prefix == NULL || !s3_is_safe_prefix(prefix))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_ERROR;
+      pgmoneta_log_error("S3 delete: invalid prefix for %s", config->common.servers[server].name);
+      goto error;
+   }
+
+   if (s3_cleanup(server, prefix))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_ERROR;
+      pgmoneta_log_error("S3 delete: failed for %s/%s",
+                         config->common.servers[server].name,
+                         prefix);
+      goto error;
+   }
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   {
+      ec = MANAGEMENT_ERROR_DELETE_S3_NETWORK;
+      pgmoneta_log_error("S3 delete: error sending response for %s",
+                         config->common.servers[server].name);
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
+
+   pgmoneta_log_info("S3 delete: %s/%s (Elapsed: %s)",
+                     config->common.servers[server].name,
+                     prefix,
+                     elapsed);
+
+   pgmoneta_json_destroy(payload);
+   free(elapsed);
+
+   pgmoneta_disconnect(client_fd);
+   pgmoneta_stop_logging();
+   exit(0);
+
+error:
+
+   pgmoneta_management_response_error(
+      NULL,
+      client_fd,
+      config->common.servers[server].name,
+      ec != -1 ? ec : MANAGEMENT_ERROR_DELETE_S3_ERROR,
+      en != NULL ? en : NAME,
+      compression,
+      encryption,
+      payload);
+
+   pgmoneta_json_destroy(payload);
+   free(elapsed);
+
+   pgmoneta_disconnect(client_fd);
+   pgmoneta_stop_logging();
    exit(1);
 }
