@@ -1037,6 +1037,15 @@ bool
 pgmoneta_contains(char* str, char* s);
 
 /**
+ * Check that a backup label is safe to use as a path component.
+ * Rejects NULL, empty, and values that contain '/' or '.' (path traversal).
+ * @param label The backup label
+ * @return true if the label is safe, otherwise false
+ */
+bool
+pgmoneta_is_safe_label(char* label);
+
+/**
  * Remove the first character of a string
  * @param str The string
  * @return The result

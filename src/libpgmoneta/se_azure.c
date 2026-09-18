@@ -34,14 +34,17 @@
 #include <logging.h>
 #include <manifest.h>
 #include <progress.h>
+#include <se_object.h>
 #include <security.h>
 #include <storage.h>
 #include <utils.h>
+#include <vfile.h>
 #include <workers.h>
 #include <workflow.h>
 
 /* system */
 #include <assert.h>
+#include <libgen.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -63,12 +66,19 @@ struct azure_transfer_task
 
 static int azure_upload_files(char* local_root, char* azure_root, int server, int compression, int encryption);
 static int azure_send_upload_request(char* local_root, char* azure_root, char* relative_path);
-static int azure_add_request_headers(struct http_request* request, char* auth_value, char* utc_date);
+static int azure_add_request_headers(struct http_request* request, char* auth_value, char* utc_date, bool blob_type);
 static void do_upload_file(struct worker_common* wc);
 static int azure_create_transfer_task(int server, char* azure_root, char* remote_path,
                                       char* local_root, char* local_path,
                                       struct workers* workers, struct azure_transfer_task** task);
 static int azure_upload_one_file(struct azure_transfer_task* task);
+
+static int azure_send_get_request(char* azure_root, char* relative_path, struct http_response** response);
+static char* azure_build_object_path(char* azure_root, char* relative_path);
+static int azure_build_authorization(char* signed_headers_prefix, char* azure_path,
+                                     char* utc_date, char** auth_value);
+static int azure_http_prepare(char* azure_path, char** azure_host, char* request_path,
+                              size_t request_path_size, struct http** connection);
 
 static char* azure_get_host(void);
 static char* azure_get_basepath(int server, char* identifier);
@@ -462,21 +472,181 @@ error:
    return 1;
 }
 
+static char*
+azure_build_object_path(char* azure_root, char* relative_path)
+{
+   char* azure_path = NULL;
+
+   azure_path = pgmoneta_append(azure_path, azure_root);
+   if (relative_path != NULL && strlen(relative_path) > 0)
+   {
+      if (!pgmoneta_ends_with(azure_root, "/"))
+      {
+         azure_path = pgmoneta_append(azure_path, "/");
+      }
+      azure_path = pgmoneta_append(azure_path, relative_path);
+   }
+
+   return azure_path;
+}
+
+/**
+ * Build a SharedKey Authorization header.
+ *
+ * signed_headers_prefix must contain the method and header lines and end with
+ * "x-ms-date:". This appends the UTC date and canonical resource, then signs.
+ */
+static int
+azure_build_authorization(char* signed_headers_prefix, char* azure_path,
+                          char* utc_date, char** auth_value)
+{
+   char* string_to_sign = NULL;
+   char* signing_key = NULL;
+   char* base64_signature = NULL;
+   size_t base64_signature_length = 0;
+   unsigned char* signature_hmac = NULL;
+   int hmac_length = 0;
+   size_t signing_key_length = 0;
+   struct main_configuration* config;
+
+   *auth_value = NULL;
+   config = (struct main_configuration*)shmem;
+
+   if (signed_headers_prefix == NULL || azure_path == NULL || utc_date == NULL)
+   {
+      goto error;
+   }
+
+   if (strchr(config->azure_storage_account, ' ') != NULL)
+   {
+      pgmoneta_log_error("Azure storage account name contains spaces: '%s'. This is not allowed.",
+                         config->azure_storage_account);
+      goto error;
+   }
+
+   string_to_sign = pgmoneta_append(string_to_sign, signed_headers_prefix);
+   string_to_sign = pgmoneta_append(string_to_sign, utc_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:2021-08-06\n/");
+   string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   /* For path-style endpoints (Azurite), the URI already contains /<account>/<container>/<blob>.
+    * The canonical resource is "/" + account_name + uri_path, so the account appears twice. */
+   if (strlen(config->azure_endpoint) > 0)
+   {
+      string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
+      string_to_sign = pgmoneta_append(string_to_sign, "/");
+   }
+   string_to_sign = pgmoneta_append(string_to_sign, config->azure_container);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, azure_path);
+
+   if (pgmoneta_base64_decode(config->azure_shared_key, strlen(config->azure_shared_key),
+                              (void**)&signing_key, &signing_key_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash(signing_key, signing_key_length, string_to_sign,
+                                                 strlen(string_to_sign), &signature_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_base64_encode((char*)signature_hmac, hmac_length, &base64_signature,
+                              &base64_signature_length))
+   {
+      goto error;
+   }
+
+   *auth_value = pgmoneta_append(*auth_value, "SharedKey ");
+   *auth_value = pgmoneta_append(*auth_value, config->azure_storage_account);
+   *auth_value = pgmoneta_append(*auth_value, ":");
+   *auth_value = pgmoneta_append(*auth_value, base64_signature);
+
+   free(string_to_sign);
+   free(signing_key);
+   free(base64_signature);
+   free(signature_hmac);
+
+   return 0;
+
+error:
+
+   free(string_to_sign);
+   free(signing_key);
+   free(base64_signature);
+   free(signature_hmac);
+   free(*auth_value);
+   *auth_value = NULL;
+
+   return 1;
+}
+
+static int
+azure_http_prepare(char* azure_path, char** azure_host, char* request_path,
+                   size_t request_path_size, struct http** connection)
+{
+   bool use_endpoint;
+   int conn_port;
+   bool conn_tls;
+   struct main_configuration* config;
+
+   *azure_host = NULL;
+   *connection = NULL;
+   config = (struct main_configuration*)shmem;
+
+   *azure_host = azure_get_host();
+   if (*azure_host == NULL)
+   {
+      goto error;
+   }
+
+   use_endpoint = (strlen(config->azure_endpoint) > 0);
+   conn_port = use_endpoint ? (config->azure_port > 0 ? config->azure_port : 443) : 443;
+   conn_tls = use_endpoint ? config->azure_use_tls : true;
+
+   if (pgmoneta_http_create(*azure_host, conn_port, conn_tls, connection))
+   {
+      pgmoneta_log_error("Failed to connect to Azure host: %s:%d", *azure_host, conn_port);
+      goto error;
+   }
+
+   if (use_endpoint)
+   {
+      pgmoneta_snprintf(request_path, request_path_size, "/%s/%s/%s",
+                        config->azure_storage_account, config->azure_container, azure_path);
+   }
+   else
+   {
+      pgmoneta_snprintf(request_path, request_path_size, "/%s/%s",
+                        config->azure_container, azure_path);
+   }
+
+   return 0;
+
+error:
+
+   if (*connection != NULL)
+   {
+      pgmoneta_http_destroy(*connection);
+      *connection = NULL;
+   }
+
+   free(*azure_host);
+   *azure_host = NULL;
+
+   return 1;
+}
+
 static int
 azure_send_upload_request(char* local_root, char* azure_root, char* relative_path)
 {
    char utc_date[UTC_TIME_LENGTH];
-   char* string_to_sign = NULL;
-   char* signing_key = NULL;
-   char* base64_signature = NULL;
-   size_t base64_signature_length;
    char* local_path = NULL;
    char* azure_path = NULL;
    char* azure_host = NULL;
    char* auth_value = NULL;
-   unsigned char* signature_hmac = NULL;
-   int hmac_length = 0;
-   size_t signing_key_length = 0;
+   char* signed_headers_prefix = NULL;
    FILE* file = NULL;
    struct stat file_info;
    void* file_data = NULL;
@@ -489,12 +659,6 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
 
    config = (struct main_configuration*)shmem;
 
-   if (strchr(config->azure_storage_account, ' ') != NULL)
-   {
-      pgmoneta_log_error("Azure storage account name contains spaces: '%s'. This is not allowed.", config->azure_storage_account);
-      goto error;
-   }
-
    local_path = pgmoneta_append(local_path, local_root);
    if (strlen(relative_path) > 0)
    {
@@ -505,14 +669,10 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       local_path = pgmoneta_append(local_path, relative_path);
    }
 
-   azure_path = pgmoneta_append(azure_path, azure_root);
-   if (strlen(relative_path) > 0)
+   azure_path = azure_build_object_path(azure_root, relative_path);
+   if (azure_path == NULL)
    {
-      if (!pgmoneta_ends_with(azure_root, "/"))
-      {
-         azure_path = pgmoneta_append(azure_path, "/");
-      }
-      azure_path = pgmoneta_append(azure_path, relative_path);
+      goto error;
    }
 
    memset(&utc_date[0], 0, sizeof(utc_date));
@@ -548,82 +708,37 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
 
    if (file_info.st_size == 0)
    {
-      string_to_sign = pgmoneta_append(string_to_sign, "PUT\n\n\n\n\napplication/octet-stream\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:");
+      signed_headers_prefix = pgmoneta_append(signed_headers_prefix,
+                                              "PUT\n\n\n\n\napplication/octet-stream\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:");
    }
    else
    {
-      string_to_sign = pgmoneta_append(string_to_sign, "PUT\n\n\n");
       pgmoneta_snprintf(size_str, sizeof(size_str), "%ld", (long)file_info.st_size);
-      string_to_sign = pgmoneta_append(string_to_sign, size_str);
-      string_to_sign = pgmoneta_append(string_to_sign, "\n\napplication/octet-stream\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:");
+      signed_headers_prefix = pgmoneta_append(signed_headers_prefix, "PUT\n\n\n");
+      signed_headers_prefix = pgmoneta_append(signed_headers_prefix, size_str);
+      signed_headers_prefix = pgmoneta_append(signed_headers_prefix,
+                                              "\n\napplication/octet-stream\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:");
    }
 
-   string_to_sign = pgmoneta_append(string_to_sign, utc_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:2021-08-06\n/");
-   string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
-   string_to_sign = pgmoneta_append(string_to_sign, "/");
-   /* For path-style endpoints (Azurite), the URI already contains /<account>/<container>/<blob>.
-    * The canonical resource is "/" + account_name + uri_path, so the account appears twice. */
-   if (strlen(config->azure_endpoint) > 0)
-   {
-      string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
-      string_to_sign = pgmoneta_append(string_to_sign, "/");
-   }
-   string_to_sign = pgmoneta_append(string_to_sign, config->azure_container);
-   string_to_sign = pgmoneta_append(string_to_sign, "/");
-   string_to_sign = pgmoneta_append(string_to_sign, azure_path);
-
-   if (pgmoneta_base64_decode(config->azure_shared_key, strlen(config->azure_shared_key), (void**)&signing_key, &signing_key_length))
+   if (azure_build_authorization(signed_headers_prefix, azure_path, utc_date, &auth_value))
    {
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash(signing_key, signing_key_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
+   if (azure_http_prepare(azure_path, &azure_host, azure_put_path, sizeof(azure_put_path), &connection))
    {
       goto error;
    }
 
-   if (pgmoneta_base64_encode((char*)signature_hmac, hmac_length, &base64_signature, &base64_signature_length))
-   {
-      goto error;
-   }
-
-   auth_value = pgmoneta_append(auth_value, "SharedKey ");
-   auth_value = pgmoneta_append(auth_value, config->azure_storage_account);
-   auth_value = pgmoneta_append(auth_value, ":");
-   auth_value = pgmoneta_append(auth_value, base64_signature);
-
-   azure_host = azure_get_host();
-
-   {
-      bool use_endpoint = (strlen(config->azure_endpoint) > 0);
-      int conn_port = use_endpoint ? (config->azure_port > 0 ? config->azure_port : 443) : 443;
-      bool conn_tls = use_endpoint ? config->azure_use_tls : true;
-
-      if (pgmoneta_http_create(azure_host, conn_port, conn_tls, &connection))
-      {
-         pgmoneta_log_error("Failed to connect to Azure host: %s:%d", azure_host, conn_port);
-         goto error;
-      }
-
-      if (use_endpoint)
-      {
-         pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s/%s",
-                           config->azure_storage_account, config->azure_container, azure_path);
-      }
-      else
-      {
-         pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s",
-                           config->azure_container, azure_path);
-      }
-   }
+   pgmoneta_log_debug("Azure upload request prepared: host=%s, path=%s, file=%s, size=%ld",
+                      azure_host, azure_put_path, local_path, (long)file_info.st_size);
 
    if (pgmoneta_http_request_create(PGMONETA_HTTP_PUT, azure_put_path, &request))
    {
       goto error;
    }
 
-   if (azure_add_request_headers(request, auth_value, utc_date))
+   if (azure_add_request_headers(request, auth_value, utc_date, true))
    {
       goto error;
    }
@@ -668,11 +783,8 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    free(local_path);
    free(azure_path);
    free(azure_host);
-   free(base64_signature);
-   free(signature_hmac);
-   free(string_to_sign);
    free(auth_value);
-   free(signing_key);
+   free(signed_headers_prefix);
    free(file_data);
 
    pgmoneta_http_request_destroy(request);
@@ -683,50 +795,12 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
 
 error:
 
-   if (local_path != NULL)
-   {
-      free(local_path);
-   }
-
-   if (azure_path != NULL)
-   {
-      free(azure_path);
-   }
-
-   if (azure_host != NULL)
-   {
-      free(azure_host);
-   }
-
-   if (signing_key != NULL)
-   {
-      free(signing_key);
-   }
-
-   if (base64_signature != NULL)
-   {
-      free(base64_signature);
-   }
-
-   if (signature_hmac != NULL)
-   {
-      free(signature_hmac);
-   }
-
-   if (string_to_sign != NULL)
-   {
-      free(string_to_sign);
-   }
-
-   if (auth_value != NULL)
-   {
-      free(auth_value);
-   }
-
-   if (file_data != NULL)
-   {
-      free(file_data);
-   }
+   free(local_path);
+   free(azure_path);
+   free(azure_host);
+   free(auth_value);
+   free(signed_headers_prefix);
+   free(file_data);
 
    if (connection != NULL)
    {
@@ -750,6 +824,103 @@ error:
 
    return 1;
 }
+
+static int
+azure_send_get_request(char* azure_root, char* relative_path, struct http_response** response)
+{
+   char utc_date[UTC_TIME_LENGTH];
+   char* azure_path = NULL;
+   char* azure_host = NULL;
+   char* auth_value = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   char azure_get_path[MAX_PATH];
+
+   azure_path = azure_build_object_path(azure_root, relative_path);
+   if (azure_path == NULL)
+   {
+      goto error;
+   }
+
+   memset(&utc_date[0], 0, sizeof(utc_date));
+
+   if (pgmoneta_get_timestamp_UTC_format(utc_date))
+   {
+      goto error;
+   }
+
+   if (azure_build_authorization("GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:",
+                                 azure_path, utc_date, &auth_value))
+   {
+      goto error;
+   }
+
+   if (azure_http_prepare(azure_path, &azure_host, azure_get_path, sizeof(azure_get_path), &connection))
+   {
+      goto error;
+   }
+
+   pgmoneta_log_debug("Azure restore request prepared: host=%s, path=%s",
+                      azure_host, azure_get_path);
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_GET, azure_get_path, &request))
+   {
+      goto error;
+   }
+
+   if (azure_add_request_headers(request, auth_value, utc_date, false))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, response))
+   {
+      pgmoneta_log_error("Failed to execute HTTP GET request for %s", azure_path);
+      goto error;
+   }
+
+   pgmoneta_log_debug("Azure GET response: path=%s, status=%d", azure_path,
+                      (*response)->status_code);
+
+   free(azure_path);
+   free(azure_host);
+   free(auth_value);
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_destroy(connection);
+
+   return 0;
+
+error:
+
+   free(azure_path);
+   free(azure_host);
+   free(auth_value);
+
+   if (connection != NULL)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+
+   if (request != NULL)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+
+   return 1;
+}
+
+static int
+azure_get_object(int server __attribute__((unused)), char* root, char* relative_path,
+                 struct http_response** response)
+{
+   return azure_send_get_request(root, relative_path, response);
+}
+
+static const struct object_storage_ops azure_ops = {
+   .name = "Azure",
+   .get_object = &azure_get_object,
+};
 
 static char*
 azure_get_host()
@@ -793,14 +964,14 @@ azure_get_basepath(int server, char* identifier)
 }
 
 static int
-azure_add_request_headers(struct http_request* request, char* auth_value, char* utc_date)
+azure_add_request_headers(struct http_request* request, char* auth_value, char* utc_date, bool blob_type)
 {
    if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
    {
       return 1;
    }
 
-   if (pgmoneta_http_request_add_header(request, "x-ms-blob-type", "BlockBlob"))
+   if (blob_type && pgmoneta_http_request_add_header(request, "x-ms-blob-type", "BlockBlob"))
    {
       return 1;
    }
@@ -833,4 +1004,146 @@ azure_upload(int server, char* label, int compression __attribute__((unused)), i
    free(local_root);
    free(azure_root);
    return rc;
+}
+
+int
+azure_download(int server, char* label, int compression __attribute__((unused)), int encryption __attribute__((unused)))
+{
+   char* local_root = NULL;
+   char* azure_root = NULL;
+   char* info_tmp = NULL;
+   char* info_final = NULL;
+   char* manifest_tmp = NULL;
+   char* manifest_final = NULL;
+   char* sha512_tmp = NULL;
+   char* sha512_final = NULL;
+   struct backup* backup = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   azure_root = azure_get_basepath(server, label);
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
+
+   pgmoneta_log_debug("Azure restore: %s/%s", config->common.servers[server].name, label);
+
+   if (pgmoneta_mkdir(local_root))
+   {
+      pgmoneta_log_error("Azure restore: could not create %s", local_root);
+      goto error;
+   }
+
+   info_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+   info_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
+
+   if (pgmoneta_object_bootstrap(&azure_ops, azure_root, server, local_root))
+   {
+      goto error;
+   }
+
+   /* Read staging metadata from .tmp; do not publish backup.info until download completes */
+   if (pgmoneta_load_info_file(info_tmp, &backup))
+   {
+      pgmoneta_log_error("Azure restore: failed to load staging backup.info from %s", info_tmp);
+      goto error;
+   }
+
+   pgmoneta_log_debug("Azure restore: compression=%d encryption=%d", backup->compression, backup->encryption);
+
+   if (pgmoneta_object_download_files(&azure_ops, azure_root, local_root, server,
+                                      backup->compression, backup->encryption))
+   {
+      goto error;
+   }
+
+   /* directory rows are excluded from the file list, so recreate them here */
+   if (pgmoneta_object_restore_directories(&azure_ops, local_root))
+   {
+      goto error;
+   }
+
+   manifest_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+   manifest_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
+   sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+   sha512_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512");
+
+   if (pgmoneta_move_file(manifest_tmp, manifest_final))
+   {
+      pgmoneta_log_error("Azure restore: could not rename %s to %s", manifest_tmp, manifest_final);
+      goto error;
+   }
+
+   if (pgmoneta_move_file(sha512_tmp, sha512_final))
+   {
+      pgmoneta_log_error("Azure restore: could not rename %s to %s", sha512_tmp, sha512_final);
+      goto error;
+   }
+
+   /* Publish last: backup.info makes this look like a real local backup */
+   if (pgmoneta_move_file(info_tmp, info_final))
+   {
+      pgmoneta_log_error("Azure restore: could not rename %s to %s", info_tmp, info_final);
+      goto error;
+   }
+
+   pgmoneta_log_info("Azure restore: %s/%s completed", config->common.servers[server].name, label);
+
+   free(azure_root);
+   free(local_root);
+   free(backup);
+   free(info_tmp);
+   free(info_final);
+   free(manifest_tmp);
+   free(manifest_final);
+   free(sha512_tmp);
+   free(sha512_final);
+
+   return 0;
+
+error:
+
+   if (local_root != NULL)
+   {
+      char* cleanup = NULL;
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+   }
+
+   free(azure_root);
+   free(local_root);
+   free(backup);
+   free(info_tmp);
+   free(info_final);
+   free(manifest_tmp);
+   free(manifest_final);
+   free(sha512_tmp);
+   free(sha512_final);
+
+   return 1;
 }

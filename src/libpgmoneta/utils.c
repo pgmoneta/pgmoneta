@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -3793,6 +3793,22 @@ pgmoneta_contains(char* str, char* s)
       return false;
    }
    return strstr(str, s) != NULL;
+}
+
+bool
+pgmoneta_is_safe_label(char* label)
+{
+   if (label == NULL || strlen(label) == 0)
+   {
+      return false;
+   }
+
+   if (pgmoneta_contains(label, "/") || pgmoneta_contains(label, "."))
+   {
+      return false;
+   }
+
+   return true;
 }
 
 char*

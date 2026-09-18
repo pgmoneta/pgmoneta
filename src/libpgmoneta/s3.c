@@ -46,26 +46,6 @@
 
 #define NAME "s3"
 
-static bool
-s3_is_safe_prefix(char* prefix)
-{
-   if (pgmoneta_contains(prefix, "/") || pgmoneta_contains(prefix, ".") || pgmoneta_contains(prefix, ".."))
-   {
-      return false;
-   }
-   if (prefix[0] == '/')
-   {
-      return false;
-   }
-
-   if (strstr(prefix, "..") != NULL)
-   {
-      return false;
-   }
-
-   return true;
-}
-
 void
 pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
@@ -249,7 +229,7 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
-   if (!s3_is_safe_prefix(prefix))
+   if (!pgmoneta_is_safe_label(prefix))
    {
       ec = MANAGEMENT_ERROR_RESTORE_S3_ERROR;
       pgmoneta_log_error("S3 restore: invalid prefix for %s", config->common.servers[server].name);
