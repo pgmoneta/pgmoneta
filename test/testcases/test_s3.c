@@ -180,6 +180,44 @@ cleanup:
 }
 
 /*
+ * Direct S3 delete removes all objects under the requested backup prefix.
+ */
+MCTF_INTEGRATION_TEST(test_s3_delete_action_removes_objects)
+{
+   char label[256] = {0};
+   char cmd[512];
+   char* listing = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(mctf_se_backup("primary") == 0, cleanup, "backup to S3 failed");
+   MCTF_ASSERT(newest_backup_label(label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not resolve backup label");
+
+   /*
+    * Use the new "s3 delete" management action directly.
+    */
+   snprintf(cmd, sizeof(cmd), "s3 delete primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "s3 delete failed");
+
+   /*
+    * Verify that the objects under the deleted prefix are gone.
+    */
+   MCTF_ASSERT(mctf_se_s3_ls("primary", label, &listing) != 0 ||
+                  listing == NULL ||
+                  strstr(listing, "S3Key") == NULL,
+               cleanup, "S3 objects remain after s3 delete");
+
+cleanup:
+   free(listing);
+   MCTF_FINISH();
+}
+
+/*
  * After delete, no S3 objects must remain for that backup label — the
  * remote store must be swept, not just the local catalog entry.
  */
