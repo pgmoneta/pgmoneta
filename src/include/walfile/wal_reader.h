@@ -98,7 +98,7 @@ typedef int64_t timestamp_tz;
 #define SIZE_OF_XLOG_SHORT_PHD    MAXALIGN(sizeof(struct xlog_page_header_data))
 #define SIZE_OF_XLOG_RECORD       (offsetof(struct xlog_record, xl_crc) + sizeof(pg_crc32c))
 
-#define DEFAULT_WAL_SEGZ_BYTES    16 * 1024 * 1024
+#define DEFAULT_WAL_SEGZ_BYTES    (16 * 1024 * 1024)
 
 /* #define macros */
 #define MAXALIGN(x)              (((x) + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1))
@@ -224,6 +224,7 @@ struct xlog_record
    xlog_rec_ptr xl_prev;  /**< Pointer to the previous record in the log. */
    uint8_t xl_info;       /**< Flag bits for the record. */
    rmgr_id xl_rmid;       /**< Resource manager ID for this record. */
+   uint8_t xl_pad[2];     /**< 2 bytes of padding to match PostgreSQL's layout. */
    pg_crc32c xl_crc;      /**< CRC for this record. */
 };
 
@@ -247,6 +248,8 @@ struct partial_xlog_record
    char* xlog_record;               /**< Pointer to the xlog record. */
    uint32_t data_buffer_bytes_read; /**< Length of the total data read in data_buffer. */
    uint32_t xlog_record_bytes_read; /**< Length of the total data read in xlog_record buffer. */
+   xlog_seg_no from_seg;            /**< Segment whose parse produced this partial record. */
+   xlog_rec_ptr lsn;                /**< Absolute LSN (record start) of the partial record. */
 };
 
 /**
