@@ -325,7 +325,7 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
    char bytea_data_buffer[DEFAULT_BURST];
    uint8_t* b_out = NULL;
    int b_len = 0;
-   char query[MISC_LENGTH];
+   char query[MAX_PATH + MISC_LENGTH];
    struct query_response* response = NULL;
    struct main_configuration* config;
 

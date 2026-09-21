@@ -566,6 +566,9 @@ wf_backup(void)
    head = pgmoneta_create_basebackup();
    current = head;
 
+   current->next = pgmoneta_create_configuration();
+   current = current->next;
+
    current->next = pgmoneta_create_manifest();
    current = current->next;
 
@@ -828,6 +831,9 @@ wf_incremental_backup(void)
 
    head = pgmoneta_create_incremental_backup();
    current = head;
+
+   current->next = pgmoneta_create_configuration();
+   current = current->next;
 
    current->next = pgmoneta_create_manifest();
    current = current->next;
