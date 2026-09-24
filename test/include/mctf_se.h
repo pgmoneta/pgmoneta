@@ -126,6 +126,17 @@ int
 mctf_se_up(int backend);
 
 /**
+ * Bring up a backend and a dedicated pgmoneta instance configured with the
+ * local storage engine as well (storage_engine = local, <backend>), so the
+ * local backup data is kept after the upload.
+ *
+ * @param backend The backend to start
+ * @return MCTF_OK, MCTF_SKIPPED, or MCTF_FAIL
+ */
+int
+mctf_se_up_local(int backend);
+
+/**
  * Bring up all backends and one pgmoneta instance with every storage engine.
  * @return MCTF_OK, MCTF_SKIPPED, or MCTF_FAIL (as mctf_se_up)
  */
@@ -206,6 +217,17 @@ mctf_se_has_local_metadata(const char* server);
  */
 const char*
 mctf_se_run_dir(void);
+
+/**
+ * Get the newest backup label of a server from the managed instance's local catalog.
+ *
+ * @param server The server name
+ * @param label The buffer for the label
+ * @param size The size of the buffer
+ * @return MCTF_OK on success, otherwise MCTF_FAIL
+ */
+int
+mctf_se_newest_label(const char* server, char* label, size_t size);
 
 /**
  * The active backend context (advanced assertions on connection details).
