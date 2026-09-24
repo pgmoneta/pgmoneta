@@ -49,33 +49,6 @@
 static int storage_status = MCTF_FAIL;
 static char shared_label[256];
 
-/* Return the lexicographically largest (newest) backup label for primary. */
-static int
-newest_backup_label(char* out, size_t size)
-{
-   char backup_dir[MAX_PATH];
-   char** dirs = NULL;
-   int ndir = 0;
-   int best = -1;
-
-   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/primary/backup", mctf_se_run_dir());
-   pgmoneta_get_directories(backup_dir, &ndir, &dirs);
-   if (ndir <= 0 || dirs == NULL)
-      return MCTF_FAIL;
-
-   for (int i = 0; i < ndir; i++)
-   {
-      if (best < 0 || strcmp(dirs[i], dirs[best]) > 0)
-         best = i;
-   }
-   pgmoneta_snprintf(out, size, "%s", dirs[best]);
-
-   for (int i = 0; i < ndir; i++)
-      free(dirs[i]);
-   free(dirs);
-
-   return out[0] != '\0' ? MCTF_OK : MCTF_FAIL;
-}
 /*
  * Count the S3 objects reported by an s3 ls response.
  * Each object is represented by one S3Key entry.
@@ -112,7 +85,7 @@ take_backup_and_get_label(const char* server, char* out, size_t size)
 {
    char previous_label[256] = {0};
 
-   if (newest_backup_label(previous_label, sizeof(previous_label)) != MCTF_OK)
+   if (mctf_se_newest_label(server, previous_label, sizeof(previous_label)) != MCTF_OK)
    {
       return MCTF_FAIL;
    }
@@ -122,7 +95,7 @@ take_backup_and_get_label(const char* server, char* out, size_t size)
       return MCTF_FAIL;
    }
 
-   if (newest_backup_label(out, size) != MCTF_OK)
+   if (mctf_se_newest_label(server, out, size) != MCTF_OK)
    {
       return MCTF_FAIL;
    }
@@ -176,7 +149,7 @@ MCTF_MODULE_SETUP(s3)
    if (storage_status == MCTF_OK)
    {
       if (mctf_se_backup("primary") != 0 ||
-          newest_backup_label(shared_label, sizeof(shared_label)) != MCTF_OK)
+          mctf_se_newest_label("primary", shared_label, sizeof(shared_label)) != MCTF_OK)
       {
          storage_status = MCTF_FAIL;
       }
