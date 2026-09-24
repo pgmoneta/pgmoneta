@@ -88,8 +88,8 @@ int pgmoneta_parse_yaml_config(const char* filename, config_t* config);
  * @param current_key Pointer to the current key being processed.
  * @param config Pointer to the configuration structure to populate.
  */
-void handle_scalar_event(yaml_event_t* event, parser_state_t* state,
-                         char** current_key, config_t* config);
+int handle_scalar_event(yaml_event_t* event, parser_state_t* state,
+                        char** current_key, config_t* config);
 
 /**
  * Cleans up the configuration structure.

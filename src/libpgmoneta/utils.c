@@ -804,6 +804,25 @@ pgmoneta_get_home_directory(void)
 }
 
 char*
+pgmoneta_get_tmpdir(void)
+{
+   char* dir = NULL;
+
+#if defined(HAVE_DARWIN) || defined(HAVE_OSX)
+   dir = getenv("TMPDIR");
+#else
+   dir = secure_getenv("TMPDIR");
+#endif
+
+   if (dir == NULL || strlen(dir) == 0 || dir[0] != '/')
+   {
+      dir = "/tmp";
+   }
+
+   return dir;
+}
+
+char*
 pgmoneta_get_user_name(void)
 {
    struct passwd* pw = getpwuid(getuid());
@@ -834,7 +853,7 @@ pgmoneta_get_password(void)
 
    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 
-   while ((c = getchar()) != '\n' && c != EOF && i < MAX_PASSWORD_LENGTH)
+   while ((c = getchar()) != '\n' && c != EOF && i < MAX_PASSWORD_LENGTH - 1)
    {
       p[i++] = c;
    }
@@ -1104,6 +1123,13 @@ int
 pgmoneta_mkdir(char* dir)
 {
    char* p;
+
+   /* dir + 1 would run past the terminator for an empty string, and callers
+    * pass allocations that can be NULL. */
+   if (dir == NULL || dir[0] == '\0')
+   {
+      return 1;
+   }
 
    for (p = dir + 1; *p; p++)
    {
@@ -1567,53 +1593,37 @@ pgmoneta_append_char(char* orig, char c)
 char*
 pgmoneta_append_int(char* orig, int i)
 {
-   char number[12];
-
-   memset(&number[0], 0, sizeof(number));
-   pgmoneta_snprintf(&number[0], 11, "%d", i);
-   orig = pgmoneta_append(orig, number);
-
-   return orig;
+   return pgmoneta_format_and_append(orig, "%d", i);
 }
 
 char*
 pgmoneta_append_ulong(char* orig, unsigned long l)
 {
-   char number[21];
+   return pgmoneta_format_and_append(orig, "%lu", l);
+}
 
-   memset(&number[0], 0, sizeof(number));
-   pgmoneta_snprintf(&number[0], 20, "%lu", l);
-   orig = pgmoneta_append(orig, number);
-
-   return orig;
+char*
+pgmoneta_append_ullong(char* orig, unsigned long long l)
+{
+   return pgmoneta_format_and_append(orig, "%llu", l);
 }
 
 char*
 pgmoneta_append_double(char* orig, double d)
 {
-   char number[21];
-
-   memset(&number[0], 0, sizeof(number));
-   pgmoneta_snprintf(&number[0], 20, "%lf", d);
-   orig = pgmoneta_append(orig, number);
-
-   return orig;
+   return pgmoneta_format_and_append(orig, "%lf", d);
 }
 
 char*
 pgmoneta_append_double_precision(char* orig, double d, int precision)
 {
-   char number[21];
-
    char* format = NULL;
    format = pgmoneta_append_char(format, '%');
    format = pgmoneta_append_char(format, '.');
    format = pgmoneta_append_int(format, precision);
    format = pgmoneta_append_char(format, 'f');
 
-   memset(&number[0], 0, sizeof(number));
-   pgmoneta_snprintf(&number[0], 20, format, d);
-   orig = pgmoneta_append(orig, number);
+   orig = pgmoneta_format_and_append(orig, format, d);
 
    free(format);
 
@@ -1670,8 +1680,8 @@ pgmoneta_remove_prefix(char* orig, char* prefix)
 {
    char* res = NULL;
    int idx = 0;
-   int len1 = strlen(orig);
-   int len2 = strlen(prefix);
+   int len1 = 0;
+   int len2 = 0;
    int len = 0;
    if (orig == NULL)
    {
@@ -1683,15 +1693,24 @@ pgmoneta_remove_prefix(char* orig, char* prefix)
       res = pgmoneta_append(res, orig);
       return res;
    }
-   while (idx < len1 && idx < len2)
+   len1 = strlen(orig);
+   len2 = strlen(prefix);
+   while (idx < len1 && idx < len2 && orig[idx] == prefix[idx])
    {
-      if (orig[idx] == prefix[idx])
-      {
-         idx++;
-      }
+      idx++;
+   }
+   if (idx < len2)
+   {
+      // does not start with the prefix
+      res = pgmoneta_append(res, orig);
+      return res;
    }
    len = len1 - idx + 1;
    res = malloc(len);
+   if (res == NULL)
+   {
+      return NULL;
+   }
    res[len - 1] = 0;
    if (len > 1)
    {
@@ -2082,8 +2101,7 @@ pgmoneta_append_file_chunk(const char* tmp_path, const void* data, size_t data_s
    if (pgmoneta_mkdir(parent_dir))
       goto error;
    // create the file with append if exists
-   f = fopen(tmp_path, "a+");
-   if (f == NULL)
+   if (pgmoneta_fopen_secure(tmp_path, "a+", &f))
    {
       goto error;
    }
@@ -2417,13 +2435,14 @@ do_delete_file(struct worker_common* wc)
 }
 
 int
-pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, struct workers* workers)
+pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_files_names, struct workers* workers)
 {
    DIR* d = opendir(from);
    char* from_buffer;
    char* to_buffer;
    struct dirent* entry;
    struct stat statbuf;
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    pgmoneta_mkdir(to);
 
@@ -2451,7 +2470,7 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
          {
             if (S_ISDIR(statbuf.st_mode))
             {
-               pgmoneta_copy_directory(from_buffer, to_buffer, restore_last_files_names, workers);
+               pgmoneta_copy_directory(server, from_buffer, to_buffer, restore_last_files_names, workers);
             }
             else
             {
@@ -2465,11 +2484,19 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
                   if (!file_is_excluded)
                   {
                      pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                     if (progress_enabled)
+                     {
+                        pgmoneta_progress_increment(server, 1);
+                     }
                   }
                }
                else
                {
                   pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  if (progress_enabled)
+                  {
+                     pgmoneta_progress_increment(server, 1);
+                  }
                }
             }
          }
@@ -2878,6 +2905,142 @@ pgmoneta_move_file(char* from, char* to)
 }
 
 int
+pgmoneta_fopen_secure(const char* path, const char* mode, FILE** file)
+{
+   int fd = -1;
+   int flags = 0;
+   int saved_errno = 0;
+   bool create = false;
+   bool read = false;
+   bool write = false;
+   bool append = false;
+   bool plus = false;
+   bool exclusive = false;
+   char fdmode[8];
+   size_t j = 0;
+   const char* p = mode;
+
+   if (file == NULL)
+   {
+      return 2;
+   }
+
+   *file = NULL;
+
+   if (path == NULL || mode == NULL)
+   {
+      return 2;
+   }
+
+   if (strchr(mode, 'r'))
+   {
+      read = true;
+   }
+   if (strchr(mode, 'w'))
+   {
+      write = true;
+      create = true;
+   }
+   if (strchr(mode, 'a'))
+   {
+      append = true;
+      create = true;
+   }
+   if (strchr(mode, '+'))
+   {
+      plus = true;
+   }
+   if (strchr(mode, 'x'))
+   {
+      exclusive = true;
+   }
+
+   if (plus)
+   {
+      flags |= O_RDWR;
+   }
+   else if (read)
+   {
+      flags |= O_RDONLY;
+   }
+   else
+   {
+      flags |= O_WRONLY;
+   }
+
+   if (create)
+   {
+      flags |= O_CREAT;
+      if (write)
+      {
+         flags |= O_TRUNC;
+      }
+      if (exclusive)
+      {
+         flags |= O_EXCL;
+      }
+   }
+
+   if (append)
+   {
+      flags |= O_APPEND;
+   }
+
+   if (create || write || append)
+   {
+      flags |= O_NOFOLLOW;
+   }
+   flags |= O_CLOEXEC;
+
+   if (create)
+   {
+      fd = open(path, flags, S_IRUSR | S_IWUSR);
+   }
+   else
+   {
+      fd = open(path, flags);
+   }
+
+   if (fd == -1)
+   {
+      return errno == EEXIST ? 1 : 2;
+   }
+
+   if (create)
+   {
+      if (fchmod(fd, S_IRUSR | S_IWUSR))
+      {
+         saved_errno = errno;
+         close(fd);
+         errno = saved_errno;
+         return 2;
+      }
+   }
+
+   /* fdopen() only accepts the access part of the mode, 'x' is already O_EXCL */
+   while (*p != '\0' && j < sizeof(fdmode) - 1)
+   {
+      if (*p == 'r' || *p == 'w' || *p == 'a' || *p == 'b' || *p == '+')
+      {
+         fdmode[j++] = *p;
+      }
+      p++;
+   }
+   fdmode[j] = '\0';
+
+   *file = fdopen(fd, fdmode);
+   if (*file == NULL)
+   {
+      saved_errno = errno;
+      close(fd);
+      errno = saved_errno;
+      return 2;
+   }
+
+   return 0;
+}
+
+int
 pgmoneta_strip_extension(char* s, char** name)
 {
    size_t size;
@@ -2925,7 +3088,7 @@ pgmoneta_translate_file_size(uint64_t size)
    char* units[] = {"B", "kB", "MB", "GB", "TB", "PB"};
    int i = 0;
 
-   while (sz >= 1024 && i < 6)
+   while (sz >= 1024 && i < (int)(sizeof(units) / sizeof(units[0])) - 1)
    {
       sz /= 1024.0;
       i++;
@@ -3280,17 +3443,24 @@ error:
 }
 
 int
-pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* workers)
+pgmoneta_copy_wal_files(int server, char* from, char* to, char* start, struct workers* workers)
 {
    struct deque* wal_files = NULL;
    struct deque_iterator* it = NULL;
    char* basename = NULL;
    char* ff = NULL;
    char* tf = NULL;
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
    if (pgmoneta_get_wal_files(from, &wal_files))
    {
       goto error;
+   }
+
+   if (progress_enabled && wal_files != NULL)
+   {
+      int total_files = pgmoneta_deque_size(wal_files);
+      pgmoneta_progress_set_total(server, total_files);
    }
 
    pgmoneta_deque_iterator_create(wal_files, &it);
@@ -3362,6 +3532,11 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
       free(basename);
       free(ff);
       free(tf);
+
+      if (progress_enabled)
+      {
+         pgmoneta_progress_increment(server, 1);
+      }
 
       basename = NULL;
       ff = NULL;
@@ -3908,7 +4083,8 @@ pgmoneta_read_checkpoint_info(char* directory, char** chkptpos)
    {
       if (pgmoneta_starts_with(buffer, "CHECKPOINT LOCATION"))
       {
-         numfields = sscanf(buffer, "CHECKPOINT LOCATION: %s\n", chkpt);
+         /* chkpt holds MISC_LENGTH bytes */
+         numfields = sscanf(buffer, "CHECKPOINT LOCATION: %127s\n", chkpt);
          if (numfields != 1)
          {
             pgmoneta_log_error("Error parsing checkpoint wal location");
@@ -4079,7 +4255,7 @@ pgmoneta_get_server_workspace(int server)
    }
    else
    {
-      ws = pgmoneta_append(ws, "/tmp/pgmoneta-workspace/");
+      ws = pgmoneta_format_and_append(ws, "%s/pgmoneta-workspace-%d/", pgmoneta_get_tmpdir(), getuid());
    }
 
    if (!pgmoneta_exists(ws))
@@ -4406,13 +4582,14 @@ get_server_basepath(int server)
 int
 pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date)
 {
+   struct tm tm_buffer;
    time_t now = time(&now);
    if (now == -1)
    {
       return 1;
    }
 
-   struct tm* ptm = gmtime(&now);
+   struct tm* ptm = gmtime_r(&now, &tm_buffer);
    if (ptm == NULL)
    {
       return 1;
@@ -4434,13 +4611,14 @@ pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date)
 int
 pgmoneta_get_timestamp_UTC_format(char* utc_date)
 {
+   struct tm tm_buffer;
    time_t now = time(&now);
    if (now == -1)
    {
       return 1;
    }
 
-   struct tm* ptm = gmtime(&now);
+   struct tm* ptm = gmtime_r(&now, &tm_buffer);
    if (ptm == NULL)
    {
       return 1;
@@ -4690,17 +4868,30 @@ char*
 pgmoneta_format_and_append(char* buf, char* format, ...)
 {
    va_list args;
-   va_start(args, format);
+   int len;
+   char* formatted_str = NULL;
 
    // Determine the required buffer size
-   int size_needed = vsnprintf(NULL, 0, format, args) + 1;
+   va_start(args, format);
+   len = vsnprintf(NULL, 0, format, args);
    va_end(args);
 
+   // Leave buf as it is on failure, like pgmoneta_append() does
+   if (len < 0)
+   {
+      return buf;
+   }
+
    // Allocate buffer to hold the formatted string
-   char* formatted_str = malloc(size_needed);
+   formatted_str = malloc((size_t)len + 1);
+
+   if (formatted_str == NULL)
+   {
+      return buf;
+   }
 
    va_start(args, format);
-   vsnprintf(formatted_str, size_needed, format, args);
+   vsnprintf(formatted_str, (size_t)len + 1, format, args);
    va_end(args);
 
    buf = pgmoneta_append(buf, formatted_str);
@@ -4821,19 +5012,31 @@ pgmoneta_lsn_to_string(uint64_t lsn)
    return result;
 }
 
-uint64_t
-pgmoneta_string_to_lsn(char* lsn)
+int
+pgmoneta_string_to_lsn(char* lsn, uint64_t* lsn_out)
 {
    uint32_t hi = 0;
    uint32_t lo = 0;
 
-   if (lsn == NULL)
+   if (lsn_out == NULL)
    {
-      return 0;
+      return 1;
    }
 
-   sscanf(lsn, "%X/%X", &hi, &lo);
-   return ((uint64_t)hi << 32) + (uint64_t)lo;
+   *lsn_out = 0;
+
+   if (lsn == NULL)
+   {
+      return 1;
+   }
+
+   if (sscanf(lsn, "%X/%X", &hi, &lo) != 2)
+   {
+      return 1;
+   }
+
+   *lsn_out = ((uint64_t)hi << 32) + (uint64_t)lo;
+   return 0;
 }
 
 bool
@@ -4955,6 +5158,7 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
    if (!temp)
    {
       free(temp_results);
+      temp_results = NULL;
       goto error;
    }
 

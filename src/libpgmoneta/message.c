@@ -85,6 +85,105 @@ pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
    return ssl_read_message(ssl, 0, msg);
 }
 
+static int
+read_append(SSL* ssl, int socket, struct message* m, size_t needed)
+{
+   ssize_t numbytes;
+
+   while ((size_t)m->length < needed)
+   {
+      if (ssl != NULL)
+      {
+         numbytes = SSL_read(ssl, (char*)m->data + m->length, DEFAULT_BUFFER_SIZE - m->length);
+
+         if (numbytes <= 0)
+         {
+            int err = SSL_get_error(ssl, numbytes);
+            ERR_clear_error();
+
+            switch (err)
+            {
+               case SSL_ERROR_WANT_READ:
+               case SSL_ERROR_WANT_WRITE:
+                  continue;
+               case SSL_ERROR_ZERO_RETURN:
+                  return MESSAGE_STATUS_ZERO;
+               default:
+                  return MESSAGE_STATUS_ERROR;
+            }
+         }
+      }
+      else
+      {
+         numbytes = read(socket, (char*)m->data + m->length, DEFAULT_BUFFER_SIZE - m->length);
+
+         if (numbytes == 0)
+         {
+            return MESSAGE_STATUS_ZERO;
+         }
+         else if (numbytes < 0)
+         {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+               errno = 0;
+               continue;
+            }
+
+            pgmoneta_log_error("read error: fd=%d errno=%d", socket, errno);
+            errno = 0;
+            return MESSAGE_STATUS_ERROR;
+         }
+      }
+
+      m->length += numbytes;
+   }
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_read_complete_message(SSL* ssl, int socket, struct message** msg)
+{
+   int status;
+   int32_t length;
+   size_t total;
+   struct message* m = NULL;
+
+   *msg = NULL;
+
+   status = pgmoneta_read_block_message(ssl, socket, &m);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      return status;
+   }
+
+   /* kind (1 byte) + length (4 bytes, includes itself) */
+   status = read_append(ssl, socket, m, 5);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      return status;
+   }
+
+   length = pgmoneta_read_int32((char*)m->data + 1);
+   if (length < 4 || (size_t)length + 1 > DEFAULT_BUFFER_SIZE)
+   {
+      pgmoneta_log_error("Invalid message length: fd=%d kind=%c length=%d", socket, m->kind, length);
+      return MESSAGE_STATUS_ERROR;
+   }
+
+   total = (size_t)length + 1;
+
+   status = read_append(ssl, socket, m, total);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      return status;
+   }
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
 int
 pgmoneta_read_timeout_message(SSL* ssl, int socket, int timeout, struct message** msg)
 {
@@ -2342,9 +2441,7 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
       pgmoneta_snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
       pgmoneta_snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "backup_manifest");
    }
-   file = fopen(tmp_file_path, "wb");
-
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(tmp_file_path, "wb", &file))
    {
       goto error;
    }
@@ -2474,20 +2571,18 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
                      decoded_data = decode_base64(current_tuple->data[0], &decoded_len);
                      if (decoded_data != NULL)
                      {
-                        FILE* file = fopen(dest_path, "wb");
-                        if (file != NULL)
-                        {
-                           fwrite(decoded_data, 1, decoded_len, file);
-                           fflush(file);
-                           fclose(file);
-                        }
-                        else
+                        FILE* file = NULL;
+                        if (pgmoneta_fopen_secure(dest_path, "wb", &file))
                         {
                            pgmoneta_log_error("Retrieving extra files: Could not open file \"%s\" for writing", dest_path);
+                           free(decoded_data);
                            free(dest_dir);
                            free(dest_path);
                            goto error;
                         }
+                        fwrite(decoded_data, 1, decoded_len, file);
+                        fflush(file);
+                        fclose(file);
                         free(decoded_data);
                      }
                   }
@@ -2513,6 +2608,7 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
             free(dest_dir);
             free(dest_path);
             free(paths[j]);
+            paths[j] = NULL;
             qr = NULL;
          }
          free(paths);
@@ -2687,8 +2783,7 @@ pgmoneta_send_file(SSL* ssl, int socket, char* username, char* source_path, char
       qr = NULL;
 
       // Open the file for reading
-      file = fopen(source_path, "rb");
-      if (file == NULL)
+      if (pgmoneta_fopen_secure(source_path, "rb", &file))
       {
          pgmoneta_log_warn("Sending file: Failed to open file: %s", source_path);
          goto error;

@@ -67,7 +67,7 @@ static void
 do_file_manifest(struct worker_common* wc);
 
 static int
-dispatch_manifest_tasks(int server, char* source_dir, struct workers* workers, struct deque* all_deque);
+dispatch_manifest_tasks(int server, char* source_dir, char* rel_path, struct workers* workers, struct deque* all_deque);
 
 int
 pgmoneta_manifest_checksum_verify(char* root, struct art* file_checksums, struct art* file_sizes)
@@ -115,12 +115,14 @@ pgmoneta_manifest_checksum_verify(char* root, struct art* file_checksums, struct
       if (file_size != file_size_manifest)
       {
          pgmoneta_log_error("File size mismatch, path: %s. getting %lu, should be %lu", file_path, file_size, file_size_manifest);
+         goto error;
       }
       hash = (char*)pgmoneta_art_search(file_checksums, file_path);
       checksum = (char*)pgmoneta_json_get(file, "Checksum");
       if (!pgmoneta_compare_string(hash, checksum))
       {
          pgmoneta_log_error("File checksum mismatch, path: %s. getting %s, should be %s", file_path, hash, checksum);
+         goto error;
       }
       pgmoneta_json_destroy(file);
       file = NULL;
@@ -357,8 +359,7 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
    pgmoneta_json_iterator_create(files, &fiter);
    pgmoneta_json_iterator_create(wal_ranges, &riter);
 
-   file = fopen(path, "wb");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(path, "wb", &file))
    {
       pgmoneta_log_error("Failed to create json file %s", path);
       goto error;
@@ -561,9 +562,10 @@ done:
 }
 
 static int
-dispatch_manifest_tasks(int server, char* source_dir, struct workers* workers, struct deque* all_deque)
+dispatch_manifest_tasks(int server, char* source_dir, char* rel_path, struct workers* workers, struct deque* all_deque)
 {
    char real_path[MAX_PATH];
+   char relative_path[MAX_PATH];
    struct stat s;
    struct dirent* dent;
    DIR* dir = NULL;
@@ -585,21 +587,54 @@ dispatch_manifest_tasks(int server, char* source_dir, struct workers* workers, s
       }
 
       memset(real_path, 0, sizeof(real_path));
+      memset(relative_path, 0, sizeof(relative_path));
       pgmoneta_snprintf(real_path, sizeof(real_path), "%s/%s", source_dir, entry_name);
+      if (pgmoneta_compare_string(rel_path, ""))
+      {
+         pgmoneta_snprintf(relative_path, sizeof(relative_path), "%s", entry_name);
+      }
+      else
+      {
+         pgmoneta_snprintf(relative_path, sizeof(relative_path), "%s/%s", rel_path, entry_name);
+      }
 
       lstat(real_path, &s);
       if (S_ISDIR(s.st_mode))
       {
-         if (dispatch_manifest_tasks(server, real_path, workers, all_deque))
+         if (dispatch_manifest_tasks(server, real_path, relative_path, workers, all_deque))
          {
             goto error;
          }
+      }
+      else if (S_ISLNK(s.st_mode))
+      {
+         char* link_target = NULL;
+
+         if (!pgmoneta_starts_with(relative_path, "pg_tblspc"))
+         {
+            continue;
+         }
+
+         /* manifest for tablespace */
+         link_target = pgmoneta_get_symlink(real_path);
+
+         if (link_target == NULL)
+         {
+            continue;
+         }
+
+         if (dispatch_manifest_tasks(server, link_target, relative_path, workers, all_deque))
+         {
+            goto error;
+         }
+
+         free(link_target);
       }
       else
       {
          struct worker_input* payload = NULL;
 
-         if (pgmoneta_create_worker_input(NULL, real_path, entry_name, server, workers, &payload))
+         if (pgmoneta_create_worker_input(NULL, real_path, relative_path, server, workers, &payload))
          {
             goto error;
          }
@@ -666,7 +701,7 @@ pgmoneta_generate_files_manifest(char* source_dir, struct json* files, int serve
       pgmoneta_progress_set_total(server, file_count);
    }
 
-   if (dispatch_manifest_tasks(server, source_dir, workers, all_deque))
+   if (dispatch_manifest_tasks(server, source_dir, "", workers, all_deque))
    {
       goto error;
    }
@@ -800,7 +835,11 @@ pgmoneta_manifest_get_paths(char* manifest_path, struct deque** paths)
          goto error;
       }
 
-      pgmoneta_deque_add(deque, entry[MANIFEST_PATH_INDEX], (uintptr_t)entry[MANIFEST_CHECKSUM_INDEX], ValueString);
+      /* directory rows carry a trailing slash and are not files */
+      if (!pgmoneta_ends_with(entry[MANIFEST_PATH_INDEX], "/"))
+      {
+         pgmoneta_deque_add(deque, entry[MANIFEST_PATH_INDEX], (uintptr_t)entry[MANIFEST_CHECKSUM_INDEX], ValueString);
+      }
       free(entry);
       entry = NULL;
    }
@@ -808,6 +847,64 @@ pgmoneta_manifest_get_paths(char* manifest_path, struct deque** paths)
    pgmoneta_csv_reader_destroy(reader);
 
    *paths = deque;
+
+   return 0;
+
+error:
+
+   pgmoneta_csv_reader_destroy(reader);
+   pgmoneta_deque_destroy(deque);
+
+   return 1;
+}
+
+int
+pgmoneta_manifest_get_directories(char* manifest_path, struct deque** dirs)
+{
+   int cols = 0;
+   char** entry = NULL;
+   char* path = NULL;
+   size_t len = 0;
+   struct csv_reader* reader = NULL;
+   struct deque* deque = NULL;
+
+   *dirs = NULL;
+
+   if (pgmoneta_deque_create(false, &deque))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_csv_reader_init(manifest_path, &reader))
+   {
+      goto error;
+   }
+
+   while (pgmoneta_csv_next_row(reader, &cols, &entry))
+   {
+      if (cols != MANIFEST_COLUMN_COUNT)
+      {
+         pgmoneta_log_error("pgmoneta_manifest_get_directories: incorrect number of columns");
+         free(entry);
+         goto error;
+      }
+
+      path = entry[MANIFEST_PATH_INDEX];
+      len = strlen(path);
+
+      if (len > 1 && path[len - 1] == '/')
+      {
+         path[len - 1] = '\0';
+         pgmoneta_deque_add(deque, path, 0, ValueString);
+      }
+
+      free(entry);
+      entry = NULL;
+   }
+
+   pgmoneta_csv_reader_destroy(reader);
+
+   *dirs = deque;
 
    return 0;
 

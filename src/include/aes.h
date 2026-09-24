@@ -134,10 +134,10 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, size_t
 
 /**
  * Encrypt a directory
+ * @param server The server index for progress tracking, or -1 to disable
  * @param d The directory
  * @param workers The optional workers
  * @param excludes The optional excludes
- * @param server The server index for progress tracking, or -1 to disable
  * @return 0 upon success, otherwise 1
  */
 int
@@ -158,13 +158,14 @@ pgmoneta_set_master_salt(unsigned char* salt);
 
 /**
  * Decrypt a directory
+ * @param server The server index for progress tracking, or -1 to disable
  * @param d The directory
  * @param workers The optional workers
  * @param excludes The optional excludes
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt_directory(char* d, struct workers* workers, struct deque* excludes);
+pgmoneta_decrypt_directory(int server, char* d, struct workers* workers, struct deque* excludes);
 
 /**
  * Encrypt a single file, also remove the original file
@@ -239,6 +240,88 @@ pgmoneta_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsign
  */
 bool
 pgmoneta_is_encrypted(char* file_path);
+
+#define AES_CBC_SALTED_MAGIC      "Salted__"
+#define AES_CBC_SALTED_MAGIC_SIZE 8
+#define AES_CBC_SALT_SIZE         8
+
+/**
+ * Derive an AES-256-CBC key and IV from a passphrase and salt using
+ * EVP_BytesToKey with a single round, as used by pgBackRest
+ * @param digest The digest name, or NULL for SHA-1
+ * @param salt The salt (AES_CBC_SALT_SIZE bytes), or NULL for no salt
+ * @param passphrase The passphrase
+ * @param passphrase_length The length of the passphrase
+ * @param key The derived key (32 bytes)
+ * @param iv The derived IV (16 bytes)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_cbc_derive_key_iv(char* digest, unsigned char* salt,
+                           unsigned char* passphrase, size_t passphrase_length,
+                           unsigned char* key, unsigned char* iv);
+
+/**
+ * Decrypt an AES-256-CBC buffer with an explicit key and IV
+ * @param key The key (32 bytes)
+ * @param iv The IV (16 bytes)
+ * @param in The ciphertext
+ * @param in_size The ciphertext size
+ * @param out The plaintext, owned by the caller
+ * @param out_size The plaintext size
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_cbc_decrypt_buffer(unsigned char* key, unsigned char* iv,
+                            unsigned char* in, size_t in_size,
+                            unsigned char** out, size_t* out_size);
+
+/**
+ * Decrypt an AES-256-CBC file with an explicit key and IV, keeping the source file
+ * @param key The key (32 bytes)
+ * @param iv The IV (16 bytes)
+ * @param from The encrypted file
+ * @param to The destination file
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_cbc_decrypt_file(unsigned char* key, unsigned char* iv,
+                          char* from, char* to);
+
+/**
+ * Decrypt a pgBackRest encrypted buffer: read the salt from the header,
+ * derive the key/IV from the passphrase and decrypt
+ * @param digest The digest name, or NULL for SHA-1
+ * @param raw If true the header is a bare salt, otherwise "Salted__" followed by the salt
+ * @param passphrase The passphrase
+ * @param passphrase_length The length of the passphrase
+ * @param in The enveloped ciphertext
+ * @param in_size The enveloped ciphertext size
+ * @param out The plaintext, owned by the caller
+ * @param out_size The plaintext size
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_cbc_decrypt_salted_buffer(char* digest, bool raw,
+                                   unsigned char* passphrase, size_t passphrase_length,
+                                   unsigned char* in, size_t in_size,
+                                   unsigned char** out, size_t* out_size);
+
+/**
+ * Decrypt a pgBackRest encrypted file: read the salt from the header,
+ * derive the key/IV from the passphrase and decrypt, keeping the source file
+ * @param digest The digest name, or NULL for SHA-1
+ * @param raw If true the header is a bare salt, otherwise "Salted__" followed by the salt
+ * @param passphrase The passphrase
+ * @param passphrase_length The length of the passphrase
+ * @param from The encrypted file
+ * @param to The destination file
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_cbc_decrypt_salted_file(char* digest, bool raw,
+                                 unsigned char* passphrase, size_t passphrase_length,
+                                 char* from, char* to);
 
 #ifdef __cplusplus
 }

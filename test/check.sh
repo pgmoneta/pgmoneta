@@ -99,11 +99,13 @@ cleanup() {
    set +e
    echo "Shutdown pgmoneta"
    if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
-     $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf shutdown
-     sleep 5
+     if [[ -f "$CONFIGURATION_DIRECTORY/pgmoneta_cli.conf" ]]; then
+       $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf shutdown
+       sleep 5
+     fi
      if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
        echo "Force stop pgmoneta"
-       kill -9 $(pgrep pgmoneta)
+       kill -9 $(pgrep pgmoneta) 2>/dev/null || true
        rm -f "/tmp/pgmoneta.localhost.pid"
      fi
    fi
@@ -203,9 +205,24 @@ cleanup_postgresql_image() {
   set -e
 }
 
+find_free_port() {
+  local p=$1
+  while ss -tlnp 2>/dev/null | grep -q ":$p "; do
+    p=$((p + 1))
+  done
+  echo $p
+}
+
 start_postgresql_container() {
   # Remove existing container so we can reuse the name
   remove_postgresql_container
+  # If the requested port is still occupied by a non-container process, pick a free one
+  if ss -tlnp 2>/dev/null | grep -q ":$PORT "; then
+    local free_port
+    free_port=$(find_free_port $((PORT + 1)))
+    echo "Port $PORT is already in use; using port $free_port instead"
+    PORT=$free_port
+  fi
   $CONTAINER_ENGINE run -p $PORT:5432 -v "$PG_LOG_DIR:/pglog:z" -v "$PGCONF_DIRECTORY:/conf:z"\
   --name $CONTAINER_NAME -d \
   -e PG_DATABASE=$PG_DATABASE \
@@ -505,10 +522,29 @@ execute_testcases() {
       sleep 2
    done
 
+   echo "Wait for WAL streaming to be ready"
+   for i in {1..5}; do
+      if $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf status details -F json 2>/dev/null | \
+         grep -q '"WalStreaming": true'; then
+         echo "WAL streaming ready ... ok"
+         break
+      fi
+      if [[ $i -eq 5 ]]; then
+         echo "WAL streaming not ready ... not ok"
+         echo "Checking logs:"
+         tail -20 $LOG_DIR/pgmoneta.log 2>/dev/null || echo "Log file not found"
+         exit 1
+      fi
+      echo "Waiting for WAL streaming to be ready"
+      sleep 2
+   done
+
    echo "Start running MCTF tests"
    if [[ -f "$TEST_DIRECTORY/pgmoneta-test" ]]; then
       TEST_FILTER_ARGS=()
-      if [[ -n "${TEST_FILTER:-}" ]]; then
+      if [[ "${INTEGRATION_MODE:-false}" == "true" ]]; then
+         TEST_FILTER_ARGS=(-i)
+      elif [[ -n "${TEST_FILTER:-}" ]]; then
          TEST_FILTER_ARGS=(-t "$TEST_FILTER")
       elif [[ -n "${MODULE_FILTER:-}" ]]; then
          TEST_FILTER_ARGS=(-m "$MODULE_FILTER")
@@ -535,11 +571,17 @@ usage() {
    echo "Options (run tests with optional filter; default is full suite):"
    echo " -t, --test NAME     Run only tests matching NAME"
    echo " -m, --module NAME   Run all tests in module NAME"
+   echo " -i, --integration   Run only the storage-engine integration tests (all backends)"
+   echo "Note: PGMONETA_TEST_PORT overrides the default container port (6432)"
    echo "Examples:"
-   echo "  $0                  Run full test suite"
-   echo "  $0 build            Set up environment only; then run e.g. $0 -t backup_full"
-   echo "  $0 -t backup_full   Run test matching 'backup_full' (runs build if needed)"
-   echo "  $0 -m restore       Run all tests in module 'restore'"
+   echo "  $0                           Run full test suite"
+   echo "  $0 build                     Set up environment only; then run e.g. $0 -t backup_full"
+   echo "  $0 -t backup_full            Run test matching 'backup_full' (runs build if needed)"
+   echo "  $0 -m restore                Run all tests in module 'restore'"
+   echo "  $0 -m azure                  Run Azure integration tests"
+   echo "  $0 -m s3                     Run S3/Garage integration tests"
+   echo "  $0 -i                        Run all storage-engine integration tests"
+   echo "  PGMONETA_TEST_PORT=6433 $0   Use port 6433 for the PostgreSQL container"
    exit 1
 }
 
@@ -561,21 +603,27 @@ run_tests() {
 
 TEST_FILTER=""
 MODULE_FILTER=""
+INTEGRATION_MODE=false
 SUBCOMMAND=""
 while [[ $# -gt 0 ]]; do
    case "$1" in
       -t|--test)
-         [[ -n "$MODULE_FILTER" ]] && { echo "Error: Cannot specify both -t and -m options"; usage; }
+         [[ -n "$MODULE_FILTER" || "$INTEGRATION_MODE" == "true" ]] && { echo "Error: Cannot combine -t with -m or -i"; usage; }
          shift
          [[ $# -eq 0 ]] && { echo "Error: -t/--test requires NAME"; usage; }
          TEST_FILTER="$1"
          shift
          ;;
       -m|--module)
-         [[ -n "$TEST_FILTER" ]] && { echo "Error: Cannot specify both -t and -m options"; usage; }
+         [[ -n "$TEST_FILTER" || "$INTEGRATION_MODE" == "true" ]] && { echo "Error: Cannot combine -m with -t or -i"; usage; }
          shift
          [[ $# -eq 0 ]] && { echo "Error: -m/--module requires NAME"; usage; }
          MODULE_FILTER="$1"
+         shift
+         ;;
+      -i|--integration)
+         [[ -n "$TEST_FILTER" || -n "$MODULE_FILTER" ]] && { echo "Error: Cannot combine -i with -t or -m"; usage; }
+         INTEGRATION_MODE=true
          shift
          ;;
       build)

@@ -41,6 +41,7 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
 | metrics | 0 | Int | No | The metrics port (disable = 0) |
+| nagios | 0 | Int | No | The Nagios port (disable = 0). When enabled, pgmoneta fetches metrics from the Prometheus endpoint and serves them in Nagios passive check format |
 | metrics_cache_max_age | 0 | String | No | The time to keep a Prometheus (metrics) response in cache. If this value is specified without units, it is taken as seconds. Setting this parameter to 0 disables caching. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
 | metrics_cache_max_size | 256k | String | No | The maximum amount of data to keep in cache when serving Prometheus responses. Changes require restart. This parameter determines the size of memory allocated for the cache even if `metrics_cache_max_age` or `metrics` are disabled. Its value, however, is taken into account only if `metrics_cache_max_age` is set to a non-zero value. Supports suffixes: 'B' (bytes), the default if omitted, 'K' or 'KB' (kilobytes), 'M' or 'MB' (megabytes), 'G' or 'GB' (gigabytes).|
 | metrics_cert_file | | String | No | Certificate file for TLS for Prometheus metrics. This file must be owned by either the user running pgmoneta or root. |
@@ -166,7 +167,7 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | 0 | Int | No | The maximum backup transfer rate in bytes per second. Use 0 to disable |
-| progress | off | Bool | No | Enable backup progress tracking |
+| progress | off | Bool | No | Enable progress tracking for backup and restore operations |
 | blocking_timeout | 30 | String | No | The number of seconds the process will be blocking for a connection. If this value is specified without units, it is taken as seconds. Setting this parameter to 0 disables it. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
 | keep_alive | on | Bool | No | Have `SO_KEEPALIVE` on sockets |
 | nodelay | on | Bool | No | Have `TCP_NODELAY` on sockets |
@@ -242,7 +243,7 @@ have access to the `postgres` database in order to get the necessary configurati
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | -1 | Int | No | The maximum backup transfer rate in bytes per second. Use 0 to disable, -1 means use the global setting |
-| progress | -1 | Int | No | Enable backup progress tracking. Use 1 to enable, 0 to disable, -1 means use the global setting |
+| progress | -1 | Int | No | Enable progress tracking for backup and restore operations. Use 1 to enable, 0 to disable, -1 means use the global setting |
 
 
 **S3**

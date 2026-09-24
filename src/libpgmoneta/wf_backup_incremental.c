@@ -264,6 +264,13 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
          usr = i;
       }
    }
+
+   if (usr == -1)
+   {
+      pgmoneta_log_error("User not found for server: %d", server);
+      goto error;
+   }
+
    // establish a connection, with replication flag set
    if (pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {
@@ -294,7 +301,11 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    prev_backup_data = pgmoneta_get_server_backup_identifier_data(server, incremental_label);
    pgmoneta_read_checkpoint_info(prev_backup_data, &chkpt_lsn);
 
-   prev_backup_chkpt_lsn = pgmoneta_string_to_lsn(chkpt_lsn);
+   if (pgmoneta_string_to_lsn(chkpt_lsn, &prev_backup_chkpt_lsn))
+   {
+      pgmoneta_log_error("Unable to parse checkpoint LSN of the preceding backup");
+      goto error;
+   }
 
    tag = pgmoneta_append(tag, "pgmoneta_");
    tag = pgmoneta_append(tag, label);
@@ -305,7 +316,11 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       pgmoneta_log_error("Incremental backup couldn't start");
       goto error;
    }
-   start_backup_lsn = pgmoneta_string_to_lsn(start_backup_xlog);
+   if (pgmoneta_string_to_lsn(start_backup_xlog, &start_backup_lsn))
+   {
+      pgmoneta_log_error("Unable to parse start backup LSN");
+      goto error;
+   }
 
    wal_dir = pgmoneta_get_server_wal(server);
 
@@ -743,6 +758,13 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
          usr = i;
       }
    }
+
+   if (usr == -1)
+   {
+      pgmoneta_log_error("User not found for server: %d", server);
+      goto error;
+   }
+
    // establish a connection, with replication flag set
    if (pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {
@@ -1156,15 +1178,13 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
    memset(label, 0, MAX_PATH);
    pgmoneta_snprintf(label, MAX_PATH, "%s/backup_label", prev_data);
 
-   label_file = fopen(label_file_path, "a");
-   if (label_file == NULL)
+   if (pgmoneta_fopen_secure(label_file_path, "a", &label_file))
    {
       pgmoneta_log_error("Unable to open backup_label file: %s", label_file_path);
       goto error;
    }
 
-   prev_label_file = fopen(label, "r");
-   if (prev_label_file == NULL)
+   if (pgmoneta_fopen_secure(label, "r", &prev_label_file))
    {
       pgmoneta_log_error("Unable to open backup_label file: %s", label);
       goto error;
@@ -1176,7 +1196,8 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
          char buf[MAX_PATH];
 
          memset(buf, 0, sizeof(buf));
-         if (sscanf(read_buffer, "START WAL LOCATION: %s\n", buf) != 1)
+         /* buf holds MAX_PATH bytes */
+         if (sscanf(read_buffer, "START WAL LOCATION: %1023s\n", buf) != 1)
          {
             pgmoneta_log_error("Error parsing start wal location");
             goto error;
@@ -1199,7 +1220,8 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
          char buf[MAX_PATH];
 
          memset(buf, 0, sizeof(buf));
-         if (sscanf(read_buffer, "START TIMELINE: %s\n", buf) != 1)
+         /* buf holds MAX_PATH bytes */
+         if (sscanf(read_buffer, "START TIMELINE: %1023s\n", buf) != 1)
          {
             pgmoneta_log_error("Error parsing start timeline");
             goto error;
@@ -1412,8 +1434,7 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
    filepath = pgmoneta_append(filepath, file_name);
 
    /* Open the file in write mode, if not present create one */
-   file = fopen(filepath, "w+");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(filepath, "w+", &file))
    {
       pgmoneta_log_error("Write incremental file: failed to open the file at %s", relative_filename);
       goto error;
@@ -1477,6 +1498,7 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
       if ((size_t)binary_data_length < block_size)
       {
          free(binary_data);
+         binary_data = NULL;
          break;
       }
 
@@ -1489,6 +1511,7 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
       }
 
       free(binary_data);
+      binary_data = NULL;
    }
 
    /* Handle truncation, by padding with 0 */
@@ -1509,6 +1532,7 @@ done:
 
 error:
    free(binary_data);
+   binary_data = NULL;
    free(filepath);
    free(file_name);
    free(rel_path);
@@ -1541,8 +1565,7 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
    filepath = pgmoneta_append(filepath, backup_data);
    filepath = pgmoneta_append(filepath, relative_filename);
    /* Open the file in write mode, if not present create one */
-   file = fopen(filepath, "w+");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(filepath, "w+", &file))
    {
       pgmoneta_log_error("Write full file: failed to open the file at %s", relative_filename);
       goto error;
@@ -1560,6 +1583,7 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
       if (binary_data_length == 0)
       {
          free(binary_data);
+         binary_data = NULL;
          break;
       }
 
@@ -1572,6 +1596,7 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
 
       offset += binary_data_length;
       free(binary_data);
+      binary_data = NULL;
    }
 
    free(filepath);
@@ -1580,6 +1605,7 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
    return 0;
 error:
    free(binary_data);
+   binary_data = NULL;
    free(filepath);
    if (file != NULL)
    {

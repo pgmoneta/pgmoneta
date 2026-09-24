@@ -68,8 +68,7 @@ extern "C" {
 #define DEFAULT_EVERY                1
 
 #define MAX_USERNAME_LENGTH          128
-#define MAX_PASSWORD_LENGTH          1024
-#define MAX_PASSWORD_CHARS           256
+#define MAX_PASSWORD_LENGTH          8192 /* Bytes; the single password-length limit, sized for cloud IAM DB-auth tokens (AWS RDS/Aurora, Azure AD, GCP) */
 #define MIN_MASTER_KEY_CHARS         8
 
 #define MAX_PATH                     1024
@@ -454,6 +453,7 @@ struct main_configuration
 
    char host[MISC_LENGTH];                /**< The host */
    int metrics;                           /**< The metrics port */
+   int nagios;                            /**< The Nagios port */
    int console;                           /**< The console port */
    pgmoneta_time_t metrics_cache_max_age; /**< Cache duration for Prometheus response */
    int metrics_cache_max_size;            /**< Number of bytes max to cache the Prometheus response */
@@ -474,6 +474,7 @@ struct main_configuration
    char ssh_ciphers[MISC_LENGTH];       /**< The SSH supported ciphers */
    char ssh_public_key_file[MAX_PATH];  /**< The SSH public key path */
    char ssh_private_key_file[MAX_PATH]; /**< The SSH private key path */
+   int ssh_port;                        /**< The SSH port (0 = default 22) */
 
    struct s3_configuration s3; /**< The S3 configuration */
 
@@ -481,6 +482,9 @@ struct main_configuration
    char azure_container[MISC_LENGTH];       /**< The Azure container name */
    char azure_shared_key[MISC_LENGTH];      /**< The Azure storage account key */
    char azure_base_dir[MAX_PATH];           /**< The Azure base directory */
+   char azure_endpoint[MISC_LENGTH];        /**< The Azure endpoint override (e.g. 127.0.0.1 for Azurite) */
+   int azure_port;                          /**< The Azure port (0 = default 443) */
+   bool azure_use_tls;                      /**< Use TLS for Azure endpoint */
 
    int retention_days;     /**< The retention days for the server */
    int retention_weeks;    /**< The retention weeks for the server */

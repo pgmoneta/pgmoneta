@@ -232,9 +232,9 @@ error:
 }
 
 int
-pgmoneta_decompress_directory(char* directory, int type, struct workers* workers, struct deque* excludes)
+pgmoneta_decompress_directory(int server, char* directory, int type, struct workers* workers, struct deque* excludes)
 {
-   return process_directory_operation(-1, directory, type, workers, excludes, true);
+   return process_directory_operation(server, directory, type, workers, excludes, true);
 }
 
 static bool

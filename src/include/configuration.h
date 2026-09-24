@@ -81,6 +81,7 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_MANAGEMENT              "management"
 #define CONFIGURATION_ARGUMENT_MANIFEST                "manifest"
 #define CONFIGURATION_ARGUMENT_METRICS                 "metrics"
+#define CONFIGURATION_ARGUMENT_NAGIOS                  "nagios"
 #define CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE   "metrics_cache_max_age"
 #define CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_SIZE  "metrics_cache_max_size"
 #define CONFIGURATION_ARGUMENT_METRICS_CA_FILE         "metrics_ca_file"

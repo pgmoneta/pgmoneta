@@ -52,7 +52,7 @@ La documentación de [**pgmoneta**][pgmoneta] requiere
 dnf install pandoc texlive-scheme-basic \
             'tex(fvextra.sty)' 'tex(footnote.sty)' 'tex(footnotebackref.sty)' \
             'tex(pagecolor.sty)' 'tex(hardwrap.sty)' \
-            'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' \
+            'tex(mdframed.sty)' 'tex(sourcesans.sty)' \
             'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' \
             'tex(titling.sty)' 'tex(csquotes.sty)' \
             'tex(zref-abspage.sty)' 'tex(needspace.sty)' \
@@ -62,10 +62,10 @@ dnf install pandoc texlive-scheme-basic \
 También necesitarás la plantilla `Eisvogel` que puedes instalar a través de
 
 ```sh
-wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v3.4.0/Eisvogel-3.4.0.tar.gz
-tar -xzf Eisvogel-3.4.0.tar.gz
+wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v3.5.0/Eisvogel-3.5.0.tar.gz
+tar -xzf Eisvogel-3.5.0.tar.gz
 mkdir -p ~/.local/share/pandoc/templates
-mv Eisvogel-3.4.0/eisvogel.latex ~/.local/share/pandoc/templates/
+mv Eisvogel-3.5.0/eisvogel.latex ~/.local/share/pandoc/templates/
 ```
 
 donde `$HOME` es tu directorio de inicio.

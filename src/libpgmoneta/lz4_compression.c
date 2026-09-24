@@ -40,6 +40,7 @@
 /* system */
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -346,8 +347,7 @@ lz4_compress(char* from, char* to)
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   fout = fopen(tmp_to, "wb");
-   if (fout == NULL)
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &fout))
    {
       goto error;
    }
@@ -448,9 +448,7 @@ lz4_decompress(char* from, char* to)
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   fout = fopen(tmp_to, "wb");
-
-   if (fout == NULL)
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &fout))
    {
       goto error;
    }

@@ -144,6 +144,7 @@ typedef uint32_t command_id;
 #define XLH_TRUNCATE_RESTART_SEQS (1 << 1)
 
 #define SizeOfHeapPruneV17        (offsetof(struct xl_heap_prune_v17, flags) + sizeof(uint8_t))
+#define SizeOfHeapPruneV19        (offsetof(struct xl_heap_prune_v19, flags) + sizeof(uint16_t))
 
 // Struct definitions
 /**
@@ -253,6 +254,20 @@ struct xl_heap_prune_v17
 };
 
 /**
+ * @struct xl_heap_prune_v19
+ * @brief Represents a prune operation in the heap (PostgreSQL 19).
+ *
+ * From PostgreSQL 19 (WAL magic >= 0xD119), the main xl_heap_prune record
+ * contains a 16-bit flags field (no "reason" byte). If XLHP_HAS_CONFLICT_HORIZON
+ * is set, snapshot_conflict_horizon follows immediately after flags, unaligned.
+ */
+struct xl_heap_prune_v19
+{
+   uint16_t flags; /**< Flags for prune/freeze/vacuum cleanup record. */
+   /* If XLHP_HAS_CONFLICT_HORIZON is set, the conflict horizon XID follows, unaligned */
+};
+
+/**
  * @struct xl_heap_prune_v16
  * @brief Represents a prune operation in the heap (version 16).
  *
@@ -322,6 +337,7 @@ struct xl_heap_prune
    char* (*format)(struct xl_heap_prune* wrapper, char* buf); /**< Function pointer to format the record */
    union
    {
+      struct xl_heap_prune_v19 v19; /**< Prune operation for version 19 */
       struct xl_heap_prune_v17 v17; /**< Prune operation for version 17 */
       struct xl_heap_prune_v16 v16; /**< Prune operation for version 16 */
       struct xl_heap_prune_v15 v15; /**< Prune operation for version 15 */
@@ -504,6 +520,7 @@ struct xl_heap_prune* create_xl_heap_prune(void);
  * @param rec The record to parse.
  */
 void xl_heap_prune_parse_v17(struct xl_heap_prune* wrapper, void* rec);
+void xl_heap_prune_parse_v19(struct xl_heap_prune* wrapper, void* rec);
 
 /**
  * @brief Parses a version 16 prune record.
@@ -545,6 +562,7 @@ void xl_heap_prune_parse_v13(struct xl_heap_prune* wrapper, void* rec);
  * @return A pointer to the formatted string.
  */
 char* xl_heap_prune_format_v17(struct xl_heap_prune* wrapper, char* buf);
+char* xl_heap_prune_format_v19(struct xl_heap_prune* wrapper, char* buf);
 
 /**
  * @brief Formats a version 16 prune record.
@@ -615,7 +633,7 @@ char* pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record);
  * @param nunused Pointer to store the number of unused items.
  * @param nowunused Pointer to store the unused items array.
  */
-void heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
+void heap_xlog_deserialize_prune_and_freeze(char* cursor, uint16_t flags,
                                             int* nplans, struct xlhp_freeze_plan** plans,
                                             offset_number** frz_offsets,
                                             int* nredirected, offset_number** redirected,

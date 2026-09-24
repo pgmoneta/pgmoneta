@@ -392,7 +392,7 @@ Por ejemplo, establecer `verification = 3600` o `verification = 1H` realizará v
 Por defecto, la encriptación está deshabilitada. Para habilitar esta característica, modifica `pgmoneta.conf`:
 
 ```
-encryption = aes-256-cbc
+encryption = aes-256-gcm
 ```
 
 Se admiten muchos modos de encriptación, consulta la documentación de la propiedad `encryption` para más detalles.

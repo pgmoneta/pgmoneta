@@ -341,7 +341,10 @@ pgmoneta-cli ping
 
 ## progress
 
-Obtener progreso para un comando de respaldo. Requiere `progress = on` en la configuración.
+Obtener progreso para un comando. Requiere `progress = on` en la configuración.
+El progreso se informa para operaciones de backup y restore, incluyendo restore
+de backups completos y restore de backups incrementales mientras se combina la
+cadena incremental.
 
 Comando
 
@@ -436,7 +439,7 @@ Ejemplo
 pgmoneta-cli conf reload
 pgmoneta-cli conf ls
 pgmoneta-cli conf get server.primary.host
-pgmoneta-cli conf set encryption aes-256-cbc
+pgmoneta-cli conf set encryption aes-256-gcm
 ```
 **conf get**
 

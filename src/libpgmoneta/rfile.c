@@ -117,6 +117,14 @@ pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_fi
       goto error;
    }
    rf = (struct rfile*)malloc(sizeof(struct rfile));
+
+   if (rf == NULL)
+   {
+      pgmoneta_record_failure(failures, "rfile_create: could not allocate rfile for %s (label %s)", extracted_file_path, label);
+      fclose(fp);
+      goto error;
+   }
+
    memset(rf, 0, sizeof(struct rfile));
 
    rf->fp = fp;
@@ -221,6 +229,14 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
    if (rf->num_blocks > 0)
    {
       rf->relative_block_numbers = malloc(sizeof(uint32_t) * rf->num_blocks);
+
+      if (rf->relative_block_numbers == NULL)
+      {
+         pgmoneta_log_error("rfile initialize: could not allocate %u block numbers for %s%s", rf->num_blocks, relative_dir, base_file_name);
+         pgmoneta_record_failure(failures, "rfile_initialize: could not allocate block numbers for %s/%s (label %s)", relative_dir, base_file_name, label);
+         goto error;
+      }
+
       nread = fread(rf->relative_block_numbers, sizeof(uint32_t), rf->num_blocks, rf->fp);
       if (nread != rf->num_blocks)
       {

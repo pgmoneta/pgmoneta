@@ -65,6 +65,7 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
    parser_state_t state = STATE_START;
    char* current_key = NULL;
    int done = 0;
+   int rc = 0;
 
    while (!done)
    {
@@ -146,7 +147,11 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
             break;
 
          case YAML_SCALAR_EVENT:
-            handle_scalar_event(&event, &state, &current_key, config);
+            if (handle_scalar_event(&event, &state, &current_key, config))
+            {
+               rc = -1;
+               done = 1;
+            }
             break;
 
          case YAML_DOCUMENT_END_EVENT:
@@ -168,10 +173,10 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
    yaml_parser_delete(&parser);
    fclose(file);
 
-   return 0;
+   return rc;
 }
 
-void
+int
 handle_scalar_event(yaml_event_t* event, parser_state_t* state,
                     char** current_key, config_t* config)
 {
@@ -226,24 +231,50 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
 
       case STATE_OPERATIONS_SEQUENCE:
          // Add operation to operations array
-         config->operations = realloc(
-            config->operations,
-            (config->operation_count + 1) * sizeof(char*));
-         config->operations[config->operation_count] = strdup(value);
-         config->operation_count++;
+         {
+            char** tmp_operations = NULL;
+            char* operation = NULL;
+
+            tmp_operations = realloc(config->operations,
+                                     (config->operation_count + 1) * sizeof(char*));
+            if (tmp_operations == NULL)
+            {
+               return 1;
+            }
+            config->operations = tmp_operations;
+
+            operation = strdup(value);
+            if (operation == NULL)
+            {
+               return 1;
+            }
+            config->operations[config->operation_count] = operation;
+            config->operation_count++;
+         }
          break;
 
       case STATE_XIDS_SEQUENCE:
          // Add XID to the XIDs array
-         config->xids = realloc(config->xids,
-                                (config->xid_count + 1) * sizeof(int));
-         config->xids[config->xid_count] = atoi(value);
-         config->xid_count++;
+         {
+            int* tmp_xids = NULL;
+
+            tmp_xids = realloc(config->xids, (config->xid_count + 1) * sizeof(int));
+            if (tmp_xids == NULL)
+            {
+               return 1;
+            }
+            config->xids = tmp_xids;
+
+            config->xids[config->xid_count] = atoi(value);
+            config->xid_count++;
+         }
          break;
 
       default:
          break;
    }
+
+   return 0;
 }
 
 void

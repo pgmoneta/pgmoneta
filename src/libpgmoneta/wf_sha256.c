@@ -138,8 +138,7 @@ sha256_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_workers_destroy(workers);
    workers = NULL;
 
-   sha256_file = fopen(sha256_path, "w");
-   if (sha256_file == NULL)
+   if (pgmoneta_fopen_secure(sha256_path, "w", &sha256_file))
    {
       goto error;
    }

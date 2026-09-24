@@ -52,6 +52,10 @@
 #include <sys/types.h>
 
 
+/* Retry parameters for pgmoneta_test_wait_for_wal_streaming() */
+#define WAL_STREAMING_TEST_RETRY_MAX          5
+#define WAL_STREAMING_TEST_RETRY_DELAY_MICRO  2000000 // 2 seconds
+
 static int check_output_outcome(int socket, int expected_error, struct json** output);
 static int get_connection();
 
@@ -549,6 +553,85 @@ pgmoneta_tsclient_status_details(int expected_error)
 error:
    pgmoneta_disconnect(socket);
    return 1;
+}
+
+int
+pgmoneta_tsclient_wal_streaming_ready(bool* ready)
+{
+   int socket = -1;
+   struct json* read = NULL;
+   struct json* response = NULL;
+   struct json* servers = NULL;
+   struct json_iterator* iter = NULL;
+
+   *ready = false;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_status_details(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, 0, &read))
+   {
+      goto error;
+   }
+
+   response = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_RESPONSE);
+   servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
+
+   if (servers != NULL && pgmoneta_json_iterator_create(servers, &iter) == 0)
+   {
+      while (pgmoneta_json_iterator_next(iter))
+      {
+         struct json* server = (struct json*)pgmoneta_value_data(iter->value);
+         if ((bool)pgmoneta_json_get(server, MANAGEMENT_ARGUMENT_WAL_STREAMING))
+         {
+            *ready = true;
+            break;
+         }
+      }
+      pgmoneta_json_iterator_destroy(iter);
+   }
+
+   pgmoneta_json_destroy(read);
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   if (read != NULL)
+   {
+      pgmoneta_json_destroy(read);
+   }
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+void
+pgmoneta_test_wait_for_wal_streaming(void)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   bool ready = false;
+
+   if (config == NULL || strlen(config->common.configuration_path) == 0)
+   {
+      return;
+   }
+
+   for (int i = 0; i < WAL_STREAMING_TEST_RETRY_MAX; i++)
+   {
+      if (pgmoneta_tsclient_wal_streaming_ready(&ready) == 0 && ready)
+      {
+         return;
+      }
+      usleep(WAL_STREAMING_TEST_RETRY_DELAY_MICRO);
+   }
+
+   pgmoneta_log_warn("WAL streaming not ready before test; proceeding anyway");
 }
 
 int

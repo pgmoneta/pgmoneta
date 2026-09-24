@@ -124,6 +124,11 @@ pgmoneta_memory_dynamic_append(void* orig, size_t orig_size, void* append, size_
    {
       s = orig_size + append_size;
       d = realloc(orig, s);
+      if (d == NULL)
+      {
+         *new_size = orig_size;
+         return orig;
+      }
       memcpy(d + orig_size, append, append_size);
    }
    else

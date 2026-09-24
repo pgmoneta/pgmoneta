@@ -185,7 +185,8 @@ if (DOCS)
         ${DOXYGEN_VERSION} STREQUAL "1.14.0" OR
         ${DOXYGEN_VERSION} STREQUAL "1.15.0" OR
         ${DOXYGEN_VERSION} STREQUAL "1.16.0" OR
-        ${DOXYGEN_VERSION} STREQUAL "1.16.1")
+        ${DOXYGEN_VERSION} STREQUAL "1.16.1" OR
+        ${DOXYGEN_VERSION} STREQUAL "1.17.0")
 
       add_custom_command(
         TARGET api

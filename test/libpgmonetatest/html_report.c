@@ -190,6 +190,9 @@ html_report_generate(const char* path, mctf_filter_type_t filter_type, const cha
       case MCTF_FILTER_TEST:
          fprintf(f, "Test name filter = <code>%s</code>\n", filter ? filter : "");
          break;
+      case MCTF_FILTER_INTEGRATION:
+         fprintf(f, "Integration tests\n");
+         break;
       case MCTF_FILTER_NONE:
       default:
          fprintf(f, "Full suite (no filter)\n");

@@ -46,6 +46,7 @@ struct csv_reader
 {
    FILE* file;     /**< The file */
    char line[512]; /**< The line */
+   char* saveptr;  /**< Per-reader strtok_r state (thread-safe) */
 };
 
 /** @struct csv_writer

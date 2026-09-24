@@ -207,6 +207,21 @@ int
 pgmoneta_tsclient_status_details(int expected_error);
 
 /**
+ * Query the server's status details and report whether any server has WAL streaming active.
+ * @param ready set to true if at least one server has an active WAL receiver, false otherwise
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_wal_streaming_ready(bool* ready);
+
+/**
+ * MCTF global per test setup hook: polls pgmoneta_tsclient_wal_streaming_ready(), retrying
+ * for a few seconds if WAL streaming isn't ready yet, then returns so the test can run.
+ */
+void
+pgmoneta_test_wait_for_wal_streaming(void);
+
+/**
  * Execute reload command on the server
  * @param expected_error expected error code
  * @return 0 upon success, otherwise 1

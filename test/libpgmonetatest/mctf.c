@@ -291,6 +291,17 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
 }
 
 void
+mctf_register_integration_test(const char* name, const char* module, const char* file, mctf_test_func_t func)
+{
+   mctf_register_test_with_options(name, module, file, func, false, 0);
+   /* Mark the just-appended test as opt-in (full-suite runs skip it). */
+   if (g_runner.tests_tail != NULL)
+   {
+      g_runner.tests_tail->is_integration = true;
+   }
+}
+
+void
 mctf_register_test_with_max_time(const char* name, const char* module, const char* file, mctf_test_func_t func, unsigned int max_seconds)
 {
    mctf_register_test_with_options(name, module, file, func, false, max_seconds);
@@ -358,6 +369,15 @@ get_or_create_module_hooks(const char* module)
    h->next = g_runner.module_hooks;
    g_runner.module_hooks = h;
    return h;
+}
+
+void
+mctf_register_global_test_setup(mctf_hook_func_t func)
+{
+   if (!g_initialized)
+      mctf_init();
+
+   g_runner.global_test_setup = func;
 }
 
 void
@@ -446,8 +466,21 @@ mctf_extract_module_name(const char* file_path)
 
 
 static bool
-matches_filter(mctf_filter_type_t filter_type, const char* test_name, const char* module, const char* filter)
+matches_filter(mctf_filter_type_t filter_type, const mctf_test_t* test, const char* filter)
 {
+   /* Integration mode runs exactly the opt-in integration tests. */
+   if (filter_type == MCTF_FILTER_INTEGRATION)
+   {
+      return test->is_integration;
+   }
+
+   /* Integration tests are opt-in: they never run as part of the default
+    * full-suite run, only when explicitly selected with -t/-m/--integration. */
+   if (test->is_integration && filter_type == MCTF_FILTER_NONE)
+   {
+      return false;
+   }
+
    if (filter_type == MCTF_FILTER_NONE || !filter || filter[0] == '\0')
    {
       return true;
@@ -456,9 +489,9 @@ matches_filter(mctf_filter_type_t filter_type, const char* test_name, const char
    switch (filter_type)
    {
       case MCTF_FILTER_MODULE:
-         return module && strstr(module, filter) != NULL;
+         return test->module && strstr(test->module, filter) != NULL;
       case MCTF_FILTER_TEST:
-         return strstr(test_name, filter) != NULL;
+         return strstr(test->name, filter) != NULL;
       default:
          return false;
    }
@@ -477,7 +510,7 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
    }
    for (test = g_runner.tests; test; test = test->next)
    {
-      if (matches_filter(filter_type, test->name, test->module, filter))
+      if (matches_filter(filter_type, test, filter))
       {
          tests_to_run++;
       }
@@ -495,6 +528,9 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
             break;
          case MCTF_FILTER_TEST:
             mctf_log_errorf("MCTF: No tests found matching filter '%s'\n", filter);
+            break;
+         case MCTF_FILTER_INTEGRATION:
+            mctf_log_errorf("MCTF: No integration tests registered\n");
             break;
       }
       return 0;
@@ -534,7 +570,7 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
 
    for (test = g_runner.tests; test; test = test->next)
    {
-      if (!matches_filter(filter_type, test->name, test->module, filter))
+      if (!matches_filter(filter_type, test, filter))
       {
          continue;
       }
@@ -601,6 +637,12 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
 
       mctf_errno = 0;
       if (mctf_errmsg) { free(mctf_errmsg); mctf_errmsg = NULL; }
+
+      // global per test setup
+      if (g_runner.global_test_setup)
+      {
+         g_runner.global_test_setup();
+      }
 
       /* Per-test setup */
       if (cur_test_hooks && cur_test_hooks->setup)

@@ -451,6 +451,13 @@ char*
 pgmoneta_get_home_directory(void);
 
 /**
+ * Get the temporary directory
+ * @return The directory
+ */
+char*
+pgmoneta_get_tmpdir(void);
+
+/**
  * Get the user name
  * @return The user name
  */
@@ -624,6 +631,15 @@ char*
 pgmoneta_append_ulong(char* orig, unsigned long l);
 
 /**
+ * Append an unsigned long long
+ * @param orig The original string
+ * @param l The long
+ * @return The resulting string
+ */
+char*
+pgmoneta_append_ullong(char* orig, unsigned long long l);
+
+/**
  * Append a double
  * @param orig The original string
  * @param d The double
@@ -767,6 +783,7 @@ pgmoneta_delete_file(char* file, struct workers* workers);
 
 /**
  * Copy a directory
+ * @param server The server identifier for progress tracking, -1 to disable progress tracking
  * @param from The from directory
  * @param to The to directory
  * @param restore_last_paths The string array of file names that should be excluded from being copied in this round
@@ -774,7 +791,7 @@ pgmoneta_delete_file(char* file, struct workers* workers);
  * @return The result
  */
 int
-pgmoneta_copy_directory(char* from, char* to, char** restore_last_paths, struct workers* workers);
+pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_paths, struct workers* workers);
 
 /**
  * List a directory
@@ -801,6 +818,25 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers);
  */
 int
 pgmoneta_move_file(char* from, char* to);
+
+/**
+ * Open a file in a secure way
+ *
+ * Creating, writing or appending adds O_NOFOLLOW, so that the last part of the
+ * path can not be redirected through a symlink. A read only open will follow,
+ * since directory entries are resolved with stat(). O_CLOEXEC is always added.
+ *
+ * A created file is set to rw------- through the descriptor, which is the
+ * equivalent of pgmoneta_permission(path, 6, 0, 0) without resolving the path
+ * a second time.
+ *
+ * @param path The path
+ * @param mode The mode, like "w", "wb", "r" or "r+", where an 'x' means exclusive creation
+ * @param file The file
+ * @return 0 upon success, 1 if the file exists and the mode is exclusive, otherwise 2
+ */
+int
+pgmoneta_fopen_secure(const char* path, const char* mode, FILE** file);
 
 /**
  * Strip the extension of a file
@@ -929,6 +965,7 @@ pgmoneta_is_symlink_valid(char* path);
 
 /**
  * Copy WAL files
+ * @param server The server identifier
  * @param from The from directory
  * @param to The to directory
  * @param start The start file
@@ -936,7 +973,7 @@ pgmoneta_is_symlink_valid(char* path);
  * @return The result
  */
 int
-pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* workers);
+pgmoneta_copy_wal_files(int server, char* from, char* to, char* start, struct workers* workers);
 
 /**
  * Get the number of WAL files
@@ -1322,10 +1359,11 @@ pgmoneta_lsn_to_string(uint64_t lsn);
 /**
  * Generate the lsn integer given a lsn string format %X/%X
  * @param lsn string value
- * @return The lsn integer
+ * @param lsn_out [out] The lsn integer, set to 0 if lsn could not be parsed
+ * @return 0 upon success, otherwise 1
  */
-uint64_t
-pgmoneta_string_to_lsn(char* lsn);
+int
+pgmoneta_string_to_lsn(char* lsn, uint64_t* lsn_out);
 
 /**
  * Check if the path to a file is an incremental path

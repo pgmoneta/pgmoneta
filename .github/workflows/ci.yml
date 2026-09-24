@@ -136,6 +136,7 @@ jobs:
           chown -R runner:runner $GITHUB_WORKSPACE
 
       - name: Run Tests
+        timeout-minutes: 45
         run: |
           export TEST_PG_VERSION=${{ matrix.pg_version }}
           if [ "${{ matrix.compiler }}" = "clang" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
@@ -167,13 +168,159 @@ jobs:
           path: /tmp/pgmoneta-test/log
           retention-days: 90
 
-  storage:
-    needs: [format-check, build-linux]
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-        pg_version: ["17"]
-    uses: ./.github/workflows/storage.yml
-    with:
-      platform: ${{ matrix.platform }}
-      pg_version: ${{ matrix.pg_version }}
+  storage-engines:
+    needs: [format-check]
+    runs-on: ubuntu-latest
+
+    env:
+      PG_VERSION: "17"
+      PG_DATABASE: mydb
+      PG_USER_NAME: myuser
+      PG_USER_PASSWORD: mypass
+      PG_REPL_USER_NAME: repl
+      PG_REPL_PASSWORD: replpass
+      ROOT_DIR: /tmp/pgmoneta-se-test
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            gcc cmake make \
+            libev-dev libssl-dev \
+            libsystemd-dev zlib1g-dev \
+            libzstd-dev liblz4-dev \
+            libssh-dev libbz2-dev \
+            libarchive-dev libyaml-dev \
+            libncurses-dev check \
+            python3-docutils
+
+      - name: Install PostgreSQL ${{ env.PG_VERSION }}
+        run: |
+          sudo apt-get install -y curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-${{ env.PG_VERSION }} postgresql-server-dev-${{ env.PG_VERSION }}
+          echo "/usr/lib/postgresql/${{ env.PG_VERSION }}/bin" >> $GITHUB_PATH
+
+      - name: Install pgmoneta_ext
+        run: |
+          cd /tmp
+          git clone --branch main --single-branch --depth 1 https://github.com/pgmoneta/pgmoneta_ext.git
+          cd pgmoneta_ext
+          mkdir build && cd build
+          cmake -DDOCS=false ..
+          make
+          sudo make install
+
+      - name: Build pgmoneta
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
+          make -j$(nproc)
+          test -x test/pgmoneta-test || { echo "pgmoneta-test was not built (is 'check' installed?)"; exit 1; }
+
+      - name: Set up PostgreSQL
+        run: |
+          CONF_DIR=${{ github.workspace }}/test/postgresql/src/postgresql${{ env.PG_VERSION }}/conf
+          PG_BIN=/usr/lib/postgresql/${{ env.PG_VERSION }}/bin
+
+          sudo mkdir -p /conf /pgdata /pgwal /pglog /tmp/pgmoneta_tblspc/ts1 /tmp/pgmoneta_tblspc/ts2
+          sudo cp "$CONF_DIR"/* /conf/
+          sudo chown -R postgres:postgres /conf /pgdata /pgwal /pglog /tmp/pgmoneta_tblspc
+          sudo chmod -R 777 /conf /pgdata /pgwal /pglog
+          sudo chmod 700 /tmp/pgmoneta_tblspc/ts1 /tmp/pgmoneta_tblspc/ts2
+
+          sudo -u postgres bash -c "
+            set -e
+            $PG_BIN/initdb -k -X /pgwal/ /pgdata/
+
+            sed -i 's/PG_MAX_CONNECTIONS/100/g;     s/PG_SHARED_BUFFERS/256MB/g; s/PG_WORK_MEM/4MB/g' /conf/postgresql.conf
+            sed -i 's/PG_MAX_PARALLEL_WORKERS/8/g;  s/PG_EFFECTIVE_CACHE_SIZE/4GB/g' /conf/postgresql.conf
+            sed -i 's/PG_MAX_WAL_SIZE/1GB/g;        s/PG_LOG_LEVEL/debug5/g' /conf/postgresql.conf
+
+            sed -i 's/PG_DATABASE/${{ env.PG_DATABASE }}/g; s/PG_USER_NAME/${{ env.PG_USER_NAME }}/g; s/PG_REPL_USER_NAME/${{ env.PG_REPL_USER_NAME }}/g' /conf/pg_hba.conf
+
+            cp /conf/postgresql.conf /conf/pg_hba.conf /pgdata/
+
+            sed -i 's/PG_DATABASE/${{ env.PG_DATABASE }}/g;        s/PG_USER_NAME/${{ env.PG_USER_NAME }}/g' /conf/setup.sql
+            sed -i 's/PG_USER_PASSWORD/${{ env.PG_USER_PASSWORD }}/g; s/PG_REPL_USER_NAME/${{ env.PG_REPL_USER_NAME }}/g' /conf/setup.sql
+            sed -i 's/PG_REPL_PASSWORD/${{ env.PG_REPL_PASSWORD }}/g' /conf/setup.sql
+
+            $PG_BIN/pg_ctl -D /pgdata/ start
+            sleep 3
+            $PG_BIN/psql -q -h /tmp -f /conf/setup.sql postgres
+          "
+
+          /usr/lib/postgresql/${{ env.PG_VERSION }}/bin/pg_isready -h localhost -p 5432
+
+      - name: Configure test harness
+        run: |
+          # Directory layout mirrors test/check.sh: the harness "base" dir is
+          # the parent of the backup dir, and the MCTF log is derived as
+          # <parent-of-base>/log (see test/runner.c:build_mctf_log_path).
+          BASE_DIR=$ROOT_DIR/base
+          mkdir -p $BASE_DIR/conf $BASE_DIR/backup $BASE_DIR/restore \
+                   $BASE_DIR/workspace $BASE_DIR/retrospect $BASE_DIR/standby \
+                   $ROOT_DIR/log
+
+          # Harness configuration. se_s3 only reads the [primary] connection
+          # details from this; the managed pgmoneta it starts writes its own
+          # S3 configuration separately.
+          cat > $BASE_DIR/conf/pgmoneta.conf <<EOF
+          [pgmoneta]
+          host = localhost
+          base_dir = $BASE_DIR/backup
+          compression = zstd
+          encryption = none
+          log_type = file
+          log_level = debug5
+          log_path = $ROOT_DIR/log/pgmoneta.log
+          unix_socket_dir = /tmp/
+          workspace = $BASE_DIR/workspace
+          create_slot = yes
+
+          [primary]
+          host = localhost
+          port = 5432
+          user = $PG_REPL_USER_NAME
+          wal_slot = repl
+          EOF
+          cp $BASE_DIR/conf/pgmoneta.conf $BASE_DIR/conf/pgmoneta.conf.sample
+
+          ./build/src/pgmoneta-admin master-key -P $PG_REPL_PASSWORD
+          ./build/src/pgmoneta-admin -f $BASE_DIR/conf/pgmoneta_users.conf \
+            -U $PG_REPL_USER_NAME -P $PG_REPL_PASSWORD user add
+
+          {
+            echo "PGMONETA_TEST_CONF=$BASE_DIR/conf/pgmoneta.conf"
+            echo "PGMONETA_TEST_CONF_SAMPLE=$BASE_DIR/conf/pgmoneta.conf.sample"
+            echo "PGMONETA_TEST_USER_CONF=$BASE_DIR/conf/pgmoneta_users.conf"
+            echo "PGMONETA_TEST_BASE_DIR=$BASE_DIR"
+            echo "PGMONETA_TEST_RESTORE_DIR=$BASE_DIR/restore"
+            echo "PGMONETA_TEST_RETROSPECT_DIR=$BASE_DIR/retrospect"
+            echo "PGMONETA_TEST_HOT_STANDBY_DIR=$BASE_DIR/standby"
+          } >> $GITHUB_ENV
+
+      - name: Run storage-engine tests
+        run: ./build/test/pgmoneta-test --integration
+
+      - name: Upload HTML test report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: storage-engines-report-pg${{ env.PG_VERSION }}
+          path: ${{ env.ROOT_DIR }}/log/pgmoneta-test-report.html
+          retention-days: 14
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: storage-engines-logs-${{ env.PG_VERSION }}
+          path: ${{ env.ROOT_DIR }}
+          retention-days: 14

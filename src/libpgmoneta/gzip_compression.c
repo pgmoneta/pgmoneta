@@ -38,6 +38,7 @@
 
 /* system */
 #include <dirent.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -590,8 +591,7 @@ gz_decompress(char* from, char* to)
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   out = fopen(tmp_to, "wb");
-   if (out == NULL)
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &out))
    {
       goto error;
    }

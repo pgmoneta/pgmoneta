@@ -63,6 +63,14 @@
 #define NAME        "configuration"
 #define LINE_LENGTH 512
 
+/*
+ * Credential files (users/admins) store each entry as
+ * "username:base64(AES-256-GCM(password))". A password near MAX_PASSWORD_LENGTH
+ * (cloud IAM DB-auth tokens) expands under encryption + base64 well beyond
+ * LINE_LENGTH, so these files are read with a dedicated, larger line buffer.
+ */
+#define MAX_USER_LINE_LENGTH 16384
+
 static int extract_syskey_value(char* str, char** key, char** value);
 static void extract_key_value(char* str, char** key, char** value);
 static int as_int(char* str, int* i);
@@ -690,6 +698,20 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (pgmoneta_compare_string(key, "nagios"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->nagios))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (pgmoneta_compare_string(key, "console"))
                {
                   if (pgmoneta_compare_string(section, "pgmoneta"))
@@ -1302,6 +1324,20 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (pgmoneta_compare_string(key, "ssh_port"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->ssh_port))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (pgmoneta_compare_string(key, "s3_use_tls"))
                {
                   if (pgmoneta_compare_string(section, "pgmoneta"))
@@ -1577,6 +1613,50 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                         max = MAX_PATH - 1;
                      }
                      memcpy(config->azure_base_dir, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "azure_endpoint"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->azure_endpoint, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "azure_port"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->azure_port))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, "azure_use_tls"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_bool(value, &config->azure_use_tls))
+                     {
+                        unknown = true;
+                     }
                   }
                   else
                   {
@@ -2851,7 +2931,7 @@ int
 pgmoneta_read_users_configuration(void* shm, char* filename)
 {
    FILE* file;
-   char line[LINE_LENGTH];
+   char line[MAX_USER_LINE_LENGTH];
    char* trimmed_line = NULL;
    int index;
    char* master_key = NULL;
@@ -2943,20 +3023,17 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
             continue;
          }
 
-         // Check character length
-         size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password, strlen(password));
          if (strlen(username) < MAX_USERNAME_LENGTH &&
-             strlen(password) < MAX_PASSWORD_LENGTH &&
-             char_count != (size_t)-1 && char_count <= MAX_PASSWORD_CHARS)
+             strlen(password) < MAX_PASSWORD_LENGTH)
          {
             memcpy(&config->common.users[index].username, username, strlen(username));
             memcpy(&config->common.users[index].password, password, strlen(password));
          }
          else
          {
-            if (char_count > MAX_PASSWORD_CHARS)
+            if (strlen(password) >= MAX_PASSWORD_LENGTH)
             {
-               pgmoneta_log_warn("Password too long for user '%s' (%zu characters)", username, char_count);
+               pgmoneta_log_warn("Password too long for user '%s' (%zu bytes, max %d)", username, strlen(password), MAX_PASSWORD_LENGTH - 1);
             }
             printf("pgmoneta: Invalid USER entry\n");
             printf("%s\n", line);
@@ -3074,7 +3151,7 @@ int
 pgmoneta_read_admins_configuration(void* shm, char* filename)
 {
    FILE* file;
-   char line[LINE_LENGTH];
+   char line[MAX_USER_LINE_LENGTH];
    char* trimmed_line = NULL;
    int index;
    char* master_key = NULL;
@@ -3168,20 +3245,17 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
             continue;
          }
 
-         // Check character length
-         size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password, strlen(password));
          if (strlen(username) < MAX_USERNAME_LENGTH &&
-             strlen(password) < MAX_PASSWORD_LENGTH &&
-             char_count != (size_t)-1 && char_count <= MAX_PASSWORD_CHARS)
+             strlen(password) < MAX_PASSWORD_LENGTH)
          {
             memcpy(&config->common.admins[index].username, username, strlen(username));
             memcpy(&config->common.admins[index].password, password, strlen(password));
          }
          else
          {
-            if (char_count > MAX_PASSWORD_CHARS)
+            if (strlen(password) >= MAX_PASSWORD_LENGTH)
             {
-               pgmoneta_log_warn("Password too long for user '%s' (%zu characters)", username, char_count);
+               pgmoneta_log_warn("Password too long for user '%s' (%zu bytes, max %d)", username, strlen(password), MAX_PASSWORD_LENGTH - 1);
             }
             printf("pgmoneta: Invalid ADMIN entry\n");
             printf("%s\n", line);
@@ -4427,6 +4501,13 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
       else if (pgmoneta_compare_string(key, "metrics"))
       {
          if (as_int(value, &config->metrics))
+         {
+            unknown = true;
+         }
+      }
+      else if (pgmoneta_compare_string(key, "nagios"))
+      {
+         if (as_int(value, &config->nagios))
          {
             unknown = true;
          }

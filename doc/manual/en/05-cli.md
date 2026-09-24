@@ -342,6 +342,8 @@ pgmoneta-cli ping
 ## progress
 
 Get progress for a command. Requires `progress = on` in the configuration.
+Progress is reported for backup operations and restore operations, including
+full backup restore and incremental backup restore.
 
 Command
 
@@ -436,7 +438,7 @@ Example
 pgmoneta-cli conf reload
 pgmoneta-cli conf ls
 pgmoneta-cli conf get server.primary.host
-pgmoneta-cli conf set encryption aes-256-cbc
+pgmoneta-cli conf set encryption aes-256-gcm
 ```
 **conf get**
 

@@ -38,6 +38,7 @@
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -448,6 +449,30 @@ MCTF_TEST(test_utils_string_manipulation)
    free(res);
    res = NULL;
 
+   // test remove_prefix without a matching prefix
+
+   s = strdup("hello");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
+   res = pgmoneta_remove_prefix(s, "world");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "remove_prefix mismatch failed");
+   MCTF_ASSERT_STR_EQ(res, "hello", cleanup, "remove_prefix mismatch result mismatch");
+   free(s);
+   s = NULL;
+   free(res);
+   res = NULL;
+
+   // test remove_prefix with a partial prefix match
+
+   s = strdup("data/x");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
+   res = pgmoneta_remove_prefix(s, "dat0/");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "remove_prefix partial match failed");
+   MCTF_ASSERT_STR_EQ(res, "data/x", cleanup, "remove_prefix partial match result mismatch");
+   free(s);
+   s = NULL;
+   free(res);
+   res = NULL;
+
    // test remove_suffix
 
    s = strdup("test.txt");
@@ -606,6 +631,150 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_fopen_secure)
+{
+   char* path = "test_fopen_secure.tmp";
+   FILE* f = NULL;
+   struct stat st;
+
+   /* Standard Write Mode "w" (should create) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w", &f), 0, cleanup, "standard w failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after w");
+   fclose(f);
+   f = NULL;
+
+   /* Permission Check (should be 0600) */
+   MCTF_ASSERT_INT_EQ(stat(path, &st), 0, cleanup, "stat failed");
+   MCTF_ASSERT_INT_EQ(st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO), S_IRUSR | S_IWUSR, cleanup, "permissions not 0600");
+
+   /* Standard Write Mode "w" on existing file (should truncate) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w", &f), 0, cleanup, "standard w update failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after update w");
+   fclose(f);
+   f = NULL;
+
+   /* Exclusive Write Mode "wx" on existing file (should FAIL with 1) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "wx", &f), 1, cleanup, "exclusive wx didn't fail on exist");
+   MCTF_ASSERT_PTR_NULL(f, cleanup, "f should be null after failed wx");
+
+   /* Standard Read Mode "r" on existing file */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "r", &f), 0, cleanup, "standard r failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after r");
+   fclose(f);
+   f = NULL;
+
+   /* Cleanup for fresh start */
+   pgmoneta_delete_file(path, NULL);
+
+   /* Exclusive Write Mode "wx" on NON-existing file (should succeed) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "wx", &f), 0, cleanup, "exclusive wx failed on new file");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after success wx");
+   fclose(f);
+   f = NULL;
+
+   /* Cleanup for mixed modes */
+   pgmoneta_delete_file(path, NULL);
+
+   /* Read/Write Mode "w+" (should create and allow writing/reading) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w+", &f), 0, cleanup, "w+ failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after w+");
+   MCTF_ASSERT_INT_EQ(fprintf(f, "test"), 4, cleanup, "writing to w+ failed");
+   rewind(f);
+   char buf[32];
+   MCTF_ASSERT_PTR_NONNULL(fgets(buf, sizeof(buf), f), cleanup, "reading from w+ failed");
+   MCTF_ASSERT_STR_EQ(buf, "test", cleanup, "content mismatch in w+");
+   fclose(f);
+   f = NULL;
+
+   /* Exclusive Read/Write Mode "w+x" on NON-existing file (should succeed) */
+   pgmoneta_delete_file(path, NULL);
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w+x", &f), 0, cleanup, "w+x failed on new file");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after w+x");
+   MCTF_ASSERT_INT_EQ(fprintf(f, "exclusive"), 9, cleanup, "writing to w+x failed");
+   rewind(f);
+   MCTF_ASSERT_PTR_NONNULL(fgets(buf, sizeof(buf), f), cleanup, "reading from w+x failed");
+   MCTF_ASSERT_STR_EQ(buf, "exclusive", cleanup, "content mismatch in w+x");
+   fclose(f);
+   f = NULL;
+
+   /* Exclusive Read/Write Mode "w+x" on existing file (should fail) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w+x", &f), 1, cleanup, "w+x should fail on existing file");
+   MCTF_ASSERT_PTR_NULL(f, cleanup, "f should be null after failed w+x");
+
+   /* Read/Append Mode "a+" (should allow reading and appending) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "a+", &f), 0, cleanup, "a+ failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after a+");
+   MCTF_ASSERT_INT_EQ(fprintf(f, "-more"), 5, cleanup, "appending to a+ failed");
+   rewind(f);
+   /* File should now contain "exclusive-more" */
+   MCTF_ASSERT_PTR_NONNULL(fgets(buf, sizeof(buf), f), cleanup, "reading from a+ failed");
+   MCTF_ASSERT_STR_EQ(buf, "exclusive-more", cleanup, "content mismatch in a+");
+   fclose(f);
+   f = NULL;
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   pgmoneta_delete_file(path, NULL);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_fopen_secure_nofollow)
+{
+   char* target = "test_fopen_secure_target.tmp";
+   char* link = "test_fopen_secure_link.tmp";
+   FILE* f = NULL;
+
+   /* A pre-existing target the symlink points at */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(target, "w", &f), 0, cleanup, "could not create target");
+   fclose(f);
+   f = NULL;
+
+   unlink(link);
+   MCTF_ASSERT_INT_EQ(symlink(target, link), 0, cleanup, "could not create symlink");
+
+   /* Writing through a symlink must be refused (O_NOFOLLOW) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(link, "w", &f), 2, cleanup, "write followed a symlink");
+   MCTF_ASSERT_PTR_NULL(f, cleanup, "f should be null after refused write");
+
+   /* Appending through a symlink must be refused too */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(link, "a", &f), 2, cleanup, "append followed a symlink");
+   MCTF_ASSERT_PTR_NULL(f, cleanup, "f should be null after refused append");
+
+   /* Reading is deliberately allowed to follow: pgmoneta_copy_directory()
+    * resolves entries with stat(), so symlinked sources are legitimate.
+    */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(link, "r", &f), 0, cleanup, "read should follow a symlink");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after read through symlink");
+   fclose(f);
+   f = NULL;
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   unlink(link);
+   pgmoneta_delete_file(target, NULL);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_get_tmpdir)
+{
+   char* dir = NULL;
+
+   dir = pgmoneta_get_tmpdir();
+   MCTF_ASSERT_PTR_NONNULL(dir, cleanup, "tmpdir is null");
+   MCTF_ASSERT_INT_EQ(dir[0], '/', cleanup, "tmpdir is not absolute");
+
+cleanup:
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_snprintf)
 {
    char buf[100];
@@ -689,13 +858,23 @@ MCTF_TEST(test_utils_string_extras)
    // pgmoneta_lsn_to_string / pgmoneta_string_to_lsn
 
    uint64_t lsn = 0x123456789ABCDEF0;
+   uint64_t parsed_lsn = 0;
+   char truncated_lsn[] = "ABC/";
+
    s = pgmoneta_lsn_to_string(lsn);
    MCTF_ASSERT_PTR_NONNULL(s, cleanup, "lsn_to_string failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(s), lsn, cleanup, "string_to_lsn round-trip failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(s, &parsed_lsn), 0, cleanup, "string_to_lsn failed");
+   MCTF_ASSERT_INT_EQ(parsed_lsn, lsn, cleanup, "string_to_lsn round-trip failed");
    free(s);
    s = NULL;
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(NULL), 0, cleanup, "string_to_lsn NULL should return 0");
+   parsed_lsn = 1;
+   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(NULL, &parsed_lsn), 1, cleanup, "string_to_lsn NULL should fail");
+   MCTF_ASSERT_INT_EQ(parsed_lsn, 0, cleanup, "string_to_lsn NULL should zero the result");
+
+   parsed_lsn = 1;
+   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(truncated_lsn, &parsed_lsn), 1, cleanup, "string_to_lsn should reject a truncated lsn");
+   MCTF_ASSERT_INT_EQ(parsed_lsn, 0, cleanup, "string_to_lsn should zero the result on failure");
 
    // pgmoneta_split
 
@@ -1865,7 +2044,7 @@ MCTF_TEST(test_utils_missing_wal)
    MCTF_ASSERT_PTR_NONNULL(to_dir, cleanup, "append to_dir failed");
    pgmoneta_mkdir(to_dir);
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_copy_wal_files(dir, to_dir, "000000000000000000000000", NULL), 0, cleanup, "copy_wal_files failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_copy_wal_files(-1, dir, to_dir, "000000000000000000000000", NULL), 0, cleanup, "copy_wal_files failed");
    check_file = pgmoneta_append(NULL, to_dir);
    MCTF_ASSERT_PTR_NONNULL(check_file, cleanup, "append check_file base failed");
    check_file = pgmoneta_append(check_file, "/000000010000000000000001");
@@ -2165,5 +2344,131 @@ cleanup:
       pgmoneta_delete_directory(tmpdir);
    }
    pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_numbers)
+{
+   char* s = NULL;
+
+   /* The largest value of each type is the corner case: it needs every digit
+      the buffer can hold, so a size argument that is one short truncates it
+      silently rather than overflowing. */
+   s = pgmoneta_append_int(NULL, INT_MIN);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_int returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "-2147483648", cleanup, "append_int truncated INT_MIN");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_int(NULL, INT_MAX);
+   MCTF_ASSERT_STR_EQ(s, "2147483647", cleanup, "append_int wrong for INT_MAX");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_int(NULL, 0);
+   MCTF_ASSERT_STR_EQ(s, "0", cleanup, "append_int wrong for 0");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_ulong(NULL, ULONG_MAX);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_ulong returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "18446744073709551615", cleanup, "append_ulong truncated ULONG_MAX");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_ulong(NULL, 0UL);
+   MCTF_ASSERT_STR_EQ(s, "0", cleanup, "append_ulong wrong for 0");
+   free(s);
+   s = NULL;
+
+   /* Appending onto an existing string must concatenate, not replace */
+   s = pgmoneta_append_int(NULL, 42);
+   s = pgmoneta_append_int(s, 7);
+   MCTF_ASSERT_STR_EQ(s, "427", cleanup, "append_int did not concatenate");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append(NULL, "n=");
+   s = pgmoneta_append_ulong(s, ULONG_MAX);
+   MCTF_ASSERT_STR_EQ(s, "n=18446744073709551615", cleanup, "append_ulong did not concatenate");
+   free(s);
+   s = NULL;
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_null_handling)
+{
+   char* s = NULL;
+
+   /* A NULL original is the empty string, and a NULL addition is a no-op */
+   s = pgmoneta_append(NULL, "abc");
+   MCTF_ASSERT_STR_EQ(s, "abc", cleanup, "append onto NULL failed");
+
+   s = pgmoneta_append(s, NULL);
+   MCTF_ASSERT_STR_EQ(s, "abc", cleanup, "append of NULL changed the string");
+
+   s = pgmoneta_append_char(s, 'd');
+   MCTF_ASSERT_STR_EQ(s, "abcd", cleanup, "append_char failed");
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_format_and_append_long)
+{
+   char* s = NULL;
+   char big[512];
+
+   /* Longer than any fixed buffer the helpers used to rely on */
+   memset(&big[0], 'x', sizeof(big) - 1);
+   big[sizeof(big) - 1] = '\0';
+
+   s = pgmoneta_format_and_append(NULL, "%s", &big[0]);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "format_and_append returned NULL");
+   MCTF_ASSERT_INT_EQ((int)strlen(s), (int)sizeof(big) - 1, cleanup, "format_and_append truncated");
+
+   s = pgmoneta_format_and_append(s, "|%d", INT_MIN);
+   MCTF_ASSERT_INT_EQ((int)strlen(s), (int)sizeof(big) - 1 + 12, cleanup, "format_and_append appended wrong length");
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_double)
+{
+   char* s = NULL;
+
+   /* %lf writes the whole integer part, so a large double needs far more
+      room than any small fixed buffer: 1e19 alone is 20 digits before the
+      six decimals. */
+   s = pgmoneta_append_double(NULL, 1e19);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_double returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "10000000000000000000.000000", cleanup, "append_double truncated 1e19");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double(NULL, 0.5);
+   MCTF_ASSERT_STR_EQ(s, "0.500000", cleanup, "append_double wrong for 0.5");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double_precision(NULL, 1e19, 2);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_double_precision returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "10000000000000000000.00", cleanup, "append_double_precision truncated 1e19");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double_precision(NULL, 3.14159, 3);
+   MCTF_ASSERT_STR_EQ(s, "3.142", cleanup, "append_double_precision wrong for 3.14159");
+   free(s);
+   s = NULL;
+
+cleanup:
+   free(s);
    MCTF_FINISH();
 }

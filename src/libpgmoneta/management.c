@@ -1359,6 +1359,7 @@ error:
    if (transfer_buffer != NULL)
    {
       free(transfer_buffer);
+      transfer_buffer = NULL;
    }
    if (decoded_buffer != NULL)
    {
@@ -1509,6 +1510,7 @@ pgmoneta_management_write_json(SSL* ssl, int socket, uint8_t compression, uint8_
       }
 
       free(transfer_buffer);
+      transfer_buffer = NULL;
       s = encoded;
       encoded = NULL;
    }
@@ -1531,6 +1533,7 @@ error:
    if (transfer_buffer != NULL)
    {
       free(transfer_buffer);
+      transfer_buffer = NULL;
    }
    if (compressed_buffer != NULL)
    {

@@ -387,6 +387,7 @@ pgmoneta_extension_parse_version(char* version_str, struct version* version)
    }
 
    free(str_copy);
+   str_copy = NULL;
 
    if (version->major == -1)
    {

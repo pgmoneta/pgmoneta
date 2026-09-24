@@ -28,6 +28,7 @@
  */
 #include <mctf.h>
 #include <html_report.h>
+#include <tsclient.h>
 #include <tscommon.h>
 #include <utils.h>
 #include <logging.h>
@@ -57,12 +58,14 @@ usage(const char* progname)
    printf("Options:\n");
    printf("  -t, --test NAME    Run only tests matching NAME (test name pattern)\n");
    printf("  -m, --module NAME Run all tests in module NAME\n");
+   printf("  -i, --integration  Run only the opt-in integration tests (all backends)\n");
    printf("  -h, --help         Show this help message\n");
    printf("\n");
    printf("Examples:\n");
-   printf("  %s                 Run full test suite\n", progname);
+   printf("  %s                 Run full test suite (excludes integration tests)\n", progname);
    printf("  %s -m backup       Run all tests in 'backup' module\n", progname);
    printf("  %s -t backup_full  Run test matching 'backup_full'\n", progname);
+   printf("  %s -i              Run the storage-engine integration tests\n", progname);
    printf("\n");
 }
 
@@ -358,10 +361,11 @@ main(int argc, char* argv[])
    static struct option long_options[] = {
       {"test", required_argument, 0, 't'},
       {"module", required_argument, 0, 'm'},
+      {"integration", no_argument, 0, 'i'},
       {"help", no_argument, 0, 'h'},
       {0, 0, 0, 0}};
 
-   while ((c = getopt_long(argc, argv, "t:m:h", long_options, NULL)) != -1)
+   while ((c = getopt_long(argc, argv, "t:m:ih", long_options, NULL)) != -1)
    {
       switch (c)
       {
@@ -369,12 +373,21 @@ main(int argc, char* argv[])
          case 'm':
             if (filter_type != MCTF_FILTER_NONE)
             {
-               fprintf(stderr, "Error: Cannot specify both -t and -m options\n");
+               fprintf(stderr, "Error: Cannot specify more than one of -t/-m/-i\n");
                usage(argv[0]);
                return EXIT_FAILURE;
             }
             filter = optarg;
             filter_type = (c == 't') ? MCTF_FILTER_TEST : MCTF_FILTER_MODULE;
+            break;
+         case 'i':
+            if (filter_type != MCTF_FILTER_NONE)
+            {
+               fprintf(stderr, "Error: Cannot specify more than one of -t/-m/-i\n");
+               usage(argv[0]);
+               return EXIT_FAILURE;
+            }
+            filter_type = MCTF_FILTER_INTEGRATION;
             break;
          case 'h':
             usage(argv[0]);
@@ -386,6 +399,8 @@ main(int argc, char* argv[])
    }
 
    setup_signal_handlers();
+
+   mctf_register_global_test_setup(pgmoneta_test_wait_for_wal_streaming);
 
    if (getenv("PGMONETA_TEST_CONF") != NULL)
    {

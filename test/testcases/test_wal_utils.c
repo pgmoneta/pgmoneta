@@ -29,6 +29,7 @@
 
 // pgmoneta
 
+#include <shmem.h>
 #include <pgmoneta.h>
 #include <configuration.h>
 #include <deque.h>
@@ -61,6 +62,28 @@ static int compare_deque(struct deque* dq1, struct deque* dq2, int (*compare)(vo
 static int compare_xlog_page_header(void* a, void* b);
 static int compare_xlog_record(void* a, void* b);
 static void destroy_walfile(struct walfile* wf);
+
+static bool shmem_allocated = false;
+
+MCTF_MODULE_SETUP(wal_utils)
+{
+   if (shmem == NULL)
+   {
+      pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem);
+      memset(shmem, 0, sizeof(struct main_configuration));
+      shmem_allocated = true;
+   }
+}
+
+MCTF_MODULE_TEARDOWN(wal_utils)
+{
+   if (shmem_allocated && shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+      shmem = NULL;
+      shmem_allocated = false;
+   }
+}
 
 MCTF_TEST(test_check_point_shutdown_v17)
 {

@@ -1,0 +1,25 @@
+[pgmoneta]
+host = localhost
+base_dir = BASE_DIR/backup
+compression = zstd
+retention = 7
+log_type = file
+log_level = debug5
+log_path = LOG_DIR/pgmoneta.log
+unix_socket_dir = /tmp/
+storage_engine = azure
+
+azure_storage_account = devstoreaccount1
+azure_shared_key = Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+azure_container = AZURE_CONTAINER
+azure_base_dir = pgmoneta
+azure_endpoint = 127.0.0.1
+azure_port = 10000
+azure_use_tls = off
+
+[primary]
+host = localhost
+port = PG_PORT
+user = PG_REPL_USER_NAME
+wal_slot = repl
+create_slot = yes

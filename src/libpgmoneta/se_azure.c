@@ -28,16 +28,20 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <deque.h>
+#include <files.h>
 #include <http.h>
 #include <logging.h>
+#include <manifest.h>
+#include <progress.h>
 #include <security.h>
 #include <storage.h>
 #include <utils.h>
+#include <workers.h>
 #include <workflow.h>
 
 /* system */
 #include <assert.h>
-#include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -46,9 +50,25 @@ static int azure_storage_setup(char* name, struct art*);
 static int azure_storage_execute(char* name, struct art*);
 static int azure_storage_teardown(char* name, struct art*);
 
-static int azure_upload_files(char* local_root, char* azure_root, char* relative_path);
+struct azure_transfer_task
+{
+   struct worker_common common;
+   int server;
+   bool progress_enabled;
+   char azure_root[MAX_PATH];
+   char remote_path[MAX_PATH];
+   char local_root[MAX_PATH];
+   char local_path[MAX_PATH];
+};
+
+static int azure_upload_files(char* local_root, char* azure_root, int server, int compression, int encryption);
 static int azure_send_upload_request(char* local_root, char* azure_root, char* relative_path);
 static int azure_add_request_headers(struct http_request* request, char* auth_value, char* utc_date);
+static void do_upload_file(struct worker_common* wc);
+static int azure_create_transfer_task(int server, char* azure_root, char* remote_path,
+                                      char* local_root, char* local_path,
+                                      struct workers* workers, struct azure_transfer_task** task);
+static int azure_upload_one_file(struct azure_transfer_task* task);
 
 static char* azure_get_host(void);
 static char* azure_get_basepath(int server, char* identifier);
@@ -137,7 +157,13 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
    base_dir = pgmoneta_get_server_backup(server);
    azure_root = azure_get_basepath(server, label);
 
-   if (azure_upload_files(local_root, azure_root, ""))
+   if (pgmoneta_load_info(base_dir, label, &temp_backup))
+   {
+      pgmoneta_log_error("Unable to get backup for directory %s", base_dir);
+      goto error;
+   }
+
+   if (azure_upload_files(local_root, azure_root, server, temp_backup->compression, temp_backup->encryption))
    {
       goto error;
    }
@@ -149,11 +175,6 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 #endif
 
    remote_azure_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
-   if (pgmoneta_load_info(base_dir, label, &temp_backup))
-   {
-      pgmoneta_log_error("Unable to get backup for directory %s", base_dir);
-      goto error;
-   }
    temp_backup->remote_azure_elapsed_time = remote_azure_elapsed_time;
    if (pgmoneta_save_info(base_dir, temp_backup))
    {
@@ -163,13 +184,16 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 
    free(temp_backup);
    free(local_root);
+   free(base_dir);
    free(azure_root);
 
    return 0;
 
 error:
 
+   free(temp_backup);
    free(local_root);
+   free(base_dir);
    free(azure_root);
 
    return 1;
@@ -180,7 +204,6 @@ azure_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   char* root = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -195,130 +218,246 @@ azure_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   if (!pgmoneta_is_storage_engine_enabled(STORAGE_ENGINE_LOCAL))
-   {
-      root = pgmoneta_get_server_backup_identifier_data(server, label);
-
-      if (root != NULL)
-      {
-         pgmoneta_delete_directory(root);
-         free(root);
-      }
-   }
-
    pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->common.servers[server].name, label);
 
    return 0;
 }
 
 static int
-azure_upload_files(char* local_root, char* azure_root, char* relative_path)
+azure_create_transfer_task(int server, char* azure_root, char* remote_path,
+                           char* local_root, char* local_path,
+                           struct workers* workers, struct azure_transfer_task** task)
 {
-   char* local_path = NULL;
-   char* relative_file;
-   char* new_file;
-   bool copied_files = false;
-   DIR* dir;
-   struct dirent* entry;
+   struct azure_transfer_task* t = NULL;
 
-   local_path = pgmoneta_append(local_path, local_root);
-   if (strlen(relative_path) > 0)
-   {
-      if (!pgmoneta_ends_with(local_root, "/"))
-      {
-         local_path = pgmoneta_append(local_path, "/");
-      }
-      local_path = pgmoneta_append(local_path, relative_path);
-   }
+   *task = NULL;
 
-   if (!(dir = opendir(local_path)))
+   if (azure_root == NULL || remote_path == NULL || local_path == NULL)
    {
       goto error;
    }
 
-   while ((entry = readdir(dir)) != NULL)
+   if (strlen(azure_root) >= MAX_PATH || strlen(remote_path) >= MAX_PATH || strlen(local_path) >= MAX_PATH)
    {
-      if (entry->d_type == DT_DIR)
+      pgmoneta_log_error("Azure transfer path too long");
+      goto error;
+   }
+
+   if (local_root != NULL && strlen(local_root) >= MAX_PATH)
+   {
+      pgmoneta_log_error("Azure local root path too long");
+      goto error;
+   }
+
+   t = (struct azure_transfer_task*)malloc(sizeof(struct azure_transfer_task));
+   if (t == NULL)
+   {
+      goto error;
+   }
+
+   memset(t, 0, sizeof(struct azure_transfer_task));
+   pgmoneta_snprintf(t->azure_root, sizeof(t->azure_root), "%s", azure_root);
+   pgmoneta_snprintf(t->remote_path, sizeof(t->remote_path), "%s", remote_path);
+   pgmoneta_snprintf(t->local_path, sizeof(t->local_path), "%s", local_path);
+   if (local_root != NULL)
+   {
+      pgmoneta_snprintf(t->local_root, sizeof(t->local_root), "%s", local_root);
+   }
+
+   t->common.workers = workers;
+   t->server = server;
+   t->progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
+
+   *task = t;
+
+   return 0;
+
+error:
+   free(t);
+   return 1;
+}
+
+static int
+azure_upload_one_file(struct azure_transfer_task* task)
+{
+   if (azure_send_upload_request(task->local_root, task->azure_root, task->remote_path))
+   {
+      pgmoneta_log_error("Azure upload: failed %s", task->remote_path);
+      return 1;
+   }
+
+   if (task->progress_enabled)
+   {
+      pgmoneta_progress_increment(task->server, 1);
+   }
+
+   return 0;
+}
+
+static void
+do_upload_file(struct worker_common* wc)
+{
+   struct azure_transfer_task* task = (struct azure_transfer_task*)wc;
+
+   if (azure_upload_one_file(task))
+   {
+      pgmoneta_record_failure(task->common.workers != NULL ? task->common.workers->outcome : NULL,
+                              "Azure upload failed: %s", task->remote_path);
+   }
+
+   free(task);
+}
+
+static int azure_upload_metadata_files(char* local_root, char* azure_root);
+
+static int
+azure_upload_metadata_files(char* local_root, char* azure_root)
+{
+   if (azure_send_upload_request(local_root, azure_root, "backup.manifest"))
+   {
+      pgmoneta_log_error("Azure upload: failed to upload backup.manifest");
+      return 1;
+   }
+   if (azure_send_upload_request(local_root, azure_root, "backup.sha512"))
+   {
+      pgmoneta_log_error("Azure upload: failed to upload backup.sha512");
+      return 1;
+   }
+   if (azure_send_upload_request(local_root, azure_root, "backup.info"))
+   {
+      pgmoneta_log_error("Azure upload: failed to upload backup.info");
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+azure_upload_files(char* local_root, char* azure_root, int server, int compression, int encryption)
+{
+   int number_of_workers = 0;
+   char* manifest_path = NULL;
+   char* file_path = NULL;
+   char* relative_file = NULL;
+   char* suffix = NULL;
+   struct deque* paths = NULL;
+   struct deque_iterator* iter = NULL;
+   struct workers* workers = NULL;
+   struct azure_transfer_task* task = NULL;
+
+   manifest_path = pgmoneta_append(manifest_path, local_root);
+   manifest_path = pgmoneta_append(manifest_path, "backup.manifest");
+
+   if (pgmoneta_extraction_get_suffix(compression, encryption, &suffix))
+   {
+      pgmoneta_log_error("Azure upload: failed to determine file suffix");
+      goto error;
+   }
+
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   if (pgmoneta_manifest_get_paths(manifest_path, &paths))
+   {
+      pgmoneta_log_error("Azure upload: failed to read manifest %s", manifest_path);
+      goto error;
+   }
+
+   pgmoneta_deque_iterator_create(paths, &iter);
+
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_set_total(server, pgmoneta_deque_size(paths));
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      file_path = iter->tag;
+
+      relative_file = NULL;
+      relative_file = pgmoneta_append(relative_file, "data/");
+      relative_file = pgmoneta_append(relative_file, file_path);
+
+      if (suffix != NULL &&
+          !pgmoneta_ends_with(file_path, "backup_label") &&
+          !pgmoneta_ends_with(file_path, "backup_manifest"))
       {
-         char relative_dir[1024];
-
-         if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
-         {
-            continue;
-         }
-
-         if (strlen(relative_path) > 0)
-         {
-            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
-         }
-         else
-         {
-            pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
-         }
-
-         azure_upload_files(local_root, azure_root, relative_dir);
+         relative_file = pgmoneta_append(relative_file, suffix);
       }
-      else
+
+      if (azure_create_transfer_task(server, azure_root, relative_file, local_root, relative_file,
+                                     workers, &task))
       {
-         copied_files = true;
+         pgmoneta_log_error("Azure upload: failed to create transfer task");
+         free(relative_file);
+         goto error;
+      }
 
-         relative_file = NULL;
-
-         if (strlen(relative_path) > 0)
+      if (workers != NULL && pgmoneta_workers_outcome_ok(workers))
+      {
+         if (pgmoneta_workers_add(workers, do_upload_file, (struct worker_common*)task))
          {
-            relative_file = pgmoneta_append(relative_file, relative_path);
-            relative_file = pgmoneta_append(relative_file, "/");
-         }
-         relative_file = pgmoneta_append(relative_file, entry->d_name);
-
-         if (azure_send_upload_request(local_root, azure_root, relative_file))
-         {
+            free(task);
+            task = NULL;
+            pgmoneta_log_error("Azure upload: failed to queue worker task");
             free(relative_file);
             goto error;
          }
-
-         free(relative_file);
+         task = NULL;
       }
-   }
+      else
+      {
+         if (azure_upload_one_file(task))
+         {
+            free(task);
+            task = NULL;
+            free(relative_file);
+            goto error;
+         }
+         free(task);
+         task = NULL;
+      }
 
-   if (!copied_files)
-   {
-      relative_file = NULL;
-
-      relative_file = pgmoneta_append(relative_file, relative_path);
-      relative_file = pgmoneta_append(relative_file, "/.pgmoneta");
-
-      new_file = NULL;
-
-      new_file = pgmoneta_append(new_file, local_root);
-      new_file = pgmoneta_append(new_file, relative_file);
-
-      FILE* file = fopen(new_file, "w");
-
-      pgmoneta_permission(new_file, 6, 4, 4);
-
-      azure_send_upload_request(local_root, azure_root, relative_file);
-
-      fflush(file);
-      fclose(file);
-
-      remove(new_file);
-
-      free(new_file);
       free(relative_file);
+      relative_file = NULL;
    }
 
-   closedir(dir);
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+   {
+      pgmoneta_workers_log_failures(workers);
+      goto error;
+   }
+   pgmoneta_workers_destroy(workers);
 
-   free(local_path);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   iter = NULL;
+   paths = NULL;
+
+   /* upload metadata files last (commit marker) */
+   if (azure_upload_metadata_files(local_root, azure_root))
+   {
+      goto error;
+   }
+
+   free(manifest_path);
+   free(suffix);
 
    return 0;
 
 error:
 
-   closedir(dir);
-
-   free(local_path);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   pgmoneta_workers_wait(workers);
+   pgmoneta_workers_destroy(workers);
+   free(manifest_path);
+   free(suffix);
+   free(task);
 
    return 1;
 }
@@ -383,8 +522,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
-   file = fopen(local_path, "rb");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(local_path, "rb", &file))
    {
       goto error;
    }
@@ -424,6 +562,13 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:2021-08-06\n/");
    string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
    string_to_sign = pgmoneta_append(string_to_sign, "/");
+   /* For path-style endpoints (Azurite), the URI already contains /<account>/<container>/<blob>.
+    * The canonical resource is "/" + account_name + uri_path, so the account appears twice. */
+   if (strlen(config->azure_endpoint) > 0)
+   {
+      string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
+      string_to_sign = pgmoneta_append(string_to_sign, "/");
+   }
    string_to_sign = pgmoneta_append(string_to_sign, config->azure_container);
    string_to_sign = pgmoneta_append(string_to_sign, "/");
    string_to_sign = pgmoneta_append(string_to_sign, azure_path);
@@ -450,13 +595,28 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
 
    azure_host = azure_get_host();
 
-   if (pgmoneta_http_create(azure_host, 443, true, &connection))
    {
-      pgmoneta_log_error("Failed to connect to Azure host: %s", azure_host);
-      goto error;
-   }
+      bool use_endpoint = (strlen(config->azure_endpoint) > 0);
+      int conn_port = use_endpoint ? (config->azure_port > 0 ? config->azure_port : 443) : 443;
+      bool conn_tls = use_endpoint ? config->azure_use_tls : true;
 
-   pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s", config->azure_container, azure_path);
+      if (pgmoneta_http_create(azure_host, conn_port, conn_tls, &connection))
+      {
+         pgmoneta_log_error("Failed to connect to Azure host: %s:%d", azure_host, conn_port);
+         goto error;
+      }
+
+      if (use_endpoint)
+      {
+         pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s/%s",
+                           config->azure_storage_account, config->azure_container, azure_path);
+      }
+      else
+      {
+         pgmoneta_snprintf(azure_put_path, sizeof(azure_put_path), "/%s/%s",
+                           config->azure_container, azure_path);
+      }
+   }
 
    if (pgmoneta_http_request_create(PGMONETA_HTTP_PUT, azure_put_path, &request))
    {
@@ -599,8 +759,15 @@ azure_get_host()
 
    config = (struct main_configuration*)shmem;
 
-   host = pgmoneta_append(host, config->azure_storage_account);
-   host = pgmoneta_append(host, ".blob.core.windows.net");
+   if (strlen(config->azure_endpoint) > 0)
+   {
+      host = pgmoneta_append(host, config->azure_endpoint);
+   }
+   else
+   {
+      host = pgmoneta_append(host, config->azure_storage_account);
+      host = pgmoneta_append(host, ".blob.core.windows.net");
+   }
 
    return host;
 }
@@ -649,4 +816,21 @@ azure_add_request_headers(struct http_request* request, char* auth_value, char* 
    }
 
    return 0;
+}
+
+int
+azure_upload(int server, char* label, int compression __attribute__((unused)), int encryption __attribute__((unused)))
+{
+   char* local_root = NULL;
+   char* azure_root = NULL;
+   int rc;
+
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
+   azure_root = azure_get_basepath(server, label);
+
+   rc = azure_upload_files(local_root, azure_root, server, compression, encryption);
+
+   free(local_root);
+   free(azure_root);
+   return rc;
 }

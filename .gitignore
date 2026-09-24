@@ -1,6 +1,8 @@
 .bundle/
 _site/
 build/
+build-bench/
+benchmarks/results/
 vendor/
 .vscode/
 .cache

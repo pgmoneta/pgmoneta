@@ -333,7 +333,7 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
    if (pgmoneta_art_contains_key(nodes, NODE_SERVER_ID))
    {
       server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-      progress_enabled = pgmoneta_is_progress_enabled(server);
+      progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
    }
 
    current = workflow;
@@ -503,6 +503,18 @@ pgmoneta_phase_name(int phase)
          return PHASE_NAME_VERIFY;
       case PHASE_DELETE:
          return PHASE_NAME_DELETE;
+      case PHASE_COPY_WAL:
+         return PHASE_NAME_COPY_WAL;
+      case PHASE_RECOVERY_INFO:
+         return PHASE_NAME_RECOVERY_INFO;
+      case PHASE_EXCLUDED_FILES:
+         return PHASE_NAME_EXCLUDED_FILES;
+      case PHASE_PERMISSIONS:
+         return PHASE_NAME_PERMISSIONS;
+      case PHASE_COMBINE_INCREMENTAL:
+         return PHASE_NAME_COMBINE_INCREMENTAL;
+      case PHASE_CLEANUP:
+         return PHASE_NAME_CLEANUP;
       default:
          return PHASE_NAME_UNKNOWN;
    }
@@ -584,25 +596,18 @@ wf_backup(void)
    {
       current->next = pgmoneta_create_sha256();
       current = current->next;
-
-      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_S3)
-   {
-      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_AZURE)
-   {
-      current->next = pgmoneta_storage_create_azure();
-      current = current->next;
    }
 
    current->next = pgmoneta_create_sha512();
    current = current->next;
+
+   if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
+       (config->storage_engine & STORAGE_ENGINE_S3) ||
+       (config->storage_engine & STORAGE_ENGINE_AZURE))
+   {
+      current->next = pgmoneta_storage_create_remote();
+      current = current->next;
+   }
 
 #ifdef DEBUG
    current = head;
@@ -785,25 +790,18 @@ wf_post_rollup(struct backup* backup)
    {
       current->next = pgmoneta_create_sha256();
       current = current->next;
-
-      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_S3)
-   {
-      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_AZURE)
-   {
-      current->next = pgmoneta_storage_create_azure();
-      current = current->next;
    }
 
    current->next = pgmoneta_create_sha512();
    current = current->next;
+
+   if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
+       (config->storage_engine & STORAGE_ENGINE_S3) ||
+       (config->storage_engine & STORAGE_ENGINE_AZURE))
+   {
+      current->next = pgmoneta_storage_create_remote();
+      current = current->next;
+   }
 
 #ifdef DEBUG
    current = head;
@@ -879,25 +877,18 @@ wf_incremental_backup(void)
    {
       current->next = pgmoneta_create_sha256();
       current = current->next;
-
-      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_S3)
-   {
-      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
-      current = current->next;
-   }
-
-   if (config->storage_engine & STORAGE_ENGINE_AZURE)
-   {
-      current->next = pgmoneta_storage_create_azure();
-      current = current->next;
    }
 
    current->next = pgmoneta_create_sha512();
    current = current->next;
+
+   if ((config->storage_engine & STORAGE_ENGINE_SSH) ||
+       (config->storage_engine & STORAGE_ENGINE_S3) ||
+       (config->storage_engine & STORAGE_ENGINE_AZURE))
+   {
+      current->next = pgmoneta_storage_create_remote();
+      current = current->next;
+   }
 
 #ifdef DEBUG
    current = head;

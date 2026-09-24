@@ -78,7 +78,7 @@
 #define SECURITY_ALL                99
 
 #define NUMBER_OF_SECURITY_MESSAGES 5
-#define SECURITY_BUFFER_SIZE        1024
+#define SECURITY_BUFFER_SIZE        16384 /* Must hold a PasswordMessage carrying a MAX_PASSWORD_LENGTH credential (cloud IAM tokens) */
 
 static signed char has_security;
 static ssize_t security_lengths[NUMBER_OF_SECURITY_MESSAGES];
@@ -466,7 +466,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   status = pgmoneta_read_block_message(ssl, server_fd, &msg);
+   status = pgmoneta_read_complete_message(ssl, server_fd, &msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -497,7 +497,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   status = pgmoneta_read_block_message(ssl, server_fd, &msg);
+   status = pgmoneta_read_complete_message(ssl, server_fd, &msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -505,12 +505,23 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
 
    sasl_continue = pgmoneta_copy_message(msg);
 
+   /* 'R' + length + AuthenticationSASLContinue + payload */
+   if (sasl_continue->length <= 9)
+   {
+      goto error;
+   }
+
    get_scram_attribute('r', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &combined_nounce);
    get_scram_attribute('s', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &base64_salt);
    get_scram_attribute('i', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &iteration_string);
    get_scram_attribute('e', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &err);
 
    if (err != NULL)
+   {
+      goto error;
+   }
+
+   if (combined_nounce == NULL || base64_salt == NULL || iteration_string == NULL)
    {
       goto error;
    }
@@ -560,13 +571,19 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   status = pgmoneta_read_block_message(ssl, server_fd, &msg);
+   status = pgmoneta_read_complete_message(ssl, server_fd, &msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
    if (pgmoneta_extract_message('R', msg, &sasl_final))
+   {
+      goto error;
+   }
+
+   /* 'R' + length + AuthenticationSASLFinal + 'v' attribute */
+   if (sasl_final->length <= 11)
    {
       goto error;
    }
@@ -841,6 +858,12 @@ retry:
       pgmoneta_socket_nonblocking(client_fd, false);
    }
 
+   /* 'p' + length + mechanism + "n,,n=,r=" + nounce */
+   if (msg->length <= 26)
+   {
+      goto error;
+   }
+
    client_first_message_bare = malloc(msg->length - 25);
 
    if (client_first_message_bare == NULL)
@@ -852,6 +875,12 @@ retry:
    memcpy(client_first_message_bare, msg->data + 26, msg->length - 26);
 
    get_scram_attribute('r', (char*)msg->data + 26, msg->length - 26, &client_nounce);
+
+   if (client_nounce == NULL)
+   {
+      goto error;
+   }
+
    generate_nounce(&server_nounce);
    generate_salt(&salt, &salt_length);
    if (pgmoneta_base64_encode(salt, salt_length, &base64_salt, &base64_salt_length))
@@ -892,7 +921,19 @@ retry:
       goto error;
    }
 
+   /* 'p' + length + "c=biws,r=" + nounces (57 bytes) + ",p=" + proof */
+   if (msg->length < 62)
+   {
+      goto error;
+   }
+
    get_scram_attribute('p', (char*)msg->data + 5, msg->length - 5, &base64_client_proof);
+
+   if (base64_client_proof == NULL)
+   {
+      goto error;
+   }
+
    if (pgmoneta_base64_decode(base64_client_proof, strlen(base64_client_proof), (void**)&client_proof_received, &client_proof_received_length))
    {
       goto error;
@@ -1261,6 +1302,12 @@ server_password(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
+   if (password_msg->length > SECURITY_BUFFER_SIZE)
+   {
+      pgmoneta_log_error("Password message too large: %ld", password_msg->length);
+      goto error;
+   }
+
    security_lengths[auth_index] = password_msg->length;
    memcpy(&security_messages[auth_index], password_msg->data, password_msg->length);
    auth_index++;
@@ -1375,7 +1422,12 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
-   status = pgmoneta_read_block_message(ssl, server_fd, &msg);
+   status = pgmoneta_read_complete_message(ssl, server_fd, &msg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
    if (msg->length > SECURITY_BUFFER_SIZE)
    {
       pgmoneta_log_message(msg);
@@ -1389,6 +1441,12 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    memcpy(&security_messages[auth_index], sasl_continue->data, sasl_continue->length);
    auth_index++;
 
+   /* 'R' + length + AuthenticationSASLContinue + payload */
+   if (sasl_continue->length <= 9)
+   {
+      goto error;
+   }
+
    get_scram_attribute('r', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &combined_nounce);
    get_scram_attribute('s', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &base64_salt);
    get_scram_attribute('i', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &iteration_string);
@@ -1397,6 +1455,11 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    if (err != NULL)
    {
       pgmoneta_log_error("SCRAM-SHA-256: %s", err);
+      goto error;
+   }
+
+   if (combined_nounce == NULL || base64_salt == NULL || iteration_string == NULL)
+   {
       goto error;
    }
 
@@ -1450,7 +1513,12 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
-   status = pgmoneta_read_block_message(ssl, server_fd, &msg);
+   status = pgmoneta_read_complete_message(ssl, server_fd, &msg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
    if (msg->length > SECURITY_BUFFER_SIZE)
    {
       pgmoneta_log_message(msg);
@@ -1468,6 +1536,12 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    }
 
    if (pgmoneta_extract_message('R', msg, &sasl_final))
+   {
+      goto error;
+   }
+
+   /* 'R' + length + AuthenticationSASLFinal + 'v' attribute */
+   if (sasl_final->length <= 11)
    {
       goto error;
    }
@@ -1693,8 +1767,7 @@ pgmoneta_get_master_key(char** masterkey, size_t* masterkey_length, unsigned cha
       }
    }
 
-   master_key_file = fopen(&buf[0], "r");
-   if (master_key_file == NULL)
+   if (pgmoneta_fopen_secure(&buf[0], "r", &master_key_file))
    {
       pgmoneta_log_error("Unable to open master key file");
       goto error;
@@ -1958,7 +2031,6 @@ error:
 static int
 sasl_prep(char* password, char** password_prep)
 {
-   size_t char_count;
    size_t password_len;
 
    if (!password || !password_prep)
@@ -1985,9 +2057,8 @@ sasl_prep(char* password, char** password_prep)
       goto error;
    }
 
-   // Validate the character count in the password
-   char_count = pgmoneta_utf8_char_length((const unsigned char*)password, password_len);
-   if (char_count == (size_t)-1 || char_count > MAX_PASSWORD_CHARS)
+   // Enforce the password byte-length limit
+   if (password_len >= MAX_PASSWORD_LENGTH)
    {
       goto error;
    }

@@ -36,6 +36,9 @@
 #include <workers.h>
 
 /* System */
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
@@ -62,7 +65,7 @@ static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 static int get_key_length(int mode);
 static int encrypt_file(char* from, char* to, int enc);
 static int pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque* excludes);
-static int decrypt_data(char* d, struct workers* workers, struct deque* excludes);
+static int decrypt_data(int server, char* d, struct workers* workers, struct deque* excludes);
 static int dispatch_aes_operation(int server, char* from, char* to, int enc, struct workers* workers);
 static void do_aes_operation(struct worker_common* wc);
 
@@ -81,6 +84,9 @@ static void noop_encryptor_reset(struct encryptor* encryptor);
 static void noop_encryptor_close(struct encryptor* encryptor);
 static int noop_encryptor_encrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size);
 static int noop_encryptor_decrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size);
+
+static const EVP_MD* cbc_digest(char* digest);
+static int cbc_decrypt_stream(unsigned char* key, unsigned char* iv, FILE* in, FILE* out);
 
 struct aes_encryptor
 {
@@ -513,8 +519,9 @@ pgmoneta_decrypt_file(char* from, char* to, struct workers* workers)
 }
 
 static int
-decrypt_data(char* d, struct workers* workers, struct deque* excludes)
+decrypt_data(int server, char* d, struct workers* workers, struct deque* excludes)
 {
+   bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;
@@ -539,7 +546,7 @@ decrypt_data(char* d, struct workers* workers, struct deque* excludes)
          }
 
          pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-         decrypt_data(path, workers, excludes);
+         decrypt_data(server, path, workers, excludes);
       }
       else
       {
@@ -597,6 +604,10 @@ decrypt_data(char* d, struct workers* workers, struct deque* excludes)
             to = NULL;
          }
       }
+      if (progress_enabled)
+      {
+         pgmoneta_progress_increment(server, 1);
+      }
    }
 
    closedir(dir);
@@ -613,9 +624,9 @@ error:
 }
 
 int
-pgmoneta_decrypt_directory(char* d, struct workers* workers, struct deque* excludes)
+pgmoneta_decrypt_directory(int server, char* d, struct workers* workers, struct deque* excludes)
 {
-   int ret = decrypt_data(d, workers, excludes);
+   int ret = decrypt_data(server, d, workers, excludes);
 
    return ret;
 }
@@ -1368,10 +1379,9 @@ encrypt_file(char* from, char* to, int enc)
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   out = fopen(tmp_to, "wb");
-   if (out == NULL)
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &out))
    {
-      pgmoneta_log_error("fopen: Could not open %s", tmp_to);
+      pgmoneta_log_error("pgmoneta_fopen_secure: Could not open %s", tmp_to);
       goto error;
    }
 
@@ -2418,6 +2428,466 @@ do_aes_operation(struct worker_common* wc)
    }
 
    free(task);
+}
+
+/* pgBackRest migration support: AES-256-CBC in the OpenSSL `enc` envelope */
+static const EVP_MD*
+cbc_digest(char* digest)
+{
+   if (digest == NULL)
+   {
+      /* The `openssl enc` / pgBackRest default */
+      return EVP_sha1();
+   }
+
+   return EVP_get_digestbyname(digest);
+}
+
+/* [private] */
+static int
+cbc_decrypt_stream(unsigned char* key, unsigned char* iv, FILE* in, FILE* out)
+{
+   EVP_CIPHER_CTX* ctx = NULL;
+   unsigned char* inbuf = NULL;
+   unsigned char* outbuf = NULL;
+   int inbuf_size = ENC_BUF_SIZE;
+   int outbuf_size = inbuf_size + EVP_CIPHER_block_size(EVP_aes_256_cbc());
+   int inl = 0;
+   int outl = 0;
+   int f_len = 0;
+   int ret = 1;
+
+   inbuf = malloc(inbuf_size);
+   outbuf = malloc(outbuf_size);
+   if (inbuf == NULL || outbuf == NULL)
+   {
+      pgmoneta_log_error("cbc_decrypt_stream: allocation failure");
+      goto error;
+   }
+
+   if (!(ctx = EVP_CIPHER_CTX_new()))
+   {
+      pgmoneta_log_error("cbc_decrypt_stream: failed to create context");
+      goto error;
+   }
+
+   if (!EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv))
+   {
+      pgmoneta_log_error("cbc_decrypt_stream: failed to initialize context");
+      goto error;
+   }
+
+   while ((inl = fread(inbuf, sizeof(char), inbuf_size, in)) > 0)
+   {
+      if (!EVP_DecryptUpdate(ctx, outbuf, &outl, inbuf, inl))
+      {
+         pgmoneta_log_error("cbc_decrypt_stream: failed to process block");
+         goto error;
+      }
+
+      if (fwrite(outbuf, sizeof(char), outl, out) != (size_t)outl)
+      {
+         pgmoneta_log_error("cbc_decrypt_stream: failed to write block");
+         goto error;
+      }
+   }
+
+   if (ferror(in))
+   {
+      pgmoneta_log_error("cbc_decrypt_stream: error reading input");
+      goto error;
+   }
+
+   if (!EVP_DecryptFinal_ex(ctx, outbuf, &f_len))
+   {
+      pgmoneta_log_error("cbc_decrypt_stream: failed to finalize (wrong passphrase or corrupt data)");
+      goto error;
+   }
+
+   if (f_len > 0)
+   {
+      if (fwrite(outbuf, sizeof(char), f_len, out) != (size_t)f_len)
+      {
+         pgmoneta_log_error("cbc_decrypt_stream: failed to write final block");
+         goto error;
+      }
+   }
+
+   ret = 0;
+
+error:
+
+   if (ctx != NULL)
+   {
+      EVP_CIPHER_CTX_free(ctx);
+   }
+
+   if (inbuf != NULL)
+   {
+      pgmoneta_cleanse(inbuf, inbuf_size);
+      free(inbuf);
+   }
+
+   if (outbuf != NULL)
+   {
+      pgmoneta_cleanse(outbuf, outbuf_size);
+      free(outbuf);
+   }
+
+   return ret;
+}
+
+int
+pgmoneta_cbc_derive_key_iv(char* digest, unsigned char* salt,
+                           unsigned char* passphrase, size_t passphrase_length,
+                           unsigned char* key, unsigned char* iv)
+{
+   const EVP_MD* md = cbc_digest(digest);
+
+   if (md == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_derive_key_iv: unknown digest: %s", digest);
+      return 1;
+   }
+
+   if (passphrase == NULL || key == NULL || iv == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_derive_key_iv: invalid arguments");
+      return 1;
+   }
+
+   if (passphrase_length > INT_MAX)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_derive_key_iv: passphrase too long");
+      return 1;
+   }
+
+   /* One round, exactly as `openssl enc` and pgBackRest do */
+   if (!EVP_BytesToKey(EVP_aes_256_cbc(), md, salt, passphrase, (int)passphrase_length, 1, key, iv))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_derive_key_iv: EVP_BytesToKey failed");
+      return 1;
+   }
+
+   return 0;
+}
+
+int
+pgmoneta_cbc_decrypt_buffer(unsigned char* key, unsigned char* iv,
+                            unsigned char* in, size_t in_size,
+                            unsigned char** out, size_t* out_size)
+{
+   EVP_CIPHER_CTX* ctx = NULL;
+   size_t buffer_size = 0;
+   int length = 0;
+   int final_length = 0;
+   unsigned char* buffer = NULL;
+
+   if (key == NULL || iv == NULL || in == NULL || out == NULL || out_size == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_buffer: invalid arguments");
+      goto error;
+   }
+
+   *out = NULL;
+   *out_size = 0;
+
+   if (in_size == 0 || in_size > INT_MAX)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_buffer: invalid input size: %zu", in_size);
+      goto error;
+   }
+
+   buffer_size = in_size + (size_t)EVP_CIPHER_block_size(EVP_aes_256_cbc());
+   buffer = malloc(buffer_size);
+   if (buffer == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_buffer: allocation failure");
+      goto error;
+   }
+
+   if (!(ctx = EVP_CIPHER_CTX_new()))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_buffer: failed to create context");
+      goto error;
+   }
+
+   if (!EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_buffer: failed to initialize context");
+      goto error;
+   }
+
+   if (!EVP_DecryptUpdate(ctx, buffer, &length, in, (int)in_size))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_buffer: failed to process data");
+      goto error;
+   }
+
+   if (!EVP_DecryptFinal_ex(ctx, buffer + length, &final_length))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_buffer: failed to finalize (wrong passphrase or corrupt data)");
+      goto error;
+   }
+
+   EVP_CIPHER_CTX_free(ctx);
+
+   *out = buffer;
+   *out_size = (size_t)length + (size_t)final_length;
+
+   return 0;
+
+error:
+
+   if (ctx != NULL)
+   {
+      EVP_CIPHER_CTX_free(ctx);
+   }
+
+   if (buffer != NULL)
+   {
+      pgmoneta_cleanse(buffer, buffer_size);
+      free(buffer);
+   }
+
+   return 1;
+}
+
+int
+pgmoneta_cbc_decrypt_file(unsigned char* key, unsigned char* iv,
+                          char* from, char* to)
+{
+   FILE* in = NULL;
+   FILE* out = NULL;
+   char* tmp_to = NULL;
+   int ret = 1;
+
+   if (key == NULL || iv == NULL || from == NULL || to == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_file: invalid arguments");
+      goto error;
+   }
+
+   if (pgmoneta_exists(to))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_file: destination file %s already exists", to);
+      goto error;
+   }
+
+   in = fopen(from, "rb");
+   if (in == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_file: could not open %s", from);
+      goto error;
+   }
+
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &out))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_file: could not open %s", tmp_to);
+      goto error;
+   }
+
+   if (cbc_decrypt_stream(key, iv, in, out))
+   {
+      goto error;
+   }
+
+   ret = 0;
+
+error:
+
+   if (in != NULL)
+   {
+      fclose(in);
+   }
+
+   if (out != NULL)
+   {
+      fflush(out);
+      fclose(out);
+   }
+
+   if (ret == 0)
+   {
+      pgmoneta_permission(tmp_to, 6, 0, 0);
+      if (pgmoneta_move_file(tmp_to, to))
+      {
+         ret = 1;
+      }
+   }
+   else if (tmp_to != NULL && pgmoneta_exists(tmp_to))
+   {
+      pgmoneta_delete_file(tmp_to, NULL);
+   }
+
+   free(tmp_to);
+
+   return ret;
+}
+
+int
+pgmoneta_cbc_decrypt_salted_buffer(char* digest, bool raw,
+                                   unsigned char* passphrase, size_t passphrase_length,
+                                   unsigned char* in, size_t in_size,
+                                   unsigned char** out, size_t* out_size)
+{
+   unsigned char key[EVP_MAX_KEY_LENGTH];
+   unsigned char iv[EVP_MAX_IV_LENGTH];
+   unsigned char salt[AES_CBC_SALT_SIZE];
+   size_t header_size = 0;
+   int ret = 1;
+
+   if (in == NULL || out == NULL || out_size == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_buffer: invalid arguments");
+      return 1;
+   }
+
+   header_size = raw ? AES_CBC_SALT_SIZE : (AES_CBC_SALTED_MAGIC_SIZE + AES_CBC_SALT_SIZE);
+
+   if (in_size <= header_size)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_buffer: input too short");
+      return 1;
+   }
+
+   if (!raw && memcmp(in, AES_CBC_SALTED_MAGIC, AES_CBC_SALTED_MAGIC_SIZE) != 0)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_buffer: invalid cipher header");
+      return 1;
+   }
+
+   memcpy(salt, in + (raw ? 0 : AES_CBC_SALTED_MAGIC_SIZE), AES_CBC_SALT_SIZE);
+
+   if (pgmoneta_cbc_derive_key_iv(digest, salt,
+                                  passphrase, passphrase_length,
+                                  key, iv))
+   {
+      goto cleanup;
+   }
+
+   ret = pgmoneta_cbc_decrypt_buffer(key, iv,
+                                     in + header_size, in_size - header_size,
+                                     out, out_size);
+
+cleanup:
+
+   pgmoneta_cleanse(key, sizeof(key));
+   pgmoneta_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(salt, sizeof(salt));
+
+   return ret;
+}
+
+int
+pgmoneta_cbc_decrypt_salted_file(char* digest, bool raw,
+                                 unsigned char* passphrase, size_t passphrase_length,
+                                 char* from, char* to)
+{
+   unsigned char key[EVP_MAX_KEY_LENGTH];
+   unsigned char iv[EVP_MAX_IV_LENGTH];
+   unsigned char header[AES_CBC_SALTED_MAGIC_SIZE + AES_CBC_SALT_SIZE];
+   unsigned char* salt = NULL;
+   size_t header_size = 0;
+   FILE* in = NULL;
+   FILE* out = NULL;
+   char* tmp_to = NULL;
+   int ret = 1;
+
+   if (from == NULL || to == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_file: invalid arguments");
+      return 1;
+   }
+
+   header_size = raw ? AES_CBC_SALT_SIZE : (AES_CBC_SALTED_MAGIC_SIZE + AES_CBC_SALT_SIZE);
+
+   if (pgmoneta_exists(to))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_file: destination file %s already exists", to);
+      goto error;
+   }
+
+   in = fopen(from, "rb");
+   if (in == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_file: could not open %s", from);
+      goto error;
+   }
+
+   if (fread(header, 1, header_size, in) != header_size)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_file: failed to read cipher header from %s", from);
+      goto error;
+   }
+
+   if (!raw && memcmp(header, AES_CBC_SALTED_MAGIC, AES_CBC_SALTED_MAGIC_SIZE) != 0)
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_file: invalid cipher header in %s", from);
+      goto error;
+   }
+
+   salt = header + (raw ? 0 : AES_CBC_SALTED_MAGIC_SIZE);
+
+   if (pgmoneta_cbc_derive_key_iv(digest, salt,
+                                  passphrase, passphrase_length,
+                                  key, iv))
+   {
+      goto error;
+   }
+
+   tmp_to = pgmoneta_append(tmp_to, to);
+   tmp_to = pgmoneta_append(tmp_to, ".tmp");
+
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &out))
+   {
+      pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_file: could not open %s", tmp_to);
+      goto error;
+   }
+
+   if (cbc_decrypt_stream(key, iv, in, out))
+   {
+      goto error;
+   }
+
+   ret = 0;
+
+error:
+
+   pgmoneta_cleanse(key, sizeof(key));
+   pgmoneta_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(header, sizeof(header));
+
+   if (in != NULL)
+   {
+      fclose(in);
+   }
+
+   if (out != NULL)
+   {
+      fflush(out);
+      fclose(out);
+   }
+
+   if (ret == 0)
+   {
+      pgmoneta_permission(tmp_to, 6, 0, 0);
+      if (pgmoneta_move_file(tmp_to, to))
+      {
+         ret = 1;
+      }
+   }
+   else if (tmp_to != NULL && pgmoneta_exists(tmp_to))
+   {
+      pgmoneta_delete_file(tmp_to, NULL);
+   }
+
+   free(tmp_to);
+
+   return ret;
 }
 
 /**

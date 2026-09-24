@@ -40,6 +40,7 @@ Nota: Si `host` comienza con un `/`, representa una ruta y `pgmoneta` se conecta
 | Propiedad | Predeterminado | Unidad | Requerido | Descripción |
 | :------- | :------ | :--- | :------- | :---------- |
 | metrics | 0 | Int | No | El puerto de métricas (desactivado = 0) |
+| nagios | 0 | Int | No | El puerto de Nagios (desactivado = 0). Cuando está habilitado, pgmoneta obtiene métricas del endpoint de Prometheus y las sirve en el formato de chequeo pasivo de Nagios |
 | metrics_cache_max_age | 0 | String | No | El tiempo para mantener una respuesta de Prometheus (métricas) en caché. Si este valor se especifica sin unidades, se toma como segundos. Establecer este parámetro a 0 desactiva el almacenamiento en caché. Soporta los siguientes sufijos de unidades: 'S' para segundos (por defecto), 'M' para minutos, 'H' para horas, 'D' para días y 'W' para semanas. |
 | metrics_cache_max_size | 256k | String | No | La cantidad máxima de datos a mantener en caché al servir respuestas de Prometheus. Los cambios requieren reinicio. Este parámetro determina el tamaño de la memoria asignada para el caché incluso si `metrics_cache_max_age` o `metrics` están desactivados. Su valor, sin embargo, se tiene en cuenta solo si `metrics_cache_max_age` se establece en un valor distinto de cero. Soporta sufijos: 'B' (bytes), el predeterminado si se omite, 'K' o 'KB' (kilobytes), 'M' o 'MB' (megabytes), 'G' o 'GB' (gigabytes).|
 | metrics_cert_file | | String | No | Archivo de certificado para TLS de métricas de Prometheus. Este archivo debe ser propiedad del usuario que ejecuta pgmoneta o root. |
@@ -165,7 +166,7 @@ Nota: Si `host` comienza con un `/`, representa una ruta y `pgmoneta` se conecta
 | Propiedad | Predeterminado | Unidad | Requerido | Descripción |
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | 0 | Int | No | La velocidad máxima de transferencia de backup en bytes por segundo. Usa 0 para desactivar |
-| progress | off | Bool | No | Habilitar seguimiento del progreso de backup |
+| progress | off | Bool | No | Habilitar seguimiento del progreso de operaciones de backup y restore |
 | blocking_timeout | 30 | String | No | El número de segundos que el proceso se bloqueará esperando una conexión. Si este valor se especifica sin unidades, se toma como segundos. Establecer este parámetro a 0 lo desactiva. Soporta los siguientes sufijos de unidades: 'S' para segundos (por defecto), 'M' para minutos, 'H' para horas, 'D' para días y 'W' para semanas. |
 | keep_alive | on | Bool | No | Tener `SO_KEEPALIVE` en sockets |
 | nodelay | on | Bool | No | Tener `TCP_NODELAY` en sockets |
@@ -241,7 +242,7 @@ tener acceso a la base de datos `postgres` para obtener los parámetros de confi
 | Propiedad | Predeterminado | Unidad | Requerido | Descripción |
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | -1 | Int | No | La velocidad máxima de transferencia de backup en bytes por segundo. Usa 0 para desactivar, -1 significa usar la configuración global |
-| progress | -1 | Int | No | Habilitar seguimiento del progreso de backup. Usa 1 para habilitar, 0 para desactivar, -1 significa usar la configuración global |
+| progress | -1 | Int | No | Habilitar seguimiento del progreso de operaciones de backup y restore. Usa 1 para habilitar, 0 para desactivar, -1 significa usar la configuración global |
 
 
 **S3**
