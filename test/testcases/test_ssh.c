@@ -46,40 +46,6 @@
 
 static int storage_status = MCTF_FAIL;
 
-/* Return the lexicographically largest (newest) backup label for primary. */
-static int
-newest_backup_label(char* out, size_t size)
-{
-   char backup_dir[MAX_PATH];
-   char** dirs = NULL;
-   int ndir = 0;
-   int best = -1;
-
-   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/primary/backup", mctf_se_run_dir());
-   pgmoneta_get_directories(backup_dir, &ndir, &dirs);
-   if (ndir <= 0 || dirs == NULL)
-   {
-      return MCTF_FAIL;
-   }
-
-   for (int i = 0; i < ndir; i++)
-   {
-      if (best < 0 || strcmp(dirs[i], dirs[best]) > 0)
-      {
-         best = i;
-      }
-   }
-   pgmoneta_snprintf(out, size, "%s", dirs[best]);
-
-   for (int i = 0; i < ndir; i++)
-   {
-      free(dirs[i]);
-   }
-   free(dirs);
-
-   return out[0] != '\0' ? MCTF_OK : MCTF_FAIL;
-}
-
 MCTF_MODULE_SETUP(ssh)
 {
    char label[256];
@@ -90,7 +56,7 @@ MCTF_MODULE_SETUP(ssh)
    {
       /* Catches silent SFTP failures where the CLI exits 0 but nothing was stored. */
       if (mctf_se_backup("primary") != 0 ||
-          newest_backup_label(label, sizeof(label)) != MCTF_OK)
+          mctf_se_newest_label("primary", label, sizeof(label)) != MCTF_OK)
       {
          storage_status = MCTF_FAIL;
       }
@@ -152,12 +118,9 @@ cleanup:
  */
 MCTF_INTEGRATION_TEST(test_ssh_backup_info_is_valid)
 {
-   char backup_dir[MAX_PATH];
-   char** dirs = NULL;
-   int ndir = 0;
+   char label[256];
    char info_path[MAX_PATH];
    char* out = NULL;
-   int best = -1;
 
    if (storage_status == MCTF_SKIPPED)
    {
@@ -166,33 +129,17 @@ MCTF_INTEGRATION_TEST(test_ssh_backup_info_is_valid)
    MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
 
    /* Locate the newest backup directory under the managed instance's local catalog. */
-   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/primary/backup", mctf_se_run_dir());
-   pgmoneta_get_directories(backup_dir, &ndir, &dirs);
-   MCTF_ASSERT(ndir > 0 && dirs != NULL, cleanup, "no backup directories in local catalog");
+   MCTF_ASSERT(mctf_se_newest_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "no backup directories in local catalog");
 
-   for (int i = 0; i < ndir; i++)
-   {
-      if (best < 0 || strcmp(dirs[i], dirs[best]) > 0)
-      {
-         best = i;
-      }
-   }
-
-   pgmoneta_snprintf(info_path, sizeof(info_path), "%s/%s/backup.info", backup_dir, dirs[best]);
+   pgmoneta_snprintf(info_path, sizeof(info_path), "%s/backup/primary/backup/%s/backup.info",
+                     mctf_se_run_dir(), label);
    mctf_sh(&out, "grep -c 'STATUS=1' %s", info_path);
    MCTF_ASSERT_PTR_NONNULL(out, cleanup, "could not read backup.info");
    MCTF_ASSERT(atoi(out) > 0, cleanup, "STATUS=1 not found in backup.info");
 
 cleanup:
    free(out);
-   if (dirs != NULL)
-   {
-      for (int i = 0; i < ndir; i++)
-      {
-         free(dirs[i]);
-      }
-      free(dirs);
-   }
    MCTF_FINISH();
 }
 
