@@ -53,6 +53,7 @@ extern int s3_cleanup(int server, char* label);
 extern int azure_upload(int server, char* label, int compression, int encryption);
 extern int azure_download(int server, char* label, int compression, int encryption);
 extern int gcs_upload(int server, char* label, int compression, int encryption);
+extern int gcs_download(int server, char* label, int compression, int encryption);
 
 /* The contract each remote backend must implement */
 struct storage_engine
@@ -78,8 +79,7 @@ static const struct storage_engine engines[] = {
     azure_upload, NULL, azure_download},
    {"GCS", STORAGE_ENGINE_GCS,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
-    /* TODO: fill with gcs_download once the GCS restore path lands */
-    gcs_upload, NULL, NULL},
+    gcs_upload, NULL, gcs_download},
 };
 
 #define N_ENGINES ((int)(sizeof(engines) / sizeof(engines[0])))
