@@ -587,7 +587,7 @@ bind_host(char* hostname, int port, int** fds, int* length)
    }
 
    memset(sport, 0, 6);
-   sprintf(sport, "%d", port);
+   pgmoneta_snprintf(sport, 6, "%d", port);
 
    /* Find all SOCK_STREAM addresses */
    memset(&hints, 0, sizeof hints);
