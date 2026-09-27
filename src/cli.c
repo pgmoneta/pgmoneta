@@ -88,6 +88,7 @@
 #define COMMAND_VERIFY         "verify"
 #define COMMAND_S3             "s3"
 #define COMMAND_AZURE          "azure"
+#define COMMAND_GCS            "gcs"
 
 #define OUTPUT_FORMAT_JSON     "json"
 #define OUTPUT_FORMAT_TEXT     "text"
@@ -103,6 +104,7 @@ static void help_archive(void);
 static void help_delete(void);
 static void help_s3(void);
 static void help_azure(void);
+static void help_gcs(void);
 static void help_retain(void);
 static void help_expunge(void);
 static void help_decrypt(void);
@@ -125,6 +127,7 @@ static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uin
 static int list_s3_objects(SSL* ssl, int socket, char* server, char* prefix, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore_azure_objects(SSL* ssl, int socket, char* server, char* label, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int restore_gcs_objects(SSL* ssl, int socket, char* server, char* label, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -239,6 +242,7 @@ usage(void)
    printf("  retain                   Retain a backup from a server\n");
    printf("  shutdown                 Shutdown pgmoneta\n");
    printf("  azure <action>           Manage azure data, with:\n");
+   printf("  gcs <action>             Manage gcs data, with:\n");
    printf("  s3 <action>              Manage s3 data, with:\n");
    printf("                           - 'ls' to list remote objects\n");
    printf("  status [details]         Status of pgmoneta, with optional details\n");
@@ -283,6 +287,12 @@ struct pgmoneta_command command_table[] = {
     .action = MANAGEMENT_AZURE_RESTORE,
     .deprecated = false,
     .log_message = "<azure restore>"},
+   {.command = "gcs",
+    .subcommand = "restore",
+    .accepted_argument_count = {3, 4},
+    .action = MANAGEMENT_GCS_RESTORE,
+    .deprecated = false,
+    .log_message = "<gcs restore>"},
    {
       .command = "restore",
       .subcommand = "",
@@ -955,6 +965,17 @@ execute:
          exit_code = restore_azure_objects(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], compression, encryption, output_format);
       }
    }
+   else if (parsed.cmd->action == MANAGEMENT_GCS_RESTORE)
+   {
+      if (parsed.args[3])
+      {
+         exit_code = restore_gcs_objects(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, encryption, output_format);
+      }
+      else
+      {
+         exit_code = restore_gcs_objects(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], compression, encryption, output_format);
+      }
+   }
    else if (parsed.cmd->action == MANAGEMENT_RESTORE)
    {
       if (parsed.args[3])
@@ -1173,6 +1194,13 @@ help_azure(void)
 }
 
 static void
+help_gcs(void)
+{
+   printf("Manage the gcs\n");
+   printf("  pgmoneta-cli gcs restore <server> <label> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
+}
+
+static void
 help_restore(void)
 {
    printf("Restore a backup for a server\n");
@@ -1326,6 +1354,10 @@ display_helper(char* command)
    else if (pgmoneta_compare_string(command, COMMAND_AZURE))
    {
       help_azure();
+   }
+   else if (pgmoneta_compare_string(command, COMMAND_GCS))
+   {
+      help_gcs();
    }
    else if (pgmoneta_compare_string(command, COMMAND_RESTORE))
    {
@@ -1487,6 +1519,25 @@ static int
 restore_azure_objects(SSL* ssl, int socket, char* server, char* label, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    if (pgmoneta_management_request_restore_azure_objects(ssl, socket, server, label, position, directory, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+   return 1;
+}
+
+static int
+restore_gcs_objects(SSL* ssl, int socket, char* server, char* label, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_restore_gcs_objects(ssl, socket, server, label, position, directory, compression, encryption, output_format))
    {
       goto error;
    }
@@ -2659,6 +2710,11 @@ translate_command(int32_t cmd_code)
          break;
       case MANAGEMENT_AZURE_RESTORE:
          command_output = pgmoneta_append(command_output, COMMAND_AZURE);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "restore");
+         break;
+      case MANAGEMENT_GCS_RESTORE:
+         command_output = pgmoneta_append(command_output, COMMAND_GCS);
          command_output = pgmoneta_append_char(command_output, ' ');
          command_output = pgmoneta_append(command_output, "restore");
          break;

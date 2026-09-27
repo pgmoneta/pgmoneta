@@ -57,6 +57,7 @@
 #include <logging.h>
 #include <manifest.h>
 #include <progress.h>
+#include <se_object.h>
 #include <storage.h>
 #include <utils.h>
 #include <value.h>
@@ -93,6 +94,10 @@ static int gcs_storage_teardown(char*, struct art*);
 
 static int gcs_upload_files(char* local_root, char* gcs_root, int server, int compression, int encryption);
 static int gcs_send_upload_request(char* local_root, char* gcs_root, char* relative_path, char* file_sha512, int server);
+
+static int gcs_send_get_request(char* gcs_root, char* relative_path, struct http_response** response, int server);
+static char* gcs_build_object_path(char* gcs_root, char* relative_path);
+static int gcs_get_object(int server, char* root, char* relative_path, struct http_response** response);
 
 static char* gcs_get_host(int server);
 static char* gcs_get_basepath(int server, char* identifier);
@@ -1314,6 +1319,149 @@ error:
    return 1;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Restore: object GET, addressed through the shared se_object.c helpers  */
+/* ---------------------------------------------------------------------- */
+
+static char*
+gcs_build_object_path(char* gcs_root, char* relative_path)
+{
+   char* object_name = NULL;
+
+   object_name = pgmoneta_append(object_name, gcs_root);
+   if (relative_path != NULL && strlen(relative_path) > 0)
+   {
+      if (!pgmoneta_ends_with(gcs_root, "/"))
+      {
+         object_name = pgmoneta_append(object_name, "/");
+      }
+      object_name = pgmoneta_append(object_name, relative_path);
+   }
+
+   return object_name;
+}
+
+static int
+gcs_send_get_request(char* gcs_root, char* relative_path, struct http_response** response, int server)
+{
+   char* auth_token = NULL;
+   char* gcs_host = NULL;
+   char* object_name = NULL;
+   char* encoded_object_name = NULL;
+   char* request_path = NULL;
+   int gcs_port;
+   bool use_tls;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+
+   char* effective_bucket = gcs_get_effective_bucket(server);
+   int effective_port = gcs_get_effective_port(server);
+   bool effective_use_tls = gcs_get_effective_use_tls(server);
+
+   object_name = gcs_build_object_path(gcs_root, relative_path);
+   if (object_name == NULL)
+   {
+      goto error;
+   }
+
+   gcs_host = gcs_get_host(server);
+
+   if (gcs_get_access_token(server, &auth_token))
+   {
+      goto error;
+   }
+
+   if (effective_port != 0)
+   {
+      gcs_port = effective_port;
+   }
+   else
+   {
+      gcs_port = effective_use_tls ? 443 : 80;
+   }
+
+   use_tls = effective_use_tls;
+   if (gcs_port == 443)
+   {
+      use_tls = true;
+   }
+
+   if (pgmoneta_http_create(gcs_host, gcs_port, use_tls, &connection))
+   {
+      goto error;
+   }
+
+   encoded_object_name = gcs_url_encode(object_name);
+
+   request_path = pgmoneta_append(request_path, "/storage/v1/b/");
+   request_path = pgmoneta_append(request_path, effective_bucket);
+   request_path = pgmoneta_append(request_path, "/o/");
+   request_path = pgmoneta_append(request_path, encoded_object_name);
+   request_path = pgmoneta_append(request_path, "?alt=media");
+
+   pgmoneta_log_debug("GCS restore request prepared: host=%s, path=%s", gcs_host, request_path);
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_GET, request_path, &request))
+   {
+      goto error;
+   }
+
+   if (gcs_apply_auth_header(request, auth_token))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, response))
+   {
+      pgmoneta_log_error("Failed to execute HTTP GET request for %s", object_name);
+      goto error;
+   }
+
+   pgmoneta_log_debug("GCS GET response: object=%s, status=%d", object_name, (*response)->status_code);
+
+   free(gcs_host);
+   free(object_name);
+   free(encoded_object_name);
+   free(request_path);
+   free(auth_token);
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_destroy(connection);
+
+   return 0;
+
+error:
+
+   free(gcs_host);
+   free(object_name);
+   free(encoded_object_name);
+   free(request_path);
+   free(auth_token);
+
+   if (connection != NULL)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+
+   if (request != NULL)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+
+   return 1;
+}
+
+static int
+gcs_get_object(int server, char* root, char* relative_path, struct http_response** response)
+{
+   return gcs_send_get_request(root, relative_path, response, server);
+}
+
+static const struct object_storage_ops gcs_ops = {
+   .name = "GCS",
+   .get_object = &gcs_get_object,
+};
+
 static char*
 gcs_get_host(int server)
 {
@@ -1416,4 +1564,146 @@ gcs_upload(int server, char* label, int compression, int encryption)
    free(local_root);
    free(gcs_root);
    return rc;
+}
+
+int
+gcs_download(int server, char* label, int compression __attribute__((unused)), int encryption __attribute__((unused)))
+{
+   char* local_root = NULL;
+   char* gcs_root = NULL;
+   char* info_tmp = NULL;
+   char* info_final = NULL;
+   char* manifest_tmp = NULL;
+   char* manifest_final = NULL;
+   char* sha512_tmp = NULL;
+   char* sha512_final = NULL;
+   struct backup* backup = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   gcs_root = gcs_get_basepath(server, label);
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
+
+   pgmoneta_log_debug("GCS restore: %s/%s", config->common.servers[server].name, label);
+
+   if (pgmoneta_mkdir(local_root))
+   {
+      pgmoneta_log_error("GCS restore: could not create %s", local_root);
+      goto error;
+   }
+
+   info_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+   info_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
+
+   if (pgmoneta_object_bootstrap(&gcs_ops, gcs_root, server, local_root))
+   {
+      goto error;
+   }
+
+   /* Read staging metadata from .tmp; do not publish backup.info until download completes */
+   if (pgmoneta_load_info_file(info_tmp, &backup))
+   {
+      pgmoneta_log_error("GCS restore: failed to load staging backup.info from %s", info_tmp);
+      goto error;
+   }
+
+   pgmoneta_log_debug("GCS restore: compression=%d encryption=%d", backup->compression, backup->encryption);
+
+   if (pgmoneta_object_download_files(&gcs_ops, gcs_root, local_root, server,
+                                      backup->compression, backup->encryption))
+   {
+      goto error;
+   }
+
+   /* directory rows are excluded from the file list, so recreate them here */
+   if (pgmoneta_object_restore_directories(&gcs_ops, local_root))
+   {
+      goto error;
+   }
+
+   manifest_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+   manifest_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
+   sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+   sha512_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512");
+
+   if (pgmoneta_move_file(manifest_tmp, manifest_final))
+   {
+      pgmoneta_log_error("GCS restore: could not rename %s to %s", manifest_tmp, manifest_final);
+      goto error;
+   }
+
+   if (pgmoneta_move_file(sha512_tmp, sha512_final))
+   {
+      pgmoneta_log_error("GCS restore: could not rename %s to %s", sha512_tmp, sha512_final);
+      goto error;
+   }
+
+   /* Publish last: backup.info makes this look like a real local backup */
+   if (pgmoneta_move_file(info_tmp, info_final))
+   {
+      pgmoneta_log_error("GCS restore: could not rename %s to %s", info_tmp, info_final);
+      goto error;
+   }
+
+   pgmoneta_log_info("GCS restore: %s/%s completed", config->common.servers[server].name, label);
+
+   free(gcs_root);
+   free(local_root);
+   free(backup);
+   free(info_tmp);
+   free(info_final);
+   free(manifest_tmp);
+   free(manifest_final);
+   free(sha512_tmp);
+   free(sha512_final);
+
+   return 0;
+
+error:
+
+   if (local_root != NULL)
+   {
+      char* cleanup = NULL;
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+   }
+
+   free(gcs_root);
+   free(local_root);
+   free(backup);
+   free(info_tmp);
+   free(info_final);
+   free(manifest_tmp);
+   free(manifest_final);
+   free(sha512_tmp);
+   free(sha512_final);
+
+   return 1;
 }

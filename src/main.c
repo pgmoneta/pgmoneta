@@ -51,6 +51,7 @@
 #include <restore.h>
 #include <retention.h>
 #include <azure.h>
+#include <gcs.h>
 #include <s3.h>
 #include <security.h>
 #include <server.h>
@@ -1400,6 +1401,50 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_AZURE_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Azure restore: No server %s (%d)", server, MANAGEMENT_ERROR_RESTORE_AZURE_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_GCS_RESTORE)
+   {
+      char* label = NULL;
+
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+      label = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_GCS_LABEL);
+
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      {
+         if (pgmoneta_compare_string(config->common.servers[i].name, server))
+         {
+            srv = i;
+         }
+      }
+
+      if (srv != -1)
+      {
+         pid = fork();
+         if (pid == -1)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_GCS_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_log_error("GCS restore: No fork %s (%d)", server, MANAGEMENT_ERROR_RESTORE_GCS_NOFORK);
+            goto error;
+         }
+         else if (pid == 0)
+         {
+            struct json* pyl = NULL;
+
+            shutdown_ports(false);
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "gcs restore", config->common.servers[srv].name);
+            pgmoneta_restore_gcs_objects(client_fd, srv, label, compression, encryption, pyl);
+         }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_GCS_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_log_error("GCS restore: No server %s (%d)", server, MANAGEMENT_ERROR_RESTORE_GCS_NOSERVER);
          goto error;
       }
    }
