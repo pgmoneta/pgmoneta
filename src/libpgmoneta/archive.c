@@ -347,6 +347,8 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       if (msg == NULL)
       {
          pgmoneta_log_error("Failed to allocate memory for msg");
+         fclose(file);
+         file = NULL;
          goto error;
       }
 
@@ -474,7 +476,10 @@ error:
       pgmoneta_disconnect(socket);
    }
    pgmoneta_free_query_response(response);
-   msg->data = NULL;
+   if (msg != NULL)
+   {
+      msg->data = NULL;
+   }
    pgmoneta_free_message(msg);
    return 1;
 }
@@ -804,7 +809,10 @@ error:
       fclose(file);
    }
    pgmoneta_free_query_response(response);
-   msg->data = NULL;
+   if (msg != NULL)
+   {
+      msg->data = NULL;
+   }
    pgmoneta_free_message(msg);
    pgmoneta_art_destroy(file_sizes);
    pgmoneta_art_destroy(file_checksums);
