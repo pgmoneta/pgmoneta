@@ -636,6 +636,10 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
          {
             bck->remote_s3_elapsed_time = atof(&value[0]);
          }
+         else if (pgmoneta_compare_string(INFO_REMOTE_GCS_ELAPSED, &key[0]))
+         {
+            bck->remote_gcs_elapsed_time = atof(&value[0]);
+         }
          else if (pgmoneta_compare_string(INFO_MAJOR_VERSION, &key[0]))
          {
             bck->major_version = atoi(&value[0]);
@@ -1405,6 +1409,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_SSH_ELAPSED, backup->remote_ssh_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_S3_ELAPSED, backup->remote_s3_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_AZURE_ELAPSED, backup->remote_azure_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_GCS_ELAPSED, backup->remote_gcs_elapsed_time);
    write_info(sfile, "%s=%d\n", INFO_MAJOR_VERSION, backup->major_version);
    write_info(sfile, "%s=%d\n", INFO_MINOR_VERSION, backup->minor_version);
    write_info(sfile, "%s=%d\n", INFO_KEEP, backup->keep ? 1 : 0);
