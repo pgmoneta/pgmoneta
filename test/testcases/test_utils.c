@@ -39,6 +39,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2433,6 +2434,99 @@ MCTF_TEST(test_utils_format_and_append_long)
 
    s = pgmoneta_format_and_append(s, "|%d", INT_MIN);
    MCTF_ASSERT_INT_EQ((int)strlen(s), (int)sizeof(big) - 1 + 12, cleanup, "format_and_append appended wrong length");
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_bool)
+{
+   char* s = NULL;
+
+   /* append_bool has no numeric-width corner case, but false was never
+      exercised anywhere in the suite before this. */
+   s = pgmoneta_append_bool(NULL, false);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_bool returned NULL for false");
+   MCTF_ASSERT_STR_EQ(s, "false", cleanup, "append_bool wrong for false");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_bool(NULL, true);
+   MCTF_ASSERT_STR_EQ(s, "true", cleanup, "append_bool wrong for true");
+   free(s);
+   s = NULL;
+
+   /* Concatenation, the same corner case already covered for int/ulong. */
+   s = pgmoneta_append_bool(NULL, true);
+   s = pgmoneta_append_char(s, ' ');
+   s = pgmoneta_append_bool(s, false);
+   MCTF_ASSERT_STR_EQ(s, "true false", cleanup, "append_bool did not concatenate");
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_ullong)
+{
+   char* s = NULL;
+
+   /* Same class of bug as the append_ulong / append_double corner cases
+      above: format_and_append sizes its buffer from vsnprintf(NULL, 0, ...),
+      so the boundary worth pinning is the widest value the type can hold. */
+   s = pgmoneta_append_ullong(NULL, 0ULL);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_ullong returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "0", cleanup, "append_ullong wrong for 0");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_ullong(NULL, ULLONG_MAX);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_ullong returned NULL for ULLONG_MAX");
+   MCTF_ASSERT_STR_EQ(s, "18446744073709551615", cleanup, "append_ullong truncated ULLONG_MAX");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_ullong(NULL, 1ULL);
+   s = pgmoneta_append_ullong(s, ULLONG_MAX);
+   MCTF_ASSERT_STR_EQ(s, "118446744073709551615", cleanup, "append_ullong did not concatenate");
+
+cleanup:
+   free(s);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_double_special_values)
+{
+   char* s = NULL;
+
+   /* format_and_append sizes its buffer with vsnprintf(NULL, 0, ...) before
+      formatting. NAN and INFINITY are the one input class where a naive
+      length precomputation could plausibly disagree with the C library
+      between the sizing pass and the write pass (glibc's printf writes
+      "nan"/"inf" for both, but that is a library guarantee worth pinning
+      with a test rather than assuming). */
+   s = pgmoneta_append_double(NULL, NAN);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_double returned NULL for NAN");
+   MCTF_ASSERT(strstr(s, "nan") != NULL, cleanup, "append_double did not format NAN as nan");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double(NULL, INFINITY);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_double returned NULL for INFINITY");
+   MCTF_ASSERT(strstr(s, "inf") != NULL, cleanup, "append_double did not format INFINITY as inf");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double(NULL, -INFINITY);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_double returned NULL for -INFINITY");
+   MCTF_ASSERT(strstr(s, "-inf") != NULL, cleanup, "append_double did not format -INFINITY as -inf");
+   free(s);
+   s = NULL;
+
+   s = pgmoneta_append_double(NULL, -1e19);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_double returned NULL for -1e19");
+   MCTF_ASSERT_STR_EQ(s, "-10000000000000000000.000000", cleanup, "append_double wrong for -1e19");
 
 cleanup:
    free(s);
