@@ -234,12 +234,27 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
 
    while (result == NULL && offset < msg->length)
    {
+      /* Need at least a 1-byte type and a 4-byte length before reading either. */
+      if (offset + 5 > msg->length)
+      {
+         break;
+      }
+
       char t = (char)pgmoneta_read_byte(msg->data + offset);
+
+      m_length = pgmoneta_read_int32(msg->data + offset + 1);
+
+      /* The length field includes itself (4 bytes), so it can never be less
+       * than 4, and offset + 1 + m_length can never run past msg->length.
+       * Widen before adding -- m_length is read off the wire and a huge
+       * value would otherwise overflow the int addition. */
+      if (m_length < 4 || (ssize_t)offset + 1 + (ssize_t)m_length > msg->length)
+      {
+         break;
+      }
 
       if (type == t)
       {
-         m_length = pgmoneta_read_int32(msg->data + offset + 1);
-
          result = (struct message*)malloc(sizeof(struct message));
          result->data = aligned_alloc((size_t)ALIGNMENT_SIZE, pgmoneta_get_aligned_size(1 + m_length));
 
@@ -262,8 +277,7 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
             pgmoneta_log_notice_response_message(warning_msg);
             pgmoneta_free_message(warning_msg);
          }
-         offset += 1;
-         offset += pgmoneta_read_int32(msg->data + offset);
+         offset += 1 + m_length;
       }
    }
 
