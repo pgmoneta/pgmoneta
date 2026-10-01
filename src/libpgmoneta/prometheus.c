@@ -1401,16 +1401,16 @@ general_information(prometheus_metrics_container_t* container)
 
    config = (struct main_configuration*)shmem;
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_state The state of pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_state gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_state The state of pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_state gauge\n");
    data = pgmoneta_append(data, "pgmoneta_state ");
    data = pgmoneta_append(data, "1");
    data = pgmoneta_append(data, "\n\n");
    add_metric_to_art(container->general_metrics, "pgmoneta_state", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_version The version of pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_version gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_version The version of pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_version gauge\n");
    data = pgmoneta_append(data, "pgmoneta_version{version=\"");
    data = pgmoneta_append(data, VERSION);
    data = pgmoneta_append(data, "\"} 1");
@@ -1418,48 +1418,48 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_version", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_fips Is pgmoneta running in FIPS mode\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_fips gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_fips Is pgmoneta running in FIPS mode\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_fips gauge\n");
    data = pgmoneta_append(data, "pgmoneta_fips ");
    data = pgmoneta_append_int(data, pgmoneta_fips_pgmoneta() ? 1 : 0);
    data = pgmoneta_append(data, "\n\n");
    add_metric_to_art(container->general_metrics, "pgmoneta_fips", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_logging_info The number of INFO logging statements\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_logging_info gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_logging_info The number of INFO logging statements\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_logging_info gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_info ");
    data = pgmoneta_append_ulong(data, atomic_load(&config->common.prometheus.logging_info));
    data = pgmoneta_append(data, "\n\n");
    add_metric_to_art(container->general_metrics, "pgmoneta_logging_info", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_logging_warn The number of WARN logging statements\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_logging_warn gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_logging_warn The number of WARN logging statements\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_logging_warn gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_warn ");
    data = pgmoneta_append_ulong(data, atomic_load(&config->common.prometheus.logging_warn));
    data = pgmoneta_append(data, "\n\n");
    add_metric_to_art(container->general_metrics, "pgmoneta_logging_warn", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_logging_error The number of ERROR logging statements\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_logging_error gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_logging_error The number of ERROR logging statements\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_logging_error gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_error ");
    data = pgmoneta_append_ulong(data, atomic_load(&config->common.prometheus.logging_error));
    data = pgmoneta_append(data, "\n\n");
    add_metric_to_art(container->general_metrics, "pgmoneta_logging_error", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_logging_fatal The number of FATAL logging statements\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_logging_fatal gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_logging_fatal The number of FATAL logging statements\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_logging_fatal gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_fatal ");
    data = pgmoneta_append_ulong(data, atomic_load(&config->common.prometheus.logging_fatal));
    data = pgmoneta_append(data, "\n\n");
    add_metric_to_art(container->general_metrics, "pgmoneta_logging_fatal", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_retention_days The retention days of pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_days gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_retention_days The retention days of pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_retention_days gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_days ");
    data = pgmoneta_append_int(data, config->retention_days <= 0 ? 0 : config->retention_days);
    data = pgmoneta_append(data, "\n\n");
@@ -1467,8 +1467,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_retention_days", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_retention_weeks The retention weeks of pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_weeks gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_retention_weeks The retention weeks of pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_retention_weeks gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_weeks ");
    data = pgmoneta_append_int(data, config->retention_weeks <= 0 ? 0 : config->retention_weeks);
    data = pgmoneta_append(data, "\n\n");
@@ -1476,8 +1476,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_retention_weeks", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_retention_months The retention months of pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_months gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_retention_months The retention months of pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_retention_months gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_months ");
    data = pgmoneta_append_int(data, config->retention_months <= 0 ? 0 : config->retention_months);
    data = pgmoneta_append(data, "\n\n");
@@ -1485,8 +1485,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_retention_months", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_retention_years The retention years of pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_years gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_retention_years The retention years of pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_retention_years gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_years ");
    data = pgmoneta_append_int(data, config->retention_years <= 0 ? 0 : config->retention_years);
    data = pgmoneta_append(data, "\n\n");
@@ -1494,8 +1494,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_retention_years", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_retention_server The retention of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_server gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_retention_server The retention of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_retention_server gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_retention_server{");
@@ -1564,8 +1564,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_retention_server", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_compression The compression used\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_compression gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_compression The compression used\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_compression gauge\n");
    data = pgmoneta_append(data, "pgmoneta_compression ");
    data = pgmoneta_append_int(data, config->compression_type);
    data = pgmoneta_append(data, "\n\n");
@@ -1580,8 +1580,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_compression", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_used_space The disk space used for pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_used_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_used_space The disk space used for pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_used_space gauge\n");
    data = pgmoneta_append(data, "pgmoneta_used_space ");
    data = pgmoneta_append_ulong(data, size);
    data = pgmoneta_append(data, "\n\n");
@@ -1598,8 +1598,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_used_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_free_space The free disk space for pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_free_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_free_space The free disk space for pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_free_space gauge\n");
    data = pgmoneta_append(data, "pgmoneta_free_space ");
    data = pgmoneta_append_ulong(data, size);
    data = pgmoneta_append(data, "\n\n");
@@ -1616,8 +1616,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_free_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_total_space The total disk space for pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_total_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_total_space The total disk space for pgmoneta\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_total_space gauge\n");
    data = pgmoneta_append(data, "pgmoneta_total_space ");
    data = pgmoneta_append_ulong(data, size);
    data = pgmoneta_append(data, "\n\n");
@@ -1629,8 +1629,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_total_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping The disk space used for WAL shipping for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_wal_shipping The disk space used for WAL shipping for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_wal_shipping gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping{");
@@ -1661,8 +1661,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->wal_metrics, "pgmoneta_wal_shipping", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_used_space The disk space used for WAL shipping of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_used_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_wal_shipping_used_space The disk space used for WAL shipping of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_wal_shipping_used_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_used_space{");
@@ -1692,8 +1692,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->wal_metrics, "pgmoneta_wal_shipping_used_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_free_space The free disk space for WAL shipping of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_free_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_wal_shipping_free_space The free disk space for WAL shipping of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_wal_shipping_free_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_free_space{");
@@ -1724,8 +1724,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->wal_metrics, "pgmoneta_wal_shipping_free_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_total_space The total disk space for WAL shipping of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_total_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_wal_shipping_total_space The total disk space for WAL shipping of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_wal_shipping_total_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_total_space{");
@@ -1761,8 +1761,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->wal_metrics, "pgmoneta_wal_shipping_total_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_workspace The disk space used for workspace for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_workspace gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_workspace The disk space used for workspace for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_workspace gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_workspace{");
@@ -1793,8 +1793,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_workspace", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_workspace_free_space The free disk space for workspace of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_workspace_free_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_workspace_free_space The free disk space for workspace of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_workspace_free_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_workspace_free_space{");
@@ -1825,8 +1825,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_workspace_free_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_workspace_total_space The total disk space for workspace of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_workspace_total_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_workspace_total_space The total disk space for workspace of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_workspace_total_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_workspace_total_space{");
@@ -1858,8 +1858,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_workspace_total_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby The disk space used for hot standby for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_hot_standby The disk space used for hot standby for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_hot_standby gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_hot_standby{");
@@ -1893,8 +1893,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_hot_standby", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby_free_space The free disk space for hot standby of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby_free_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_hot_standby_free_space The free disk space for hot standby of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_hot_standby_free_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_hot_standby_free_space{");
@@ -1928,8 +1928,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_hot_standby_free_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby_total_space The total disk space for hot standby of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby_total_space gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_hot_standby_total_space The total disk space for hot standby of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_hot_standby_total_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_hot_standby_total_space{");
@@ -1963,8 +1963,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->storage_metrics, "pgmoneta_hot_standby_total_space", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_timeline The current timeline a server is on\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_timeline counter\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_timeline The current timeline a server is on\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_timeline counter\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_timeline{");
@@ -1982,8 +1982,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_timeline", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_parent_tli The parent timeline of a timeline on a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_parent_tli gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_parent_tli The parent timeline of a timeline on a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_parent_tli gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       struct timeline_history* history = NULL;
@@ -2032,8 +2032,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_parent_tli", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_timeline_switchpos The WAL switch position of a timeline on a server (showed in hex as a parameter)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_timeline_switchpos gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_timeline_switchpos The WAL switch position of a timeline on a server (showed in hex as a parameter)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_timeline_switchpos gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       struct timeline_history* history = NULL;
@@ -2090,8 +2090,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_timeline_switchpos", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_workers The numbeer of workers for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_workers gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_workers The numbeer of workers for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_workers gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       int workers = config->common.servers[i].workers != -1 ? config->common.servers[i].workers : config->workers;
@@ -2111,8 +2111,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_workers", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_online Is the server in an online state\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_online gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_online Is the server in an online state\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_online gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_online{");
@@ -2130,8 +2130,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_online", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_primary Is the server a primary\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_primary gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_primary Is the server a primary\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_primary gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_primary{");
@@ -2149,8 +2149,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_primary", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_valid Is the server in a valid state\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_valid gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_valid Is the server in a valid state\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_valid gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_valid{");
@@ -2168,8 +2168,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_valid", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_wal_streaming The WAL streaming status of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_streaming gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_wal_streaming The WAL streaming status of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_wal_streaming gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_streaming{");
@@ -2187,8 +2187,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->wal_metrics, "pgmoneta_wal_streaming", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_operation_count The count of client operations of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_operation_count gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_operation_count The count of client operations of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_operation_count gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_operation_count{");
@@ -2206,8 +2206,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_operation_count", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_failed_operation_count The count of failed client operations of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_failed_operation_count gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_failed_operation_count The count of failed client operations of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_failed_operation_count gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_failed_operation_count{");
@@ -2225,8 +2225,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_failed_operation_count", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_last_operation_time The time of the latest client operation of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_last_operation_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_last_operation_time The time of the latest client operation of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_last_operation_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_last_operation_time{");
@@ -2256,8 +2256,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_last_operation_time", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_last_failed_operation_time The time of the latest failed client operation of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_last_failed_operation_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_last_failed_operation_time The time of the latest failed client operation of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_last_failed_operation_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_last_failed_operation_time{");
@@ -2287,8 +2287,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_last_failed_operation_time", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_checksums Are checksums enabled\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_checksums gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_checksums Are checksums enabled\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_checksums gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_checksums{");
@@ -2313,8 +2313,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_checksums", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_fips_mode Is FIPS mode enabled\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_fips_mode gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_fips_mode Is FIPS mode enabled\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_fips_mode gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_fips_mode{");
@@ -2339,8 +2339,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_fips_mode", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_summarize_wal Is summarize_wal enabled\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_summarize_wal gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_summarize_wal Is summarize_wal enabled\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_summarize_wal gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_summarize_wal{");
@@ -2365,8 +2365,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_summarize_wal", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_extensions_detected The number of extensions detected on server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_extensions_detected gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_extensions_detected The number of extensions detected on server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_extensions_detected gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_extensions_detected{");
@@ -2381,8 +2381,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_extensions_detected", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_server_extension Information about installed extensions on server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_server_extension gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_server_extension Information about installed extensions on server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_server_extension gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (config->common.servers[i].number_of_extensions > 0)
@@ -2453,8 +2453,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->server_metrics, "pgmoneta_server_extension", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_extension_pgmoneta_ext Status of the pgmoneta extension\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_extension_pgmoneta_ext gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_extension_pgmoneta_ext Status of the pgmoneta extension\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_extension_pgmoneta_ext gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       bool found_pgmoneta_ext = false;
@@ -2510,8 +2510,8 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_extension_pgmoneta_ext", data, NULL, NULL, 0);
    free(data);
    data = NULL;
-   data = pgmoneta_append(data, "#HELP pgmoneta_progress_percentage The workflow progress percentage (0-100) for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_progress_percentage gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_progress_percentage The workflow progress percentage (0-100) for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_progress_percentage gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       int wt = atomic_load(&config->common.servers[i].progress.workflow_type);
@@ -2533,8 +2533,8 @@ general_information(prometheus_metrics_container_t* container)
    free(data);
    data = NULL;
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_progress_elapsed_time The elapsed seconds since the current workflow started\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_progress_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_progress_elapsed_time The elapsed seconds since the current workflow started\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_progress_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       int wt = atomic_load(&config->common.servers[i].progress.workflow_type);
@@ -2556,8 +2556,8 @@ general_information(prometheus_metrics_container_t* container)
    free(data);
    data = NULL;
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_progress_total The total units of work in the current workflow phase\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_progress_total gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_progress_total The total units of work in the current workflow phase\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_progress_total gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       int wt = atomic_load(&config->common.servers[i].progress.workflow_type);
@@ -2579,8 +2579,8 @@ general_information(prometheus_metrics_container_t* container)
    free(data);
    data = NULL;
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_progress_done The units of work completed in the current workflow phase\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_progress_done gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_progress_done The units of work completed in the current workflow phase\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_progress_done gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       int wt = atomic_load(&config->common.servers[i].progress.workflow_type);
@@ -2614,8 +2614,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
 
    config = (struct main_configuration*)shmem;
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_oldest The oldest backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_oldest gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_oldest The oldest backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_oldest gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_backup_oldest{");
@@ -2650,8 +2650,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_newest The newest backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_newest gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_newest The newest backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_newest gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_backup_newest{");
@@ -2679,8 +2679,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_valid The number of valid backups for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_valid gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_valid The number of valid backups for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_valid gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_backup_valid{");
@@ -2711,8 +2711,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_invalid The number of invalid backups for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_invalid gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_invalid The number of invalid backups for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_invalid gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_backup_invalid{");
@@ -2743,8 +2743,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup Is the backup valid for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup Is the backup valid for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -2784,8 +2784,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_version The version of postgresql for a backup\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_version gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_version The version of postgresql for a backup\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_version gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -2833,8 +2833,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_total_elapsed_time The backup in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_total_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_total_elapsed_time The backup in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_total_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -2867,8 +2867,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_basebackup_elapsed_time The duration for basebackup in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_basebackup_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_basebackup_elapsed_time The duration for basebackup in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_basebackup_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -2901,8 +2901,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_manifest_elapsed_time The duration for manifest in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_manifest_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_manifest_elapsed_time The duration for manifest in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_manifest_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -2935,8 +2935,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_zstd_elapsed_time The duration for zstd compression in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_zstd_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_zstd_elapsed_time The duration for zstd compression in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_zstd_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -2969,8 +2969,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_gzip_elapsed_time The duration for gzip compression in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_gzip_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_gzip_elapsed_time The duration for gzip compression in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_gzip_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3003,8 +3003,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_bzip2_elapsed_time The duration for bzip2 compression in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_bzip2_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_bzip2_elapsed_time The duration for bzip2 compression in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_bzip2_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3037,8 +3037,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_lz4_elapsed_time The duration for lz4 compression in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_lz4_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_lz4_elapsed_time The duration for lz4 compression in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_lz4_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3071,8 +3071,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_encryption_elapsed_time The duration for encryption in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_encryption_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_encryption_elapsed_time The duration for encryption in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_encryption_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3105,8 +3105,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_linking_elapsed_time The duration for linking in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_linking_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_linking_elapsed_time The duration for linking in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_linking_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3139,8 +3139,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_ssh_elapsed_time The duration for remote ssh in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_ssh_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_remote_ssh_elapsed_time The duration for remote ssh in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_remote_ssh_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3174,8 +3174,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
 
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_s3_elapsed_time The duration for remote_s3 in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_s3_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_remote_s3_elapsed_time The duration for remote_s3 in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_remote_s3_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3209,8 +3209,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
 
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_azure_elapsed_time The duration for remote_azure in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_azure_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_remote_azure_elapsed_time The duration for remote_azure in seconds for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_remote_azure_elapsed_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3244,8 +3244,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
 
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_start_timeline The starting timeline of a backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_start_timeline gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_start_timeline The starting timeline of a backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_start_timeline gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3278,8 +3278,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_end_timeline The ending timeline of a backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_end_timeline gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_end_timeline The ending timeline of a backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_end_timeline gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3312,8 +3312,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_start_walpos The starting WAL position of a backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_start_walpos gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_start_walpos The starting WAL position of a backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_start_walpos gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3356,8 +3356,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_checkpoint_walpos The checkpoint WAL position of a backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_checkpoint_walpos gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_checkpoint_walpos The checkpoint WAL position of a backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_checkpoint_walpos gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3398,8 +3398,8 @@ backup_information(prometheus_metrics_container_t* container, int* number_of_bac
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_end_walpos The ending WAL position of a backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_end_walpos gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_end_walpos The ending WAL position of a backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_end_walpos gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3461,8 +3461,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
 
    config = (struct main_configuration*)shmem;
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_restore_newest_size The size of the newest restore for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_restore_newest_size gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_restore_newest_size The size of the newest restore for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_restore_newest_size gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_restore_newest_size{");
@@ -3497,8 +3497,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_newest_size The size of the newest backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_newest_size gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_newest_size The size of the newest backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_newest_size gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_backup_newest_size{");
@@ -3533,8 +3533,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_restore_size The size of a restore for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_restore_size gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_restore_size The size of a restore for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_restore_size gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3577,8 +3577,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_restore_size_increment The size increment of a restore for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_restore_size_increment gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_restore_size_increment The size increment of a restore for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_restore_size_increment gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3628,8 +3628,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_size The size of a backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_size gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_size The size of a backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_size gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3669,8 +3669,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_ratio The ratio of backup size to restore size for each backup\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_ratio gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_ratio The ratio of backup size to restore size for each backup\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_ratio gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3720,8 +3720,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_throughput The throughput of the backup for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_throughput gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_throughput The throughput of the backup for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_throughput gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3770,8 +3770,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_basebackup_mbs The throughput of the basebackup for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_basebackup_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_basebackup_mbs The throughput of the basebackup for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_basebackup_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3820,8 +3820,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_manifest_mbs The throughput of the manifest for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_manifest_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_manifest_mbs The throughput of the manifest for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_manifest_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3870,8 +3870,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_zstd_mbs The throughput of the zstd compression for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_zstd_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_zstd_mbs The throughput of the zstd compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_zstd_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3920,8 +3920,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_gzip_mbs The throughput of the gzip compression for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_gzip_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_gzip_mbs The throughput of the gzip compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_gzip_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -3970,8 +3970,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_bzip2_mbs The throughput of the bzip2 compression for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_bzip2_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_bzip2_mbs The throughput of the bzip2 compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_bzip2_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -4020,8 +4020,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_lz4_mbs The throughput of the lz4 compression for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_lz4_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_compression_lz4_mbs The throughput of the lz4 compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_compression_lz4_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -4070,8 +4070,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_encryption_mbs The throughput of the encryption for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_encryption_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_encryption_mbs The throughput of the encryption for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_encryption_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -4120,8 +4120,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_linking_mbs The throughput of the linking for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_linking_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_linking_mbs The throughput of the linking for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_linking_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -4170,8 +4170,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_ssh_mbs The throughput of the remote_ssh for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_ssh_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_remote_ssh_mbs The throughput of the remote_ssh for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_remote_ssh_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -4220,8 +4220,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_s3_mbs The throughput of the remote_s3 for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_s3_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_remote_s3_mbs The throughput of the remote_s3 for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_remote_s3_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -4270,8 +4270,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_azure_mbs The throughput of the remote_azure for a server (MB/s)\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_azure_mbs gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_remote_azure_mbs The throughput of the remote_azure for a server (MB/s)\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_remote_azure_mbs gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -4320,8 +4320,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_retain Retain backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_retain gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_retain Retain backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_retain gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       if (number_of_backups[i] > 0)
@@ -4364,8 +4364,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_total_size The total size of the backups for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_total_size gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_backup_total_size The total size of the backups for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_backup_total_size gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
@@ -4393,8 +4393,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_wal_total_size The total size of the WAL for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_total_size gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_wal_total_size The total size of the WAL for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_wal_total_size gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_wal(i);
@@ -4431,8 +4431,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_total_size The total size for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_total_size gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_total_size The total size for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_total_size gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server(i);
@@ -4462,8 +4462,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_active_backup Is there an active backup for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_active_backup gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_active_backup Is there an active backup for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_active_backup gauge\n");
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
@@ -4484,8 +4484,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_active_restore Is there an active restore for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_active_restore gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_active_restore Is there an active restore for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_active_restore gauge\n");
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
@@ -4507,8 +4507,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_active_archive Is there an active archiving for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_active_archive gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_active_archive Is there an active archiving for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_active_archive gauge\n");
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
@@ -4530,8 +4530,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_active_delete Is there an active delete for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_active_delete gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_active_delete Is there an active delete for a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_active_delete gauge\n");
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
@@ -4553,9 +4553,9 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_active_retention Is there an "
+   data = pgmoneta_append(data, "# HELP pgmoneta_active_retention Is there an "
                                 "active archiving for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_active_retention gauge\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_active_retention gauge\n");
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
@@ -4577,8 +4577,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_current_wal_file The current streaming WAL filename of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_current_wal_file gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_current_wal_file The current streaming WAL filename of a server\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_current_wal_file gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_current_wal_file{");
@@ -4598,8 +4598,8 @@ size_information(prometheus_metrics_container_t* container, int* number_of_backu
    data = pgmoneta_append(data, "\n");
 
    // Append the WAL LSN of every server
-   data = pgmoneta_append(data, "#HELP pgmoneta_current_wal_lsn The current WAL log sequence number\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_current_wal_lsn gauge\n");
+   data = pgmoneta_append(data, "# HELP pgmoneta_current_wal_lsn The current WAL log sequence number\n");
+   data = pgmoneta_append(data, "# TYPE pgmoneta_current_wal_lsn gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_current_wal_lsn{");
