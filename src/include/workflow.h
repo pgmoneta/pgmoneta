@@ -117,6 +117,7 @@ extern "C" {
 #define NODE_ALL                         "all"                 /* All the files in a manifest */
 #define NODE_BACKUP                      "backup"              /* The backup structure */
 #define NODE_COMBINE_AS_IS               "combine_as_is"       /* Whether to combine the backups as is*/
+#define NODE_CONFIGURATION_FILES         "configuration_files" /* The configuration files outside the data directory */
 #define NODE_COPY_WAL                    "copy_wal"            /* Whether to copy WAL */
 #define NODE_BACKUP_BASE                 "backup_base"         /* The base directory of the backup */
 #define NODE_BACKUP_DATA                 "backup_data"         /* The data directory of the backup */

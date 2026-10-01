@@ -27,6 +27,7 @@
  */
 #include <pgmoneta.h>
 #include <csv.h>
+#include <deque.h>
 #include <info.h>
 #include <logging.h>
 #include <manifest.h>
@@ -170,6 +171,8 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    char file_path[MAX_PATH];
    char* info[MANIFEST_COLUMN_COUNT];
    struct main_configuration* config;
+   struct deque* files = NULL;
+   struct deque_iterator* iter = NULL;
 
    struct json* m = NULL;
 
@@ -262,6 +265,24 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);
       pgmoneta_json_destroy(entry);
       entry = NULL;
+   }
+
+   files = (struct deque*)pgmoneta_art_search(nodes, NODE_CONFIGURATION_FILES);
+   if (files != NULL)
+   {
+      if (pgmoneta_deque_iterator_create(files, &iter))
+      {
+         goto error;
+      }
+
+      while (pgmoneta_deque_iterator_next(iter))
+      {
+         info[MANIFEST_PATH_INDEX] = iter->tag;
+         info[MANIFEST_CHECKSUM_INDEX] = (char*)pgmoneta_value_data(iter->value);
+         pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);
+      }
+
+      pgmoneta_deque_iterator_destroy(iter);
    }
 
    if (write_directory_entries(writer, backup_data, ""))

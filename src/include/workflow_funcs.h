@@ -202,6 +202,13 @@ pgmoneta_create_manifest(void);
  */
 struct workflow*
 pgmoneta_create_extra(void);
+
+/**
+ * Create a workflow for the configuration files
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_create_configuration(void);
 #ifdef __cplusplus
 }
 #endif

@@ -308,6 +308,24 @@ psql -f init-permissions.sql postgres
 
 Once this setup is done you can go ahead and create incremental backups without hassles.
 
+## Configuration files outside the data directory
+
+Some installations, like Debian and Ubuntu clusters created with `pg_createcluster`, keep `postgresql.conf`, `pg_hba.conf` and `pg_ident.conf` outside the data directory, so they are not part of the base backup.
+
+**pgmoneta** detects this and adds these files to the `data` directory of the backup, so they are restored together with the cluster. The restored files still contain the original locations, like `data_directory`, which may need to be adjusted.
+
+The connection user needs the following privileges
+
+```sql
+GRANT pg_read_all_settings TO repl;
+GRANT pg_read_server_files TO repl;
+GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO repl;
+```
+
+If you used the setup script from the incremental backup section, only `pg_read_all_settings` is new.
+
+Without them the backup is still taken, but the configuration files are skipped with a warning in the log, and restoring that backup will fail.
+
 ## Backup information
 
 You can list the information about a backup
