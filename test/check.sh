@@ -34,6 +34,7 @@ export TEST_PG_VERSION="${TEST_PG_VERSION:-17}"
 
 IMAGE_NAME="pgmoneta-test-postgresql$PG_VERSION-rocky10"
 CONTAINER_NAME="pgmoneta-test-postgresql$PG_VERSION"
+REPLICA_CONTAINER_NAME="$CONTAINER_NAME-replica"
 
 SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 PROJECT_DIRECTORY=$(realpath "$SCRIPT_DIR/..")
@@ -49,6 +50,7 @@ PG_LOG_DIR="$PGMONETA_ROOT_DIR/pg_log"
 RETROSPECT_DIR="$PGMONETA_ROOT_DIR/retrospect"
 HOT_STANDBY_DIRECTORY="$PGMONETA_ROOT_DIR/standby"
 TABLESPACE_DIR="/tmp/pgmoneta_tblspc"
+REPLICA_TABLESPACE_DIR="/tmp/pgmoneta_replica_tblspc"
 
 # BASE DIR holds all the run time data
 WORKSPACE_DIRECTORY="$BASE_DIR/pgmoneta-workspace/"
@@ -66,6 +68,7 @@ PG_REPL_PASSWORD=replpass
 USER=$(whoami)
 MODE="dev"
 PORT=6432
+REPLICA_PORT=$((PORT + 1))
 
 # Use sudo only when not running as root (CI containers run as root)
 if [ "$(id -u)" -eq 0 ]; then
@@ -171,6 +174,15 @@ cleanup() {
    if [[ $MODE != "ci" ]]; then
      echo "Removing postgres $PG_VERSION container"
      remove_postgresql_container
+     echo "Removing postgres $PG_VERSION replica container"
+     remove_postgresql_replica_container
+   fi
+
+   if [[ $MODE == "ci" ]] && [[ "$PG_VERSION" == "17" || "$PG_VERSION" == "14" ]] ; then
+     echo "Stopping local PostgreSQL $PG_VERSION replica"
+     /usr/pgsql-$PG_VERSION/bin/pg_ctl -D /pgdata_replica/ stop 2>/dev/null || true
+     $SUDO rm -Rf /pgdata_replica
+     $SUDO rm -Rf "$REPLICA_TABLESPACE_DIR"
    fi
 
    if [[ -d "$TABLESPACE_DIR" ]]; then
@@ -291,9 +303,161 @@ start_postgresql() {
   set -e
 }
 
+start_postgresql_replica_local() {
+  if [[ -z "${PGMONETA_TEST_REPLICA_PORT:-}" ]]; then
+    REPLICA_PORT=$(find_free_port $((PORT + 1)))
+  else
+    if ss -tlnp 2>/dev/null | grep -q ":$REPLICA_PORT "; then
+      local free_port
+      free_port=$(find_free_port $((REPLICA_PORT + 1)))
+      echo "Port $REPLICA_PORT is already in use; using port $free_port instead"
+      REPLICA_PORT=$free_port
+    fi
+  fi
+  echo "Replica port is set to: $REPLICA_PORT"
+
+  set +e
+  $SUDO cp -R $TEST_PG_DIRECTORY/root /
+  $SUDO mkdir -p /pgdata_replica
+  $SUDO chown -R postgres:postgres /pgdata_replica
+  $SUDO chmod 700 /pgdata_replica
+
+  echo "Setting up replica tablespace location directories (postgres-owned)"
+  $SUDO rm -Rf "$REPLICA_TABLESPACE_DIR"
+  $SUDO mkdir -p "$REPLICA_TABLESPACE_DIR/ts1" "$REPLICA_TABLESPACE_DIR/ts2"
+  $SUDO chown -R postgres:postgres "$REPLICA_TABLESPACE_DIR"
+  $SUDO chmod 777 "$REPLICA_TABLESPACE_DIR"
+  $SUDO chmod 700 "$REPLICA_TABLESPACE_DIR/ts1" "$REPLICA_TABLESPACE_DIR/ts2"
+
+  $SUDO chmod -R 777 /root
+
+  echo "Setting up env variables"
+  export PG_PRIMARY_HOST=localhost
+  export PG_PRIMARY_PORT=5432
+  export PG_REPLICA_PORT=${REPLICA_PORT}
+  export PG_REPL_USER_NAME=${PG_REPL_USER_NAME}
+  export PG_REPL_PASSWORD=${PG_REPL_PASSWORD}
+  export PG_MAX_CONNECTIONS=100
+  export PG_SHARED_BUFFERS=256MB
+  export PG_WORK_MEM=4MB
+  export PG_MAX_PARALLEL_WORKERS=8
+  export PG_EFFECTIVE_CACHE_SIZE=4GB
+  export PG_MAX_WAL_SIZE=1GB
+  export PG_LOG_LEVEL=debug5
+
+  if [ "$(id -u)" -eq 0 ]; then
+    runuser -m -u postgres -- /root/usr/bin/run-postgresql-replica-local
+  else
+    sudo -E -u postgres /root/usr/bin/run-postgresql-replica-local
+  fi
+  set -e
+
+  echo "Checking PostgreSQL $PG_VERSION replica readiness"
+  sleep 3
+  if /usr/pgsql-$PG_VERSION/bin/pg_isready -h localhost -p $REPLICA_PORT >/dev/null 2>&1; then
+    echo "PostgreSQL $PG_VERSION replica is ready!"
+  else
+    echo "Wait for 10 seconds and retry"
+    sleep 10
+    if /usr/pgsql-$PG_VERSION/bin/pg_isready -h localhost -p $REPLICA_PORT >/dev/null 2>&1; then
+      echo "PostgreSQL $PG_VERSION replica is ready!"
+    else
+      echo "Printing replica log..."
+      tail -20 /pglog/logfile_replica 2>/dev/null || echo "Log file not found"
+      echo ""
+      echo "PostgreSQL $PG_VERSION replica is not ready, exiting"
+      exit 1
+    fi
+  fi
+
+  echo "Verifying the replica is in recovery mode"
+  if PGPASSWORD=$PG_REPL_PASSWORD /usr/pgsql-$PG_VERSION/bin/psql \
+       -h localhost -p $REPLICA_PORT -U $PG_REPL_USER_NAME -d postgres \
+       -tAc "select pg_is_in_recovery()" | grep -qx "t"; then
+    echo "PostgreSQL $PG_VERSION replica is in recovery (hot standby)"
+  else
+    echo "PostgreSQL $PG_VERSION replica is not in recovery, exiting"
+    tail -20 /pglog/logfile_replica 2>/dev/null || true
+    exit 1
+  fi
+}
+
 remove_postgresql_container() {
   $CONTAINER_ENGINE stop $CONTAINER_NAME 2>/dev/null || true
   $CONTAINER_ENGINE rm -f $CONTAINER_NAME 2>/dev/null || true
+}
+
+start_postgresql_replica() {
+  # Remove existing container so we can reuse the name
+  remove_postgresql_replica_container
+  # Determine the port for the replica container (default is primary port + 1)
+  if [[ -z "${PGMONETA_TEST_REPLICA_PORT:-}" ]]; then
+    REPLICA_PORT=$(find_free_port $((PORT + 1)))
+  else
+    if ss -tlnp 2>/dev/null | grep -q ":$REPLICA_PORT "; then
+      local free_port
+      free_port=$(find_free_port $((REPLICA_PORT + 1)))
+      echo "Port $REPLICA_PORT is already in use; using port $free_port instead"
+      REPLICA_PORT=$free_port
+    fi
+  fi
+  echo "Replica container port is set to: $REPLICA_PORT"
+
+  PRIMARY_IP=$($CONTAINER_ENGINE inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_NAME 2>/dev/null | head -1)
+  if [[ -n "$PRIMARY_IP" ]]; then
+    echo "Primary container $CONTAINER_NAME IP is $PRIMARY_IP"
+    PG_PRIMARY_HOST=$PRIMARY_IP
+    PG_PRIMARY_PORT_DIRECT=5432
+  else
+    # Rootless container engines (e.g. podman with pasta) do not assign bridge
+    # IPs; reach the primary through the host's published port instead.
+    echo "Primary container IP not available; reaching the primary via host.containers.internal"
+    PG_PRIMARY_HOST="host.containers.internal"
+    PG_PRIMARY_PORT_DIRECT=$PORT
+  fi
+
+  $CONTAINER_ENGINE run -p $REPLICA_PORT:5432 -v "$PG_LOG_DIR:/pglog:z" -v "$PGCONF_DIRECTORY:/conf:z"\
+  --name $REPLICA_CONTAINER_NAME -d \
+  -e PG_PRIMARY_HOST=$PG_PRIMARY_HOST \
+  -e PG_PRIMARY_PORT=$PG_PRIMARY_PORT_DIRECT \
+  -e PG_REPL_USER_NAME=$PG_REPL_USER_NAME \
+  -e PG_REPL_PASSWORD=$PG_REPL_PASSWORD \
+  -e PG_LOG_LEVEL=debug5 \
+  $IMAGE_NAME /usr/bin/run-postgresql-replica
+
+  echo "Checking PostgreSQL $PG_VERSION replica container readiness"
+  sleep 3
+  if $CONTAINER_ENGINE exec $REPLICA_CONTAINER_NAME /usr/pgsql-$PG_VERSION/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
+    echo "PostgreSQL $PG_VERSION replica is ready!"
+  else
+    echo "Wait for 10 seconds and retry"
+    sleep 10
+    if $CONTAINER_ENGINE exec $REPLICA_CONTAINER_NAME /usr/pgsql-$PG_VERSION/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
+      echo "PostgreSQL $PG_VERSION replica is ready!"
+    else
+      echo "Printing replica container logs..."
+      $CONTAINER_ENGINE logs $REPLICA_CONTAINER_NAME
+      echo ""
+      echo "PostgreSQL $PG_VERSION replica is not ready, exiting"
+      exit 1
+    fi
+  fi
+
+  echo "Verifying the replica is in recovery mode"
+  if $CONTAINER_ENGINE exec -e PGPASSWORD=$PG_REPL_PASSWORD $REPLICA_CONTAINER_NAME \
+       /usr/pgsql-$PG_VERSION/bin/psql -h localhost -p 5432 -U $PG_REPL_USER_NAME -d postgres \
+       -tAc "select pg_is_in_recovery()" | grep -qx "t"; then
+    echo "PostgreSQL $PG_VERSION replica is in recovery (hot standby)"
+  else
+    echo "PostgreSQL $PG_VERSION replica is not in recovery, exiting"
+    $CONTAINER_ENGINE logs $REPLICA_CONTAINER_NAME
+    exit 1
+  fi
+}
+
+remove_postgresql_replica_container() {
+  $CONTAINER_ENGINE stop $REPLICA_CONTAINER_NAME 2>/dev/null || true
+  $CONTAINER_ENGINE rm -f $REPLICA_CONTAINER_NAME 2>/dev/null || true
 }
 
 pgmoneta_initialize_configuration() {
@@ -339,6 +503,17 @@ workers = 4
 hot_standby = $HOT_STANDBY_DIRECTORY
 hot_standby_overrides = $HOT_STANDBY_DIRECTORY/overrides
 EOF
+   if [[ "$PG_VERSION" == "17" || "$PG_VERSION" == "14" ]]; then
+   cat <<EOF >>$CONFIGURATION_DIRECTORY/pgmoneta.conf
+# replica configuration
+[replica]
+host = localhost
+port = $REPLICA_PORT
+user = $PG_REPL_USER_NAME
+wal_slot = repl_replica
+workers = 4
+EOF
+   fi
    echo "Add test configuration to pgmoneta.conf ... ok"
    if [[ ! -e $HOME/.pgmoneta/master.key ]]; then
      $EXECUTABLE_DIRECTORY/pgmoneta-admin master-key -P $PG_REPL_PASSWORD
@@ -460,6 +635,10 @@ do_setup() {
   if [[ $MODE == "ci" ]]; then
     echo "Start PostgreSQL $PG_VERSION locally"
     start_postgresql
+    if [[ "$PG_VERSION" == "17" || "$PG_VERSION" == "14" ]]; then
+      echo "Start PostgreSQL $PG_VERSION replica locally"
+      start_postgresql_replica_local
+    fi
   else
     echo "Start PostgreSQL $PG_VERSION container"
     start_postgresql_container
@@ -469,6 +648,10 @@ do_setup() {
       rm -Rf "$TABLESPACE_DIR"
       mkdir -p "$TABLESPACE_DIR"
       chmod 777 "$TABLESPACE_DIR"
+    fi
+    if [[ "$PG_VERSION" == "17" || "$PG_VERSION" == "14" ]]; then
+      echo "Start PostgreSQL $PG_VERSION replica container"
+      start_postgresql_replica
     fi
   fi
 
@@ -573,6 +756,7 @@ usage() {
    echo " -m, --module NAME   Run all tests in module NAME"
    echo " -i, --integration   Run only the storage-engine integration tests (all backends)"
    echo "Note: PGMONETA_TEST_PORT overrides the default container port (6432)"
+   echo "Note: PGMONETA_TEST_REPLICA_PORT overrides the default replica container port (primary port + 1)"
    echo "Examples:"
    echo "  $0                           Run full test suite"
    echo "  $0 build                     Set up environment only; then run e.g. $0 -t backup_full"
