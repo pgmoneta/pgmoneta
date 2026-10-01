@@ -61,41 +61,48 @@ extern "C" {
 /**
  * Management commands
  */
-#define MANAGEMENT_UNKNOWN        0
-#define MANAGEMENT_BACKUP         1
-#define MANAGEMENT_LIST_BACKUP    2
-#define MANAGEMENT_RESTORE        3
-#define MANAGEMENT_ARCHIVE        4
-#define MANAGEMENT_DELETE         5
-#define MANAGEMENT_SHUTDOWN       6
-#define MANAGEMENT_STATUS         7
-#define MANAGEMENT_STATUS_DETAILS 8
-#define MANAGEMENT_PING           9
-#define MANAGEMENT_RESET          10
-#define MANAGEMENT_RELOAD         11
-#define MANAGEMENT_RETAIN         12
-#define MANAGEMENT_EXPUNGE        13
-#define MANAGEMENT_DECRYPT        14
-#define MANAGEMENT_ENCRYPT        15
-#define MANAGEMENT_DECOMPRESS     16
-#define MANAGEMENT_COMPRESS       17
-#define MANAGEMENT_INFO           18
-#define MANAGEMENT_VERIFY         19
-#define MANAGEMENT_ANNOTATE       20
-#define MANAGEMENT_CONF_LS        21
-#define MANAGEMENT_CONF_GET       22
-#define MANAGEMENT_CONF_SET       23
-#define MANAGEMENT_MODE           24
-#define MANAGEMENT_PROGRESS       25
+#define MANAGEMENT_UNKNOWN            0
+#define MANAGEMENT_BACKUP             1
+#define MANAGEMENT_LIST_BACKUP        2
+#define MANAGEMENT_RESTORE            3
+#define MANAGEMENT_ARCHIVE            4
+#define MANAGEMENT_DELETE             5
+#define MANAGEMENT_SHUTDOWN           6
+#define MANAGEMENT_STATUS             7
+#define MANAGEMENT_STATUS_DETAILS     8
+#define MANAGEMENT_PING               9
+#define MANAGEMENT_RESET              10
+#define MANAGEMENT_RELOAD             11
+#define MANAGEMENT_RETAIN             12
+#define MANAGEMENT_EXPUNGE            13
+#define MANAGEMENT_DECRYPT            14
+#define MANAGEMENT_ENCRYPT            15
+#define MANAGEMENT_DECOMPRESS         16
+#define MANAGEMENT_COMPRESS           17
+#define MANAGEMENT_INFO               18
+#define MANAGEMENT_VERIFY             19
+#define MANAGEMENT_ANNOTATE           20
+#define MANAGEMENT_CONF_LS            21
+#define MANAGEMENT_CONF_GET           22
+#define MANAGEMENT_CONF_SET           23
+#define MANAGEMENT_MODE               24
+#define MANAGEMENT_PROGRESS           25
+#define MANAGEMENT_JOB                26
 
-#define MANAGEMENT_MASTER_KEY     100
-#define MANAGEMENT_ADD_USER       101
-#define MANAGEMENT_UPDATE_USER    102
-#define MANAGEMENT_REMOVE_USER    103
-#define MANAGEMENT_LIST_USERS     104
+#define MANAGEMENT_MASTER_KEY         100
+#define MANAGEMENT_ADD_USER           101
+#define MANAGEMENT_UPDATE_USER        102
+#define MANAGEMENT_REMOVE_USER        103
+#define MANAGEMENT_LIST_USERS         104
 
-#define MANAGEMENT_S3_LS          200
-#define MANAGEMENT_S3_RESTORE     201
+#define MANAGEMENT_S3_LS              200
+#define MANAGEMENT_S3_RESTORE         201
+
+#define MANAGEMENT_JOB_ACTION_UNKNOWN 300
+#define MANAGEMENT_JOB_ACTION_GET     301
+#define MANAGEMENT_JOB_ACTION_STATUS  302
+#define MANAGEMENT_JOB_ACTION_LIST    303
+#define MANAGEMENT_JOB_ACTION_REMOVE  304
 
 /**
  * Management categories
@@ -104,6 +111,7 @@ extern "C" {
 #define MANAGEMENT_CATEGORY_REQUEST  "Request"
 #define MANAGEMENT_CATEGORY_RESPONSE "Response"
 #define MANAGEMENT_CATEGORY_OUTCOME  "Outcome"
+#define MANAGEMENT_CATEGORY_JOB      "Job"
 
 /**
  * Management arguments
@@ -115,6 +123,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_ACTIVE_RESTORE        "ActiveRestore"
 #define MANAGEMENT_ARGUMENT_ACTIVE_RETENTION      "ActiveRetention"
 #define MANAGEMENT_ARGUMENT_ALL                   "All"
+#define MANAGEMENT_ARGUMENT_ASYNC                 "Async"
 #define MANAGEMENT_ARGUMENT_BACKUP                "Backup"
 #define MANAGEMENT_ARGUMENT_BACKUPS               "Backups"
 #define MANAGEMENT_ARGUMENT_BACKUP_SIZE           "BackupSize"
@@ -151,11 +160,20 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE      "HotStandbySize"
 #define MANAGEMENT_ARGUMENT_INCREMENTAL           "Incremental"
 #define MANAGEMENT_ARGUMENT_INCREMENTAL_PARENT    "IncrementalParent"
+#define MANAGEMENT_ARGUMENT_JOBS                  "Jobs"
+#define MANAGEMENT_ARGUMENT_JOB_ID                "JobId"
+#define MANAGEMENT_ARGUMENT_JOB_PID               "JobPid"
+#define MANAGEMENT_ARGUMENT_JOB_STATE             "JobState"
+#define MANAGEMENT_ARGUMENT_JOB_START_TIME        "JobStartTime"
+#define MANAGEMENT_ARGUMENT_JOB_END_TIME          "JobEndTime"
+#define MANAGEMENT_ARGUMENT_JOB_UPDATED_TIME      "JobUpdatedTime"
+#define MANAGEMENT_ARGUMENT_JOB_PHASE             "JobPhase"
 #define MANAGEMENT_ARGUMENT_KEEP                  "Keep"
 #define MANAGEMENT_ARGUMENT_KEY                   "Key"
 #define MANAGEMENT_ARGUMENT_MAJOR_VERSION         "MajorVersion"
 #define MANAGEMENT_ARGUMENT_MINOR_VERSION         "MinorVersion"
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_BACKUPS     "NumberOfBackups"
+#define MANAGEMENT_ARGUMENT_NUMBER_OF_JOBS        "NumberOfJobs"
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS     "NumberOfServers"
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES "NumberOfTablespaces"
 #define MANAGEMENT_ARGUMENT_ONLINE                "Online"
@@ -289,6 +307,7 @@ extern "C" {
 #define MANAGEMENT_ERROR_ARCHIVE_NOFORK                     906
 #define MANAGEMENT_ERROR_ARCHIVE_NETWORK                    907
 #define MANAGEMENT_ERROR_ARCHIVE_ERROR                      908
+#define MANAGEMENT_ERROR_ARCHIVE_RESTORE                    909
 
 #define MANAGEMENT_ERROR_STATUS_NOFORK                      1000
 #define MANAGEMENT_ERROR_STATUS_NETWORK                     1001
@@ -405,6 +424,18 @@ extern "C" {
 #define MANAGEMENT_ERROR_RESTORE_S3_NETWORK                 3103
 #define MANAGEMENT_ERROR_RESTORE_S3_ERROR                   3104
 
+#define MANAGEMENT_ERROR_JOB_NOSERVER                       3200
+#define MANAGEMENT_ERROR_JOB_NOT_FOUND                      3201
+#define MANAGEMENT_ERROR_JOB_ACTIVE                         3202
+#define MANAGEMENT_ERROR_JOB_NETWORK                        3203
+#define MANAGEMENT_ERROR_JOB_NOFORK                         3204
+#define MANAGEMENT_ERROR_JOB_REMOVE_ACTIVE                  3205
+#define MANAGEMENT_ERROR_JOB_DEQUE_CREATE                   3206
+#define MANAGEMENT_ERROR_JOB_LIST_STATUS_INVALID            3207
+#define MANAGEMENT_ERROR_JOB_ERROR                          3208
+#define MANAGEMENT_ERROR_JOB_ACTION_INVALID                 3209
+#define MANAGEMENT_ERROR_JOB_REQUEST_INVALID                3210
+
 /**
  * Output formats
  */
@@ -418,11 +449,12 @@ extern "C" {
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
+ * @param async Whether the request should run asynchronously
  * @param json The target json
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_create_header(int32_t command, uint8_t compression, uint8_t encryption, int32_t output_format, struct json** json);
+pgmoneta_management_create_header(int32_t command, uint8_t compression, uint8_t encryption, int32_t output_format, bool async, struct json** json);
 
 /**
  * Create request for management command
@@ -464,10 +496,11 @@ pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, cha
  * @param encryption The encrypt method for wire protocol
  * @param incremental The base of incremental backup
  * @param output_format The output format
+ * @param async Whether the request should run asynchronously
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
+pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format, bool async);
 
 /**
  * Create a list backup request
@@ -523,10 +556,11 @@ pgmoneta_management_request_restore_s3_objects(SSL* ssl, int socket, char* serve
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
+ * @param async Whether the request should run asynchronously
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format, bool async);
 
 /**
  * Create a verify request
@@ -555,10 +589,11 @@ pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* bac
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
+ * @param async Whether the request should run asynchronously
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format, bool async);
 
 /**
  * Create a delete request
@@ -570,10 +605,11 @@ pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* ba
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
+ * @param async Whether the request should run asynchronously
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, bool force, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, bool force, uint8_t compression, uint8_t encryption, int32_t output_format, bool async);
 
 /**
  * Create a shutdown request
@@ -799,6 +835,84 @@ int
 pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* backup_id, char* action, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
+ * Get the status of a job
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param job_id The job id
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_job(SSL* ssl, int socket, char* job_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Remove a job if the job_id is specified, otherwise remove all jobs
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param job_id The job id (NULL to remove all jobs)
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_job_remove(SSL* ssl, int socket, char* job_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Get the status of an async server's job
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param command The command (backup, restore, archive, delete)
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_job_status(SSL* ssl, int socket, char* server, char* command, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * List all jobs
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_job_list_all(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * List all jobs for a specific server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_job_list_server(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * List all jobs with a specific status
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param status The status
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_job_list_status(SSL* ssl, int socket, char* status, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
  * Create a mode request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
@@ -883,6 +997,15 @@ pgmoneta_management_response_error_with_nodes(SSL* ssl, int socket, char* server
  */
 int
 pgmoneta_management_create_response(struct json* json, int server, struct json** response);
+
+/**
+ * Create a Job response
+ * @param json The JSON structure
+ * @param job The job
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_create_job(struct json* json, struct json** job);
 
 /**
  * Read the management JSON

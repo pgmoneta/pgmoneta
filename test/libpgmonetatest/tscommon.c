@@ -179,7 +179,7 @@ pgmoneta_test_add_backup(void)
       return 1;
    }
 
-   if (pgmoneta_tsclient_backup("primary", NULL, 0))
+   if (pgmoneta_tsclient_backup("primary", NULL, false, NULL, 0))
    {
       return 1;
    }
@@ -195,17 +195,17 @@ pgmoneta_test_add_backup_chain(void)
       return 1;
    }
 
-   if (pgmoneta_tsclient_backup("primary", NULL, 0))
+   if (pgmoneta_tsclient_backup("primary", NULL, false, NULL, 0))
    {
       return 1;
    }
 
-   if (pgmoneta_tsclient_backup("primary", "newest", 0))
+   if (pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0))
    {
       return 1;
    }
 
-   if (pgmoneta_tsclient_backup("primary", "newest", 0))
+   if (pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0))
    {
       return 1;
    }
@@ -322,7 +322,7 @@ int
 pgmoneta_test_backup(const char* server_name, const char* backup_name)
 {
    /* Cast const away as pgmoneta_tsclient_backup doesn't modify the strings */
-   return pgmoneta_tsclient_backup((char*)server_name, (char*)backup_name, 0);
+   return pgmoneta_tsclient_backup((char*)server_name, (char*)backup_name, false, NULL, 0);
 }
 
 int

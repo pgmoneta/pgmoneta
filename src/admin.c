@@ -350,7 +350,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-   if (pgmoneta_management_create_header(MANAGEMENT_MASTER_KEY, 0, 0, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_MASTER_KEY, 0, 0, output_format, false, &j))
    {
       goto error;
    }
@@ -639,7 +639,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-   if (pgmoneta_management_create_header(MANAGEMENT_ADD_USER, 0, 0, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_ADD_USER, 0, 0, output_format, false, &j))
    {
       goto error;
    }
@@ -1001,7 +1001,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-   if (pgmoneta_management_create_header(MANAGEMENT_UPDATE_USER, 0, 0, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_UPDATE_USER, 0, 0, output_format, false, &j))
    {
       goto error;
    }
@@ -1375,7 +1375,7 @@ remove_user(char* users_path, char* username, int32_t output_format)
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-   if (pgmoneta_management_create_header(MANAGEMENT_REMOVE_USER, 0, 0, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_REMOVE_USER, 0, 0, output_format, false, &j))
    {
       goto error;
    }
@@ -1541,7 +1541,7 @@ list_users(char* users_path, int32_t output_format)
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-   if (pgmoneta_management_create_header(MANAGEMENT_LIST_USERS, 0, 0, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_LIST_USERS, 0, 0, output_format, false, &j))
    {
       goto error;
    }
