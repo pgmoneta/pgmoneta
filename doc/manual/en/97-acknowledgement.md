@@ -77,6 +77,7 @@ Haoran Zhang <andrewzhr9911@gmail.com>
 Luca Ferrari <fluca1978@gmail.com>
 Bassam Adnan <mailbassam@gmail.com>
 Tejas Tyagi <tejastyagi.tt@gmail.com>
+Abdulrahman Nader <a0xnader.oss@outlook.com>
 ```
 
 ## Contributing
