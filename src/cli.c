@@ -2045,6 +2045,7 @@ static int
 process_result(SSL* ssl, int socket, int32_t output_format)
 {
    struct json* read = NULL;
+   struct json* outcome = NULL;
 
    if (pgmoneta_management_read_json(ssl, socket, NULL, NULL, &read))
    {
@@ -2063,6 +2064,16 @@ process_result(SSL* ssl, int socket, int32_t output_format)
    else
    {
       pgmoneta_json_print(read, FORMAT_JSON);
+   }
+
+   /* Success == 0, Error == 1: report the operation's own outcome, not
+    * just whether a response was received. */
+   outcome = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_OUTCOME);
+
+   if (outcome && !(bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS))
+   {
+      pgmoneta_json_destroy(read);
+      return 1;
    }
 
    pgmoneta_json_destroy(read);
