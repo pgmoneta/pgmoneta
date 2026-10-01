@@ -3045,11 +3045,15 @@ pgmoneta_strip_extension(char* s, char** name)
 {
    size_t size;
    char* ext = NULL;
+   char* base = NULL;
    char* r = NULL;
 
    *name = NULL;
 
-   ext = strrchr(s, '.');
+   /* Only the file name carries an extension, so a dot in a directory
+    * component is not one. */
+   base = strrchr(s, '/');
+   ext = strrchr(base != NULL ? base : s, '.');
    if (ext != NULL)
    {
       size = ext - s + 1;
