@@ -197,6 +197,11 @@ pgmoneta-cli s3 restore primary 20260316000957 /tmp
 
 Verificar un backup de un servidor
 
+Cada archivo se comprueba con el hash registrado cuando se tomó el backup. Si el clúster se
+creó con sumas de verificación de datos, también se comprueban las páginas de sus archivos de
+relación, lo que detecta una página que ya estaba dañada cuando se hizo el backup en lugar de
+una dañada después. El comando falla si algún archivo no se verifica.
+
 Comando
 
 ``` sh

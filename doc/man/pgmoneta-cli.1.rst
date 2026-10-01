@@ -127,7 +127,9 @@ status [details]
   Status of pgmoneta, with optional details
 
 verify
-  Verify a backup from a server
+  Verify a backup from a server. Files are checked against the hashes recorded when the
+  backup was taken, and the pages of relation files are checked as well when the cluster
+  was created with data checksums. Fails if any file does not verify.
 
 REPORTING BUGS
 ==============
