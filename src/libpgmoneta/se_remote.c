@@ -51,6 +51,9 @@ extern int ssh_upload(int server, char* label, int compression, int encryption);
 extern int s3_upload(int server, char* label, int compression, int encryption);
 extern int s3_cleanup(int server, char* label);
 extern int azure_upload(int server, char* label, int compression, int encryption);
+extern int azure_download(int server, char* label, int compression, int encryption);
+extern int gcs_upload(int server, char* label, int compression, int encryption);
+extern int gcs_download(int server, char* label, int compression, int encryption);
 
 /* The contract each remote backend must implement */
 struct storage_engine
@@ -60,18 +63,23 @@ struct storage_engine
    int capabilities;
    int (*upload)(int server, char* label, int compression, int encryption);
    int (*cleanup)(int server, char* label);
+   int (*download)(int server, char* label, int compression, int encryption);
 };
 
 static const struct storage_engine engines[] = {
    {"SSH", STORAGE_ENGINE_SSH,
     STORAGE_CAP_ATOMIC_RENAME,
-    ssh_upload, NULL},
+    ssh_upload, NULL, NULL},
    {"S3", STORAGE_ENGINE_S3,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_BATCH_DELETE | STORAGE_CAP_MULTIPART | STORAGE_CAP_PARALLEL_SAFE,
-    s3_upload, s3_cleanup},
+    /* TODO: fill with s3_download - dispatching restore here mirrors upload, keeps a new backend to one table row instead of a WORKFLOW_TYPE_* plus switch arms, and lets the duplicated staging collapse into se_object.c */
+    s3_upload, s3_cleanup, NULL},
    {"Azure", STORAGE_ENGINE_AZURE,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
-    azure_upload, NULL},
+    azure_upload, NULL, azure_download},
+   {"GCS", STORAGE_ENGINE_GCS,
+    STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
+    gcs_upload, NULL, gcs_download},
 };
 
 #define N_ENGINES ((int)(sizeof(engines) / sizeof(engines[0])))
@@ -139,6 +147,30 @@ pgmoneta_storage_create_remote(void)
    wf->next = NULL;
 
    return wf;
+}
+
+int
+pgmoneta_storage_remote_download(int server, char* label)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   for (int i = 0; i < N_ENGINES; i++)
+   {
+      if (!(config->storage_engine & engines[i].engine_flag) || engines[i].download == NULL)
+      {
+         continue;
+      }
+
+      pgmoneta_log_debug("remote_download: staging %s/%s from %s",
+                         config->common.servers[server].name, label, engines[i].name);
+
+      return engines[i].download(server, label, 0, 0);
+   }
+
+   pgmoneta_log_error("remote_download: no configured storage engine supports download for %s",
+                      config->common.servers[server].name);
+
+   return 1;
 }
 
 static char*
@@ -319,6 +351,10 @@ remote_upload_execute(char* name __attribute__((unused)), struct art* nodes)
       else if (tasks[i].engine->engine_flag == STORAGE_ENGINE_AZURE)
       {
          bck->remote_azure_elapsed_time = tasks[i].elapsed;
+      }
+      else if (tasks[i].engine->engine_flag == STORAGE_ENGINE_GCS)
+      {
+         bck->remote_gcs_elapsed_time = tasks[i].elapsed;
       }
    }
 

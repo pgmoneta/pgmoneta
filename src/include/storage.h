@@ -106,11 +106,28 @@ struct workflow*
 pgmoneta_storage_create_azure(void);
 
 /**
+ * Create a workflow for the GCS storage engine
+ * @param workflow_type The workflow type
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_storage_create_gcs(int workflow_type);
+
+/**
  * Create a workflow for the remote storage engines
  * @return The workflow
  */
 struct workflow*
 pgmoneta_storage_create_remote(void);
+
+/**
+ * Stage a backup from the remote storage engine into local storage
+ * @param server The server index
+ * @param label The backup label
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_storage_remote_download(int server, char* label);
 
 /**
  * Open WAL shipping file in remote ssh server

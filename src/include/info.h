@@ -66,6 +66,7 @@ extern "C" {
 #define INFO_MINOR_VERSION             "MINOR_VERSION"
 #define INFO_PARENT                    "PARENT"
 #define INFO_REMOTE_AZURE_ELAPSED      "REMOTE_AZURE_ELAPSED"
+#define INFO_REMOTE_GCS_ELAPSED        "REMOTE_GCS_ELAPSED"
 #define INFO_REMOTE_S3_ELAPSED         "REMOTE_S3_ELAPSED"
 #define INFO_REMOTE_SSH_ELAPSED        "REMOTE_SSH_ELAPSED"
 #define INFO_RESTORE                   "RESTORE"
@@ -113,6 +114,7 @@ struct backup
    double remote_ssh_elapsed_time;                                /**< The remote ssh elapsed time in seconds */
    double remote_s3_elapsed_time;                                 /**< The remote s3 elapsed time in seconds */
    double remote_azure_elapsed_time;                              /**< The remote azure elapsed time in seconds */
+   double remote_gcs_elapsed_time;                                /**< The remote gcs elapsed time in seconds */
    int32_t major_version;                                         /**< The major version */
    int32_t minor_version;                                         /**< The minor version */
    bool keep;                                                     /**< Keep the backup */
@@ -168,6 +170,15 @@ pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** ba
  */
 int
 pgmoneta_load_info(char* directory, char* identifier, struct backup** backup);
+
+/**
+ * Load a backup.info file from an explicit path (e.g. backup.info.tmp during staging)
+ * @param path The path to the info file
+ * @param backup The backup
+ * @return The result
+ */
+int
+pgmoneta_load_info_file(char* path, struct backup** backup);
 
 /**
  * Get the number of valid backups

@@ -61,6 +61,11 @@
 #define SFTP_USER_CONF       SFTP_USER "::::upload"
 #define SFTP_READY_RETRIES   30
 
+/* fake-gcs-server (Google Cloud Storage emulator) container definition. */
+#define FAKE_GCS_IMAGE         "fsouza/fake-gcs-server:latest"
+#define FAKE_GCS_PORT          4443
+#define FAKE_GCS_READY_RETRIES 30
+
 /* Image-pull retry policy (transient registry failures). */
 #define PULL_RETRIES         3
 #define PULL_BACKOFF_SECONDS 2
@@ -68,6 +73,7 @@
 static int start_garage(struct mctf_container* c);
 static int start_azurite(struct mctf_container* c);
 static int start_sftp(struct mctf_container* c);
+static int start_fake_gcs(struct mctf_container* c);
 
 int
 mctf_sh(char** output, const char* fmt, ...)
@@ -275,6 +281,8 @@ mctf_container_start(struct mctf_container* c, int kind)
          return start_azurite(c);
       case MCTF_CONTAINER_SFTP:
          return start_sftp(c);
+      case MCTF_CONTAINER_FAKE_GCS:
+         return start_fake_gcs(c);
       default:
          pgmoneta_log_error("mctf_container: unknown kind %d", kind);
          return MCTF_FAIL;
@@ -369,6 +377,49 @@ start_sftp(struct mctf_container* c)
    }
 
    pgmoneta_log_error("mctf_container: sftp sshd not ready after %d s", SFTP_READY_RETRIES);
+   return MCTF_FAIL;
+}
+
+static int
+start_fake_gcs(struct mctf_container* c)
+{
+   char name[128];
+   int i;
+
+   pgmoneta_snprintf(name, sizeof(name), "pgmoneta-mctf-fake-gcs-%d", (int)getpid());
+   pgmoneta_snprintf(c->name, sizeof(c->name), "%s", name);
+
+   mctf_container_pull(c->engine, FAKE_GCS_IMAGE, PULL_RETRIES);
+
+   /* Remove any stale container with the same name. */
+   mctf_sh(NULL, "%s rm -f %s 2>/dev/null", c->engine, name);
+
+   /* Plain HTTP, in-memory backend; no auth is enforced (matches how the
+    * official GCS client libraries behave against STORAGE_EMULATOR_HOST). */
+   if (mctf_sh(NULL, "%s run -d --name %s --label %s --network host %s "
+               "-scheme http -port %d -public-host 127.0.0.1:%d",
+               c->engine, name, MCTF_CONTAINER_LABEL, FAKE_GCS_IMAGE,
+               FAKE_GCS_PORT, FAKE_GCS_PORT) != 0)
+   {
+      pgmoneta_log_error("mctf_container: failed to start fake-gcs-server");
+      return MCTF_FAIL;
+   }
+   c->running = true;
+
+   /* Wait until the JSON API answers (checked from the host). */
+   for (i = 0; i < FAKE_GCS_READY_RETRIES; i++)
+   {
+      if (mctf_sh(NULL, "python3 -c \""
+                  "import urllib.request; "
+                  "urllib.request.urlopen('http://127.0.0.1:%d/storage/v1/b', timeout=1)"
+                  "\" 2>/dev/null", FAKE_GCS_PORT) == 0)
+      {
+         return MCTF_OK;
+      }
+      sleep(1);
+   }
+
+   pgmoneta_log_error("mctf_container: fake-gcs-server not ready after %d s", FAKE_GCS_READY_RETRIES);
    return MCTF_FAIL;
 }
 

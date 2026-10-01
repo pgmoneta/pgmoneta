@@ -28,18 +28,18 @@
  */
 
 /*
- * Storage-engine integration tests: Azure Blob Storage via Azurite.
+ * Storage-engine integration tests: GCS backup and restore via fake-gcs-server.
  *
- * The entire backend lifecycle (start the Azurite container, provision the
- * blob container, configure and start a dedicated pgmoneta, tear everything
- * down) is handled by mctf_se. A test only states intent.
+ * Backup verification reads back the emulator's REST API directly. Restore
+ * verification goes through the real "gcs restore" pgmoneta-cli command --
+ * the module setup runs a GCS-only backup, and gcs_storage_teardown removes
+ * the local data/ directory afterwards (see se_gcs.c), so every file a
+ * restore produces has to have come back from the emulator via
+ * pgmoneta_object_download_files() in se_object.c.
  *
- * Blob-side verification uses a direct Azurite REST query (python3 stdlib,
- * SharedKey auth) to count blobs in the container — equivalent to what
- * mctf_se_s3_ls does for S3. Indirect signals are also checked:
- *   - STATUS=1 in backup.info confirms the upload completed successfully
- *   - the local data/ subdirectory is removed by azure_storage_teardown when
- *     STORAGE_ENGINE_LOCAL is not set — this proves the teardown ran
+ * The container lifecycle (start fake-gcs-server, provision the bucket,
+ * configure and start a dedicated pgmoneta, tear everything down) is handled
+ * by mctf_se. A test only states intent.
  */
 
 #include <mctf.h>
@@ -87,10 +87,10 @@ newest_backup_label(char* out, size_t size)
    return out[0] != '\0' ? MCTF_OK : MCTF_FAIL;
 }
 
-MCTF_MODULE_SETUP(azure)
+MCTF_MODULE_SETUP(gcs)
 {
    memset(shared_label, 0, sizeof(shared_label));
-   storage_status = mctf_se_up(MCTF_BACKEND_AZURITE);
+   storage_status = mctf_se_up(MCTF_BACKEND_GCS);
    if (storage_status == MCTF_OK)
    {
       if (mctf_se_backup("primary") != 0 ||
@@ -101,15 +101,18 @@ MCTF_MODULE_SETUP(azure)
    }
 }
 
-MCTF_MODULE_TEARDOWN(azure)
+MCTF_MODULE_TEARDOWN(gcs)
 {
    mctf_se_down();
 }
 
-/* Verify blobs physically exist in Azurite by querying its list-blobs REST API. */
-MCTF_INTEGRATION_TEST(test_azure_blobs_exist_in_container)
+/*
+ * Backup to GCS succeeds and the local catalog records it. Local metadata
+ * must always be present and authoritative, even with a remote-only engine.
+ */
+MCTF_INTEGRATION_TEST(test_gcs_backup_keeps_local_metadata)
 {
-   int blob_count;
+   char* listing = NULL;
 
    if (storage_status == MCTF_SKIPPED)
    {
@@ -117,117 +120,26 @@ MCTF_INTEGRATION_TEST(test_azure_blobs_exist_in_container)
    }
    MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
 
-   blob_count = mctf_se_azure_blob_count();
-   MCTF_ASSERT(blob_count > 0, cleanup,
-               "Azurite container is empty after backup — se_azure.c did not upload any blobs");
+   MCTF_ASSERT(mctf_se_has_local_metadata("primary"), cleanup,
+               "local metadata missing after GCS backup");
+
+   MCTF_ASSERT(mctf_se_list_backup("primary", &listing) == 0, cleanup, "list-backup failed");
+   MCTF_ASSERT_PTR_NONNULL(listing, cleanup, "empty list-backup response");
 
 cleanup:
-   MCTF_FINISH();
-}
-
-/* Verify backup.info contains STATUS=1, confirming the upload completed without error. */
-MCTF_INTEGRATION_TEST(test_azure_backup_info_is_valid)
-{
-   if (storage_status == MCTF_SKIPPED)
-   {
-      MCTF_SKIP("no container engine / test environment");
-   }
-   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
-   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
-
-   MCTF_ASSERT(
-      mctf_sh(NULL, "grep -q 'STATUS=1' %s/backup/primary/backup/%s/backup.info",
-              mctf_se_run_dir(), shared_label) == 0,
-      cleanup, "backup.info does not contain STATUS=1 (upload may have failed)");
-
-cleanup:
-   MCTF_FINISH();
-}
-
-/* Verify the local data/ directory is removed after upload, confirming teardown ran. */
-MCTF_INTEGRATION_TEST(test_azure_backup_removes_local_data)
-{
-   char data_path[MAX_PATH];
-
-   if (storage_status == MCTF_SKIPPED)
-   {
-      MCTF_SKIP("no container engine / test environment");
-   }
-   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
-   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
-
-   snprintf(data_path, sizeof(data_path), "%s/backup/primary/backup/%s/data",
-            mctf_se_run_dir(), shared_label);
-
-   MCTF_ASSERT(access(data_path, F_OK) != 0, cleanup,
-               "local data/ directory still exists after azure-only backup (teardown failed)");
-
-cleanup:
-   MCTF_FINISH();
-}
-
-/* Verify a second consecutive backup also succeeds, guarding against WAL or connection regressions. */
-MCTF_INTEGRATION_TEST(test_azure_second_backup_succeeds)
-{
-   char label2[256] = {0};
-
-   if (storage_status == MCTF_SKIPPED)
-   {
-      MCTF_SKIP("no container engine / test environment");
-   }
-   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
-
-   MCTF_ASSERT(mctf_se_backup("primary") == 0, cleanup, "second backup to Azure failed");
-   MCTF_ASSERT(newest_backup_label(label2, sizeof(label2)) == MCTF_OK, cleanup,
-               "could not resolve second backup label");
-
-   /* The new label must be different from (and lexicographically after) the first. */
-   MCTF_ASSERT(strcmp(label2, shared_label) > 0, cleanup,
-               "second backup label is not newer than first");
-
-   MCTF_ASSERT(
-      mctf_sh(NULL, "grep -q 'STATUS=1' %s/backup/primary/backup/%s/backup.info",
-              mctf_se_run_dir(), label2) == 0,
-      cleanup, "second backup.info does not contain STATUS=1");
-
-cleanup:
+   free(listing);
    MCTF_FINISH();
 }
 
 /*
- * The upload is driven by backup.manifest and runs one file per worker task,
- * so the blobs for a label must be exactly the manifest entries plus the three
- * metadata files. A count is what catches a dropped file: a worker whose
- * failure is swallowed, or a task freed before its request is sent, still
- * leaves a backup that reports STATUS=1 and a container that is not empty.
+ * Backup uploads the actual data files to GCS, not just metadata: the bucket
+ * must hold a large number of objects under the backup prefix (guards
+ * against a false-positive backup that returns 0 but uploads nothing).
  */
-static int
-manifest_entry_count(const char* label)
-{
-   char manifest_path[MAX_PATH];
-   struct deque* paths = NULL;
-   int count = -1;
-
-   snprintf(manifest_path, sizeof(manifest_path), "%s/backup/primary/backup/%s/backup.manifest",
-            mctf_se_run_dir(), label);
-
-   if (pgmoneta_manifest_get_paths(manifest_path, &paths))
-   {
-      return -1;
-   }
-
-   count = (int)pgmoneta_deque_size(paths);
-
-   pgmoneta_deque_destroy(paths);
-
-   return count;
-}
-
-MCTF_INTEGRATION_TEST(test_azure_uploads_every_manifest_file)
+MCTF_INTEGRATION_TEST(test_gcs_backup_uploads_data_files)
 {
    char prefix[MAX_PATH];
-   int entries;
-   int blobs;
+   int count;
 
    if (storage_status == MCTF_SKIPPED)
    {
@@ -236,34 +148,31 @@ MCTF_INTEGRATION_TEST(test_azure_uploads_every_manifest_file)
    MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
    MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
 
-   entries = manifest_entry_count(shared_label);
-   MCTF_ASSERT(entries > 0, cleanup, "could not read backup.manifest");
+   snprintf(prefix, sizeof(prefix), "pgmoneta/primary/backup/%s/data/", shared_label);
+   count = mctf_se_gcs_object_count_prefix(prefix);
 
-   snprintf(prefix, sizeof(prefix), "pgmoneta/primary/backup/%s/", shared_label);
-   blobs = mctf_se_azure_blob_count_prefix(prefix);
-
-   /* backup.manifest, backup.sha512 and backup.info are uploaded after the
-    * worker pool drains, and are not themselves manifest entries.
-    */
-   MCTF_ASSERT(blobs == entries + 3, cleanup,
-               "Azurite holds %d blobs under %s (%d in the container overall) but the "
-               "manifest has %d entries (expected %d) — the parallel upload dropped "
-               "or duplicated files",
-               blobs, prefix, mctf_se_azure_blob_count_prefix(""), entries, entries + 3);
+   MCTF_ASSERT(count > 0, cleanup, "no data-file objects found under %s in GCS", prefix);
 
 cleanup:
    MCTF_FINISH();
 }
 
 /*
- * The three metadata files are the commit marker: they are uploaded only once
- * every data blob has landed, so a reader that sees backup.info can rely on
- * the rest being there. This pins that ordering contract.
+ * After a backup, the three mandatory metadata files (backup.info,
+ * backup.sha512, backup.manifest) must each appear as exactly one object
+ * in GCS -- they are the commit markers gcs_upload_files() writes last.
+ * Empty-directory layout lives in backup.manifest (trailing-slash rows)
+ * rather than a separate sidecar file.
  */
-MCTF_INTEGRATION_TEST(test_azure_uploads_metadata_commit_markers)
+MCTF_INTEGRATION_TEST(test_gcs_backup_uploads_metadata_files)
 {
-   const char* metadata[] = {"backup.manifest", "backup.sha512", "backup.info"};
-   char name[MAX_PATH];
+   const char* metadata_files[] = {
+      "backup.info",
+      "backup.sha512",
+      "backup.manifest"};
+   const size_t file_count = sizeof(metadata_files) / sizeof(metadata_files[0]);
+   char object_name[MAX_PATH];
+   size_t i;
 
    if (storage_status == MCTF_SKIPPED)
    {
@@ -272,61 +181,17 @@ MCTF_INTEGRATION_TEST(test_azure_uploads_metadata_commit_markers)
    MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
    MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
 
-   for (int i = 0; i < 3; i++)
+   for (i = 0; i < file_count; i++)
    {
-      snprintf(name, sizeof(name), "pgmoneta/primary/backup/%s/%s", shared_label, metadata[i]);
-      MCTF_ASSERT(mctf_se_azure_blob_exists(name), cleanup,
-                  "%s was not uploaded to Azure", metadata[i]);
+      int count;
+
+      snprintf(object_name, sizeof(object_name), "pgmoneta/primary/backup/%s/%s",
+               shared_label, metadata_files[i]);
+      count = mctf_se_gcs_object_count_prefix(object_name);
+
+      MCTF_ASSERT(count == 1, cleanup, "expected exactly one %s object in GCS, found %d",
+                  metadata_files[i], count);
    }
-
-cleanup:
-   MCTF_FINISH();
-}
-
-/*
- * Restore a backup that exists only in Azure.
- *
- * The module setup ran an azure-only backup, and test_azure_backup_removes_local_data
- * pins that the local data/ directory is deleted afterwards. So every data file the
- * restore produces has to have been downloaded from the container by
- * azure_download_files — there is no local copy left to fall back on.
- */
-MCTF_INTEGRATION_TEST(test_azure_restore_recovers_data)
-{
-   char target[MAX_PATH];
-   char args[2 * MAX_PATH];
-
-   if (storage_status == MCTF_SKIPPED)
-   {
-      MCTF_SKIP("no container engine / test environment");
-   }
-   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
-   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
-
-   snprintf(target, sizeof(target), "%s/restore_azure", mctf_se_run_dir());
-   MCTF_ASSERT(mctf_sh(NULL, "rm -rf %s && mkdir -p %s", target, target) == 0,
-               cleanup, "could not prepare restore target directory");
-
-   pgmoneta_snprintf(args, sizeof(args), "azure restore primary %s %s", shared_label, target);
-   MCTF_ASSERT(mctf_se_cli(args, NULL) == 0, cleanup,
-               "azure restore command failed for %s", shared_label);
-
-   /* Record hard evidence outside the run dir, which the harness tears down */
-   mctf_sh(NULL,
-           "{ echo '--- restored tree ---'; find %s -type f | head -50; "
-           "echo '--- file count ---'; find %s -type f | wc -l; } "
-           "> /tmp/azure-restore-evidence.txt 2>&1",
-           target, target);
-
-   /* PG_VERSION is a data file: it can only be here if the download ran */
-   MCTF_ASSERT(mctf_sh(NULL, "find %s -name PG_VERSION | grep -q .", target) == 0,
-               cleanup,
-               "restored tree has no PG_VERSION — nothing was downloaded from Azure");
-
-   /* Files are staged as .tmp and renamed only on a clean transfer */
-   MCTF_ASSERT(mctf_sh(NULL, "! find %s -name '*.tmp' | grep -q .", target) == 0,
-               cleanup,
-               "restored tree still contains .tmp files — a transfer did not complete");
 
 cleanup:
    MCTF_FINISH();
@@ -336,7 +201,7 @@ cleanup:
  * Directories are recorded in the manifest with a trailing slash. Without them a
  * restore loses every directory that holds no files.
  */
-MCTF_INTEGRATION_TEST(test_azure_manifest_has_directory_entries)
+MCTF_INTEGRATION_TEST(test_gcs_manifest_has_directory_entries)
 {
    char manifest[MAX_PATH];
    char* out = NULL;
@@ -358,6 +223,55 @@ MCTF_INTEGRATION_TEST(test_azure_manifest_has_directory_entries)
 
 cleanup:
    free(out);
+   MCTF_FINISH();
+}
+
+/*
+ * Restore a backup that exists only in GCS.
+ *
+ * The module setup ran a GCS-only backup, and gcs_storage_teardown deletes the
+ * local data/ directory afterwards (mirroring se_azure.c). So every data file the
+ * restore produces has to have been downloaded from the bucket by
+ * pgmoneta_object_download_files() -- there is no local copy left to fall back on.
+ */
+MCTF_INTEGRATION_TEST(test_gcs_restore_recovers_data)
+{
+   char target[MAX_PATH];
+   char args[2 * MAX_PATH];
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   snprintf(target, sizeof(target), "%s/restore_gcs", mctf_se_run_dir());
+   MCTF_ASSERT(mctf_sh(NULL, "rm -rf %s && mkdir -p %s", target, target) == 0,
+               cleanup, "could not prepare restore target directory");
+
+   pgmoneta_snprintf(args, sizeof(args), "gcs restore primary %s %s", shared_label, target);
+   MCTF_ASSERT(mctf_se_cli(args, NULL) == 0, cleanup,
+               "gcs restore command failed for %s", shared_label);
+
+   /* Record hard evidence outside the run dir, which the harness tears down */
+   mctf_sh(NULL,
+           "{ echo '--- restored tree ---'; find %s -type f | head -50; "
+           "echo '--- file count ---'; find %s -type f | wc -l; } "
+           "> /tmp/gcs-restore-evidence.txt 2>&1",
+           target, target);
+
+   /* PG_VERSION is a data file: it can only be here if the download ran */
+   MCTF_ASSERT(mctf_sh(NULL, "find %s -name PG_VERSION | grep -q .", target) == 0,
+               cleanup,
+               "restored tree has no PG_VERSION -- nothing was downloaded from GCS");
+
+   /* Files are staged as .tmp and renamed only on a clean transfer */
+   MCTF_ASSERT(mctf_sh(NULL, "! find %s -name '*.tmp' | grep -q .", target) == 0,
+               cleanup,
+               "restored tree still contains .tmp files -- a transfer did not complete");
+
+cleanup:
    MCTF_FINISH();
 }
 
@@ -445,7 +359,7 @@ start_restored_cluster(const char* pgdata)
       }
 
       if (run_step("pg_ctl start",
-                   "pg_ctl -D %s -o '-p 5433 -c logging_collector=off' "
+                   "pg_ctl -D %s -o '-p 5434 -c logging_collector=off' "
                    "-l %s/../restored.log -w -t 30 start",
                    pgdata, pgdata))
       {
@@ -456,7 +370,7 @@ start_restored_cluster(const char* pgdata)
          return 1;
       }
 
-      if (run_step("pg_isready", "pg_isready -h /tmp -p 5433"))
+      if (run_step("pg_isready", "pg_isready -h /tmp -p 5434"))
       {
          mctf_sh(NULL, "pg_ctl -D %s stop -m immediate", pgdata);
          return 1;
@@ -467,24 +381,24 @@ start_restored_cluster(const char* pgdata)
       return 0;
    }
 
-   if (run_step("rm", "%s exec -u root %s rm -rf /tmp/restored", engine, container) ||
-       run_step("cp", "%s cp %s %s:/tmp/restored", engine, pgdata, container) ||
-       run_step("chown", "%s exec -u root %s chown -R postgres:postgres /tmp/restored",
+   if (run_step("rm", "%s exec -u root %s rm -rf /tmp/restored-gcs", engine, container) ||
+       run_step("cp", "%s cp %s %s:/tmp/restored-gcs", engine, pgdata, container) ||
+       run_step("chown", "%s exec -u root %s chown -R postgres:postgres /tmp/restored-gcs",
                 engine, container) ||
-       run_step("chmod", "%s exec -u root %s chmod 700 /tmp/restored", engine, container))
+       run_step("chmod", "%s exec -u root %s chmod 700 /tmp/restored-gcs", engine, container))
    {
       return 1;
    }
 
    if (run_step("pg_ctl start",
-                "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored "
-                "-o '-p 5433 -c logging_collector=off' "
-                "-l /tmp/restored.log -w -t 30 start",
+                "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored-gcs "
+                "-o '-p 5434 -c logging_collector=off' "
+                "-l /tmp/restored-gcs.log -w -t 30 start",
                 engine, container, bin))
    {
       char* log = NULL;
 
-      mctf_sh(&log, "%s exec -u postgres %s tail -30 /tmp/restored.log", engine, container);
+      mctf_sh(&log, "%s exec -u postgres %s tail -30 /tmp/restored-gcs.log", engine, container);
       fprintf(stderr, "    postgres log:\n%s\n", log != NULL ? log : "(empty)");
       fflush(stderr);
       free(log);
@@ -492,17 +406,17 @@ start_restored_cluster(const char* pgdata)
       return 1;
    }
 
-   if (run_step("pg_isready", "%s exec -u postgres %s %s/pg_isready -h /tmp -p 5433",
+   if (run_step("pg_isready", "%s exec -u postgres %s %s/pg_isready -h /tmp -p 5434",
                 engine, container, bin))
    {
-      mctf_sh(NULL, "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored stop -m immediate",
+      mctf_sh(NULL, "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored-gcs stop -m immediate",
               engine, container, bin);
       return 1;
    }
 
-   mctf_sh(NULL, "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored stop -m immediate",
+   mctf_sh(NULL, "%s exec -u postgres %s %s/pg_ctl -D /tmp/restored-gcs stop -m immediate",
            engine, container, bin);
-   mctf_sh(NULL, "%s exec -u root %s rm -rf /tmp/restored", engine, container);
+   mctf_sh(NULL, "%s exec -u root %s rm -rf /tmp/restored-gcs", engine, container);
 
    return 0;
 }
@@ -513,7 +427,7 @@ start_restored_cluster(const char* pgdata)
  * refuses to start without them, so a restore that omits them looks successful
  * but is not.
  */
-MCTF_INTEGRATION_TEST(test_azure_restore_recreates_empty_directories)
+MCTF_INTEGRATION_TEST(test_gcs_restore_recreates_empty_directories)
 {
    const char* empty_dirs[] = {
       "pg_notify",
@@ -539,15 +453,15 @@ MCTF_INTEGRATION_TEST(test_azure_restore_recreates_empty_directories)
    MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
    MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
 
-   snprintf(cmd, sizeof(cmd), "azure restore primary %s %s", shared_label, TEST_RESTORE_DIR);
-   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "azure restore failed");
+   snprintf(cmd, sizeof(cmd), "gcs restore primary %s %s", shared_label, TEST_RESTORE_DIR);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "gcs restore failed");
 
    for (i = 0; i < dir_count; i++)
    {
       MCTF_ASSERT(mctf_sh(NULL, "test -d %s/primary-%s/%s",
                           TEST_RESTORE_DIR, shared_label, empty_dirs[i]) == 0,
                   cleanup,
-                  "restored data directory is missing %s — PostgreSQL would refuse to start",
+                  "restored data directory is missing %s -- PostgreSQL would refuse to start",
                   empty_dirs[i]);
    }
 
@@ -561,7 +475,7 @@ cleanup:
  * this starts a cluster on the restored files and waits for it to accept
  * connections.
  */
-MCTF_INTEGRATION_TEST(test_azure_restored_cluster_starts)
+MCTF_INTEGRATION_TEST(test_gcs_restored_cluster_starts)
 {
    char pgdata[MAX_PATH];
    char cmd[2 * MAX_PATH];
@@ -573,8 +487,8 @@ MCTF_INTEGRATION_TEST(test_azure_restored_cluster_starts)
    MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
    MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
 
-   snprintf(cmd, sizeof(cmd), "azure restore primary %s %s", shared_label, TEST_RESTORE_DIR);
-   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "azure restore failed");
+   snprintf(cmd, sizeof(cmd), "gcs restore primary %s %s", shared_label, TEST_RESTORE_DIR);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "gcs restore failed");
 
    snprintf(pgdata, sizeof(pgdata), "%s/primary-%s", TEST_RESTORE_DIR, shared_label);
 
