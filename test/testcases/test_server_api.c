@@ -74,6 +74,47 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_server_api_database_size)
+{
+   uint64_t size = 0;
+
+   MCTF_ASSERT(setup_server_connection() == 0, cleanup, "failed to setup server connection");
+
+   MCTF_ASSERT(pgmoneta_server_database_size(PRIMARY_SERVER, srv_ssl, srv_socket, "postgres", &size) == 0,
+               cleanup, "failed to get database size");
+   MCTF_ASSERT(size > 0, cleanup, "database size should be > 0");
+
+cleanup:
+   teardown_server_connection();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_server_api_databases)
+{
+   struct main_configuration* config = NULL;
+   struct server srv;
+
+   MCTF_ASSERT(setup_server_connection() == 0, cleanup, "failed to setup server connection");
+
+   config = (struct main_configuration*)shmem;
+   pgmoneta_server_info(PRIMARY_SERVER, srv_ssl, srv_socket);
+
+   srv = config->common.servers[PRIMARY_SERVER];
+
+   MCTF_ASSERT(srv.number_of_databases > 0, cleanup, "no databases found");
+   MCTF_ASSERT(srv.number_of_databases <= NUMBER_OF_DATABASES, cleanup, "number of databases exceeds the maximum");
+
+   for (int i = 0; i < srv.number_of_databases; i++)
+   {
+      MCTF_ASSERT(strlen(srv.databases[i].name) > 0, cleanup, "database name is empty");
+      MCTF_ASSERT(srv.databases[i].size > 0, cleanup, "database size should be > 0");
+   }
+
+cleanup:
+   teardown_server_connection();
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_server_api_checkpoint)
 {
    uint64_t chkt;

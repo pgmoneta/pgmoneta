@@ -55,6 +55,7 @@ static int get_checksums(SSL* ssl, int socket, bool* checksums);
 static int get_segment_size(SSL* ssl, int socket, size_t* segsz);
 static int get_block_size(SSL* ssl, int socket, size_t* blocksz);
 static int get_summarize_wal(SSL* ssl, int socket, bool* sw);
+static int get_databases(SSL* ssl, int socket, int srv);
 static int has_predefined_role(SSL* ssl, int socket, char* usr, char* role, bool* has_role);
 static int has_superuser_role(SSL* ssl, int socket, char* usr, bool* is_superuser);
 static int has_execute_privilege(SSL* ssl, int socket, char* usr, char* func_name, bool* has_privilege);
@@ -178,6 +179,11 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
                       config->common.servers[srv].name,
                       config->common.servers[srv].has_extension ? "true" : "false",
                       config->common.servers[srv].has_extension ? config->common.servers[srv].ext_version : "N/A");
+
+   if (get_databases(ssl, socket, srv))
+   {
+      pgmoneta_log_warn("Unable to get databases for server %s", config->common.servers[srv].name);
+   }
 
    bool fips = false;
 
@@ -768,6 +774,53 @@ error:
    return 1;
 }
 
+int
+pgmoneta_server_database_size(int srv, SSL* ssl, int socket, char* database, uint64_t* size)
+{
+   char query[MISC_LENGTH];
+   char* data = NULL;
+   struct query_response* response = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   *size = 0;
+
+   memset(&query[0], 0, sizeof(query));
+   pgmoneta_snprintf(&query[0], sizeof(query), "SELECT pg_database_size('%s');", database);
+
+   if (query_execute(ssl, socket, query, &response))
+   {
+      goto error;
+   }
+
+   if (response->number_of_columns != 1)
+   {
+      goto error;
+   }
+
+   data = pgmoneta_query_response_get_data(response, 0);
+
+   if (data == NULL)
+   {
+      goto error;
+   }
+
+   *size = strtoull(data, NULL, 10);
+
+   pgmoneta_free_query_response(response);
+
+   return 0;
+
+error:
+
+   pgmoneta_log_error("Error getting size of database %s for server %s", database, config->common.servers[srv].name);
+
+   pgmoneta_free_query_response(response);
+
+   return 1;
+}
+
 static int
 get_wal_size(SSL* ssl, int socket, int* ws)
 {
@@ -1308,6 +1361,66 @@ error:
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+static int
+get_databases(SSL* ssl, int socket, int srv)
+{
+   int idx = 0;
+   struct query_response* response = NULL;
+   struct tuple* tuple = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   config->common.servers[srv].number_of_databases = 0;
+
+   if (query_execute(ssl, socket,
+                     "SELECT datname, pg_database_size(datname) FROM pg_database WHERE datistemplate = false AND datallowconn AND has_database_privilege(current_user, datname, 'CONNECT') ORDER BY datname;",
+                     &response))
+   {
+      goto error;
+   }
+
+   if (response->number_of_columns != 2)
+   {
+      goto error;
+   }
+
+   tuple = response->tuples;
+
+   while (tuple != NULL)
+   {
+      if (config->common.servers[srv].number_of_databases >= NUMBER_OF_DATABASES)
+      {
+         pgmoneta_log_warn("Maximum number of databases reached for server %s (%d)",
+                           config->common.servers[srv].name, NUMBER_OF_DATABASES);
+         break;
+      }
+
+      if (tuple->data[0] != NULL && tuple->data[1] != NULL)
+      {
+         idx = config->common.servers[srv].number_of_databases;
+
+         memset(&config->common.servers[srv].databases[idx].name[0], 0, MISC_LENGTH);
+         pgmoneta_snprintf(&config->common.servers[srv].databases[idx].name[0], MISC_LENGTH, "%s", tuple->data[0]);
+         config->common.servers[srv].databases[idx].size = strtoull(tuple->data[1], NULL, 10);
+
+         config->common.servers[srv].number_of_databases++;
+      }
+
+      tuple = tuple->next;
+   }
+
+   pgmoneta_free_query_response(response);
+
+   return 0;
+
+error:
+
+   pgmoneta_free_query_response(response);
+
    return 1;
 }
 

@@ -99,6 +99,7 @@ static struct http_route prometheus_routes[] = {
 static void general_information(prometheus_metrics_container_t* container);
 static void backup_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
 static void size_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
+static void escape_label_value(char* dst, size_t size, char* src);
 
 static bool is_metrics_cache_configured(void);
 static bool is_metrics_cache_valid(void);
@@ -296,6 +297,9 @@ home_page(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_server_extension</h2>\n");
    data = pgmoneta_append(data, "  Information about installed extensions on server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_database_size</h2>\n");
+   data = pgmoneta_append(data, "  The size of a database on server\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_extension_pgmoneta_ext</h2>\n");
    data = pgmoneta_append(data, "  Status of the pgmoneta extension\n");
@@ -1385,6 +1389,32 @@ error:
    free(data);
 
    return MESSAGE_STATUS_ERROR;
+}
+
+static void
+escape_label_value(char* dst, size_t size, char* src)
+{
+   size_t i = 0;
+
+   for (size_t j = 0; src[j] != '\0' && i + 2 < size; j++)
+   {
+      if (src[j] == '\\' || src[j] == '"')
+      {
+         dst[i++] = '\\';
+         dst[i++] = src[j];
+      }
+      else if (src[j] == '\n')
+      {
+         dst[i++] = '\\';
+         dst[i++] = 'n';
+      }
+      else
+      {
+         dst[i++] = src[j];
+      }
+   }
+
+   dst[i] = '\0';
 }
 
 static void
@@ -2508,6 +2538,33 @@ general_information(prometheus_metrics_container_t* container)
    data = pgmoneta_append(data, "\n");
 
    add_metric_to_art(container->general_metrics, "pgmoneta_extension_pgmoneta_ext", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_database_size The size of a database on server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_database_size gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      for (int j = 0; j < config->common.servers[i].number_of_databases; j++)
+      {
+         char database[2 * MISC_LENGTH];
+         struct database* db = &config->common.servers[i].databases[j];
+
+         escape_label_value(&database[0], sizeof(database), &db->name[0]);
+
+         data = pgmoneta_append(data, "pgmoneta_server_database_size{");
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->common.servers[i].name);
+         data = pgmoneta_append(data, "\", ");
+         data = pgmoneta_append(data, "database=\"");
+         data = pgmoneta_append(data, &database[0]);
+         data = pgmoneta_append(data, "\"} ");
+         data = pgmoneta_append_ulong(data, db->size);
+         data = pgmoneta_append(data, "\n");
+      }
+   }
+   data = pgmoneta_append(data, "\n");
+
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_database_size", data, NULL, NULL, 0);
    free(data);
    data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_progress_percentage The workflow progress percentage (0-100) for a server\n");
