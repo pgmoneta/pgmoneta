@@ -215,6 +215,11 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       free(elapsed);
    }
+   else
+   {
+      ec = MANAGEMENT_ERROR_ARCHIVE_ERROR;
+      goto error;
+   }
 
    pgmoneta_art_destroy(nodes);
 
@@ -240,6 +245,11 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    exit(0);
 
 error:
+
+   if (pgmoneta_exists(real_directory))
+   {
+      pgmoneta_delete_directory(real_directory);
+   }
 
    pgmoneta_management_response_error_with_nodes(ssl, client_fd,
                                                  config->common.servers[server].name,
