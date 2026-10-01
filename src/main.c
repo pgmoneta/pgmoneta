@@ -1002,6 +1002,15 @@ main(int argc, char** argv)
       ev_loop(main_loop, 0);
    }
 
+   /* sigchld_cb is an event watcher, so it stops running the moment the loop
+    * is broken. Any child exiting during the shutdown sequence below would
+    * therefore stay a zombie for the rest of the process's life. Reap what has
+    * already exited before starting it. */
+   while (waitpid(-1, NULL, WNOHANG) > 0)
+   {
+      ;
+   }
+
    pgmoneta_log_info("Shutdown");
 #ifdef HAVE_SYSTEMD
    sd_notify(0, "STOPPING=1");
