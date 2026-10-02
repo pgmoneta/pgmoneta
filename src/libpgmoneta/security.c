@@ -54,6 +54,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -606,7 +607,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    }
 
    if (server_signature_calc_length != server_signature_received_length ||
-       memcmp(server_signature_received, server_signature_calc, server_signature_calc_length) != 0)
+       CRYPTO_memcmp(server_signature_received, server_signature_calc, server_signature_calc_length) != 0)
    {
       goto bad_password;
    }
@@ -955,7 +956,7 @@ retry:
    }
 
    if (client_proof_received_length != client_proof_calc_length ||
-       memcmp(client_proof_received, client_proof_calc, client_proof_calc_length) != 0)
+       CRYPTO_memcmp(client_proof_received, client_proof_calc, client_proof_calc_length) != 0)
    {
       goto bad_password;
    }
@@ -1566,7 +1567,7 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    }
 
    if (server_signature_calc_length != server_signature_received_length ||
-       memcmp(server_signature_received, server_signature_calc, server_signature_calc_length) != 0)
+       CRYPTO_memcmp(server_signature_received, server_signature_calc, server_signature_calc_length) != 0)
    {
       goto bad_password;
    }
