@@ -482,8 +482,8 @@ pgmoneta_sha512_verification(char** argv)
                   goto cleanup;
                }
 
-               hash = strdup(entry);
-               if (hash == NULL)
+               hash = NULL;
+               if (pgmoneta_copy_string(entry, &hash))
                {
                   pgmoneta_log_error("Verification: %s / Memory allocation error for hash",
                                      config->common.servers[server].name);

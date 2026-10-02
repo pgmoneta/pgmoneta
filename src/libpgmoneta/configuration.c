@@ -556,7 +556,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      memcpy(&srv.name, section, max);
 
                      // comma separated paths
-                     char* paths = strdup(value);
+                     char* paths = NULL;
+                     pgmoneta_copy_string(value, &paths);
                      char* token = strtok(paths, ",");
                      int count = 0;
 
@@ -595,7 +596,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      memcpy(&srv.name, section, max);
 
                      // comma separated paths
-                     char* paths = strdup(value);
+                     char* paths = NULL;
+                     pgmoneta_copy_string(value, &paths);
                      char* token = strtok(paths, "|");
                      int count = 0;
 
@@ -633,7 +635,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      memcpy(&srv.name, section, max);
 
                      // comma separated paths
-                     char* paths = strdup(value);
+                     char* paths = NULL;
+                     pgmoneta_copy_string(value, &paths);
                      char* token = strtok(paths, "|");
                      int count = 0;
 
@@ -5782,7 +5785,9 @@ as_ciphers(char* str)
 
    if (converted == str)
    {
-      return strdup("aes256-ctr,aes192-ctr,aes128-ctr");
+      char* default_ciphers = NULL;
+      pgmoneta_copy_string("aes256-ctr,aes192-ctr,aes128-ctr", &default_ciphers);
+      return default_ciphers;
    }
 
    ptr = strtok(converted, ",");

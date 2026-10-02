@@ -207,7 +207,18 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
 
    if (*database == NULL)
    {
-      *database = *username;
+      if (*username != NULL)
+      {
+         if (pgmoneta_copy_string(*username, database))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         pgmoneta_log_error("Startup message missing both username and database");
+         goto error;
+      }
    }
 
    pgmoneta_log_trace("Username: %s", *username);
@@ -220,6 +231,21 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
    free(array);
 
    return 0;
+
+error:
+   for (int i = 0; i < counter; i++)
+   {
+      free(array[i]);
+   }
+   free(array);
+   free(un);
+   free(db);
+   free(an);
+   *username = NULL;
+   *database = NULL;
+   *appname = NULL;
+
+   return 1;
 }
 
 int
@@ -618,6 +644,40 @@ pgmoneta_compare_string(const char* str1, const char* str2)
       return false;
    }
    return strcmp(str1, str2) == 0;
+}
+
+int
+pgmoneta_copy_string(const char* from, char** to)
+{
+   char* tmp = NULL;
+   size_t size = 0;
+
+   if (from == NULL || to == NULL)
+   {
+      goto error;
+   }
+
+   size = strlen(from) + 1;
+   tmp = malloc(size);
+   if (tmp == NULL)
+   {
+      goto error;
+   }
+   memset(tmp, 0, size);
+   memcpy(tmp, from, size);
+
+   *to = tmp;
+
+   return 0;
+
+error:
+   free(tmp);
+   if (to != NULL)
+   {
+      *to = NULL;
+   }
+
+   return 1;
 }
 
 void
@@ -1907,7 +1967,7 @@ pgmoneta_calculate_wal_size(char* directory, char* start)
       }
       else
       {
-         basename = strdup(filename);
+         pgmoneta_copy_string(filename, &basename);
       }
 
       if (pgmoneta_is_compressed(basename))
@@ -2677,8 +2737,8 @@ do_copy_file(struct worker_common* wc)
       /* In auto mode, pre-check O_DIRECT support to avoid unnecessary attempts */
       if (config->direct_io == DIRECT_IO_AUTO)
       {
-         char* from_copy = strdup(from);
-         if (from_copy != NULL)
+         char* from_copy = NULL;
+         if (!pgmoneta_copy_string(from, &from_copy))
          {
             char* test_dir = dirname(from_copy);
             if (!pgmoneta_direct_io_supported(test_dir))
@@ -2770,8 +2830,8 @@ do_copy_file(struct worker_common* wc)
       goto error;
    }
 
-   to = strdup(fi->to);
-   dn = strdup(dirname(fi->to));
+   pgmoneta_copy_string(fi->to, &to);
+   pgmoneta_copy_string(dirname(fi->to), &dn);
 
    if (pgmoneta_mkdir(dn))
    {
@@ -3344,7 +3404,10 @@ pgmoneta_symlink_at_file(char* from, char* to)
    char* ret_path;
    char absolute_path[MAX_PATH];
 
-   from_copy = pgmoneta_append(from_copy, from);
+   if (pgmoneta_copy_string(from, &from_copy))
+   {
+      return 1;
+   }
    dir_path = dirname(from_copy);
 #ifndef HAVE_OSX
    dirfd = open(dir_path, O_DIRECTORY | O_NOFOLLOW);
@@ -3366,6 +3429,7 @@ pgmoneta_symlink_at_file(char* from, char* to)
       ret_path = realpath(from, absolute_path);
       if (ret_path == NULL)
       {
+         free(from_copy);
          return 1;
       }
 
@@ -5217,7 +5281,7 @@ int
 pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
 {
    char delim_str[2] = {delimiter, '\0'};
-   char* temp = strdup(string);
+   char* temp = NULL;
    char** temp_results = NULL;
    int num_objects = 0;
    char* token = NULL;
@@ -5225,7 +5289,11 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
    *results = NULL;
    *count = 0;
 
-   if (!string || !results || !count || !temp)
+   if (!string || !results || !count)
+   {
+      goto error;
+   }
+   if (pgmoneta_copy_string(string, &temp))
    {
       goto error;
    }
@@ -5257,8 +5325,8 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
    }
 
    free(temp);
-   temp = strdup(string);
-   if (!temp)
+   temp = NULL;
+   if (pgmoneta_copy_string(string, &temp))
    {
       free(temp_results);
       temp_results = NULL;
@@ -5268,8 +5336,7 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
    token = strtok(temp, delim_str);
    for (int i = 0; i < num_objects; i++)
    {
-      temp_results[i] = strdup(token);
-      if (!temp_results[i])
+      if (pgmoneta_copy_string(token, &temp_results[i]))
       {
          goto error;
       }
@@ -5334,8 +5401,7 @@ pgmoneta_merge_string_arrays(char** lists[], char*** out_list)
    {
       for (char** str = *current; *str; str++)
       {
-         merged[index] = strdup(*str);
-         if (!merged[index])
+         if (pgmoneta_copy_string(*str, &merged[index]))
          {
             for (int i = 0; i < index; i++)
             {
@@ -5842,8 +5908,8 @@ pgmoneta_get_parent_dir(const char* path)
       return NULL;
    }
 
-   char* parent_dir = strdup(path);
-   if (parent_dir == NULL)
+   char* parent_dir = NULL;
+   if (pgmoneta_copy_string(path, &parent_dir))
    {
       return NULL;
    }
@@ -5862,7 +5928,7 @@ pgmoneta_get_parent_dir(const char* path)
    {
       // No slash found, return "."
       free(parent_dir);
-      parent_dir = strdup(".");
+      pgmoneta_copy_string(".", &parent_dir);
    }
 
    return parent_dir;

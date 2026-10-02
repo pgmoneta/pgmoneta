@@ -399,6 +399,15 @@ bool
 pgmoneta_compare_string(const char* str1, const char* str2);
 
 /**
+ * Copy a string
+ * @param from The from string
+ * @param to The to string
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_copy_string(const char* from, char** to);
+
+/**
  * Cleanse memory
  * @param data The data
  * @param size The size

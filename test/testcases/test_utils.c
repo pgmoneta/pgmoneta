@@ -2629,3 +2629,177 @@ cleanup:
    free(s);
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_utils_copy_string)
+{
+   char* src = "hello";
+   char* dest = NULL;
+
+   MCTF_ASSERT(pgmoneta_copy_string(src, &dest) == 0, cleanup, "copy_string basic failed");
+   MCTF_ASSERT_PTR_NONNULL(dest, cleanup, "dest should not be NULL");
+   MCTF_ASSERT_STR_EQ(dest, "hello", cleanup, "copy_string content mismatch");
+   MCTF_ASSERT(dest != src, cleanup, "dest must not alias the source pointer");
+   free(dest);
+   dest = NULL;
+
+   MCTF_ASSERT(pgmoneta_copy_string("", &dest) == 0, cleanup, "copy_string empty failed");
+   MCTF_ASSERT_PTR_NONNULL(dest, cleanup, "dest should not be NULL for empty string");
+   MCTF_ASSERT_STR_EQ(dest, "", cleanup, "copy_string empty content mismatch");
+   free(dest);
+   dest = NULL;
+
+   MCTF_ASSERT(pgmoneta_copy_string(NULL, &dest) != 0, cleanup, "copy_string NULL should return non-zero");
+   MCTF_ASSERT_PTR_NULL(dest, cleanup, "dest should remain NULL for NULL input");
+
+   MCTF_ASSERT(pgmoneta_copy_string("hello", NULL) != 0, cleanup, "copy_string NULL to should return non-zero");
+   MCTF_ASSERT(pgmoneta_copy_string(NULL, NULL) != 0, cleanup, "copy_string both NULL should return non-zero");
+
+cleanup:
+   if (dest != NULL)
+   {
+      free(dest);
+      dest = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_extract_username_database_without_database)
+{
+   struct message* msg = NULL;
+   char* username = NULL;
+   char* database = NULL;
+   char* appname = NULL;
+   int res = 0;
+   void* p = NULL;
+
+   msg = (struct message*)malloc(sizeof(struct message));
+   MCTF_ASSERT_PTR_NONNULL(msg, cleanup, "malloc message failed");
+   msg->kind = 0;
+   msg->data = calloc(1, 1024);
+   MCTF_ASSERT_PTR_NONNULL(msg->data, cleanup, "calloc msg->data failed");
+   p = msg->data;
+
+   /* Startup packet with user but no database key: [Length][Protocol][Key][Val]... */
+   pgmoneta_write_int32(p, 0);
+   p += 4;
+   pgmoneta_write_int32(p, 196608);
+   p += 4;
+   pgmoneta_write_string(p, "user");
+   p += 5;
+   pgmoneta_write_string(p, "test");
+   p += 5;
+   pgmoneta_write_byte(p, 0);
+   p += 1;
+
+   msg->length = (char*)p - (char*)msg->data;
+
+   res = pgmoneta_extract_username_database(msg, &username, &database, &appname);
+   MCTF_ASSERT_INT_EQ(res, 0, cleanup, "extract_username_database failed");
+   MCTF_ASSERT_PTR_NONNULL(username, cleanup, "username is null");
+   MCTF_ASSERT_PTR_NONNULL(database, cleanup, "database is null");
+   MCTF_ASSERT_STR_EQ(username, "test", cleanup, "username mismatch");
+   MCTF_ASSERT_STR_EQ(database, "test", cleanup, "database mismatch");
+   MCTF_ASSERT(database != username, cleanup, "database must not alias username");
+   MCTF_ASSERT_PTR_NULL(appname, cleanup, "appname should be null");
+
+   /* Free exactly once each: double-free here aborts under ASan */
+   free(username);
+   username = NULL;
+   free(database);
+   database = NULL;
+
+cleanup:
+   if (username != NULL)
+   {
+      free(username);
+      username = NULL;
+   }
+   if (database != NULL)
+   {
+      free(database);
+      database = NULL;
+   }
+   if (appname != NULL)
+   {
+      free(appname);
+      appname = NULL;
+   }
+   if (msg != NULL)
+   {
+      if (msg->data != NULL)
+      {
+         free(msg->data);
+         msg->data = NULL;
+      }
+      free(msg);
+      msg = NULL;
+   }
+   MCTF_FINISH();
+}
+
+/* Both username and database missing must log + return 1 with NULL outs.
+ * NEGATIVE because pgmoneta_log_error emits an ERROR line (see doc/TEST.md). */
+MCTF_TEST_NEGATIVE(test_utils_extract_username_database_missing_both)
+{
+   struct message* msg = NULL;
+   char* username = NULL;
+   char* database = NULL;
+   char* appname = NULL;
+   int res = 0;
+   void* p = NULL;
+
+   msg = (struct message*)malloc(sizeof(struct message));
+   MCTF_ASSERT_PTR_NONNULL(msg, cleanup, "malloc message failed");
+   msg->kind = 0;
+   msg->data = calloc(1, 1024);
+   MCTF_ASSERT_PTR_NONNULL(msg->data, cleanup, "calloc msg->data failed");
+   p = msg->data;
+
+   /* Startup packet with neither user nor database: only application_name */
+   pgmoneta_write_int32(p, 0);
+   p += 4;
+   pgmoneta_write_int32(p, 196608);
+   p += 4;
+   pgmoneta_write_string(p, "application_name");
+   p += 17;
+   pgmoneta_write_string(p, "myapp");
+   p += 6;
+   pgmoneta_write_byte(p, 0);
+   p += 1;
+
+   msg->length = (char*)p - (char*)msg->data;
+
+   res = pgmoneta_extract_username_database(msg, &username, &database, &appname);
+   MCTF_ASSERT_INT_EQ(res, 1, cleanup, "extract should fail when both username and database are missing");
+   MCTF_ASSERT_PTR_NULL(username, cleanup, "username should be NULL on error");
+   MCTF_ASSERT_PTR_NULL(database, cleanup, "database should be NULL on error");
+   MCTF_ASSERT_PTR_NULL(appname, cleanup, "appname should be NULL on error");
+
+cleanup:
+   if (username != NULL)
+   {
+      free(username);
+      username = NULL;
+   }
+   if (database != NULL)
+   {
+      free(database);
+      database = NULL;
+   }
+   if (appname != NULL)
+   {
+      free(appname);
+      appname = NULL;
+   }
+   if (msg != NULL)
+   {
+      if (msg->data != NULL)
+      {
+         free(msg->data);
+         msg->data = NULL;
+      }
+      free(msg);
+      msg = NULL;
+   }
+   MCTF_FINISH();
+}

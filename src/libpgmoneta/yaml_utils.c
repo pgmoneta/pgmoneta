@@ -187,29 +187,29 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
       case STATE_ROOT:
          if (*current_key == NULL)
          {
-            *current_key = strdup(value);
+            pgmoneta_copy_string(value, current_key);
          }
          else
          {
             if (pgmoneta_compare_string(*current_key, "source_dir"))
             {
-               config->source_dir = strdup(value);
+               pgmoneta_copy_string(value, &config->source_dir);
             }
             else if (pgmoneta_compare_string(*current_key, "target_dir"))
             {
-               config->target_dir = strdup(value);
+               pgmoneta_copy_string(value, &config->target_dir);
             }
             else if (pgmoneta_compare_string(*current_key, "encryption"))
             {
-               config->encryption = strdup(value);
+               pgmoneta_copy_string(value, &config->encryption);
             }
             else if (pgmoneta_compare_string(*current_key, "compression"))
             {
-               config->compression = strdup(value);
+               pgmoneta_copy_string(value, &config->compression);
             }
             else if (pgmoneta_compare_string(*current_key, "configuration_file"))
             {
-               config->configuration_file = strdup(value);
+               pgmoneta_copy_string(value, &config->configuration_file);
             }
             free(*current_key);
             *current_key = NULL;
@@ -219,7 +219,7 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
       case STATE_RULE_MAPPING:
          if (*current_key == NULL)
          {
-            *current_key = strdup(value);
+            pgmoneta_copy_string(value, current_key);
          }
          else
          {
@@ -243,8 +243,8 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
             }
             config->operations = tmp_operations;
 
-            operation = strdup(value);
-            if (operation == NULL)
+            operation = NULL;
+            if (pgmoneta_copy_string(value, &operation))
             {
                return 1;
             }
