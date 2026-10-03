@@ -67,6 +67,7 @@ Mostafa Mahmoud <mm1471800@gmail.com>
 R Sai Pranav <rajasaipranav0@gmail.com>
 Krishna Lokhande <krishlokhande45@gmail.com>
 Loay Tarek <loaytareq44@gmail.com>
+Ahmed Mordi <ahmed.m.hamada2003@gmail.com>
 ```
 
 ## Committers
