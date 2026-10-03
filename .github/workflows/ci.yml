@@ -168,6 +168,74 @@ jobs:
           path: /tmp/pgmoneta-test/log
           retention-days: 90
 
+  build-macos:
+    needs: [format-check]
+    runs-on: macos-latest
+    env:
+      PGMONETA_ROOT: ${{ github.workspace }}
+      BUILD_DIR: ${{ github.workspace }}/build
+      POSTGRESQL_VERSION: "@17"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@2026.09.28.1
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install \
+            libev \
+            libssh \
+            libarchive \
+            libyaml \
+            openssl \
+            bzip2 \
+            zstd \
+            lz4 \
+            check \
+            docutils \
+            pandoc \
+            postgresql${POSTGRESQL_VERSION}
+
+      - name: Add PostgreSQL to PATH
+        run: |
+          echo "$(brew --prefix postgresql${POSTGRESQL_VERSION})/bin" >> $GITHUB_PATH
+
+      - name: Build with Clang
+        run: |
+          mkdir -p $BUILD_DIR
+          cd $BUILD_DIR
+          export CC=$(xcrun -find clang)
+          export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
+          cmake -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Show logs on failure
+        if: failure()
+        working-directory: ${{ env.BUILD_DIR }}
+        run: |
+          cat ./log/pgmoneta.log || echo "pgmoneta.log not found"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: macos-build-logs
+          path: |
+            ${{ env.BUILD_DIR }}/log/
+            /tmp/*.log
+          retention-days: 7
+
+      - name: Upload Generated Documentation Artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: macos-generated-docs
+          path: ${{ env.BUILD_DIR }}/doc/
+          retention-days: 7
+
   storage-engines:
     needs: [format-check]
     runs-on: ubuntu-latest
