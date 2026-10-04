@@ -154,6 +154,16 @@ int
 pgmoneta_test_connect_user(SSL** ssl, int* socket);
 
 /**
+ * Execute SQL as the postgres superuser in PG_DATABASE (mydb).
+ * The SQL must not contain double quotes, $ or backticks.
+ * @param sql The SQL
+ * @param output [out] The first line of the output, or NULL (caller must free)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_test_superuser_query(char* sql, char** output);
+
+/**
  * Resolve an executable path under build/src from a test process.
  * Example: "pgmoneta-walinfo" -> ".../build/src/pgmoneta-walinfo"
  * @param binary_name The executable name

@@ -31,6 +31,7 @@
 #include <aes.h>
 #include <art.h>
 #include <compression.h>
+#include <files.h>
 #include <logging.h>
 #include <manifest.h>
 #include <restore.h>
@@ -44,6 +45,8 @@
 
 static char* hot_standby_name(void);
 static int hot_standby_execute(char*, struct art*);
+static void copy_entry(char*, char*, char*, char*, struct workers*);
+static bool same_tablespaces(struct backup*, struct backup*);
 
 struct workflow*
 pgmoneta_create_hot_standby(void)
@@ -80,6 +83,8 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
    char* base = NULL;
    char* source_root = NULL;
    char* source = NULL;
+   char* newest = NULL;
+   char* suffix = NULL;
    bool incremental = false;
    struct timespec start_t;
    struct timespec end_t;
@@ -130,8 +135,6 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
          char* old_manifest = NULL;
          char* new_manifest = NULL;
          char* f = NULL;
-         char* from = NULL;
-         char* to = NULL;
          struct art* deleted_files = NULL;
          struct art_iterator* deleted_iter = NULL;
          struct art* changed_files = NULL;
@@ -153,24 +156,31 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
          destination = pgmoneta_append(destination, root);
          destination = pgmoneta_append(destination, config->common.servers[server].name);
-         if (!incremental && pgmoneta_exists(destination) && number_of_backups >= 2)
+         if (!incremental && pgmoneta_exists(destination) && number_of_backups >= 2 &&
+             same_tablespaces(backups[number_of_backups - 1], backups[number_of_backups - 2]))
          {
             if (number_of_workers > 0 && workers == NULL)
             {
                pgmoneta_workers_initialize(number_of_workers, &workers);
             }
 
-            if (source == NULL)
+            if (newest == NULL)
             {
-               source = pgmoneta_append(source, base);
-               if (!pgmoneta_ends_with(source, "/"))
+               if (pgmoneta_extraction_get_suffix(config->compression_type, config->common.encryption, &suffix))
                {
-                  source = pgmoneta_append_char(source, '/');
+                  error = true;
+                  goto cleanup;
                }
-               source = pgmoneta_append(source, backups[number_of_backups - 1]->label);
-               if (!pgmoneta_ends_with(source, "/"))
+
+               newest = pgmoneta_append(newest, base);
+               if (!pgmoneta_ends_with(newest, "/"))
                {
-                  source = pgmoneta_append_char(source, '/');
+                  newest = pgmoneta_append_char(newest, '/');
+               }
+               newest = pgmoneta_append(newest, backups[number_of_backups - 1]->label);
+               if (!pgmoneta_ends_with(newest, "/"))
+               {
+                  newest = pgmoneta_append_char(newest, '/');
                }
             }
 
@@ -186,7 +196,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             }
             old_manifest = pgmoneta_append(old_manifest, "backup.manifest");
 
-            new_manifest = pgmoneta_append(new_manifest, source);
+            new_manifest = pgmoneta_append(new_manifest, newest);
             new_manifest = pgmoneta_append(new_manifest, "backup.manifest");
 
             pgmoneta_log_trace("old_manifest: %s", old_manifest);
@@ -209,7 +219,14 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
                if (pgmoneta_exists(f))
                {
-                  pgmoneta_delete_file(f, workers);
+                  if (pgmoneta_ends_with(f, "/"))
+                  {
+                     pgmoneta_delete_directory(f);
+                  }
+                  else
+                  {
+                     pgmoneta_delete_file(f, workers);
+                  }
                }
                else
                {
@@ -222,58 +239,12 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
             while (pgmoneta_art_iterator_next(changed_iter))
             {
-               from = pgmoneta_append(from, source);
-               if (!pgmoneta_ends_with(from, "/"))
-               {
-                  from = pgmoneta_append_char(from, '/');
-               }
-               from = pgmoneta_append(from, "data/");
-               from = pgmoneta_append(from, changed_iter->key);
-
-               to = pgmoneta_append(to, destination);
-               if (!pgmoneta_ends_with(to, "/"))
-               {
-                  to = pgmoneta_append_char(to, '/');
-               }
-               to = pgmoneta_append(to, changed_iter->key);
-
-               pgmoneta_log_trace("hot_standby changed: %s -> %s", from, to);
-
-               pgmoneta_copy_file(from, to, workers);
-
-               free(from);
-               from = NULL;
-
-               free(to);
-               to = NULL;
+               copy_entry(newest, destination, changed_iter->key, suffix, workers);
             }
 
             while (pgmoneta_art_iterator_next(added_iter))
             {
-               from = pgmoneta_append(from, source);
-               if (!pgmoneta_ends_with(from, "/"))
-               {
-                  from = pgmoneta_append_char(from, '/');
-               }
-               from = pgmoneta_append(from, "data/");
-               from = pgmoneta_append(from, added_iter->key);
-
-               to = pgmoneta_append(to, destination);
-               if (!pgmoneta_ends_with(to, "/"))
-               {
-                  to = pgmoneta_append_char(to, '/');
-               }
-               to = pgmoneta_append(to, added_iter->key);
-
-               pgmoneta_log_trace("hot_standby new: %s -> %s", from, to);
-
-               pgmoneta_copy_file(from, to, workers);
-
-               free(from);
-               from = NULL;
-
-               free(to);
-               to = NULL;
+               copy_entry(newest, destination, added_iter->key, suffix, workers);
             }
          }
          else
@@ -394,6 +365,10 @@ cleanup:
             ++failed_count;
             pgmoneta_log_error("Failed to process hot standby directory: %s",
                                config->common.servers[server].hot_standby[i]);
+
+            /* The standby no longer matches a backup, so force a full copy next time */
+            pgmoneta_workers_wait(workers);
+            pgmoneta_delete_directory(destination);
          }
          free(old_manifest);
          free(new_manifest);
@@ -440,6 +415,8 @@ cleanup:
 
    free(base);
    free(source);
+   free(newest);
+   free(suffix);
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
@@ -447,4 +424,63 @@ cleanup:
    free(backups);
 
    return failed_count;
+}
+
+static void
+copy_entry(char* source, char* destination, char* key, char* suffix, struct workers* workers)
+{
+   char* from = NULL;
+   char* to = NULL;
+
+   to = pgmoneta_append(to, destination);
+   if (!pgmoneta_ends_with(to, "/"))
+   {
+      to = pgmoneta_append_char(to, '/');
+   }
+   to = pgmoneta_append(to, key);
+
+   if (pgmoneta_ends_with(key, "/"))
+   {
+      pgmoneta_mkdir(to);
+   }
+   else
+   {
+      from = pgmoneta_append(from, source);
+      from = pgmoneta_append(from, "data/");
+      from = pgmoneta_append(from, key);
+
+      if (suffix != NULL &&
+          !pgmoneta_compare_string(key, "backup_label") &&
+          !pgmoneta_compare_string(key, "backup_manifest"))
+      {
+         from = pgmoneta_append(from, suffix);
+         to = pgmoneta_append(to, suffix);
+      }
+
+      pgmoneta_log_trace("hot_standby: %s -> %s", from, to);
+
+      pgmoneta_copy_file(from, to, workers);
+   }
+
+   free(from);
+   free(to);
+}
+
+static bool
+same_tablespaces(struct backup* b1, struct backup* b2)
+{
+   if (b1->number_of_tablespaces != b2->number_of_tablespaces)
+   {
+      return false;
+   }
+
+   for (uint64_t i = 0; i < b1->number_of_tablespaces; i++)
+   {
+      if (!pgmoneta_compare_string(b1->tablespaces_oids[i], b2->tablespaces_oids[i]))
+      {
+         return false;
+      }
+   }
+
+   return true;
 }
