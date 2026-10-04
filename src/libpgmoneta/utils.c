@@ -3303,11 +3303,13 @@ pgmoneta_symlink_at_file(char* from, char* to)
 {
    int dirfd;
    int ret;
+   char* from_copy = NULL;
    char* dir_path;
    char* ret_path;
    char absolute_path[MAX_PATH];
 
-   dir_path = dirname(strdup(from));
+   from_copy = pgmoneta_append(from_copy, from);
+   dir_path = dirname(from_copy);
 #ifndef HAVE_OSX
    dirfd = open(dir_path, O_DIRECTORY | O_NOFOLLOW);
 #elif defined(HAVE_OPENBSD)
@@ -3345,7 +3347,7 @@ pgmoneta_symlink_at_file(char* from, char* to)
       ret = 1;
    }
    close(dirfd);
-   free(dir_path);
+   free(from_copy);
 
    return ret;
 }
