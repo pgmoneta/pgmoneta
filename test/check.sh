@@ -67,8 +67,13 @@ USER=$(whoami)
 MODE="dev"
 PORT=6432
 
-# Use sudo only when not running as root (CI containers run as root)
+# Use sudo only when not running as root (CI containers run as root) AND
+# the Docker socket actually requires it. A rootless Docker context --
+# e.g. colima on macOS -- is already reachable without sudo, and sudo
+# then just blocks on an interactive password prompt instead of helping.
 if [ "$(id -u)" -eq 0 ]; then
+  SUDO=""
+elif docker info > /dev/null 2>&1; then
   SUDO=""
 else
   SUDO="sudo"
