@@ -3174,6 +3174,7 @@ pgmoneta_crc32c_sse42(const void* buffer, size_t size, uint32_t* crc)
    return 0;
 }
 #endif // __x86_64__
+#endif // HAVE_CRC32_SSE42
 
 static int
 pgmoneta_crc32c_software(const void* buffer, size_t size, uint32_t* crc)
@@ -3254,7 +3255,6 @@ pgmoneta_crc32c_software(const void* buffer, size_t size, uint32_t* crc)
 
    return 0;
 }
-#endif // HAVE_CRC32_SSE42
 
 void
 pgmoneta_crc_init(void)
@@ -3267,9 +3267,9 @@ pgmoneta_crc_init(void)
       return;
    }
 #endif
+#endif
 
    crc_impl = pgmoneta_crc32c_software;
-#endif
 }
 
 int
