@@ -2404,7 +2404,14 @@ pgmoneta_delete_file(char* file, struct workers* workers)
    {
       if (pgmoneta_workers_outcome_ok(workers))
       {
-         pgmoneta_workers_add(workers, do_delete_file, (struct worker_common*)fi);
+         if (pgmoneta_workers_add(workers, do_delete_file, (struct worker_common*)fi))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         free(fi);
       }
    }
    else
@@ -2415,6 +2422,8 @@ pgmoneta_delete_file(char* file, struct workers* workers)
    return 0;
 
 error:
+
+   free(fi);
 
    return 1;
 }
@@ -2594,7 +2603,14 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
    {
       if (pgmoneta_workers_outcome_ok(workers))
       {
-         pgmoneta_workers_add(workers, do_copy_file, (struct worker_common*)fi);
+         if (pgmoneta_workers_add(workers, do_copy_file, (struct worker_common*)fi))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         free(fi);
       }
    }
    else
@@ -2605,6 +2621,8 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
    return 0;
 
 error:
+
+   free(fi);
 
    return 1;
 }

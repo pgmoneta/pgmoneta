@@ -30,6 +30,7 @@
 #include <aes.h>
 #include <configuration.h>
 #include <logging.h>
+#include <mctf_container.h>
 #include <message.h>
 #include <network.h>
 #include <security.h>
@@ -380,6 +381,43 @@ int
 pgmoneta_test_connect_user(SSL** ssl, int* socket)
 {
    return pgmoneta_server_authenticate(PRIMARY_SERVER, "mydb", "myuser", "mypass", false, ssl, socket);
+}
+
+int
+pgmoneta_test_superuser_query(char* sql, char** output)
+{
+   char* ver = getenv("TEST_PG_VERSION");
+   char engine[MISC_LENGTH] = {0};
+   char* out = NULL;
+   int rc = 0;
+
+   if (ver == NULL || strlen(ver) == 0)
+   {
+      ver = "17";
+   }
+
+   /* CI runs against a local PostgreSQL; otherwise it lives in a container */
+   if (mctf_container_engine(engine, sizeof(engine)) == MCTF_OK &&
+       mctf_sh(NULL, "%s inspect pgmoneta-test-postgresql%s >/dev/null 2>&1", engine, ver) == 0)
+   {
+      rc = mctf_sh(&out, "%s exec -u postgres pgmoneta-test-postgresql%s /usr/pgsql-%s/bin/psql -h /tmp -p 5432 -U postgres -d mydb -qtAc \"%s\"",
+                   engine, ver, ver, sql);
+   }
+   else
+   {
+      rc = mctf_sh(&out, "psql -h /tmp -p 5432 -U postgres -d mydb -qtAc \"%s\"", sql);
+   }
+
+   if (rc == 0 && output != NULL && out != NULL)
+   {
+      out[strcspn(out, "\r\n")] = '\0';
+      *output = out;
+      out = NULL;
+   }
+
+   free(out);
+
+   return rc == 0 ? 0 : 1;
 }
 
 int
