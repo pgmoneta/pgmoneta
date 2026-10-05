@@ -1421,8 +1421,22 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
 
    /* preprocessing of incremental filename */
    rel_path = pgmoneta_append(rel_path, relative_filename);
-   rel_path = dirname(rel_path);
-   file_name = pgmoneta_append(file_name, rel_path + strlen(rel_path) + 1);
+   {
+      char* slash = strrchr(rel_path, '/');
+
+      if (slash != NULL)
+      {
+         file_name = pgmoneta_append(file_name, slash + 1);
+         *slash = '\0';
+      }
+      else
+      {
+         file_name = pgmoneta_append(file_name, rel_path);
+         free(rel_path);
+         rel_path = NULL;
+         rel_path = pgmoneta_append(rel_path, ".");
+      }
+   }
 
    filepath = pgmoneta_append(filepath, backup_data);
    filepath = pgmoneta_append(filepath, rel_path);
