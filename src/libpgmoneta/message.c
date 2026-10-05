@@ -1111,11 +1111,10 @@ pgmoneta_create_query_message(char* query, struct message** msg)
 {
    struct message* m = NULL;
    size_t size;
-   char cmd[1024];
+   size_t query_length;
 
-   memset(&cmd[0], 0, sizeof(cmd));
-   strcpy(cmd, query);
-   size = 1 + 4 + strlen(cmd) + 1;
+   query_length = strlen(query);
+   size = 1 + 4 + query_length + 1;
 
    m = allocate_message(size);
 
@@ -1123,7 +1122,7 @@ pgmoneta_create_query_message(char* query, struct message** msg)
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
-   memcpy(m->data + 5, &cmd[0], strlen(cmd));
+   memcpy(m->data + 5, query, query_length);
 
    *msg = m;
 
