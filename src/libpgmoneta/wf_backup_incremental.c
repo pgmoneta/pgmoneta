@@ -186,8 +186,8 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    uint64_t biggest_file_size;
    char* prev_backup_data = NULL;
    char* wal_dir = NULL;
-   char* chkpt_lsn = NULL;
-   uint64_t prev_backup_chkpt_lsn = 0;
+   char* prev_start_lsn_str = NULL;
+   uint64_t prev_start_lsn = 0;
    uint64_t start_backup_lsn = 0;
    char* start_backup_xlog = NULL;
    char* stop_backup_xlog = NULL;
@@ -297,13 +297,17 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    rel_seg_size = config->common.servers[server].relseg_size;
    wal_segment_size = config->common.servers[server].wal_size;
 
-   /* Get the checkpoint information of the preceding backup using backup_label */
+   /* Changes since the preceding backup start at its redo point, not its checkpoint record */
    prev_backup_data = pgmoneta_get_server_backup_identifier_data(server, incremental_label);
-   pgmoneta_read_checkpoint_info(prev_backup_data, &chkpt_lsn);
-
-   if (pgmoneta_string_to_lsn(chkpt_lsn, &prev_backup_chkpt_lsn))
+   if (pgmoneta_read_start_wal_location(prev_backup_data, &prev_start_lsn_str))
    {
-      pgmoneta_log_error("Unable to parse checkpoint LSN of the preceding backup");
+      pgmoneta_log_error("Unable to read the start WAL location of the preceding backup");
+      goto error;
+   }
+
+   if (pgmoneta_string_to_lsn(prev_start_lsn_str, &prev_start_lsn))
+   {
+      pgmoneta_log_error("Unable to parse the start WAL location of the preceding backup");
       goto error;
    }
 
@@ -325,7 +329,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    wal_dir = pgmoneta_get_server_wal(server);
 
    /* Do WAL Summarization */
-   if (pgmoneta_summarize_wal(server, wal_dir, prev_backup_chkpt_lsn, start_backup_lsn, &summarized_brt))
+   if (pgmoneta_summarize_wal(server, wal_dir, prev_start_lsn, start_backup_lsn, &summarized_brt))
    {
       pgmoneta_log_error("WAL summation for incremental backup failed");
       goto error;
@@ -614,7 +618,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    }
    free_string_array(server_files, num_of_server_files);
 
-   free(chkpt_lsn);
+   free(prev_start_lsn_str);
    free(backup_label);
    free(start_backup_xlog);
    free(stop_backup_xlog);
@@ -647,7 +651,7 @@ error:
    }
    free_string_array(server_files, num_of_server_files);
 
-   free(chkpt_lsn);
+   free(prev_start_lsn_str);
    free(backup_label);
    free(start_backup_xlog);
    free(stop_backup_xlog);

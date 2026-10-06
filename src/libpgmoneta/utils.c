@@ -4110,6 +4110,55 @@ error:
    return 1;
 }
 
+int
+pgmoneta_read_start_wal_location(char* directory, char** startpos)
+{
+   char label[MAX_PATH];
+   char buffer[MAX_PATH];
+   char value[MISC_LENGTH];
+   FILE* file = NULL;
+
+   *startpos = NULL;
+
+   memset(label, 0, sizeof(label));
+   pgmoneta_snprintf(label, sizeof(label), "%s/backup_label", directory);
+
+   file = fopen(label, "r");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Unable to open backup_label file: %s", strerror(errno));
+      goto error;
+   }
+
+   memset(buffer, 0, sizeof(buffer));
+   while (fgets(buffer, sizeof(buffer), file) != NULL)
+   {
+      if (pgmoneta_starts_with(buffer, "START WAL LOCATION"))
+      {
+         memset(value, 0, sizeof(value));
+         if (sscanf(buffer, "START WAL LOCATION: %127s", value) != 1)
+         {
+            pgmoneta_log_error("Error parsing start wal location");
+            goto error;
+         }
+         *startpos = pgmoneta_append(*startpos, value);
+         break;
+      }
+      memset(buffer, 0, sizeof(buffer));
+   }
+
+   fclose(file);
+
+   return *startpos == NULL ? 1 : 0;
+
+error:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   return 1;
+}
+
 static int
 string_compare(const void* a, const void* b)
 {
