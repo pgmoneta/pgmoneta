@@ -112,6 +112,14 @@ static void free_string_array(char** arr, int count);
  * add additional fields for incremental backup in backup_label
  */
 static int add_incremental_label_fields(char* label_file_path, char* prev_data);
+
+/**
+ * Load the relative paths of all files in a backup, with any INCREMENTAL. prefix removed
+ * @param backup_base The backup directory
+ * @param files The resulting set of paths
+ * @return 0 upon success, otherwise 1
+ */
+static int load_backup_files(char* backup_base, struct art** files);
 /**
  * Serialize the incremental blocks for a relation file
  */
@@ -230,6 +238,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    struct query_response* response = NULL;
    char** server_files = NULL;
    int num_of_server_files = 0;
+   struct art* prior_files = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -357,6 +366,12 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       goto error;
    }
 
+   /* Without the parent's file list every file is copied in full */
+   if (load_backup_files(incremental, &prior_files))
+   {
+      pgmoneta_log_warn("Incremental backup: Unable to read the manifest of %s, copying all relation files in full", incremental_label);
+   }
+
    for (int i = 0; i < num_of_server_files; i++)
    {
       block_number limit_block = InvalidBlockNumber;
@@ -425,6 +440,17 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
           entire file every time.
        */
       if (frk == FSM_FORKNUM)
+      {
+         if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+         {
+            pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
+            goto error;
+         }
+         continue;
+      }
+
+      /* A file that is not in the parent backup has no blocks to combine with */
+      if (!pgmoneta_art_contains_key(prior_files, server_files[i]))
       {
          if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
          {
@@ -654,6 +680,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    pgmoneta_free_message(msg);
    pgmoneta_free_query_response(response);
    pgmoneta_brt_destroy(summarized_brt);
+   pgmoneta_art_destroy(prior_files);
    pgmoneta_memory_destroy();
    return 0;
 
@@ -689,6 +716,7 @@ error:
    pgmoneta_free_message(msg);
    pgmoneta_free_query_response(response);
    pgmoneta_brt_destroy(summarized_brt);
+   pgmoneta_art_destroy(prior_files);
    pgmoneta_memory_destroy();
    return 1;
 }
@@ -2071,5 +2099,76 @@ find_wal_segment(char* wal_dir, char* wal_file, char** current)
 
 error:
    pgmoneta_deque_destroy(files);
+   return 1;
+}
+
+static int
+load_backup_files(char* backup_base, struct art** files)
+{
+   char* manifest = NULL;
+   char* key = NULL;
+   char* name = NULL;
+   struct deque* paths = NULL;
+   struct deque_iterator* iter = NULL;
+   struct art* f = NULL;
+
+   *files = NULL;
+
+   manifest = pgmoneta_append(manifest, backup_base);
+   if (!pgmoneta_ends_with(manifest, "/"))
+   {
+      manifest = pgmoneta_append_char(manifest, '/');
+   }
+   manifest = pgmoneta_append(manifest, "backup.manifest");
+
+   if (pgmoneta_manifest_get_paths(manifest, &paths))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_art_create(&f))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_iterator_create(paths, &iter))
+   {
+      goto error;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      name = strrchr(iter->tag, '/');
+      name = name != NULL ? name + 1 : iter->tag;
+
+      if (pgmoneta_starts_with(name, INCREMENTAL_PREFIX))
+      {
+         key = pgmoneta_append_bytes(key, iter->tag, name - iter->tag, 0);
+         key = pgmoneta_append(key, name + strlen(INCREMENTAL_PREFIX));
+      }
+      else
+      {
+         key = pgmoneta_append(key, iter->tag);
+      }
+
+      pgmoneta_art_insert(f, key, (uintptr_t)true, ValueBool);
+      free(key);
+      key = NULL;
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   free(manifest);
+
+   *files = f;
+
+   return 0;
+
+error:
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   pgmoneta_art_destroy(f);
+   free(manifest);
+
    return 1;
 }
