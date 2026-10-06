@@ -322,7 +322,6 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
    char* user = NULL;
    bool has_role = false;
    bool has_privilege = false;
-   char bytea_data_buffer[DEFAULT_BURST];
    uint8_t* b_out = NULL;
    int b_len = 0;
    char query[MISC_LENGTH];
@@ -377,13 +376,8 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
       goto error;
    }
 
-   memset(bytea_data_buffer, 0, DEFAULT_BURST);
-
    /* Note: we get data in hex format */
-   pgmoneta_snprintf(bytea_data_buffer, DEFAULT_BURST, "%s", response->tuples->data[0]);
-
-   /* Transform it to binary */
-   if (transform_hex_bytea_to_binary(bytea_data_buffer, &b_out, &b_len))
+   if (transform_hex_bytea_to_binary(response->tuples->data[0], &b_out, &b_len))
    {
       goto error;
    }
