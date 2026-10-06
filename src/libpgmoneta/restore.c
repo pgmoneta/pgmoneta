@@ -1325,7 +1325,10 @@ pgmoneta_copy_postgresql_restore(int server, char* from, char* to, char* base, c
             {
                if (pgmoneta_compare_string(entry->d_name, "pg_tblspc"))
                {
-                  copy_tablespaces_restore(server, from, to, base, id, backup, workers);
+                  if (copy_tablespaces_restore(server, from, to, base, id, backup, workers))
+                  {
+                     goto error;
+                  }
                }
                else
                {
@@ -1391,6 +1394,14 @@ error:
 
    pgmoneta_workers_wait(workers);
 
+   if (d != NULL)
+   {
+      closedir(d);
+   }
+
+   free(from_buffer);
+   free(to_buffer);
+
    if (restore_last_files_names != NULL)
    {
       for (int i = 0; restore_last_files_names[i] != NULL; i++)
@@ -1437,7 +1448,10 @@ pgmoneta_copy_postgresql_hotstandby(int server, char* from, char* to, char* tbls
             {
                if (pgmoneta_compare_string(entry->d_name, "pg_tblspc"))
                {
-                  copy_tablespaces_hotstandby(server, from, to, tblspc_mappings, backup, workers);
+                  if (copy_tablespaces_hotstandby(server, from, to, tblspc_mappings, backup, workers))
+                  {
+                     goto error;
+                  }
                }
                else
                {
@@ -1468,6 +1482,16 @@ pgmoneta_copy_postgresql_hotstandby(int server, char* from, char* to, char* tbls
    return 0;
 
 error:
+
+   pgmoneta_workers_wait(workers);
+
+   if (d != NULL)
+   {
+      closedir(d);
+   }
+
+   free(from_buffer);
+   free(to_buffer);
 
    return 1;
 }
@@ -3130,7 +3154,6 @@ copy_tablespaces_restore(int server, char* from, char* to, char* base, char* id,
 {
    char* from_tblspc = NULL;
    char* to_tblspc = NULL;
-   int idx = -1;
    DIR* d = NULL;
    ssize_t size;
    struct dirent* entry;
@@ -3166,10 +3189,10 @@ copy_tablespaces_restore(int server, char* from, char* to, char* base, char* id,
 
       while ((entry = readdir(d)))
       {
-         char tmp_tblspc_name[MISC_LENGTH];
          char* link = NULL;
          char path[MAX_PATH];
          char* tblspc_name = NULL;
+         int idx = -1;
 
          if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
          {
@@ -3181,22 +3204,26 @@ copy_tablespaces_restore(int server, char* from, char* to, char* base, char* id,
 
          memset(&path[0], 0, sizeof(path));
          size = readlink(link, &path[0], sizeof(path));
-         if (size == -1)
+         if (size <= 0 || size >= (ssize_t)sizeof(path))
          {
+            pgmoneta_log_error("Could not read symlink: %s", link);
+            free(link);
             goto error;
          }
 
          if (pgmoneta_ends_with(&path[0], "/"))
          {
-            memset(&tmp_tblspc_name[0], 0, sizeof(tmp_tblspc_name));
-            memcpy(&tmp_tblspc_name[0], &path[0], strlen(&path[0]) - 1);
+            path[size - 1] = '\0';
+         }
 
-            tblspc_name = strrchr(&tmp_tblspc_name[0], '/') + 1;
-         }
-         else
+         tblspc_name = strrchr(&path[0], '/');
+         if (tblspc_name == NULL)
          {
-            tblspc_name = strrchr(&path[0], '/') + 1;
+            pgmoneta_log_error("Invalid tablespace link: %s -> %s", link, &path[0]);
+            free(link);
+            goto error;
          }
+         tblspc_name++;
 
          for (uint64_t i = 0; idx == -1 && i < backup->number_of_tablespaces; i++)
          {
@@ -3266,6 +3293,11 @@ copy_tablespaces_restore(int server, char* from, char* to, char* base, char* id,
 
 error:
 
+   if (d != NULL)
+   {
+      closedir(d);
+   }
+
    free(from_tblspc);
    free(to_tblspc);
 
@@ -3277,6 +3309,9 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
 {
    char* from_tblspc = NULL;
    char* to_tblspc = NULL;
+   char* src = NULL;
+   char* dst = NULL;
+   char* link = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -3301,9 +3336,6 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
    {
       for (unsigned long i = 0; i < backup->number_of_tablespaces; i++)
       {
-         char* src = NULL;
-         char* dst = NULL;
-         char* link = NULL;
          bool found = false;
          char* copied_tblspc_mappings = NULL;
          char* token = NULL;
@@ -3396,6 +3428,10 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
          free(src);
          free(dst);
          free(link);
+
+         src = NULL;
+         dst = NULL;
+         link = NULL;
       }
    }
 
@@ -3406,6 +3442,9 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
 
 error:
 
+   free(src);
+   free(dst);
+   free(link);
    free(from_tblspc);
    free(to_tblspc);
 

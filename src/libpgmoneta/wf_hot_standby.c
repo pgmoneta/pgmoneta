@@ -308,9 +308,13 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             pgmoneta_mkdir(root);
             pgmoneta_mkdir(destination);
 
-            pgmoneta_copy_postgresql_hotstandby(server, source, destination,
-                                                config->common.servers[server].hot_standby_tablespaces[i],
-                                                backups[number_of_backups - 1], workers);
+            if (pgmoneta_copy_postgresql_hotstandby(server, source, destination,
+                                                    config->common.servers[server].hot_standby_tablespaces[i],
+                                                    backups[number_of_backups - 1], workers))
+            {
+               error = true;
+               goto cleanup;
+            }
          }
          pgmoneta_log_debug("hot_standby source:      %s", source);
          pgmoneta_log_debug("hot_standby destination: %s", destination);
