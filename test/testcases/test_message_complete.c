@@ -307,3 +307,73 @@ cleanup:
    pgmoneta_memory_stream_buffer_free(buffer);
    MCTF_FINISH();
 }
+
+/* A copy stream message that ends exactly at the end of the buffered data
+ * must be returned without waiting for more data. Runs in a child process
+ * with a timeout, since the broken behaviour blocks forever. */
+MCTF_TEST(test_copy_stream_message_ends_at_buffer_end)
+{
+   int sv[2] = {-1, -1};
+   const char* payload = "copy data";
+   size_t total = 1 + 4 + strlen(payload);
+   struct stream_buffer* buffer = NULL;
+   pid_t pid;
+   int wstatus = 0;
+
+   pgmoneta_memory_stream_buffer_init(&buffer);
+   MCTF_ASSERT(buffer != NULL && buffer->buffer != NULL, cleanup, "stream buffer init failed");
+
+   MCTF_ASSERT_INT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sv), 0, cleanup, "socketpair failed");
+
+   pgmoneta_write_byte(buffer->buffer, 'd');
+   pgmoneta_write_int32(buffer->buffer + 1, (int32_t)(4 + strlen(payload)));
+   memcpy(buffer->buffer + 5, payload, strlen(payload));
+   buffer->end = total;
+
+   pid = fork();
+   MCTF_ASSERT(pid >= 0, cleanup, "fork failed");
+
+   if (pid == 0)
+   {
+      struct main_configuration* config = NULL;
+      struct message msg;
+      int status;
+
+      alarm(5);
+
+      /* private configuration so the shared one is left untouched */
+      config = (struct main_configuration*)calloc(1, sizeof(struct main_configuration));
+      if (config == NULL)
+      {
+         _exit(2);
+      }
+      if (shmem != NULL)
+      {
+         memcpy(config, shmem, sizeof(struct main_configuration));
+      }
+      config->running = true;
+      config->common.servers[0].online = true;
+      shmem = config;
+
+      memset(&msg, 0, sizeof(msg));
+      status = pgmoneta_consume_copy_stream_start(0, NULL, sv[0], buffer, &msg);
+
+      _exit(status == MESSAGE_STATUS_OK && msg.kind == 'd' && msg.length == (ssize_t)strlen(payload) ? 0 : 1);
+   }
+
+   MCTF_ASSERT(waitpid(pid, &wstatus, 0) == pid, cleanup, "waitpid failed");
+   MCTF_ASSERT(!WIFSIGNALED(wstatus), cleanup, "blocked waiting for data after a complete message");
+   MCTF_ASSERT(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0, cleanup, "complete message not returned");
+
+cleanup:
+   if (sv[0] >= 0)
+   {
+      close(sv[0]);
+   }
+   if (sv[1] >= 0)
+   {
+      close(sv[1]);
+   }
+   pgmoneta_memory_stream_buffer_free(buffer);
+   MCTF_FINISH();
+}

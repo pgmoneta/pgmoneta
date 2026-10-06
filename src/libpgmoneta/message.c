@@ -2117,7 +2117,7 @@ pgmoneta_consume_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer
       m = (struct message*)malloc(sizeof(struct message));
       m->kind = buffer->buffer[buffer->cursor++];
       // try to get message length
-      while (buffer->cursor + 4 >= buffer->end)
+      while (buffer->cursor + 4 > buffer->end)
       {
          status = pgmoneta_read_copy_stream(srv, ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
@@ -2131,7 +2131,7 @@ pgmoneta_consume_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer
       }
       length = pgmoneta_read_int32(buffer->buffer + buffer->cursor);
       // receive the whole message even if we are going to skip it
-      while (buffer->cursor + length >= buffer->end)
+      while (buffer->cursor + length > buffer->end)
       {
          status = pgmoneta_read_copy_stream(srv, ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
@@ -2212,7 +2212,7 @@ pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_
       }
       message->kind = buffer->buffer[buffer->cursor];
       // try to get message length
-      while (buffer->cursor + 1 + 4 >= buffer->end)
+      while (buffer->cursor + 1 + 4 > buffer->end)
       {
          status = pgmoneta_read_copy_stream(srv, ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
@@ -2227,7 +2227,7 @@ pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_
       length = pgmoneta_read_int32(buffer->buffer + buffer->cursor + 1);
 
       // receive the whole message even if we are going to skip it
-      while (buffer->cursor + 1 + length >= buffer->end)
+      while (buffer->cursor + 1 + length > buffer->end)
       {
          status = pgmoneta_read_copy_stream(srv, ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
