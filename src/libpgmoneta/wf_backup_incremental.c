@@ -1441,16 +1441,16 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
    }
 
    /* Write the file header */
-   bytes_written += fwrite(&magic, sizeof(magic), 1, file);
-   bytes_written += fwrite(&num_incr_blocks, sizeof(num_incr_blocks), 1, file);
-   bytes_written += fwrite(&truncation_block_length, sizeof(truncation_block_length), 1, file);
+   bytes_written += fwrite(&magic, 1, sizeof(magic), file);
+   bytes_written += fwrite(&num_incr_blocks, 1, sizeof(num_incr_blocks), file);
+   bytes_written += fwrite(&truncation_block_length, 1, sizeof(truncation_block_length), file);
 
    if (empty)
    {
       goto done;
    }
 
-   bytes_written += fwrite(incr_blocks, sizeof(block_number), num_incr_blocks, file);
+   bytes_written += fwrite(incr_blocks, 1, sizeof(block_number) * num_incr_blocks, file);
 
    if ((num_incr_blocks > 0) && (bytes_written % block_size != 0))
    {
