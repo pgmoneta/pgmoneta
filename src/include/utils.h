@@ -1097,6 +1097,15 @@ int
 pgmoneta_read_checkpoint_info(char* directory, char** chkptpos);
 
 /**
+ * Read the start WAL location from a backup_label file
+ * @param directory The base directory
+ * @param startpos [out] The start WAL position
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_read_start_wal_location(char* directory, char** startpos);
+
+/**
  * Get the directory for a server
  * @param server The server
  * @return The directory
