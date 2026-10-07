@@ -357,7 +357,12 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       // get the copy out response
       while (msg != NULL && msg->kind != 'H')
       {
-         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
+         if (pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg) != MESSAGE_STATUS_OK)
+         {
+            fflush(file);
+            fclose(file);
+            goto error;
+         }
          if (msg->kind == 'E' || msg->kind == 'f')
          {
             pgmoneta_log_copyfail_message(msg);
@@ -370,7 +375,12 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       }
       while (msg->kind != 'c')
       {
-         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
+         if (pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg) != MESSAGE_STATUS_OK)
+         {
+            fflush(file);
+            fclose(file);
+            goto error;
+         }
          if (msg->kind == 'E' || msg->kind == 'f')
          {
             pgmoneta_log_copyfail_message(msg);
@@ -545,7 +555,10 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    }
    while (msg != NULL && msg->kind != 'H')
    {
-      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
+      if (pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg) != MESSAGE_STATUS_OK)
+      {
+         goto error;
+      }
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -557,7 +570,10 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
 
    while (msg->kind != 'c')
    {
-      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
+      if (pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg) != MESSAGE_STATUS_OK)
+      {
+         goto error;
+      }
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
