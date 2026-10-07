@@ -2019,16 +2019,8 @@ pgmoneta_read_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer* b
             goto ssl_error;
          }
 
-         if (errno == EAGAIN || errno == EWOULDBLOCK)
-         {
-            keep_read = true;
-            errno = 0;
-            SLEEP(1000000L);
-         }
-         else
-         {
-            return MESSAGE_STATUS_ZERO;
-         }
+         pgmoneta_log_error("Connection closed by server %s", config->common.servers[srv].name);
+         goto error;
       }
       else
       {
@@ -2039,9 +2031,8 @@ ssl_error:
             switch (err)
             {
                case SSL_ERROR_ZERO_RETURN:
-                  /* Sleep for 100ms */
-                  SLEEP(100000000L);
-                  keep_read = true;
+                  pgmoneta_log_error("Connection closed by server %s", config->common.servers[srv].name);
+                  keep_read = false;
                   break;
                case SSL_ERROR_WANT_READ:
                   keep_read = true;
@@ -2089,6 +2080,7 @@ ssl_error:
             }
             else
             {
+               pgmoneta_log_error("Could not read from server %s: %s", config->common.servers[srv].name, strerror(errno));
                keep_read = false;
             }
          }
@@ -2449,7 +2441,10 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
    // get the copy out response
    while (msg != NULL && msg->kind != 'H')
    {
-      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
+      if (pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg) != MESSAGE_STATUS_OK)
+      {
+         goto error;
+      }
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -2461,7 +2456,10 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
 
    while (msg->kind != 'c')
    {
-      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
+      if (pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg) != MESSAGE_STATUS_OK)
+      {
+         goto error;
+      }
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);

@@ -124,6 +124,8 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_start_logging();
    pgmoneta_memory_init();
    install_wal_sigchld_handler();
+   /* a write to a closed connection must fail with EPIPE, not kill the receiver */
+   signal(SIGPIPE, SIG_IGN);
 
    pgmoneta_set_proc_title(1, argv, "wal", config->common.servers[srv].name);
 
@@ -606,7 +608,10 @@ pgmoneta_wal(int srv, char** argv)
       msg->kind = '\0';
       while (config->running && pgmoneta_server_is_online(srv) && msg->kind != 'C')
       {
-         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
+         if (pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg) != MESSAGE_STATUS_OK)
+         {
+            goto error;
+         }
          pgmoneta_consume_copy_stream_end(buffer, msg);
       }
 
