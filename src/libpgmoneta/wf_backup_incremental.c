@@ -96,6 +96,13 @@ static int parse_relation_file(char* backup_data, char* rel_file_path, struct re
 static int create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** paths, int* count);
 static char** get_paths(char* backup_data, struct query_response* data, int* count);
 /**
+ * Is the path one that a base backup leaves out (see pg_basebackup's exclude lists)
+ * @param path The path relative to the data directory
+ * @param is_dir Whether the path is a directory
+ * @return true if excluded
+ */
+static bool is_excluded_path(char* path, bool is_dir);
+/**
  * free an array of string
  */
 static void free_string_array(char** arr, int count);
@@ -1665,6 +1672,13 @@ get_paths(char* backup_data, struct query_response* response, int* c)
    tuple = response->tuples;
    while (tuple != NULL)
    {
+      if (is_excluded_path(pgmoneta_starts_with(tuple->data[0], "./") ? tuple->data[0] + 2 : tuple->data[0],
+                           !pgmoneta_compare_string(tuple->data[1], "f")))
+      {
+         tuple = tuple->next;
+         continue;
+      }
+
       if (pgmoneta_compare_string(tuple->data[1], "f"))
       {
          count++;
@@ -1701,7 +1715,8 @@ get_paths(char* backup_data, struct query_response* response, int* c)
    tuple = response->tuples;
    while (tuple != NULL && idx < count)
    {
-      if (pgmoneta_compare_string(tuple->data[1], "f"))
+      if (pgmoneta_compare_string(tuple->data[1], "f") &&
+          !is_excluded_path(pgmoneta_starts_with(tuple->data[0], "./") ? tuple->data[0] + 2 : tuple->data[0], false))
       {
          if (pgmoneta_starts_with(tuple->data[0], "./"))
          {
@@ -1918,4 +1933,41 @@ error:
       fclose(manifest);
    }
    return 1;
+}
+
+static bool
+is_excluded_path(char* path, bool is_dir)
+{
+   /* directories whose contents are not needed: the directory itself is kept */
+   char* dirs[] = {"pg_stat_tmp/", "pg_replslot/", "pg_dynshmem/", "pg_notify/",
+                   "pg_serial/", "pg_snapshots/", "pg_subtrans/", NULL};
+   /* files left out wherever they are */
+   char* files[] = {"postgresql.auto.conf.tmp", "current_logfiles.tmp", "backup_label",
+                    "tablespace_map", "backup_manifest", "postmaster.pid", "postmaster.opts", NULL};
+   char* name = strrchr(path, '/');
+
+   name = name != NULL ? name + 1 : path;
+
+   for (int i = 0; dirs[i] != NULL; i++)
+   {
+      if (pgmoneta_starts_with(path, dirs[i]))
+      {
+         return true;
+      }
+   }
+
+   if (is_dir)
+   {
+      return false;
+   }
+
+   for (int i = 0; files[i] != NULL; i++)
+   {
+      if (pgmoneta_compare_string(name, files[i]))
+      {
+         return true;
+      }
+   }
+
+   return pgmoneta_starts_with(name, "pg_internal.init");
 }
