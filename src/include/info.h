@@ -170,6 +170,15 @@ int
 pgmoneta_load_info(char* directory, char* identifier, struct backup** backup);
 
 /**
+ * Load a backup.info file from an explicit path (e.g. backup.info.tmp during staging)
+ * @param path The path to the info file
+ * @param backup The backup
+ * @return The result
+ */
+int
+pgmoneta_load_info_file(char* path, struct backup** backup);
+
+/**
  * Get the number of valid backups
  * @param i The server
  * @return The result

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2026 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -437,16 +437,253 @@ error:
 }
 
 int
-pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
+pgmoneta_load_info_file(char* path, struct backup** backup)
 {
-   char* label = NULL;
-   char* fn = NULL;
    char buffer[INFO_BUFFER_SIZE];
    FILE* file = NULL;
    int tbl_idx = 0;
    struct backup* bck = NULL;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
+
+   *backup = NULL;
+
+   if (path == NULL || strlen(path) == 0 || !pgmoneta_exists(path))
+   {
+      goto error;
+   }
+
+   file = fopen(path, "r");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", path, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   bck = (struct backup*)malloc(sizeof(struct backup));
+   if (bck == NULL)
+   {
+      goto error;
+   }
+
+   memset(bck, 0, sizeof(struct backup));
+   bck->valid = VALID_UNKNOWN;
+
+   while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
+   {
+      char key[INFO_BUFFER_SIZE];
+      char value[INFO_BUFFER_SIZE];
+      char* ptr = NULL;
+
+      memset(&key[0], 0, sizeof(key));
+      memset(&value[0], 0, sizeof(value));
+
+      ptr = strtok(&buffer[0], "=");
+
+      if (ptr == NULL)
+      {
+         goto error;
+      }
+
+      memcpy(&key[0], ptr, strlen(ptr));
+
+      ptr = strtok(NULL, "=");
+
+      if (ptr == NULL)
+      {
+         goto error;
+      }
+
+      memcpy(&value[0], ptr, strlen(ptr) - 1);
+
+      if (pgmoneta_compare_string(INFO_PGMONETA_VERSION, &key[0]))
+      {
+         memcpy(&bck->version[0], &value[0], strlen(&value[0]));
+      }
+      else if (pgmoneta_compare_string(INFO_STATUS, &key[0]))
+      {
+         if (pgmoneta_compare_string("1", &value[0]))
+         {
+            bck->valid = VALID_TRUE;
+         }
+         else
+         {
+            bck->valid = VALID_FALSE;
+         }
+      }
+      else if (pgmoneta_compare_string(INFO_LABEL, &key[0]))
+      {
+         memcpy(&bck->label[0], &value[0], strlen(&value[0]));
+      }
+      else if (pgmoneta_compare_string(INFO_WAL, &key[0]))
+      {
+         memcpy(&bck->wal[0], &value[0], strlen(&value[0]));
+      }
+      else if (pgmoneta_compare_string(INFO_BACKUP, &key[0]))
+      {
+         bck->backup_size = strtoul(&value[0], &ptr, 10);
+      }
+      else if (pgmoneta_compare_string(INFO_RESTORE, &key[0]))
+      {
+         bck->restore_size = strtoul(&value[0], &ptr, 10);
+      }
+      else if (pgmoneta_compare_string(INFO_BIGGEST_FILE, &key[0]))
+      {
+         bck->biggest_file_size = strtoul(&value[0], &ptr, 10);
+      }
+      else if (pgmoneta_compare_string(INFO_ELAPSED, &key[0]))
+      {
+         bck->total_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_BASEBACKUP_ELAPSED, &key[0]))
+      {
+         bck->basebackup_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_HASH_ELAPSED, &key[0]))
+      {
+         bck->hash_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_MANIFEST_ELAPSED, &key[0]))
+      {
+         bck->manifest_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_COMPRESSION_ZSTD_ELAPSED, &key[0]))
+      {
+         bck->compression_zstd_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_COMPRESSION_BZIP2_ELAPSED, &key[0]))
+      {
+         bck->compression_bzip2_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_COMPRESSION_GZIP_ELAPSED, &key[0]))
+      {
+         bck->compression_gzip_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_COMPRESSION_LZ4_ELAPSED, &key[0]))
+      {
+         bck->compression_lz4_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_ENCRYPTION_ELAPSED, &key[0]))
+      {
+         bck->encryption_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_LINKING_ELAPSED, &key[0]))
+      {
+         bck->linking_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_REMOTE_SSH_ELAPSED, &key[0]))
+      {
+         bck->remote_ssh_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_REMOTE_AZURE_ELAPSED, &key[0]))
+      {
+         bck->remote_azure_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_REMOTE_S3_ELAPSED, &key[0]))
+      {
+         bck->remote_s3_elapsed_time = atof(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_MAJOR_VERSION, &key[0]))
+      {
+         bck->major_version = atoi(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_MINOR_VERSION, &key[0]))
+      {
+         bck->minor_version = atoi(&value[0]);
+      }
+      else if (pgmoneta_compare_string(INFO_KEEP, &key[0]))
+      {
+         bck->keep = atoi(&value[0]) == 1 ? true : false;
+      }
+      else if (pgmoneta_compare_string(INFO_TABLESPACES, &key[0]))
+      {
+         bck->number_of_tablespaces = strtoul(&value[0], &ptr, 10);
+      }
+      else if (pgmoneta_starts_with(&key[0], "TABLESPACE_OID"))
+      {
+         memcpy(&bck->tablespaces_oids[tbl_idx], &value[0], strlen(&value[0]));
+      }
+      else if (pgmoneta_starts_with(&key[0], "TABLESPACE_PATH"))
+      {
+         memcpy(&bck->tablespaces_paths[tbl_idx], &value[0], strlen(&value[0]));
+         /* This one is last */
+         tbl_idx++;
+      }
+      else if (pgmoneta_starts_with(&key[0], "TABLESPACE"))
+      {
+         memcpy(&bck->tablespaces[tbl_idx], &value[0], strlen(&value[0]));
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_START_WALPOS))
+      {
+         sscanf(&value[0], "%X/%X", &bck->start_lsn_hi32, &bck->start_lsn_lo32);
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_END_WALPOS))
+      {
+         sscanf(&value[0], "%X/%X", &bck->end_lsn_hi32, &bck->end_lsn_lo32);
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_CHKPT_WALPOS))
+      {
+         sscanf(&value[0], "%X/%X", &bck->checkpoint_lsn_hi32, &bck->checkpoint_lsn_lo32);
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_START_TIMELINE))
+      {
+         bck->start_timeline = atoi(&value[0]);
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_END_TIMELINE))
+      {
+         bck->end_timeline = atoi(&value[0]);
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_COMMENTS))
+      {
+         memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_EXTRA))
+      {
+         memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_COMPRESSION))
+      {
+         bck->compression = migrate_compression_value(atoi(&value[0]));
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_ENCRYPTION))
+      {
+         bck->encryption = atoi(&value[0]);
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_TYPE))
+      {
+         bck->type = atoi(&value[0]);
+      }
+      else if (pgmoneta_starts_with(&key[0], INFO_PARENT))
+      {
+         memcpy(&bck->parent_label[0], &value[0], strlen(&value[0]));
+      }
+   }
+
+   *backup = bck;
+
+   fsync(fileno(file));
+   fclose(file);
+
+   return 0;
+
+error:
+
+   free(bck);
+
+   if (file != NULL)
+   {
+      fsync(fileno(file));
+      fclose(file);
+   }
+
+   return 1;
+}
+
+int
+pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
+{
+   char* label = NULL;
+   char* fn = NULL;
+   struct backup* bck = NULL;
 
    *backup = NULL;
 
@@ -500,237 +737,25 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
 
    if (pgmoneta_exists(fn))
    {
-      file = fopen(fn, "r");
-      if (file == NULL)
+      if (pgmoneta_load_info_file(fn, backup))
       {
-         pgmoneta_log_error("Could not open file %s due to %s", fn, strerror(errno));
-         errno = 0;
          goto error;
       }
    }
-
-   bck = (struct backup*)malloc(sizeof(struct backup));
-
-   if (bck == NULL)
+   else
    {
-      goto error;
-   }
-
-   memset(bck, 0, sizeof(struct backup));
-
-   bck->valid = VALID_UNKNOWN;
-
-   if (file != NULL)
-   {
-      while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
+      bck = (struct backup*)malloc(sizeof(struct backup));
+      if (bck == NULL)
       {
-         char key[INFO_BUFFER_SIZE];
-         char value[INFO_BUFFER_SIZE];
-         char* ptr = NULL;
-
-         memset(&key[0], 0, sizeof(key));
-         memset(&value[0], 0, sizeof(value));
-
-         ptr = strtok(&buffer[0], "=");
-
-         if (ptr == NULL)
-         {
-            goto error;
-         }
-
-         memcpy(&key[0], ptr, strlen(ptr));
-
-         ptr = strtok(NULL, "=");
-
-         if (ptr == NULL)
-         {
-            goto error;
-         }
-
-         memcpy(&value[0], ptr, strlen(ptr) - 1);
-
-         if (pgmoneta_compare_string(INFO_PGMONETA_VERSION, &key[0]))
-         {
-            memcpy(&bck->version[0], &value[0], strlen(&value[0]));
-         }
-         else if (pgmoneta_compare_string(INFO_STATUS, &key[0]))
-         {
-            if (pgmoneta_compare_string("1", &value[0]))
-            {
-               bck->valid = VALID_TRUE;
-            }
-            else
-            {
-               bck->valid = VALID_FALSE;
-            }
-         }
-         else if (pgmoneta_compare_string(INFO_LABEL, &key[0]))
-         {
-            memcpy(&bck->label[0], &value[0], strlen(&value[0]));
-         }
-         else if (pgmoneta_compare_string(INFO_WAL, &key[0]))
-         {
-            memcpy(&bck->wal[0], &value[0], strlen(&value[0]));
-         }
-         else if (pgmoneta_compare_string(INFO_BACKUP, &key[0]))
-         {
-            bck->backup_size = strtoul(&value[0], &ptr, 10);
-         }
-         else if (pgmoneta_compare_string(INFO_RESTORE, &key[0]))
-         {
-            bck->restore_size = strtoul(&value[0], &ptr, 10);
-         }
-         else if (pgmoneta_compare_string(INFO_BIGGEST_FILE, &key[0]))
-         {
-            bck->biggest_file_size = strtoul(&value[0], &ptr, 10);
-         }
-         else if (pgmoneta_compare_string(INFO_ELAPSED, &key[0]))
-         {
-            bck->total_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_BASEBACKUP_ELAPSED, &key[0]))
-         {
-            bck->basebackup_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_HASH_ELAPSED, &key[0]))
-         {
-            bck->hash_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_MANIFEST_ELAPSED, &key[0]))
-         {
-            bck->manifest_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_COMPRESSION_ZSTD_ELAPSED, &key[0]))
-         {
-            bck->compression_zstd_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_COMPRESSION_BZIP2_ELAPSED, &key[0]))
-         {
-            bck->compression_bzip2_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_COMPRESSION_GZIP_ELAPSED, &key[0]))
-         {
-            bck->compression_gzip_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_COMPRESSION_LZ4_ELAPSED, &key[0]))
-         {
-            bck->compression_lz4_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_ENCRYPTION_ELAPSED, &key[0]))
-         {
-            bck->encryption_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_LINKING_ELAPSED, &key[0]))
-         {
-            bck->linking_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_REMOTE_SSH_ELAPSED, &key[0]))
-         {
-            bck->remote_ssh_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_REMOTE_AZURE_ELAPSED, &key[0]))
-         {
-            bck->remote_azure_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_REMOTE_S3_ELAPSED, &key[0]))
-         {
-            bck->remote_s3_elapsed_time = atof(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_MAJOR_VERSION, &key[0]))
-         {
-            bck->major_version = atoi(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_MINOR_VERSION, &key[0]))
-         {
-            bck->minor_version = atoi(&value[0]);
-         }
-         else if (pgmoneta_compare_string(INFO_KEEP, &key[0]))
-         {
-            bck->keep = atoi(&value[0]) == 1 ? true : false;
-         }
-         else if (pgmoneta_compare_string(INFO_TABLESPACES, &key[0]))
-         {
-            bck->number_of_tablespaces = strtoul(&value[0], &ptr, 10);
-         }
-         else if (pgmoneta_starts_with(&key[0], "TABLESPACE_OID"))
-         {
-            memcpy(&bck->tablespaces_oids[tbl_idx], &value[0], strlen(&value[0]));
-         }
-         else if (pgmoneta_starts_with(&key[0], "TABLESPACE_PATH"))
-         {
-            memcpy(&bck->tablespaces_paths[tbl_idx], &value[0], strlen(&value[0]));
-            /* This one is last */
-            tbl_idx++;
-         }
-         else if (pgmoneta_starts_with(&key[0], "TABLESPACE"))
-         {
-            memcpy(&bck->tablespaces[tbl_idx], &value[0], strlen(&value[0]));
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_START_WALPOS))
-         {
-            sscanf(&value[0], "%X/%X", &bck->start_lsn_hi32, &bck->start_lsn_lo32);
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_END_WALPOS))
-         {
-            sscanf(&value[0], "%X/%X", &bck->end_lsn_hi32, &bck->end_lsn_lo32);
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_CHKPT_WALPOS))
-         {
-            sscanf(&value[0], "%X/%X", &bck->checkpoint_lsn_hi32, &bck->checkpoint_lsn_lo32);
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_START_TIMELINE))
-         {
-            bck->start_timeline = atoi(&value[0]);
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_END_TIMELINE))
-         {
-            bck->end_timeline = atoi(&value[0]);
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_COMMENTS))
-         {
-            memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_EXTRA))
-         {
-            memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_COMPRESSION))
-         {
-            bck->compression = migrate_compression_value(atoi(&value[0]));
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_ENCRYPTION))
-         {
-            bck->encryption = atoi(&value[0]);
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_TYPE))
-         {
-            bck->type = atoi(&value[0]);
-         }
-         else if (pgmoneta_starts_with(&key[0], INFO_PARENT))
-         {
-            memcpy(&bck->parent_label[0], &value[0], strlen(&value[0]));
-         }
+         goto error;
       }
-   }
 
-   *backup = bck;
-
-   if (file != NULL)
-   {
-      fsync(fileno(file));
-      fclose(file);
+      memset(bck, 0, sizeof(struct backup));
+      bck->valid = VALID_UNKNOWN;
+      *backup = bck;
    }
 
    free(fn);
-
-   if (backups != NULL)
-   {
-      for (int i = 0; i < number_of_backups; i++)
-      {
-         free(backups[i]);
-      }
-      free(backups);
-   }
 
    if (identifier != label)
    {
@@ -740,23 +765,6 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
    return 0;
 
 error:
-
-   if (backups != NULL)
-   {
-      for (int i = 0; i < number_of_backups; i++)
-      {
-         free(backups[i]);
-      }
-      free(backups);
-   }
-
-   free(bck);
-
-   if (file != NULL)
-   {
-      fsync(fileno(file));
-      fclose(file);
-   }
 
    free(fn);
 
