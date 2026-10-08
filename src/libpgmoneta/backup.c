@@ -113,13 +113,31 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-   curr_t = time(NULL);
-   memset(&date_str[0], 0, sizeof(date_str));
-   time_info = localtime(&curr_t);
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    incremental = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
 
-   strftime(&date_str[0], sizeof(date_str), "%Y%m%d%H%M%S", time_info);
+   /* labels have second resolution: never reuse the directory of an existing backup */
+   while (true)
+   {
+      char* existing = NULL;
+      bool taken = false;
+
+      curr_t = time(NULL);
+      memset(&date_str[0], 0, sizeof(date_str));
+      time_info = localtime(&curr_t);
+      strftime(&date_str[0], sizeof(date_str), "%Y%m%d%H%M%S", time_info);
+
+      existing = pgmoneta_get_server_backup_identifier(server, &date_str[0]);
+      taken = pgmoneta_exists(existing);
+      free(existing);
+
+      if (!taken)
+      {
+         break;
+      }
+
+      SLEEP(100000000L);
+   }
 
    date = pgmoneta_append(date, &date_str[0]);
 
