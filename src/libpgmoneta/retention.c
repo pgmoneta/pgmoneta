@@ -53,15 +53,14 @@ pgmoneta_retention(char** argv)
 
    for (server = 0; server < config->common.number_of_servers; server++)
    {
-      bool active = false;
-
       if (!config->common.servers[server].online)
       {
          pgmoneta_log_debug("Retention: Server %s is offline", config->common.servers[server].name);
          continue;
       }
 
-      if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
+      /* the deletes take the repository lock themselves */
+      if (atomic_load(&config->common.servers[server].repository))
       {
          pgmoneta_log_debug("Retention: Server %s is active", config->common.servers[server].name);
          pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
@@ -94,7 +93,6 @@ pgmoneta_retention(char** argv)
       workflow = NULL;
 
       config->common.servers[server].active_retention = false;
-      atomic_store(&config->common.servers[server].repository, false);
    }
 
    pgmoneta_stop_logging();
@@ -109,7 +107,6 @@ error:
    pgmoneta_workflow_destroy(workflow);
 
    config->common.servers[server].active_retention = false;
-   atomic_store(&config->common.servers[server].repository, false);
 
    pgmoneta_stop_logging();
 

@@ -56,7 +56,7 @@ pgmoneta_delete(int srv, char* label)
    char* en = NULL;
    struct workflow* workflow = NULL;
    struct art* nodes = NULL;
-   struct backup* backup = NULL;
+   struct backup* backup = NULL; /* owned by nodes */
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, NULL);
 
@@ -75,7 +75,6 @@ pgmoneta_delete(int srv, char* label)
       goto error;
    }
 
-   free(backup);
    pgmoneta_art_destroy(nodes);
 
    pgmoneta_workflow_destroy(workflow);
@@ -86,7 +85,6 @@ error:
 
    pgmoneta_log_error("Delete: %s (%d)", en, ec);
 
-   free(backup);
    pgmoneta_art_destroy(nodes);
 
    pgmoneta_workflow_destroy(workflow);
