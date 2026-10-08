@@ -38,12 +38,14 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
 static void do_link(struct worker_common* wc);
 static void do_relink(struct worker_common* wc);
+static int repoint(char* deleted, char* next, char* dir);
 static void do_comparefiles(struct worker_common* wc);
 static char* trim_suffix(char* str);
 
@@ -154,6 +156,7 @@ static void
 do_link(struct worker_common* wc)
 {
    struct worker_input* wi = (struct worker_input*)wc;
+   char* target = NULL;
 
    if (pgmoneta_exists(wi->to))
    {
@@ -165,7 +168,14 @@ do_link(struct worker_common* wc)
       {
          pgmoneta_log_debug("%s doesn't exists", wi->from);
       }
-      pgmoneta_symlink_file(wi->from, wi->to);
+
+      /* link to the file itself, not to the previous backup's link, so links stay one hop */
+      if (pgmoneta_is_symlink(wi->to))
+      {
+         target = pgmoneta_get_symlink(wi->to);
+      }
+      pgmoneta_symlink_file(wi->from, target != NULL ? target : wi->to);
+      free(target);
    }
    else
    {
@@ -519,4 +529,84 @@ trim_suffix(char* str)
    free(suffix);
 
    return res;
+}
+
+int
+pgmoneta_relink_newer(char* deleted, char* next, char* newer)
+{
+   return repoint(deleted, next, newer);
+}
+
+static int
+repoint(char* deleted, char* next, char* dir)
+{
+   DIR* d = opendir(dir);
+   struct dirent* entry;
+   struct stat statbuf;
+   char* path = NULL;
+   char* target = NULL;
+   char* moved = NULL;
+   size_t len = strlen(deleted);
+   int ret = 0;
+
+   if (d == NULL)
+   {
+      return 1;
+   }
+
+   while ((entry = readdir(d)))
+   {
+      if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
+      {
+         continue;
+      }
+
+      path = pgmoneta_append(path, dir);
+      if (!pgmoneta_ends_with(dir, "/"))
+      {
+         path = pgmoneta_append(path, "/");
+      }
+      path = pgmoneta_append(path, entry->d_name);
+
+      if (!lstat(path, &statbuf))
+      {
+         if (S_ISDIR(statbuf.st_mode))
+         {
+            if (repoint(deleted, next, path))
+            {
+               ret = 1;
+            }
+         }
+         else if (S_ISLNK(statbuf.st_mode))
+         {
+            target = pgmoneta_get_symlink(path);
+
+            /* a link into the deleted backup now belongs to the next one */
+            if (target != NULL && pgmoneta_starts_with(target, deleted))
+            {
+               moved = pgmoneta_append(moved, next);
+               moved = pgmoneta_append(moved, target + len);
+
+               pgmoneta_delete_file(path, NULL);
+               if (pgmoneta_symlink_file(path, moved))
+               {
+                  pgmoneta_log_error("repoint: failed to link %s -> %s", path, moved);
+                  ret = 1;
+               }
+            }
+
+            free(target);
+            free(moved);
+            target = NULL;
+            moved = NULL;
+         }
+      }
+
+      free(path);
+      path = NULL;
+   }
+
+   closedir(d);
+
+   return ret;
 }

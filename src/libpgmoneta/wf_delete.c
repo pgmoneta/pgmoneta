@@ -45,6 +45,8 @@
 #include <stdlib.h>
 #include <strings.h>
 
+static void relink_newer_backups(int server, struct backup** backups, int number_of_backups, int index, int next_index);
+
 static char* delete_name(void);
 static int delete_backup_execute(char*, struct art*);
 
@@ -325,6 +327,9 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          }
          pgmoneta_workers_destroy(workers);
 
+         /* newer backups may link into the deleted backup directly */
+         relink_newer_backups(server, backups, number_of_backups, index, next_index);
+
          /* Delete from */
          pgmoneta_delete_directory(d);
          free(d);
@@ -379,6 +384,9 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
             goto error;
          }
          pgmoneta_workers_destroy(workers);
+
+         /* newer backups may link into the deleted backup directly */
+         relink_newer_backups(server, backups, number_of_backups, index, next_index);
 
          /* Delete from */
          pgmoneta_delete_directory(d);
@@ -444,4 +452,34 @@ error:
    free(from);
    free(to);
    return 1;
+}
+
+static void
+relink_newer_backups(int server, struct backup** backups, int number_of_backups, int index, int next_index)
+{
+   char* deleted = NULL;
+   char* next = NULL;
+   char* newer = NULL;
+
+   deleted = pgmoneta_get_server_backup_identifier(server, backups[index]->label);
+   next = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
+
+   for (int i = index + 1; i < number_of_backups; i++)
+   {
+      if (i == next_index)
+      {
+         continue;
+      }
+
+      newer = pgmoneta_get_server_backup_identifier(server, backups[i]->label);
+      if (pgmoneta_relink_newer(deleted, next, newer))
+      {
+         pgmoneta_log_warn("Delete: unable to repoint links in %s", newer);
+      }
+      free(newer);
+      newer = NULL;
+   }
+
+   free(deleted);
+   free(next);
 }
