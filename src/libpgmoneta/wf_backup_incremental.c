@@ -48,7 +48,9 @@
 
 /* system */
 #include <assert.h>
+#include <errno.h>
 #include <libgen.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -133,7 +135,11 @@ static int copy_wal_from_archive(char* start_wal_file, char* wal_dir, char* back
 /*
  * Wait until the WAL segment file appears in the wal archive directory
  */
-static int wait_for_wal_switch(char* wal_dir, char* wal_file);
+static int wait_for_wal_switch(int server, char* wal_dir, char* wal_file);
+/*
+ * Find a WAL segment under its current name (plain, compressed or encrypted, not .partial)
+ */
+static int find_wal_segment(char* wal_dir, char* wal_file, char** current);
 static char* incr_backup_name(void);
 static int incr_backup_execute(char*, struct art*);
 
@@ -196,12 +202,14 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    char* prev_start_lsn_str = NULL;
    uint64_t prev_start_lsn = 0;
    uint64_t start_backup_lsn = 0;
+   uint64_t stop_backup_lsn = 0;
    char* start_backup_xlog = NULL;
    char* stop_backup_xlog = NULL;
    struct label_file_contents lf = {0};
    uint32_t stop_tli = 0;
    block_ref_table* summarized_brt = NULL;
    char* start_wal_filename = NULL;
+   char* stop_wal_filename = NULL;
    int num_incr_blocks = 0;
    block_number* incr_blocks = NULL;
    uint32_t truncation_block_length = 0;
@@ -548,10 +556,18 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    /* copy wal */
    start_wal_filename = pgmoneta_wal_file_name(lf.start_tli, start_backup_lsn / wal_segment_size, wal_segment_size);
 
-   /* wait for start_wal_file to get switched */
-   if (wait_for_wal_switch(wal_dir, start_wal_filename))
+   if (pgmoneta_string_to_lsn(stop_backup_xlog, &stop_backup_lsn) || stop_backup_lsn == 0)
    {
-      pgmoneta_log_error("Error during WAL switch for %s", start_wal_filename);
+      pgmoneta_log_error("Incremental backup: Invalid stop WAL location %s", stop_backup_xlog);
+      goto error;
+   }
+
+   /* the restore needs every segment up to the one holding the stop record */
+   stop_wal_filename = pgmoneta_wal_file_name(stop_tli, (stop_backup_lsn - 1) / wal_segment_size, wal_segment_size);
+
+   if (wait_for_wal_switch(server, wal_dir, stop_wal_filename))
+   {
+      pgmoneta_log_error("Error during WAL switch for %s", stop_wal_filename);
       goto error;
    }
 
@@ -633,6 +649,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    free(wal);
    free(tag);
    free(start_wal_filename);
+   free(stop_wal_filename);
    free(prev_backup_data);
    pgmoneta_free_message(msg);
    pgmoneta_free_query_response(response);
@@ -667,6 +684,7 @@ error:
    free(wal);
    free(tag);
    free(start_wal_filename);
+   free(stop_wal_filename);
    free(prev_backup_data);
    pgmoneta_free_message(msg);
    pgmoneta_free_query_response(response);
@@ -1809,8 +1827,24 @@ copy_wal_from_archive(char* start_wal_file, char* wal_dir, char* backup_data)
 
          if (!pgmoneta_is_file(src_file))
          {
-            pgmoneta_log_warn("WAL segment %s does not exist in source", file_name);
-            goto error;
+            char* current = NULL;
+
+            /* compressed or encrypted since the directory was listed */
+            if (find_wal_segment(wal_dir, file_name, &current))
+            {
+               pgmoneta_log_warn("WAL segment %s does not exist in source", file_name);
+               goto error;
+            }
+
+            free(dst_file);
+            free(src_file);
+            dst_file = NULL;
+            src_file = NULL;
+            dst_file = pgmoneta_append(dst_file, pg_wal_dir);
+            dst_file = pgmoneta_append(dst_file, current);
+            src_file = pgmoneta_append(src_file, wal_dir);
+            src_file = pgmoneta_append(src_file, current);
+            free(current);
          }
 
          // copy and extract
@@ -1841,15 +1875,15 @@ error:
 }
 
 static int
-wait_for_wal_switch(char* wal_dir, char* wal_file)
+wait_for_wal_switch(int server, char* wal_dir, char* wal_file)
 {
    int loop = 1;
    struct deque* files = NULL;
    struct deque_iterator* it = NULL;
    /* bool active = false; */
-   /* struct main_configuration* config; */
+   struct main_configuration* config;
 
-   /* config = (struct main_configuration*)shmem; */
+   config = (struct main_configuration*)shmem;
 
    while (loop)
    {
@@ -1874,7 +1908,8 @@ wait_for_wal_switch(char* wal_dir, char* wal_file)
       while (pgmoneta_deque_iterator_next(it))
       {
          char* file_name = (char*)it->value->data;
-         if (pgmoneta_compare_string(file_name, wal_file))
+         /* the segment may already be compressed or encrypted */
+         if (pgmoneta_starts_with(file_name, wal_file) && !pgmoneta_ends_with(file_name, ".partial"))
          {
             loop = 0;
          }
@@ -1883,7 +1918,19 @@ wait_for_wal_switch(char* wal_dir, char* wal_file)
       it = NULL;
 
       pgmoneta_deque_destroy(files);
-      SLEEP(1); // avoid wasting CPU cycles for searching
+      files = NULL;
+
+      if (loop)
+      {
+         /* the segment can only arrive through WAL streaming */
+         if (!config->running || config->common.servers[server].wal_streaming <= 0 ||
+             (kill(config->common.servers[server].wal_streaming, 0) == -1 && errno == ESRCH))
+         {
+            pgmoneta_log_error("WAL streaming is not running for %s", config->common.servers[server].name);
+            goto error;
+         }
+         SLEEP(100000000L);
+      }
    }
 
    return 0;
@@ -1988,4 +2035,41 @@ is_excluded_path(char* path, bool is_dir)
    }
 
    return pgmoneta_starts_with(name, "pg_internal.init");
+}
+
+static int
+find_wal_segment(char* wal_dir, char* wal_file, char** current)
+{
+   char segment[25];
+   struct deque* files = NULL;
+   struct deque_iterator* it = NULL;
+
+   *current = NULL;
+
+   memset(segment, 0, sizeof(segment));
+   memcpy(segment, wal_file, strlen(wal_file) < 24 ? strlen(wal_file) : 24);
+
+   if (pgmoneta_get_wal_files(wal_dir, &files))
+   {
+      goto error;
+   }
+
+   pgmoneta_deque_iterator_create(files, &it);
+   while (*current == NULL && pgmoneta_deque_iterator_next(it))
+   {
+      char* name = (char*)it->value->data;
+
+      if (pgmoneta_starts_with(name, segment) && !pgmoneta_ends_with(name, ".partial"))
+      {
+         *current = pgmoneta_append(*current, name);
+      }
+   }
+   pgmoneta_deque_iterator_destroy(it);
+   pgmoneta_deque_destroy(files);
+
+   return *current == NULL ? 1 : 0;
+
+error:
+   pgmoneta_deque_destroy(files);
+   return 1;
 }
