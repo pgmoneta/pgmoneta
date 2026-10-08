@@ -72,6 +72,17 @@ pgmoneta_relink(char* from, char* to, struct workers* workers);
 int
 pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers);
 
+/**
+ * Repoint the links of a newer backup that point into a backup being deleted
+ * to the same files in the next backup
+ * @param deleted The root directory of the backup being deleted, ending with '/'
+ * @param next The root directory of the next backup, which received the deleted backup's files, ending with '/'
+ * @param newer The root directory of a newer backup
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_relink_newer(char* deleted, char* next, char* newer);
+
 #ifdef __cplusplus
 }
 #endif
