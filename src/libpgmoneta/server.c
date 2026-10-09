@@ -608,7 +608,7 @@ pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** 
          goto error;
       }
       memset(query, 0, sizeof(query));
-      pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM  pg_backup_start('%s', false);", label);
+      pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM  pg_backup_start('%s', true);", label);
    }
    else
    {
@@ -623,7 +623,7 @@ pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** 
          goto error;
       }
       memset(query, 0, sizeof(query));
-      pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM  pg_start_backup('%s', false, false);", label);
+      pgmoneta_snprintf(query, sizeof(query), "SELECT * FROM  pg_start_backup('%s', true, false);", label);
    }
 
    if (query_execute(ssl, socket, query, &response))
