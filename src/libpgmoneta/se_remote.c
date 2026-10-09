@@ -49,7 +49,6 @@
 /* Per-backend upload/cleanup entry points defined in their respective se_*.c */
 extern int ssh_upload(int server, char* label, int compression, int encryption);
 extern int s3_upload(int server, char* label, int compression, int encryption);
-extern int s3_cleanup(int server, char* label);
 extern int azure_upload(int server, char* label, int compression, int encryption);
 extern int azure_download(int server, char* label, int compression, int encryption);
 extern int gcs_upload(int server, char* label, int compression, int encryption);
