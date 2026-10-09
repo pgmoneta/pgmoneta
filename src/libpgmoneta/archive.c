@@ -58,6 +58,7 @@ void
 pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
+   bool locked = false;
    char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
@@ -101,6 +102,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
+   locked = true;
    config->common.servers[server].active_archive = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
@@ -264,8 +266,11 @@ error:
 
    pgmoneta_disconnect(client_fd);
 
-   config->common.servers[server].active_archive = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   if (locked)
+   {
+      config->common.servers[server].active_archive = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
 
    pgmoneta_stop_logging();
 

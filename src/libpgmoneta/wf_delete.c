@@ -82,6 +82,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    bool active = false;
+   bool locked = false;
    bool force = false;
    int backup_index = -1;
    char* label = NULL;
@@ -119,6 +120,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
+   locked = true;
    config->common.servers[server].active_delete = true;
 
    d = pgmoneta_get_server_backup(server);
@@ -240,8 +242,11 @@ error:
 
    free(child);
 
-   config->common.servers[server].active_delete = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   if (locked)
+   {
+      config->common.servers[server].active_delete = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
    pgmoneta_log_trace("Delete is ready for %s", config->common.servers[server].name);
 
    return 1;
