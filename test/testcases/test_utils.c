@@ -1308,6 +1308,48 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_get_wal_files_suffixes)
+{
+   char* dir = "test_wal_suffixes";
+   char* names[] = {"000000010000000000000001", "000000010000000000000002.partial",
+                    "000000010000000000000003.gz", "000000010000000000000004.lz4",
+                    "000000010000000000000005.zstd", "000000010000000000000006.bz2",
+                    "000000010000000000000007.aes", "000000010000000000000008.gz.aes",
+                    "000000010000000000000009.lz4.aes", "00000001000000000000000A.zstd.aes",
+                    "00000001000000000000000B.bz2.aes", "00000001000000000000000C.tmp",
+                    "0000000100000000000000.aes", NULL};
+   char* path = NULL;
+   struct deque* files = NULL;
+   FILE* f = NULL;
+
+   pgmoneta_delete_directory(dir);
+   pgmoneta_mkdir(dir);
+
+   for (int i = 0; names[i] != NULL; i++)
+   {
+      path = pgmoneta_append(NULL, dir);
+      path = pgmoneta_append_char(path, '/');
+      path = pgmoneta_append(path, names[i]);
+      MCTF_ASSERT_PTR_NONNULL(path, cleanup, "append failed");
+      f = fopen(path, "w");
+      MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not create %s", path);
+      fclose(f);
+      f = NULL;
+      free(path);
+      path = NULL;
+   }
+
+   /* every suffix pgmoneta writes, including encryption without compression; not the last two */
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_wal_files(dir, &files), 0, cleanup, "get_wal_files failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_deque_size(files), 11, cleanup, "wrong number of WAL files");
+
+cleanup:
+   free(path);
+   pgmoneta_deque_destroy(files);
+   pgmoneta_delete_directory(dir);
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_server)
 {
    char* s = NULL;
