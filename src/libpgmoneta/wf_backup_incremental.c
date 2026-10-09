@@ -105,6 +105,10 @@ static char** get_paths(char* backup_data, struct query_response* data, int* cou
  */
 static bool is_excluded_path(char* path, bool is_dir);
 /**
+ * Is the file a fork of an unlogged relation other than its init fork
+ */
+static bool is_unlogged_fork(char* path, struct art* init_forks);
+/**
  * free an array of string
  */
 static void free_string_array(char** arr, int count);
@@ -1726,10 +1730,30 @@ get_paths(char* backup_data, struct query_response* response, int* c)
    int idx = 0;
    char* dest_path = NULL;
    struct tuple* tuple = NULL;
+   struct art* init_forks = NULL;
 
    if (response == NULL || response->number_of_columns != 3)
    {
       goto error;
+   }
+
+   /* unlogged relations, recognised by their init fork: only the init fork is needed */
+   if (pgmoneta_art_create(&init_forks))
+   {
+      goto error;
+   }
+   tuple = response->tuples;
+   while (tuple != NULL)
+   {
+      if (pgmoneta_compare_string(tuple->data[1], "f") && pgmoneta_ends_with(tuple->data[0], "_init"))
+      {
+         dest_path = pgmoneta_append(dest_path, pgmoneta_starts_with(tuple->data[0], "./") ? tuple->data[0] + 2 : tuple->data[0]);
+         dest_path[strlen(dest_path) - strlen("_init")] = '\0';
+         pgmoneta_art_insert(init_forks, dest_path, (uintptr_t)true, ValueBool);
+         free(dest_path);
+         dest_path = NULL;
+      }
+      tuple = tuple->next;
    }
 
    /* count the number of server file and create any directory along the way */
@@ -1737,7 +1761,9 @@ get_paths(char* backup_data, struct query_response* response, int* c)
    while (tuple != NULL)
    {
       if (is_excluded_path(pgmoneta_starts_with(tuple->data[0], "./") ? tuple->data[0] + 2 : tuple->data[0],
-                           !pgmoneta_compare_string(tuple->data[1], "f")))
+                           !pgmoneta_compare_string(tuple->data[1], "f")) ||
+          (pgmoneta_compare_string(tuple->data[1], "f") &&
+           is_unlogged_fork(pgmoneta_starts_with(tuple->data[0], "./") ? tuple->data[0] + 2 : tuple->data[0], init_forks)))
       {
          tuple = tuple->next;
          continue;
@@ -1780,7 +1806,8 @@ get_paths(char* backup_data, struct query_response* response, int* c)
    while (tuple != NULL && idx < count)
    {
       if (pgmoneta_compare_string(tuple->data[1], "f") &&
-          !is_excluded_path(pgmoneta_starts_with(tuple->data[0], "./") ? tuple->data[0] + 2 : tuple->data[0], false))
+          !is_excluded_path(pgmoneta_starts_with(tuple->data[0], "./") ? tuple->data[0] + 2 : tuple->data[0], false) &&
+          !is_unlogged_fork(pgmoneta_starts_with(tuple->data[0], "./") ? tuple->data[0] + 2 : tuple->data[0], init_forks))
       {
          if (pgmoneta_starts_with(tuple->data[0], "./"))
          {
@@ -1799,9 +1826,11 @@ get_paths(char* backup_data, struct query_response* response, int* c)
 
    *c = count;
 
+   pgmoneta_art_destroy(init_forks);
    return paths;
 error:
    free(dest_path);
+   pgmoneta_art_destroy(init_forks);
    return NULL;
 }
 
@@ -2063,6 +2092,48 @@ is_excluded_path(char* path, bool is_dir)
    }
 
    return pgmoneta_starts_with(name, "pg_internal.init");
+}
+
+static bool
+is_unlogged_fork(char* path, struct art* init_forks)
+{
+   char* name = strrchr(path, '/');
+   char* rest = NULL;
+   char* key = NULL;
+   size_t digits;
+   bool found;
+
+   name = name != NULL ? name + 1 : path;
+   digits = strspn(name, "0123456789");
+   if (digits == 0)
+   {
+      return false;
+   }
+
+   rest = name + digits;
+   if (pgmoneta_starts_with(rest, "_fsm"))
+   {
+      rest += 4;
+   }
+   else if (pgmoneta_starts_with(rest, "_vm"))
+   {
+      rest += 3;
+   }
+   if (*rest == '.' && strlen(rest) > 1 && strspn(rest + 1, "0123456789") == strlen(rest + 1))
+   {
+      rest += strlen(rest);
+   }
+   if (*rest != '\0')
+   {
+      return false;
+   }
+
+   key = pgmoneta_append(key, path);
+   key[(name - path) + digits] = '\0';
+   found = pgmoneta_art_contains_key(init_forks, key);
+   free(key);
+
+   return found;
 }
 
 static int
