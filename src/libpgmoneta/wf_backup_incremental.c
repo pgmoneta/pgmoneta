@@ -95,8 +95,8 @@ static int parse_relation_file(char* backup_data, char* rel_file_path, struct re
  * Create standard directories inside data directory of backup, returns a set of paths of all the files
  * inside server data directory
  */
-static int create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** paths, int* count);
-static char** get_paths(char* backup_data, struct query_response* data, int* count);
+static int create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** paths, size_t** sizes, int* count);
+static char** get_paths(char* backup_data, struct query_response* data, size_t** sizes, int* count);
 /**
  * Is the path one that a base backup leaves out (see pg_basebackup's exclude lists)
  * @param path The path relative to the data directory
@@ -229,7 +229,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    int segno = 0;
    struct rel_file_locator rlocator = {0};
    enum fork_number frk = MAIN_FORKNUM;
-   struct file_stats fs = {0};
+   size_t file_size = 0;
 
    struct backup* backup = NULL;
    struct main_configuration* config;
@@ -238,6 +238,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    struct query_response* response = NULL;
    char** server_files = NULL;
    int num_of_server_files = 0;
+   size_t* server_file_sizes = NULL;
    struct art* prior_files = NULL;
 
    config = (struct main_configuration*)shmem;
@@ -360,7 +361,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    }
 
    pgmoneta_mkdir(backup_data);
-   if (create_standard_directories(ssl, socket, backup_data, &server_files, &num_of_server_files))
+   if (create_standard_directories(ssl, socket, backup_data, &server_files, &server_file_sizes, &num_of_server_files))
    {
       pgmoneta_log_error("Incremental backup: Failed to creating standard directories");
       goto error;
@@ -418,16 +419,12 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       }
 
       /* find the file stat */
-      if (pgmoneta_server_file_stat(server, ssl, socket, server_files[i], &fs))
-      {
-         pgmoneta_log_error("Incremental backup: Error getting stats for %s", server_files[i]);
-         goto error;
-      }
+      file_size = server_file_sizes[i];
 
       /* file size is not multiple of block size */
-      if (fs.size % block_size != 0)
+      if (file_size % block_size != 0)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+         if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
          {
             pgmoneta_log_error("Incremental backup: Error doing backup of %s", server_files[i]);
             goto error;
@@ -441,7 +438,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
        */
       if (frk == FSM_FORKNUM)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+         if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
             goto error;
@@ -452,7 +449,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       /* A file that is not in the parent backup has no blocks to combine with */
       if (!pgmoneta_art_contains_key(prior_files, server_files[i]))
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+         if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
             goto error;
@@ -474,9 +471,9 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
        */
       if (brtentry == NULL)
       {
-         if (fs.size == 0)
+         if (file_size == 0)
          {
-            if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+            if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
             {
                pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
                goto error;
@@ -485,7 +482,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
          }
 
          num_incr_blocks = 0;
-         truncation_block_length = fs.size / block_size;
+         truncation_block_length = file_size / block_size;
          if (write_incremental_file(server, ssl, socket, backup_data, server_files[i],
                                     num_incr_blocks, NULL, truncation_block_length, true))
          {
@@ -502,7 +499,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
        */
       if (limit_block <= segno * rel_seg_size)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], fs.size))
+         if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
             goto error;
@@ -515,7 +512,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
 
       if (start_blk / rel_seg_size != (size_t)segno || end_blk < start_blk)
       {
-         pgmoneta_log_error("Incremental backup: Overflow computing block number bounds for segment %u with size %zu", segno, fs.size);
+         pgmoneta_log_error("Incremental backup: Overflow computing block number bounds for segment %u with size %zu", segno, file_size);
          goto error;
       }
 
@@ -543,7 +540,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
           block numbers below this threshold that are not present in the backup need to be
           fetched from the prior backup.
        */
-      truncation_block_length = fs.size / block_size;
+      truncation_block_length = file_size / block_size;
       if (brtentry->limit_block != InvalidBlockNumber)
       {
          uint32_t relative_limit = brtentry->limit_block - segno * rel_seg_size;
@@ -666,6 +663,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       pgmoneta_disconnect(socket);
    }
    free_string_array(server_files, num_of_server_files);
+   free(server_file_sizes);
 
    free(prev_start_lsn_str);
    free(backup_label);
@@ -701,6 +699,7 @@ error:
       pgmoneta_disconnect(socket);
    }
    free_string_array(server_files, num_of_server_files);
+   free(server_file_sizes);
 
    free(prev_start_lsn_str);
    free(backup_label);
@@ -1173,17 +1172,18 @@ compare_block_numbers(const void* a, const void* b)
 }
 
 static int
-create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** p, int* c)
+create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** p, size_t** s, int* c)
 {
    struct query_response* qr = NULL;
    char** paths = NULL;
+   size_t* sizes = NULL;
    int count = 0;
 
    /* get all the paths */
    pgmoneta_ext_get_files(ssl, socket, ".", &qr);
    if (qr != NULL && qr->number_of_columns == 3)
    {
-      paths = get_paths(backup_data, qr, &count);
+      paths = get_paths(backup_data, qr, &sizes, &count);
    }
    else
    {
@@ -1192,6 +1192,7 @@ create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** p, 
    }
 
    *p = paths;
+   *s = sizes;
    *c = count;
 
    pgmoneta_free_query_response(qr);
@@ -1205,6 +1206,7 @@ error:
       }
       free(paths);
    }
+   free(sizes);
    pgmoneta_free_query_response(qr);
    return 1;
 }
@@ -1719,9 +1721,10 @@ error:
 }
 
 static char**
-get_paths(char* backup_data, struct query_response* response, int* c)
+get_paths(char* backup_data, struct query_response* response, size_t** s, int* c)
 {
    char** paths = NULL;
+   size_t* sizes = NULL;
    int count = 0;
    int idx = 0;
    char* dest_path = NULL;
@@ -1774,6 +1777,11 @@ get_paths(char* backup_data, struct query_response* response, int* c)
    }
 
    paths = (char**)calloc(count + 1, sizeof(char*));
+   sizes = (size_t*)calloc(count + 1, sizeof(size_t));
+   if (paths == NULL || sizes == NULL)
+   {
+      goto error;
+   }
 
    /* get the server files */
    tuple = response->tuples;
@@ -1791,17 +1799,21 @@ get_paths(char* backup_data, struct query_response* response, int* c)
             dest_path = pgmoneta_append(dest_path, tuple->data[0]);
          }
 
+         sizes[idx] = strtoull(tuple->data[2], NULL, 10);
          paths[idx++] = dest_path;
          dest_path = NULL;
       }
       tuple = tuple->next;
    }
 
+   *s = sizes;
    *c = count;
 
    return paths;
 error:
    free(dest_path);
+   free(paths);
+   free(sizes);
    return NULL;
 }
 
