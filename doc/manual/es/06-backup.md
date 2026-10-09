@@ -154,7 +154,6 @@ Para la versión de PostgreSQL 14-16, confiamos en soluciones de backup incremen
 |-----------------------------|---|--------|------------|--------------------------------------------------------|
 | `pgmoneta_server_backup_start`    |   pg_start_backup/pg_backup_start |    EXECUTE    | label | Devuelve una fila con el LSN de inicio del backup |
 | `pgmoneta_server_backup_stop`    |   pg_stop_backup/pg_backup_stop |    EXECUTE    | Ninguno | Devuelve una fila con dos columnas - LSN de parada del backup y contenido del archivo de etiqueta de backup  |
-| `pgmoneta_server_read_binary`    |   pg_read_binary_file |    pg_read_server_files & EXECUTE    | (offset, length, path/to/file) | Devuelve el contenido del archivo proporcionado del servidor de longitud particular en un offset particular |
 
 Para información completa sobre la API del servidor, consulta [esto](https://github.com/pgmoneta/pgmoneta/blob/main/doc/manual/en/80-server-api.md)
 
@@ -162,6 +161,9 @@ Las funciones de extensión en las que depende la solución nativa son:
 
 - `pgmoneta_ext_get_file('<path/to/file>')`
 - `pgmoneta_ext_get_files('<path/to/dir>')`
+- `pgmoneta_ext_get_blocks('<path/to/file>', <block numbers>, <block size>)`
+
+`pgmoneta_ext_get_blocks()` se añadió en pgmoneta_ext 0.1.2, por lo que se requiere esa versión o posterior.
 
 Puedes leer más sobre estas funciones y sus privilegios requeridos [aquí](https://github.com/pgmoneta/pgmoneta_ext/blob/main/doc/manual/en/04-functions.md)
 
@@ -268,11 +270,10 @@ cat <<EOF >> "$OUTPUT_SQL_FILE"
 
 GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_file(text) TO $CONN_USER_NAME;
 GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_files(text) TO $CONN_USER_NAME;
+GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_blocks(text, bigint[], integer) TO $CONN_USER_NAME;
 
 -- Privilegio para leer archivos del servidor
 GRANT pg_read_server_files TO $CONN_USER_NAME;
-
-GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO $CONN_USER_NAME;
 
 -- Privilegios de función de backup dependiendo de la versión
 EOF
@@ -319,7 +320,7 @@ GRANT pg_read_server_files TO repl;
 GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO repl;
 ```
 
-Si usó el script de configuración de la sección de backup incremental, solo `pg_read_all_settings` es nuevo.
+Si usó el script de configuración de la sección de backup incremental, `pg_read_all_settings` y EXECUTE sobre `pg_read_binary_file` son nuevos.
 
 Sin ellos, el backup se realiza igualmente, pero los archivos de configuración se omiten con una advertencia en el log, y la restauración de ese backup fallará.
 

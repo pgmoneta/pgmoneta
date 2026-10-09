@@ -105,6 +105,20 @@ int
 pgmoneta_ext_get_files(SSL* ssl, int socket, char* file_path, struct query_response** qr);
 
 /**
+ * Read blocks of a file using pgmoneta_ext_get_blocks()
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param file_path The file path, relative to the data directory
+ * @param blocks The block numbers
+ * @param count The number of blocks
+ * @param block_size The block size
+ * @param qr The query response
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_get_blocks(SSL* ssl, int socket, char* file_path, uint32_t* blocks, uint32_t count, size_t block_size, struct query_response** qr);
+
+/**
  * Send a file chunk to the extension
  * @param ssl The SSL structure
  * @param socket The socket

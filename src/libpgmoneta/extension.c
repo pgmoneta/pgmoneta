@@ -82,6 +82,33 @@ pgmoneta_ext_get_files(SSL* ssl, int socket, char* file_path, struct query_respo
 }
 
 int
+pgmoneta_ext_get_blocks(SSL* ssl, int socket, char* file_path, uint32_t* blocks, uint32_t count, size_t block_size, struct query_response** qr)
+{
+   char* query = NULL;
+   int ret;
+
+   query = pgmoneta_append(query, "SELECT pgmoneta_ext_get_blocks('");
+   query = pgmoneta_append(query, file_path);
+   query = pgmoneta_append(query, "', ARRAY[");
+   for (uint32_t i = 0; i < count; i++)
+   {
+      if (i > 0)
+      {
+         query = pgmoneta_append_char(query, ',');
+      }
+      query = pgmoneta_append_ulong(query, blocks[i]);
+   }
+   query = pgmoneta_append(query, "]::bigint[], ");
+   query = pgmoneta_append_ulong(query, block_size);
+   query = pgmoneta_append(query, ");");
+
+   ret = query_execute(ssl, socket, query, qr);
+
+   free(query);
+   return ret;
+}
+
+int
 pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, char* dest_path, char* base64_data, struct query_response** qr)
 {
    char query[MAX_QUERY_LENGTH];

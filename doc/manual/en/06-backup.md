@@ -157,7 +157,6 @@ For PostgreSQL version 14-16, we rely on `pgmoneta` native block-level increment
 |-----------------------------|---|--------|------------|--------------------------------------------------------|
 | `pgmoneta_server_backup_start`    |   pg_start_backup/pg_backup_start |    EXECUTE    | label | Returns a row with the backup start lsn |
 | `pgmoneta_server_backup_stop`    |   pg_stop_backup/pg_backup_stop |    EXECUTE    | None | Returns a row with two columns - backup stop lsn and the backup label file contents  |
-| `pgmoneta_server_read_binary`    |   pg_read_binary_file |    pg_read_server_files & EXECUTE    | (offset, length, path/to/file) | Returns the contents of the file provided from the server of particular length at a particular offset |
 
 For complete information on the server api refer [this](https://github.com/pgmoneta/pgmoneta/blob/main/doc/manual/en/80-server-api.md)
 
@@ -165,6 +164,9 @@ The extension functions on which the native solution depends are:
 
 - `pgmoneta_ext_get_file('<path/to/file>')`
 - `pgmoneta_ext_get_files('<path/to/dir>')`
+- `pgmoneta_ext_get_blocks('<path/to/file>', <block numbers>, <block size>)`
+
+`pgmoneta_ext_get_blocks()` was added in pgmoneta_ext 0.1.2, so that version or later is required.
 
 You can read more about these functions and their required privileges over [here](https://github.com/pgmoneta/pgmoneta_ext/blob/main/doc/manual/en/04-functions.md)
 
@@ -271,11 +273,10 @@ cat <<EOF >> "$OUTPUT_SQL_FILE"
 
 GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_file(text) TO $CONN_USER_NAME;
 GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_files(text) TO $CONN_USER_NAME;
+GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_blocks(text, bigint[], integer) TO $CONN_USER_NAME;
 
 -- Privilege to read server files
 GRANT pg_read_server_files TO $CONN_USER_NAME;
-
-GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO $CONN_USER_NAME;
 
 -- Backup function privileges depending on version
 EOF
@@ -322,7 +323,7 @@ GRANT pg_read_server_files TO repl;
 GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO repl;
 ```
 
-If you used the setup script from the incremental backup section, only `pg_read_all_settings` is new.
+If you used the setup script from the incremental backup section, `pg_read_all_settings` and EXECUTE on `pg_read_binary_file` are new.
 
 Without them the backup is still taken, but the configuration files are skipped with a warning in the log, and restoring that backup will fail.
 

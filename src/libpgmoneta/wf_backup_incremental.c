@@ -55,6 +55,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Number of blocks fetched with one pgmoneta_ext_get_blocks() call */
+#define GET_BLOCKS_BATCH  128
+
 #define SPCOID_PG_DEFAULT 1663
 #define SPCOID_PG_GLOBAL  1664
 
@@ -127,18 +130,32 @@ static int load_backup_files(char* backup_base, struct art** files);
 /**
  * Serialize the incremental blocks for a relation file
  */
-static int write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
+static int write_incremental_file(SSL* ssl, int socket, char* backup_data,
                                   char* relative_filename, uint32_t num_incr_blocks,
                                   block_number* incr_blocks, uint32_t truncation_block_length, bool empty);
 /**
  * Serialize all the blocks for a relation file
  */
-static int write_full_file(int server, SSL* ssl, int socket, char* backup_data,
+static int write_full_file(SSL* ssl, int socket, char* backup_data,
                            char* relative_filename, size_t expected_size);
 /**
  * Append padding (0 bytes) to the file stream
  */
 static int write_padding(FILE* file, size_t padding_length, size_t* bytes_written);
+/**
+ * Fetch blocks of a file with pgmoneta_ext_get_blocks() and append them to the file stream,
+ * stopping early when the relation was truncated
+ */
+static int write_blocks(SSL* ssl, int socket, FILE* file, char* relative_filename,
+                        block_number* blocks, uint32_t num_blocks, size_t* bytes_written);
+/**
+ * Create an empty file in the backup
+ */
+static int write_empty_file(char* backup_data, char* relative_filename);
+/**
+ * Check that the server has pgmoneta_ext_get_blocks()
+ */
+static bool has_get_blocks(SSL* ssl, int socket);
 /**
  * copy the wal files from the archive, the idea is copy only wal files that are generated between
  * the backup was started and ended
@@ -316,6 +333,13 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
          goto error;
       }
    }
+
+   if (!has_get_blocks(ssl, socket))
+   {
+      pgmoneta_log_error("Incremental backup: pgmoneta_ext 0.1.2 or later is required for %s", config->common.servers[server].name);
+      goto error;
+   }
+
    memset(version, 0, sizeof(version));
    pgmoneta_snprintf(version, sizeof(version), "%d", config->common.servers[server].version);
    memset(minor_version, 0, sizeof(minor_version));
@@ -390,7 +414,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       if (!pgmoneta_starts_with(server_files[i], "base") && !pgmoneta_starts_with(server_files[i], "global"))
       {
          // full backup
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], 0))
+         if (write_full_file(ssl, socket, backup_data, server_files[i], 0))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of: %s", server_files[i]);
             goto error;
@@ -407,7 +431,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       if (pgmoneta_ends_with(server_files[i], "pg_filenode.map") || pgmoneta_ends_with(server_files[i], "PG_VERSION") || pgmoneta_ends_with(server_files[i], "pg_control"))
       {
          /* undergo full backup */
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], 0))
+         if (write_full_file(ssl, socket, backup_data, server_files[i], 0))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of: %s", server_files[i]);
             goto error;
@@ -428,7 +452,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       /* file size is not multiple of block size */
       if (file_size % block_size != 0)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
+         if (write_full_file(ssl, socket, backup_data, server_files[i], file_size))
          {
             pgmoneta_log_error("Incremental backup: Error doing backup of %s", server_files[i]);
             goto error;
@@ -442,7 +466,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
        */
       if (frk == FSM_FORKNUM)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
+         if (write_full_file(ssl, socket, backup_data, server_files[i], file_size))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
             goto error;
@@ -453,7 +477,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       /* A file that is not in the parent backup has no blocks to combine with */
       if (!pgmoneta_art_contains_key(prior_files, server_files[i]))
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
+         if (write_full_file(ssl, socket, backup_data, server_files[i], file_size))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
             goto error;
@@ -477,7 +501,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       {
          if (file_size == 0)
          {
-            if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
+            if (write_empty_file(backup_data, server_files[i]))
             {
                pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
                goto error;
@@ -487,7 +511,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
 
          num_incr_blocks = 0;
          truncation_block_length = file_size / block_size;
-         if (write_incremental_file(server, ssl, socket, backup_data, server_files[i],
+         if (write_incremental_file(ssl, socket, backup_data, server_files[i],
                                     num_incr_blocks, NULL, truncation_block_length, true))
          {
             goto error;
@@ -503,7 +527,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
        */
       if (limit_block <= segno * rel_seg_size)
       {
-         if (write_full_file(server, ssl, socket, backup_data, server_files[i], file_size))
+         if (write_full_file(ssl, socket, backup_data, server_files[i], file_size))
          {
             pgmoneta_log_error("Incremental backup: Error during backup of %s", server_files[i]);
             goto error;
@@ -555,7 +579,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       }
 
       /* serialize the incremental changes */
-      if (write_incremental_file(server, ssl, socket, backup_data, server_files[i],
+      if (write_incremental_file(ssl, socket, backup_data, server_files[i],
                                  num_incr_blocks, incr_blocks, truncation_block_length, false))
       {
          goto error;
@@ -1476,7 +1500,7 @@ error:
 }
 
 static int
-write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
+write_incremental_file(SSL* ssl, int socket, char* backup_data,
                        char* relative_filename, uint32_t num_incr_blocks,
                        block_number* incr_blocks, uint32_t truncation_block_length, bool empty)
 {
@@ -1488,10 +1512,7 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
    char* rel_path = NULL;
    size_t padding_length = 0;
    size_t padding_bytes = 0;
-   block_number blkno;
    size_t bytes_written = 0;
-   uint8_t* binary_data = NULL;
-   int binary_data_length = 0;
 
    /* preprocessing of incremental filename */
    rel_path = pgmoneta_append(rel_path, relative_filename);
@@ -1557,49 +1578,15 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
    }
 
    expected_file_size = get_incremental_file_size(num_incr_blocks);
+
    /*
-       Request the blocks from the server
-
-       Assume the incremental block array is sorted, also note that we may have to consider
-       the filename with their segment number, which can be determined using the block number
-       segment_number = block_number / (# of blocks in each segment)
-
-       Will try to fetch untill either we get all the blocks (from server) with block number
-       provided by the caller or request failed due to side effects like concurrent truncation.
+       Request the blocks from the server. If the relation was truncated after the incremental
+       workflow started we get fewer blocks than requested; the rest is padded with 0 below and
+       WAL replay takes care of it later.
     */
-   for (uint32_t i = 0; i < num_incr_blocks; i++)
+   if (write_blocks(ssl, socket, file, relative_filename, incr_blocks, num_incr_blocks, &bytes_written))
    {
-      blkno = incr_blocks[i];
-
-      if (pgmoneta_server_read_binary_file(server, ssl, relative_filename,
-                                           block_size * blkno, block_size, socket, &binary_data, &binary_data_length))
-      {
-         pgmoneta_log_error("Write incremental file: error fetching the block#%d of file: %s from the server", blkno, relative_filename);
-         goto error;
-      }
-
-      /*
-          If partial read, means the relation is truncated after the incremental workflow has started.
-          Not to worry, just fill all the blocks including this one with 0, untill we wrote the number
-           of bytes expected by caller, WAL replay will take care of it later.
-       */
-      if ((size_t)binary_data_length < block_size)
-      {
-         free(binary_data);
-         binary_data = NULL;
-         break;
-      }
-
-      bytes_written += fwrite(binary_data, sizeof(uint8_t), binary_data_length, file);
-      /* read/write content must be of multiple of block size length */
-      if (bytes_written % block_size)
-      {
-         pgmoneta_log_error("Write incremental file: partial write/read");
-         goto error;
-      }
-
-      free(binary_data);
-      binary_data = NULL;
+      goto error;
    }
 
    /* Handle truncation, by padding with 0 */
@@ -1624,8 +1611,6 @@ done:
    return 0;
 
 error:
-   free(binary_data);
-   binary_data = NULL;
    free(filepath);
    free(file_name);
    free(rel_path);
@@ -1638,16 +1623,17 @@ error:
 }
 
 static int
-write_full_file(int server, SSL* ssl, int socket, char* backup_data,
+write_full_file(SSL* ssl, int socket, char* backup_data,
                 char* relative_filename, size_t expected_size)
 {
    FILE* file = NULL;
-   size_t chunk_size = block_size * 1024;
-   size_t offset = 0;
    char* filepath = NULL;
-   uint8_t* binary_data = NULL;
-   int binary_data_length = 0;
+   block_number* blocks = NULL;
+   uint32_t num_blocks = 0;
    size_t bytes_written = 0;
+   struct query_response* qr = NULL;
+   void* data = NULL;
+   size_t data_length = 0;
 
    if (expected_size % block_size)
    {
@@ -1664,32 +1650,48 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
       goto error;
    }
 
-   while (true)
+   if (expected_size > 0)
    {
-      if (pgmoneta_server_read_binary_file(server, ssl, relative_filename, offset, chunk_size,
-                                           socket, &binary_data, &binary_data_length))
+      /* A relation file: copy the blocks it had when the directory was listed */
+      num_blocks = expected_size / block_size;
+      blocks = (block_number*)malloc(sizeof(block_number) * num_blocks);
+      if (blocks == NULL)
       {
          goto error;
       }
-
-      /* EOF */
-      if (binary_data_length == 0)
+      for (uint32_t i = 0; i < num_blocks; i++)
       {
-         free(binary_data);
-         binary_data = NULL;
-         break;
+         blocks[i] = i;
       }
 
-      /* write the output */
-      bytes_written = fwrite(binary_data, sizeof(uint8_t), binary_data_length, file);
-      if (bytes_written != (size_t)binary_data_length)
+      if (write_blocks(ssl, socket, file, relative_filename, blocks, num_blocks, &bytes_written))
       {
          goto error;
       }
+   }
+   else
+   {
+      /* Other files are small, copy them whole */
+      if (pgmoneta_ext_get_file(ssl, socket, relative_filename, &qr) || qr == NULL || qr->tuples == NULL)
+      {
+         pgmoneta_log_error("Write full file: error fetching %s from the server", relative_filename);
+         goto error;
+      }
 
-      offset += binary_data_length;
-      free(binary_data);
-      binary_data = NULL;
+      if (qr->tuples->data[0] != NULL && strlen(qr->tuples->data[0]) > 0)
+      {
+         if (pgmoneta_base64_decode(qr->tuples->data[0], strlen(qr->tuples->data[0]), &data, &data_length))
+         {
+            pgmoneta_log_error("Write full file: invalid data for %s", relative_filename);
+            goto error;
+         }
+
+         if (fwrite(data, 1, data_length, file) != data_length)
+         {
+            pgmoneta_log_error("Write full file: failed to write %s", relative_filename);
+            goto error;
+         }
+      }
    }
 
    /* fclose() writes the last buffer, so a full disk can show up only here */
@@ -1699,11 +1701,15 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
       file = NULL;
       goto error;
    }
+   free(blocks);
+   free(data);
+   pgmoneta_free_query_response(qr);
    free(filepath);
    return 0;
 error:
-   free(binary_data);
-   binary_data = NULL;
+   free(blocks);
+   free(data);
+   pgmoneta_free_query_response(qr);
    free(filepath);
    if (file != NULL)
    {
@@ -2275,4 +2281,104 @@ error:
    free(manifest);
 
    return 1;
+}
+
+static int
+write_blocks(SSL* ssl, int socket, FILE* file, char* relative_filename,
+             block_number* blocks, uint32_t num_blocks, size_t* bytes_written)
+{
+   struct query_response* qr = NULL;
+   void* data = NULL;
+   size_t data_length = 0;
+   uint32_t n = 0;
+
+   for (uint32_t i = 0; i < num_blocks; i += n)
+   {
+      n = num_blocks - i < GET_BLOCKS_BATCH ? num_blocks - i : GET_BLOCKS_BATCH;
+
+      if (pgmoneta_ext_get_blocks(ssl, socket, relative_filename, blocks + i, n, block_size, &qr) ||
+          qr == NULL || qr->tuples == NULL)
+      {
+         pgmoneta_log_error("Write blocks: error fetching blocks of %s from the server", relative_filename);
+         goto error;
+      }
+
+      data = NULL;
+      data_length = 0;
+      if (qr->tuples->data[0] != NULL && strlen(qr->tuples->data[0]) > 0 &&
+          pgmoneta_base64_decode(qr->tuples->data[0], strlen(qr->tuples->data[0]), &data, &data_length))
+      {
+         pgmoneta_log_error("Write blocks: invalid block data for %s", relative_filename);
+         goto error;
+      }
+      pgmoneta_free_query_response(qr);
+      qr = NULL;
+
+      if (data_length % block_size != 0)
+      {
+         pgmoneta_log_error("Write blocks: partial block in %s", relative_filename);
+         goto error;
+      }
+
+      if (data_length > 0 && fwrite(data, 1, data_length, file) != data_length)
+      {
+         pgmoneta_log_error("Write blocks: failed to write %s", relative_filename);
+         goto error;
+      }
+      *bytes_written += data_length;
+      free(data);
+      data = NULL;
+
+      /* Fewer blocks than requested: the relation was truncated */
+      if (data_length < (size_t)n * block_size)
+      {
+         break;
+      }
+   }
+
+   return 0;
+
+error:
+   free(data);
+   pgmoneta_free_query_response(qr);
+   return 1;
+}
+
+static int
+write_empty_file(char* backup_data, char* relative_filename)
+{
+   char* filepath = NULL;
+   FILE* file = NULL;
+
+   filepath = pgmoneta_append(filepath, backup_data);
+   filepath = pgmoneta_append(filepath, relative_filename);
+
+   if (pgmoneta_fopen_secure(filepath, "w", &file))
+   {
+      pgmoneta_log_error("Write empty file: failed to create %s", relative_filename);
+      free(filepath);
+      return 1;
+   }
+
+   fclose(file);
+   free(filepath);
+   return 0;
+}
+
+static bool
+has_get_blocks(SSL* ssl, int socket)
+{
+   struct message* msg = NULL;
+   struct query_response* qr = NULL;
+   bool found = false;
+
+   pgmoneta_create_query_message("SELECT 1 FROM pg_proc WHERE proname = 'pgmoneta_ext_get_blocks';", &msg);
+   if (msg != NULL && !pgmoneta_query_execute(ssl, socket, msg, &qr) && qr != NULL && qr->tuples != NULL)
+   {
+      found = true;
+   }
+
+   pgmoneta_free_message(msg);
+   pgmoneta_free_query_response(qr);
+   return found;
 }
