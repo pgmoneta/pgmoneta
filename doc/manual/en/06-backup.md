@@ -156,7 +156,6 @@ For PostgreSQL version 14-16, we rely on `pgmoneta` native block-level increment
 | `pgmoneta_server_backup_start`    |   pg_start_backup/pg_backup_start |    EXECUTE    | label | Returns a row with the backup start lsn |
 | `pgmoneta_server_backup_stop`    |   pg_stop_backup/pg_backup_stop |    EXECUTE    | None | Returns a row with two columns - backup stop lsn and the backup label file contents  |
 | `pgmoneta_server_read_binary`    |   pg_read_binary_file |    pg_read_server_files & EXECUTE    | (offset, length, path/to/file) | Returns the contents of the file provided from the server of particular length at a particular offset |
-| `pgmoneta_server_file_stat`    |   pg_stat_file |    pg_read_server_files & EXECUTE    | path/to/file | Returns the metadata of the file provided from the server like file size, modification time etc |
 
 For complete information on the server api refer [this](https://github.com/pgmoneta/pgmoneta/blob/main/doc/manual/en/80-server-api.md)
 
@@ -275,7 +274,6 @@ GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_files(text) TO $CONN_USER_NAME;
 GRANT pg_read_server_files TO $CONN_USER_NAME;
 
 GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO $CONN_USER_NAME;
-GRANT EXECUTE ON FUNCTION pg_stat_file(text, boolean) TO $CONN_USER_NAME;
 
 -- Backup function privileges depending on version
 EOF
