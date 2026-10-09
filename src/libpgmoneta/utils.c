@@ -3479,11 +3479,12 @@ pgmoneta_get_symlink(char* symlink)
 
    memset(&link[0], 0, sizeof(link));
    size = readlink(symlink, &link[0], sizeof(link));
-   if (size == -1)
+   /* A target that fills the whole buffer may have been truncated */
+   if (size == -1 || (size_t)size == sizeof(link))
    {
       goto error;
    }
-   link[size + 1] = '\0';
+   link[size] = '\0';
 
    if (strlen(&link[0]) == 0)
    {
