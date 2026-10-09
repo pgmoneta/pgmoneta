@@ -147,6 +147,8 @@ This section will provide a brief idea of how `pgmoneta` performs incremental ba
 * Copy all the WAL segments after and including the WAL segment in which start LSN is present
 * Generate manifest file over the incremental backup data directory
 
+Incremental backups on PostgreSQL 14-16 request an immediate (fast) checkpoint when the backup starts, the same as full backups. This means the backup does not wait for a spread checkpoint, which can take up to `checkpoint_completion_target` x `checkpoint_timeout`. The tradeoff is a burst of I/O on a busy primary at the start of the backup.
+
 ### Dependencies
 
 For PostgreSQL version 14-16, we rely on `pgmoneta` native block-level incremental solutions for backups. To facilitate this solution `pgmoneta` highly depends on [pgmoneta_ext](https://github.com/pgmoneta/pgmoneta_ext) extension and PostgreSQL's system administration functions. Following are the list of admin functions `pgmoneta` depends on:
