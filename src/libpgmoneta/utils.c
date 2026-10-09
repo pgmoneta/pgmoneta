@@ -2345,6 +2345,7 @@ is_valid_wal_file_name(char* f)
       ".lz4",
       ".zstd",
       ".bz2",
+      ".aes",
       ".gz.aes",
       ".lz4.aes",
       ".zstd.aes",
