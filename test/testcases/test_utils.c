@@ -1308,6 +1308,32 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_get_symlink_long_target)
+{
+   char* slink = "test_symlinks_long/link.txt";
+   char target[1024];
+   char* link_target = NULL;
+
+   pgmoneta_delete_directory("test_symlinks_long");
+   pgmoneta_mkdir("test_symlinks_long");
+
+   /* The longest target a 1024-byte buffer can hold with its terminator */
+   memset(target, 'a', sizeof(target) - 1);
+   target[sizeof(target) - 1] = '\0';
+
+   MCTF_ASSERT_INT_EQ(symlink(target, slink), 0, cleanup, "could not create symlink");
+
+   link_target = pgmoneta_get_symlink(slink);
+   MCTF_ASSERT_PTR_NONNULL(link_target, cleanup, "get_symlink returned null");
+   MCTF_ASSERT_STR_EQ(link_target, target, cleanup, "symlink target mismatch");
+
+cleanup:
+   free(link_target);
+   link_target = NULL;
+   pgmoneta_delete_directory("test_symlinks_long");
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_server)
 {
    char* s = NULL;
