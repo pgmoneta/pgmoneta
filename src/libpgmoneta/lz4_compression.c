@@ -488,8 +488,9 @@ lz4_decompress(char* from, char* to)
          goto error;
       }
 
+      /* an empty block decompresses to 0 bytes */
       int decompression = LZ4_decompress_safe_continue(lz4StreamDecode, buffOut, buffIn[buffInIndex], compression, BLOCK_BYTES);
-      if (decompression <= 0)
+      if (decompression < 0)
       {
          goto error;
       }

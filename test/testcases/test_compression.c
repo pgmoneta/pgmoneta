@@ -29,6 +29,7 @@
 
 #include <pgmoneta.h>
 #include <compression.h>
+#include <lz4_compression.h>
 #include <configuration.h>
 #include <tsclient.h>
 #include <tscommon.h>
@@ -479,5 +480,33 @@ MCTF_TEST(test_not_double_compression_wal_files)
 cleanup:
    free(wal_dir);
    pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_compression_lz4_empty_block)
+{
+   /* what a backup stores for an empty file: block size 1, then an empty LZ4 block */
+   unsigned char empty_file[] = {0x01, 0x00, 0x00, 0x00, 0x00};
+   char* lz4 = "test_lz4_empty_block.lz4";
+   char* path = "test_lz4_empty_block";
+   FILE* f = NULL;
+
+   f = fopen(lz4, "wb");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not create %s", lz4);
+   MCTF_ASSERT(fwrite(empty_file, 1, sizeof(empty_file), f) == sizeof(empty_file), cleanup, "write failed");
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lz4d_file(lz4, path), 0, cleanup, "decompressing an empty block failed");
+   MCTF_ASSERT(pgmoneta_exists(path), cleanup, "decompressed file missing");
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_file_size(path), 0, cleanup, "decompressed file should be empty");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   remove(path);
+   remove(lz4);
    MCTF_FINISH();
 }
