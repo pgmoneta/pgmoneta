@@ -1188,6 +1188,11 @@ create_standard_directories(SSL* ssl, int socket, char* backup_data, char*** p, 
    if (qr != NULL && qr->number_of_columns == 3)
    {
       paths = get_paths(backup_data, qr, &count);
+      if (paths == NULL)
+      {
+         pgmoneta_log_error("Incremental backup: Failed to list the files of the data directory");
+         goto error;
+      }
    }
    else
    {
@@ -1800,6 +1805,10 @@ get_paths(char* backup_data, struct query_response* response, int* c)
    }
 
    paths = (char**)calloc(count + 1, sizeof(char*));
+   if (paths == NULL)
+   {
+      goto error;
+   }
 
    /* get the server files */
    tuple = response->tuples;
