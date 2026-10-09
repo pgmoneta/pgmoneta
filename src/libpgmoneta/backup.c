@@ -46,6 +46,7 @@ void
 pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
+   bool locked = false;
    char date_str[128];
    char* date = NULL;
    char* elapsed = NULL;
@@ -105,6 +106,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
+   locked = true;
    config->common.servers[server].active_backup = true;
 
 #ifdef HAVE_FREEBSD
@@ -342,8 +344,11 @@ error:
       pgmoneta_progress_teardown(server);
    }
 
-   config->common.servers[server].active_backup = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   if (locked)
+   {
+      config->common.servers[server].active_backup = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
 
    pgmoneta_management_response_error_with_nodes(NULL, client_fd, config->common.servers[server].name,
                                                  ec != -1 ? ec : MANAGEMENT_ERROR_BACKUP_ERROR,
