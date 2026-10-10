@@ -20,6 +20,9 @@ This directory contains Grafana dashboards for monitoring `pgmoneta` using Prome
     - **Backup Total Size**: Disk space used by backups for this specific server.
     - **WAL Streaming**: Current WAL streaming status and storage usage.
     - **Workspace Storage**: Space used in the working directory.
+  - **Databases**:
+    - **Total Database Size**: Combined size of the databases on this server.
+    - **Database Size**: Size of each database over time.
 
 - **pgmoneta Performance** (`pgmoneta-performance.json`):
   - **Duration Analysis**:
