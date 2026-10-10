@@ -81,6 +81,7 @@ static struct mctf_se storage[MAX_BACKENDS];
 static int n_active = 0;
 static bool storage_active = false;
 static bool atexit_registered = false;
+static bool with_local = false;
 
 static char run_dir[MAX_PATH];
 static char sock_dir[MAX_PATH];
@@ -125,6 +126,10 @@ write_confs(void)
    fprintf(f, "encryption = none\n");
    fprintf(f, "workers = 4\n");
    fprintf(f, "storage_engine = ");
+   if (with_local)
+   {
+      fprintf(f, "local, ");
+   }
    for (int i = 0; i < n_active; i++)
    {
       fprintf(f, "%s%s", i > 0 ? ", " : "", storage[i].driver->storage_engine);
@@ -261,7 +266,7 @@ signal_cleanup(int sig)
 
 /* Start n backends, write config, and start the managed daemon. */
 static int
-se_up_common(const int* backends, int n, const char* name)
+se_up_common(const int* backends, int n, const char* name, bool local)
 {
    const char* uc;
    time_t start;
@@ -284,6 +289,8 @@ se_up_common(const int* backends, int n, const char* name)
          return MCTF_FAIL;
       }
    }
+
+   with_local = local;
 
    memset(storage, 0, sizeof(storage));
    n_active = n;
@@ -376,9 +383,12 @@ se_up_common(const int* backends, int n, const char* name)
    return MCTF_OK;
 }
 
-int
-mctf_se_up(int backend)
+/* Start one backend, optionally with the local storage engine enabled too */
+static int
+se_up_one(int backend, bool local)
 {
+   char name[MISC_LENGTH];
+
    if ((size_t)backend >= sizeof(registry) / sizeof(registry[0]) ||
        registry[backend] == NULL)
    {
@@ -386,7 +396,21 @@ mctf_se_up(int backend)
       return MCTF_FAIL;
    }
 
-   return se_up_common(&backend, 1, registry[backend]->name);
+   pgmoneta_snprintf(name, sizeof(name), "%s%s", registry[backend]->name, local ? "-local" : "");
+
+   return se_up_common(&backend, 1, name, local);
+}
+
+int
+mctf_se_up(int backend)
+{
+   return se_up_one(backend, false);
+}
+
+int
+mctf_se_up_local(int backend)
+{
+   return se_up_one(backend, true);
 }
 
 int
@@ -399,7 +423,7 @@ mctf_se_up_all(void)
       all[i] = i;
    }
 
-   return se_up_common(all, MAX_BACKENDS, "remote");
+   return se_up_common(all, MAX_BACKENDS, "remote", false);
 }
 
 void
@@ -422,6 +446,7 @@ mctf_se_down(void)
       }
    }
    n_active = 0;
+   with_local = false;
 }
 
 int
@@ -515,6 +540,41 @@ const char*
 mctf_se_run_dir(void)
 {
    return storage_active ? run_dir : "";
+}
+
+int
+mctf_se_newest_label(const char* server, char* label, size_t size)
+{
+   char backup_dir[MAX_PATH];
+   char** dirs = NULL;
+   int ndir = 0;
+   int best = -1;
+
+   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/%s/backup", mctf_se_run_dir(), server);
+   pgmoneta_get_directories(backup_dir, &ndir, &dirs);
+
+   if (ndir <= 0 || dirs == NULL)
+   {
+      return MCTF_FAIL;
+   }
+
+   for (int i = 0; i < ndir; i++)
+   {
+      if (best < 0 || strcmp(dirs[i], dirs[best]) > 0)
+      {
+         best = i;
+      }
+   }
+
+   pgmoneta_snprintf(label, size, "%s", dirs[best]);
+
+   for (int i = 0; i < ndir; i++)
+   {
+      free(dirs[i]);
+   }
+   free(dirs);
+
+   return label[0] != '\0' ? MCTF_OK : MCTF_FAIL;
 }
 
 const struct mctf_se*
