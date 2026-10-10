@@ -312,7 +312,11 @@ decryption_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_progress_set_total(server, file_count);
    }
 
-   pgmoneta_decrypt_directory(server, base, workers, NULL);
+   if (pgmoneta_decrypt_directory(server, base, workers, NULL))
+   {
+      ret = 1;
+      goto error;
+   }
 
    if (workers != NULL)
    {

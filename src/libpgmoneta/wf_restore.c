@@ -748,16 +748,16 @@ copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
       return 0;
    }
 
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
    {
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
-
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-   directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
-   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    origwal = pgmoneta_get_server_backup_identifier_data_wal(server, label);
    waldir = pgmoneta_get_server_wal(server);
@@ -769,7 +769,10 @@ copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
    waltarget = pgmoneta_append(waltarget, label);
    waltarget = pgmoneta_append(waltarget, "/pg_wal/");
 
-   pgmoneta_copy_wal_files(server, waldir, waltarget, &backup->wal[0], workers);
+   if (pgmoneta_copy_wal_files(server, waldir, waltarget, &backup->wal[0], workers))
+   {
+      goto error;
+   }
 
    pgmoneta_workers_wait(workers);
    if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))

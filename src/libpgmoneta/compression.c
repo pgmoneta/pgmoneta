@@ -77,6 +77,9 @@ create_compression_operation_task(int server, char* from, char* to, int type, bo
                                   struct workers* workers,
                                   struct compression_operation_task** task);
 
+static int
+compression_operation(struct compression_operation_task* task);
+
 static void
 do_compression_operation(struct worker_common* wc);
 
@@ -314,10 +317,9 @@ error:
    return 1;
 }
 
-static void
-do_compression_operation(struct worker_common* wc)
+static int
+compression_operation(struct compression_operation_task* task)
 {
-   struct compression_operation_task* task = (struct compression_operation_task*)wc;
    int result;
 
    if (task->decompress)
@@ -329,15 +331,23 @@ do_compression_operation(struct worker_common* wc)
       result = pgmoneta_compress_file(task->from, task->to, task->type, NULL);
    }
 
-   if (result != 0)
-   {
-      pgmoneta_record_failure(task->common.workers != NULL ? task->common.workers->outcome : NULL,
-                              "%s failed: %s", task->decompress ? "Decompress" : "Compress", task->from);
-   }
-
    if (task->progress_enabled)
    {
       pgmoneta_progress_increment(task->server, 1);
+   }
+
+   return result;
+}
+
+static void
+do_compression_operation(struct worker_common* wc)
+{
+   struct compression_operation_task* task = (struct compression_operation_task*)wc;
+
+   if (compression_operation(task))
+   {
+      pgmoneta_record_failure(task->common.workers->outcome,
+                              "%s failed: %s", task->decompress ? "Decompress" : "Compress", task->from);
    }
 
    free(task);
@@ -369,7 +379,11 @@ dispatch_compression_operation(int server, char* from, char* to, int type, bool 
    }
    else
    {
-      do_compression_operation((struct worker_common*)task);
+      if (compression_operation(task))
+      {
+         goto error;
+      }
+      free(task);
    }
 
    return 0;
@@ -388,6 +402,7 @@ process_directory_operation(int server, char* directory, int type, struct worker
    char full_path[MAX_PATH];
    const char* suffix = NULL;
    int algorithm = COMPRESSION_ALGORITHM(type);
+   bool failed = false;
 
    if (directory == NULL)
    {
@@ -492,11 +507,15 @@ process_directory_operation(int server, char* directory, int type, struct worker
 
       if (dispatch_compression_operation(server, full_path, to, type, decompress, workers))
       {
-         free(to);
-         goto error;
+         failed = true;
       }
 
       free(to);
+   }
+
+   if (failed)
+   {
+      goto error;
    }
 
    closedir(dir);
