@@ -546,7 +546,10 @@ decrypt_data(int server, char* d, struct workers* workers, struct deque* exclude
          }
 
          pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-         decrypt_data(server, path, workers, excludes);
+         if (decrypt_data(server, path, workers, excludes))
+         {
+            goto error;
+         }
       }
       else
       {
@@ -572,18 +575,18 @@ decrypt_data(int server, char* d, struct workers* workers, struct deque* exclude
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
 
-            if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
+            if (workers == NULL)
             {
-               if (workers != NULL)
+               if (pgmoneta_decrypt_file(from, to, NULL))
                {
-                  if (pgmoneta_workers_outcome_ok(workers))
-                  {
-                     pgmoneta_workers_add(workers, do_decrypt_file, (struct worker_common*)wi);
-                  }
-                  else
-                  {
-                     do_decrypt_file((struct worker_common*)wi);
-                  }
+                  goto error;
+               }
+            }
+            else if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
+            {
+               if (pgmoneta_workers_outcome_ok(workers))
+               {
+                  pgmoneta_workers_add(workers, do_decrypt_file, (struct worker_common*)wi);
                }
                else
                {
@@ -614,6 +617,12 @@ decrypt_data(int server, char* d, struct workers* workers, struct deque* exclude
    return 0;
 
 error:
+
+   pgmoneta_workers_wait(workers);
+
+   free(name);
+   free(from);
+   free(to);
 
    if (dir != NULL)
    {

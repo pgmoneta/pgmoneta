@@ -27,12 +27,17 @@
  */
 
 #include <pgmoneta.h>
+#include <info.h>
+#include <management.h>
 #include <tsclient.h>
 #include <tscommon.h>
+#include <utils.h>
 #include <mctf.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 MCTF_TEST(test_pgmoneta_restore_full)
 {
@@ -56,6 +61,46 @@ MCTF_TEST(test_pgmoneta_restore_incremental_chain)
    MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "restore operation failed");
 
 cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_pgmoneta_restore_no_workers_copy_failure)
+{
+   char* backup_dir = NULL;
+   char* label_file = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+
+   if (geteuid() == 0)
+   {
+      MCTF_SKIP("file permissions are not enforced for root");
+   }
+
+   pgmoneta_test_setup();
+
+   /* Without workers every file is copied synchronously */
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set("server.primary.workers", "0", 0) == 0, cleanup, "failed to set workers = 0");
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
+
+   backup_dir = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   MCTF_ASSERT(pgmoneta_load_infos(backup_dir, &number_of_backups, &backups) == 0 && number_of_backups == 1, cleanup, "failed to load the backup");
+
+   label_file = pgmoneta_get_server_backup_identifier_data(PRIMARY_SERVER, backups[0]->label);
+   label_file = pgmoneta_append(label_file, "backup_label");
+   MCTF_ASSERT(chmod(label_file, 0) == 0, cleanup, "failed to make backup_label unreadable");
+
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", MANAGEMENT_ERROR_RESTORE_NOBACKUP) == 0, cleanup, "restore must fail when a file cannot be copied");
+
+cleanup:
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+   free(backup_dir);
+   free(label_file);
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }

@@ -1331,7 +1331,10 @@ pgmoneta_copy_postgresql_restore(int server, char* from, char* to, char* base, c
                }
                else
                {
-                  pgmoneta_copy_directory(server, from_buffer, to_buffer, restore_last_files_names, workers);
+                  if (pgmoneta_copy_directory(server, from_buffer, to_buffer, restore_last_files_names, workers))
+                  {
+                     goto error;
+                  }
                }
             }
             else
@@ -1345,7 +1348,10 @@ pgmoneta_copy_postgresql_restore(int server, char* from, char* to, char* base, c
                   }
                   if (!file_is_excluded)
                   {
-                     pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                     if (pgmoneta_copy_file(from_buffer, to_buffer, workers))
+                     {
+                        goto error;
+                     }
                      if (progress_enabled)
                      {
                         pgmoneta_progress_increment(server, 1);
@@ -1354,7 +1360,10 @@ pgmoneta_copy_postgresql_restore(int server, char* from, char* to, char* base, c
                }
                else
                {
-                  pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  if (pgmoneta_copy_file(from_buffer, to_buffer, workers))
+                  {
+                     goto error;
+                  }
                   if (progress_enabled)
                   {
                      pgmoneta_progress_increment(server, 1);
@@ -2030,7 +2039,10 @@ copy_backup_file(int server,
       pgmoneta_snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s", output_dir, base_file_name);
    }
 
-   pgmoneta_copy_file(extracted_file_path, ofullpath, NULL);
+   if (pgmoneta_copy_file(extracted_file_path, ofullpath, NULL))
+   {
+      goto error;
+   }
 
    pgmoneta_delete_file(extracted_file_path, NULL);
    free(extracted_file_path);
@@ -3292,7 +3304,14 @@ copy_tablespaces_restore(int server, char* from, char* to, char* base, char* id,
             pgmoneta_mkdir(to_directory);
             pgmoneta_symlink_at_file(to_oid, relative_directory);
 
-            pgmoneta_copy_directory(server, link, to_directory, NULL, workers);
+            if (pgmoneta_copy_directory(server, link, to_directory, NULL, workers))
+            {
+               free(to_oid);
+               free(to_directory);
+               free(relative_directory);
+               free(link);
+               goto error;
+            }
 
             free(to_oid);
             free(to_directory);

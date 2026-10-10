@@ -94,6 +94,7 @@ static char* get_server_basepath(int server);
 
 static int get_permissions(char* from, int* permissions);
 
+static int copy_file(struct worker_input* fi);
 static void do_copy_file(struct worker_common* wc);
 static void do_delete_file(struct worker_common* wc);
 static bool is_valid_wal_file_prefix(char* f);
@@ -2527,6 +2528,7 @@ pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_fi
    struct dirent* entry;
    struct stat statbuf;
    bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
+   bool failed = false;
 
    pgmoneta_mkdir(to);
 
@@ -2554,7 +2556,10 @@ pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_fi
          {
             if (S_ISDIR(statbuf.st_mode))
             {
-               pgmoneta_copy_directory(server, from_buffer, to_buffer, restore_last_files_names, workers);
+               if (pgmoneta_copy_directory(server, from_buffer, to_buffer, restore_last_files_names, workers))
+               {
+                  failed = true;
+               }
             }
             else
             {
@@ -2567,7 +2572,10 @@ pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_fi
                   }
                   if (!file_is_excluded)
                   {
-                     pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                     if (pgmoneta_copy_file(from_buffer, to_buffer, workers))
+                     {
+                        failed = true;
+                     }
                      if (progress_enabled)
                      {
                         pgmoneta_progress_increment(server, 1);
@@ -2576,7 +2584,10 @@ pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_fi
                }
                else
                {
-                  pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  if (pgmoneta_copy_file(from_buffer, to_buffer, workers))
+                  {
+                     failed = true;
+                  }
                   if (progress_enabled)
                   {
                      pgmoneta_progress_increment(server, 1);
@@ -2591,6 +2602,11 @@ pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_fi
       closedir(d);
    }
    else
+   {
+      goto error;
+   }
+
+   if (failed)
    {
       goto error;
    }
@@ -2690,7 +2706,11 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
    }
    else
    {
-      do_copy_file((struct worker_common*)fi);
+      if (copy_file(fi))
+      {
+         goto error;
+      }
+      free(fi);
    }
 
    return 0;
@@ -2706,6 +2726,18 @@ static void
 do_copy_file(struct worker_common* wc)
 {
    struct worker_input* fi = (struct worker_input*)wc;
+
+   if (copy_file(fi))
+   {
+      pgmoneta_record_failure(fi->common.workers->outcome, "File copy failed: %s", fi->from);
+   }
+
+   free(fi);
+}
+
+static int
+copy_file(struct worker_input* fi)
+{
    struct main_configuration* config = (struct main_configuration*)shmem;
    char* from = NULL;
    int fd_from = -1;
@@ -2917,6 +2949,12 @@ do_copy_file(struct worker_common* wc)
       while (nread > 0);
    }
 
+   if (nread < 0)
+   {
+      pgmoneta_log_error("Unable to read file: %s", from);
+      goto error;
+   }
+
    if (nread == 0)
    {
       fsync(fd_to);
@@ -2944,9 +2982,8 @@ do_copy_file(struct worker_common* wc)
    {
       free(buffer);
    }
-   free(fi);
 
-   return;
+   return 0;
 
 error:
 
@@ -2965,8 +3002,6 @@ error:
 
    errno = 0;
 
-   pgmoneta_record_failure(fi->common.workers != NULL ? fi->common.workers->outcome : NULL, "File copy failed: %s", fi->from);
-
    free(dn);
    free(from);
    free(to);
@@ -2978,7 +3013,8 @@ error:
    {
       free(buffer);
    }
-   free(fi);
+
+   return 1;
 }
 
 int
@@ -3629,7 +3665,10 @@ pgmoneta_copy_wal_files(int server, char* from, char* to, char* start, struct wo
             tf = pgmoneta_append(tf, wal_file);
          }
 
-         pgmoneta_copy_file(ff, tf, workers);
+         if (pgmoneta_copy_file(ff, tf, workers))
+         {
+            goto error;
+         }
       }
 
       free(basename);
@@ -3653,6 +3692,12 @@ pgmoneta_copy_wal_files(int server, char* from, char* to, char* start, struct wo
    return 0;
 
 error:
+
+   pgmoneta_workers_wait(workers);
+
+   free(basename);
+   free(ff);
+   free(tf);
 
    pgmoneta_deque_iterator_destroy(it);
    pgmoneta_deque_destroy(wal_files);
