@@ -40,6 +40,7 @@ extern "C" {
 #include <openssl/ssl.h>
 
 #define PRIMARY_SERVER               0
+#define REPLICA_SERVER               1
 #define ENV_VAR_BASE_DIR             "PGMONETA_TEST_BASE_DIR"
 #define RESTORED_BACKUP_DEFAULT_PORT 15432
 
@@ -243,6 +244,14 @@ pgmoneta_test_setup_encryption_env(struct test_encryption_env* env);
  */
 void
 pgmoneta_test_teardown_encryption_env(struct test_encryption_env* env);
+
+/**
+ * Check if a replica server is configured
+ * @param config
+ * @return true if a replica server is configured, otherwise false
+ */
+bool
+pgmoneta_test_has_replica(struct main_configuration* config);
 
 #ifdef __cplusplus
 }

@@ -1,0 +1,91 @@
+#!/bin/bash
+# Copyright (C) 2026 The pgmoneta community
+#
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this list
+# of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice, this
+# list of conditions and the following disclaimer in the documentation and/or other
+# materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its contributors may
+# be used to endorse or promote products derived from this software without specific
+# prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+# THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+# OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+# TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+export PG_PRIMARY_HOST=${PG_PRIMARY_HOST}
+export PG_PRIMARY_PORT=${PG_PRIMARY_PORT:-5432}
+export PG_REPLICA_PORT=${PG_REPLICA_PORT:-5433}
+
+if [ -z "${PG_PRIMARY_HOST}" ] ||
+   [ -z "${PG_REPL_USER_NAME}" ] || [ -z "${PG_REPL_PASSWORD}" ]; then
+    echo "PG_PRIMARY_HOST, PG_REPL_USER_NAME and PG_REPL_PASSWORD need to be defined."
+    exit 1
+fi
+
+export PG_MAX_CONNECTIONS=${PG_MAX_CONNECTIONS:-100}
+export PG_SHARED_BUFFERS=${PG_SHARED_BUFFERS:-256MB}
+export PG_WORK_MEM=${PG_WORK_MEM:-4MB}
+export PG_MAX_PARALLEL_WORKERS=${PG_MAX_PARALLEL_WORKERS:-8}
+export PG_EFFECTIVE_CACHE_SIZE=${PG_EFFECTIVE_CACHE_SIZE:-4GB}
+export PG_MAX_WAL_SIZE=${PG_MAX_WAL_SIZE:-1GB}
+export PG_LOG_LEVEL=${PG_LOG_LEVEL:-debug5}
+
+find /pgdata_replica -mindepth 1 -delete
+
+PGPASSWORD="$PG_REPL_PASSWORD" /usr/pgsql-14/bin/psql \
+  -h "$PG_PRIMARY_HOST" -p "$PG_PRIMARY_PORT" -U "$PG_REPL_USER_NAME" -d postgres \
+  -tAc "SELECT pg_drop_replication_slot('repl_replica') WHERE EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = 'repl_replica');" \
+  >/dev/null 2>&1 || true
+
+PGPASSWORD="$PG_REPL_PASSWORD" /usr/pgsql-14/bin/pg_basebackup \
+  -h "$PG_PRIMARY_HOST" -p "$PG_PRIMARY_PORT" \
+  -U "$PG_REPL_USER_NAME" -D /pgdata_replica -X stream -R -S repl_replica -C -c fast -P \
+  --tablespace-mapping=/tmp/pgmoneta_tblspc/ts1=/tmp/pgmoneta_replica_tblspc/ts1 \
+  --tablespace-mapping=/tmp/pgmoneta_tblspc/ts2=/tmp/pgmoneta_replica_tblspc/ts2 \
+  || { echo "pg_basebackup failed"; exit 1; }
+
+{
+  while IFS= read -r line; do
+    if [[ "$line" == primary_conninfo* ]] && [[ "$line" != *password=* ]]; then
+      line="${line%\'} password=${PG_REPL_PASSWORD}'"
+    fi
+    printf '%s\n' "$line"
+  done
+} < /pgdata_replica/postgresql.auto.conf > /pgdata_replica/postgresql.auto.conf.tmp
+mv /pgdata_replica/postgresql.auto.conf.tmp /pgdata_replica/postgresql.auto.conf
+chmod 600 /pgdata_replica/postgresql.auto.conf
+
+cp /conf/postgresql.conf /pgdata_replica/
+cp /conf/pg_hba.conf /pgdata_replica/
+
+cat >> /pgdata_replica/postgresql.conf <<EOF
+
+# Standby specific settings
+port = $PG_REPLICA_PORT
+hot_standby = on
+log_filename = 'logfile_replica'
+EOF
+
+touch /pgdata_replica/standby.signal
+
+/usr/pgsql-14/bin/pg_ctl -D /pgdata_replica/ -l /pglog/logfile_replica start
+for i in {1..10}; do
+  /usr/pgsql-14/bin/pg_isready -h localhost -p "$PG_REPLICA_PORT" >/dev/null 2>&1 && break
+  sleep 1
+done
+PGPASSWORD="$PG_REPL_PASSWORD" /usr/pgsql-14/bin/psql \
+  -h localhost -p "$PG_REPLICA_PORT" -U "$PG_REPL_USER_NAME" -d postgres \
+  -c "SELECT pg_create_physical_replication_slot('repl_replica') WHERE NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = 'repl_replica');"
