@@ -50,6 +50,7 @@
 extern int ssh_upload(int server, char* label, int compression, int encryption);
 extern int s3_upload(int server, char* label, int compression, int encryption);
 extern int s3_cleanup(int server, char* label);
+extern int s3_download(int server, char* label, int compression, int encryption);
 extern int azure_upload(int server, char* label, int compression, int encryption);
 extern int azure_download(int server, char* label, int compression, int encryption);
 extern int gcs_upload(int server, char* label, int compression, int encryption);
@@ -72,8 +73,7 @@ static const struct storage_engine engines[] = {
     ssh_upload, NULL, NULL},
    {"S3", STORAGE_ENGINE_S3,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_BATCH_DELETE | STORAGE_CAP_MULTIPART | STORAGE_CAP_PARALLEL_SAFE,
-    /* TODO: fill with s3_download - dispatching restore here mirrors upload, keeps a new backend to one table row instead of a WORKFLOW_TYPE_* plus switch arms, and lets the duplicated staging collapse into se_object.c */
-    s3_upload, s3_cleanup, NULL},
+    s3_upload, s3_cleanup, s3_download},
    {"Azure", STORAGE_ENGINE_AZURE,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
     azure_upload, NULL, azure_download},

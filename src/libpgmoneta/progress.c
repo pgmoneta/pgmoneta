@@ -414,9 +414,6 @@ calculate_fallback_weights(int workflow_type, int* phases, int n_phases, int* we
       case WORKFLOW_TYPE_S3_LIST:
          weights[0] = 100;
          break;
-      case WORKFLOW_TYPE_S3_RESTORE:
-         weights[0] = 100;
-         break;
       default:
          break;
    }
@@ -537,7 +534,6 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
          calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
       case WORKFLOW_TYPE_S3_LIST:
-      case WORKFLOW_TYPE_S3_RESTORE:
          calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
       default:

@@ -50,7 +50,6 @@ extern "C" {
 #define WORKFLOW_TYPE_POST_ROLLUP        10
 
 #define WORKFLOW_TYPE_S3_LIST            100
-#define WORKFLOW_TYPE_S3_RESTORE         101
 
 #define WORKFLOW_NAME_BACKUP             "Backup"             /**< The name of backup workflow */
 #define WORKFLOW_NAME_INCREMENTAL_BACKUP "Incremental backup" /**< The name of incremental backup workflow */
@@ -63,7 +62,6 @@ extern "C" {
 #define WORKFLOW_NAME_COMBINE_AS_IS      "Combine as is"      /**< The name of combine as is workflow */
 #define WORKFLOW_NAME_POST_ROLLUP        "Post rollup"        /**< The name of post rollup workflow */
 #define WORKFLOW_NAME_S3_LIST            "S3 list"            /**< The name of S3 list workflow */
-#define WORKFLOW_NAME_S3_RESTORE         "S3 restore"         /**< The name of S3 restore workflow */
 #define WORKFLOW_NAME_UNKNOWN            "Unknown"            /**< The name of unknown workflow */
 
 #define PHASE_NONE                       0  /* No phase */
