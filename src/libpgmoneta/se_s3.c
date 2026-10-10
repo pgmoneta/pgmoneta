@@ -56,12 +56,10 @@
 #include <string.h>
 
 static char* s3_backup_name(void);
-static char* s3_restore_name(void);
 static char* s3_cleanup_name(void);
 static char* s3_info_name(void);
 static int s3_storage_setup(char*, struct art*);
 static int s3_storage_execute(char*, struct art*);
-static int s3_storage_restore(char*, struct art*);
 static int s3_storage_list(char*, struct art*);
 static int s3_storage_teardown(char*, struct art*);
 static int s3_storage_noop_teardown(char*, struct art*);
@@ -158,11 +156,6 @@ pgmoneta_storage_create_s3(int workflow_type)
          wf->execute = &s3_storage_cleanup;
          wf->teardown = &s3_storage_noop_teardown;
          break;
-      case WORKFLOW_TYPE_S3_RESTORE:
-         wf->name = &s3_restore_name;
-         wf->execute = &s3_storage_restore;
-         wf->teardown = &s3_storage_noop_teardown;
-         break;
       default:
          break;
    }
@@ -208,12 +201,6 @@ static char*
 s3_backup_name(void)
 {
    return PHASE_NAME_BASEBACKUP;
-}
-
-static char*
-s3_restore_name(void)
-{
-   return PHASE_NAME_RESTORE;
 }
 
 static char*
@@ -794,153 +781,6 @@ error:
    free(info_tmp);
    free(suffix);
 
-   return 1;
-}
-
-static int
-s3_storage_restore(char* name __attribute__((unused)), struct art* nodes)
-{
-   int server = -1;
-   char* label = NULL;
-   char* s3_root = NULL;
-   char* local_root = NULL;
-   char* base_dir = NULL;
-   char* manifest_tmp = NULL;
-   char* manifest_final = NULL;
-   char* sha512_tmp = NULL;
-   char* sha512_final = NULL;
-   char* info_tmp = NULL;
-   char* info_final = NULL;
-   struct backup* backup = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_dump_art(nodes);
-
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("S3 storage engine (restore): %s/%s",
-                      config->common.servers[server].name, label);
-   pgmoneta_log_debug("S3 effective config: bucket=%s, region=%s, endpoint=%s",
-                      s3_get_effective_bucket(server),
-                      s3_get_effective_region(server),
-                      s3_get_effective_endpoint(server));
-
-   s3_root = s3_get_basepath(server, label);
-   local_root = pgmoneta_get_server_backup_identifier(server, label);
-   info_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
-   info_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
-
-   if (pgmoneta_object_bootstrap(&s3_ops, s3_root, server, local_root))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_move_file(info_tmp, info_final))
-   {
-      pgmoneta_log_error("S3 restore: could not rename %s to %s", info_tmp, info_final);
-      goto error;
-   }
-
-   base_dir = pgmoneta_get_server_backup(server);
-
-   if (pgmoneta_load_info(base_dir, label, &backup))
-   {
-      pgmoneta_log_error("S3 restore: failed to load backup.info from %s", local_root);
-      goto error;
-   }
-
-   pgmoneta_log_debug("S3 restore: compression=%d encryption=%d", backup->compression, backup->encryption);
-
-   if (pgmoneta_object_download_files(&s3_ops, s3_root, local_root, server,
-                                      backup->compression, backup->encryption))
-   {
-      goto error;
-   }
-
-   /* directory rows are excluded from the file list, so recreate them here */
-   if (pgmoneta_object_restore_directories(&s3_ops, local_root))
-   {
-      goto error;
-   }
-
-   manifest_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
-   manifest_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
-   sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
-   sha512_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512");
-
-   if (pgmoneta_move_file(manifest_tmp, manifest_final))
-   {
-      pgmoneta_log_error("S3 restore: could not rename %s to %s", manifest_tmp, manifest_final);
-      goto error;
-   }
-
-   if (pgmoneta_move_file(sha512_tmp, sha512_final))
-   {
-      pgmoneta_log_error("S3 restore: could not rename %s to %s", sha512_tmp, sha512_final);
-      goto error;
-   }
-
-   pgmoneta_log_info("S3 restore: %s/%s completed", config->common.servers[server].name, label);
-
-   free(s3_root);
-   free(local_root);
-   free(base_dir);
-   free(backup);
-   free(manifest_tmp);
-   free(manifest_final);
-   free(sha512_tmp);
-   free(sha512_final);
-   free(info_tmp);
-   free(info_final);
-
-   return 0;
-
-error:
-
-   if (local_root != NULL)
-   {
-      char* cleanup = NULL;
-
-      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
-      if (pgmoneta_exists(cleanup))
-      {
-         pgmoneta_delete_file(cleanup, NULL);
-      }
-      free(cleanup);
-
-      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
-      if (pgmoneta_exists(cleanup))
-      {
-         pgmoneta_delete_file(cleanup, NULL);
-      }
-      free(cleanup);
-
-      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
-      if (pgmoneta_exists(cleanup))
-      {
-         pgmoneta_delete_file(cleanup, NULL);
-      }
-      free(cleanup);
-   }
-
-   free(s3_root);
-   free(local_root);
-   free(base_dir);
-   free(backup);
-   free(manifest_tmp);
-   free(manifest_final);
-   free(sha512_tmp);
-   free(sha512_final);
-   free(info_tmp);
-   free(info_final);
    return 1;
 }
 
@@ -2824,4 +2664,146 @@ s3_cleanup(int server, char* label)
    rc = s3_delete_all_objects("", s3_root, server, NULL);
    free(s3_root);
    return rc;
+}
+
+int
+s3_download(int server, char* label, int compression __attribute__((unused)), int encryption __attribute__((unused)))
+{
+   char* local_root = NULL;
+   char* s3_root = NULL;
+   char* info_tmp = NULL;
+   char* info_final = NULL;
+   char* manifest_tmp = NULL;
+   char* manifest_final = NULL;
+   char* sha512_tmp = NULL;
+   char* sha512_final = NULL;
+   struct backup* backup = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   s3_root = s3_get_basepath(server, label);
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
+
+   pgmoneta_log_debug("S3 restore: %s/%s", config->common.servers[server].name, label);
+
+   if (pgmoneta_mkdir(local_root))
+   {
+      pgmoneta_log_error("S3 restore: could not create %s", local_root);
+      goto error;
+   }
+
+   info_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+   info_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
+
+   if (pgmoneta_object_bootstrap(&s3_ops, s3_root, server, local_root))
+   {
+      goto error;
+   }
+
+   /* Read staging metadata from .tmp; do not publish backup.info until download completes */
+   if (pgmoneta_load_info_file(info_tmp, &backup))
+   {
+      pgmoneta_log_error("S3 restore: failed to load staging backup.info from %s", info_tmp);
+      goto error;
+   }
+
+   pgmoneta_log_debug("S3 restore: compression=%d encryption=%d", backup->compression, backup->encryption);
+
+   if (pgmoneta_object_download_files(&s3_ops, s3_root, local_root, server,
+                                      backup->compression, backup->encryption))
+   {
+      goto error;
+   }
+
+   /* directory rows are excluded from the file list, so recreate them here */
+   if (pgmoneta_object_restore_directories(&s3_ops, local_root))
+   {
+      goto error;
+   }
+
+   manifest_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+   manifest_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
+   sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+   sha512_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512");
+
+   if (pgmoneta_move_file(manifest_tmp, manifest_final))
+   {
+      pgmoneta_log_error("S3 restore: could not rename %s to %s", manifest_tmp, manifest_final);
+      goto error;
+   }
+
+   if (pgmoneta_move_file(sha512_tmp, sha512_final))
+   {
+      pgmoneta_log_error("S3 restore: could not rename %s to %s", sha512_tmp, sha512_final);
+      goto error;
+   }
+
+   /* Publish last: backup.info makes this look like a real local backup */
+   if (pgmoneta_move_file(info_tmp, info_final))
+   {
+      pgmoneta_log_error("S3 restore: could not rename %s to %s", info_tmp, info_final);
+      goto error;
+   }
+
+   pgmoneta_log_info("S3 restore: %s/%s completed", config->common.servers[server].name, label);
+
+   free(s3_root);
+   free(local_root);
+   free(backup);
+   free(info_tmp);
+   free(info_final);
+   free(manifest_tmp);
+   free(manifest_final);
+   free(sha512_tmp);
+   free(sha512_final);
+
+   return 0;
+
+error:
+
+   if (local_root != NULL)
+   {
+      char* cleanup = NULL;
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+
+      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
+      if (pgmoneta_exists(cleanup))
+      {
+         pgmoneta_delete_file(cleanup, NULL);
+      }
+      free(cleanup);
+   }
+
+   free(s3_root);
+   free(local_root);
+   free(backup);
+   free(info_tmp);
+   free(info_final);
+   free(manifest_tmp);
+   free(manifest_final);
+   free(sha512_tmp);
+   free(sha512_final);
+
+   return 1;
 }

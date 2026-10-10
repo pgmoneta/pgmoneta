@@ -514,22 +514,6 @@ MCTF_TEST(test_progress_setup_s3_workflows)
    MCTF_ASSERT_INT_EQ((int)atomic_load(&p->current_phase), PHASE_INFO,
                       cleanup, "s3 list should start in info phase");
    pgmoneta_progress_teardown(0);
-   pgmoneta_workflow_destroy(workflow);
-   workflow = NULL;
-   pgmoneta_art_destroy(nodes);
-   nodes = NULL;
-
-   MCTF_ASSERT_INT_EQ(pgmoneta_art_create(&nodes), 0,
-                      cleanup, "failed to recreate art");
-
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_S3_RESTORE, NULL);
-   MCTF_ASSERT_PTR_NONNULL(workflow, cleanup, "failed to create s3 restore workflow");
-   pgmoneta_progress_setup(0, workflow, nodes, WORKFLOW_TYPE_S3_RESTORE);
-
-   MCTF_ASSERT_INT_EQ((int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_RESTORE), 100,
-                      cleanup, "s3 restore should reserve 100 percent for restore");
-   MCTF_ASSERT_INT_EQ((int)atomic_load(&p->current_phase), PHASE_RESTORE,
-                      cleanup, "s3 restore should start in restore phase");
 
 cleanup:
    if (workflow != NULL)

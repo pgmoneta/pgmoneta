@@ -39,6 +39,7 @@
 #include <network.h>
 #include <restore.h>
 #include <security.h>
+#include <storage.h>
 #include <utils.h>
 #include <wal.h>
 #include <workflow.h>
@@ -210,12 +211,11 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
    double total_seconds;
    char* directory = NULL;
    char* position = NULL;
-   struct art* nodes = NULL;
-   struct workflow* workflow = NULL;
-   struct main_configuration* config;
-   struct backup* backup = NULL;
    char* local_data = NULL;
+   struct art* nodes = NULL;
+   struct backup* backup = NULL;
    struct json* req = NULL;
+   struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
 
@@ -267,26 +267,12 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
       goto error;
    }
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_S3_RESTORE, NULL);
-
-   if (workflow == NULL)
+   if (pgmoneta_storage_remote_download(server, prefix))
    {
-      ec = MANAGEMENT_ERROR_RESTORE_S3_WORKFLOW;
-      pgmoneta_log_error("S3 restore: S3 storage engine is not configured for %s", config->common.servers[server].name);
+      ec = MANAGEMENT_ERROR_RESTORE_S3_DOWNLOAD;
+      pgmoneta_log_error("S3 restore: failed to stage %s/%s", config->common.servers[server].name, prefix);
       goto error;
    }
-
-   /* TODO: S3 restore progress only covers the staging workflow here.
-    * The subsequent local restore runs via pgmoneta_restore_backup() and
-    * needs its own progress lifecycle until both stages are unified. */
-
-   if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
-   {
-      pgmoneta_log_error("S3 restore: workflow failed for %s", config->common.servers[server].name);
-      goto error;
-   }
-   pgmoneta_workflow_destroy(workflow);
-   workflow = NULL;
 
    if (pgmoneta_workflow_nodes(server, prefix, nodes, &backup))
    {
@@ -337,12 +323,11 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
 
    pgmoneta_json_destroy(payload);
    pgmoneta_art_destroy(nodes);
-   pgmoneta_workflow_destroy(workflow);
    free(elapsed);
+   free(local_data);
 
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
-   free(local_data);
    exit(0);
 
 error:
@@ -353,12 +338,13 @@ error:
 
    pgmoneta_json_destroy(payload);
    pgmoneta_art_destroy(nodes);
-   pgmoneta_workflow_destroy(workflow);
    free(elapsed);
+
    if (local_data != NULL)
    {
       pgmoneta_delete_directory(local_data);
    }
+
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
    free(local_data);
