@@ -574,7 +574,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
             delta *= config->common.servers[server].wal_size;
          }
 
-         if (pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)delta, ValueUInt64))
+         if (pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DELTA, (uintptr_t)delta, ValueUInt64))
          {
             ec = MANAGEMENT_ERROR_LIST_BACKUP_JSON_VALUE;
             goto error;
