@@ -706,6 +706,7 @@ fi
 if [[ "$SUBCOMMAND" == "ci" ]]; then
    MODE="ci"
    PORT=5432
+   export PGMONETA_TEST_LOCAL_RESTORE=1
    trap cleanup EXIT SIGINT
    run_tests
    exit 0

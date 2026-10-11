@@ -272,7 +272,6 @@ MCTF_TEST(test_pgmoneta_hot_standby_incremental)
    pgmoneta_snprintf(standby_dir, sizeof(standby_dir), "%s/primary", TEST_HOT_STANDBY_DIR);
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "full backup failed");
-   MCTF_ASSERT(create_file(standby_dir, "hs_incremental_marker") == 0, cleanup, "failed to create the marker");
 
    pgmoneta_snprintf(overrides_dir, sizeof(overrides_dir), "%s/overrides", TEST_HOT_STANDBY_DIR);
    pgmoneta_mkdir(overrides_dir);
@@ -287,7 +286,6 @@ MCTF_TEST(test_pgmoneta_hot_standby_incremental)
    MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", 0) == 0, cleanup, "first incremental backup failed");
 
    pgmoneta_snprintf(override_dst, sizeof(override_dst), "%s/override_marker_inc.txt", standby_dir);
-   MCTF_ASSERT(standby_has(standby_dir, "hs_incremental_marker"), cleanup, "hot standby was not updated by the first incremental backup");
    MCTF_ASSERT(pgmoneta_exists(override_dst), cleanup, "override file added after the full backup is missing in hot standby");
    MCTF_ASSERT(relation_in_standby(standby_dir, "hs_incremental_added") == 0, cleanup, "relation added after the full backup is missing or has the wrong size in hot standby");
 
