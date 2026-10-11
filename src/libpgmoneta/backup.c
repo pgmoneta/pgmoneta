@@ -107,6 +107,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    }
 
    locked = true;
+   config->common.servers[server].repository_pid = getpid();
    config->common.servers[server].active_backup = true;
 
 #ifdef HAVE_FREEBSD
@@ -311,6 +312,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    pgmoneta_wal_server_compress_encrypt(server, NULL, NULL);
 
    config->common.servers[server].active_backup = false;
+   config->common.servers[server].repository_pid = 0;
    atomic_store(&config->common.servers[server].repository, false);
 
    pgmoneta_json_destroy(payload);
@@ -347,6 +349,7 @@ error:
    if (locked)
    {
       config->common.servers[server].active_backup = false;
+      config->common.servers[server].repository_pid = 0;
       atomic_store(&config->common.servers[server].repository, false);
    }
 

@@ -381,6 +381,7 @@ pgmoneta_sha512_verification(char** argv)
       pgmoneta_log_debug("Verification: Starting for server %s", config->common.servers[server].name);
 
       locked = true;
+      config->common.servers[server].repository_pid = getpid();
 
       backup_dir = pgmoneta_get_server_backup(server);
 
@@ -599,6 +600,7 @@ server_cleanup:
 
       if (locked)
       {
+         config->common.servers[server].repository_pid = 0;
          atomic_store(&config->common.servers[server].repository, false);
          locked = false;
       }

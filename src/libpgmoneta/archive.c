@@ -103,6 +103,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    }
 
    locked = true;
+   config->common.servers[server].repository_pid = getpid();
    config->common.servers[server].active_archive = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
@@ -232,6 +233,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    pgmoneta_disconnect(client_fd);
 
    config->common.servers[server].active_archive = false;
+   config->common.servers[server].repository_pid = 0;
    atomic_store(&config->common.servers[server].repository, false);
 
 #ifdef DEBUG
@@ -269,6 +271,7 @@ error:
    if (locked)
    {
       config->common.servers[server].active_archive = false;
+      config->common.servers[server].repository_pid = 0;
       atomic_store(&config->common.servers[server].repository, false);
    }
 
