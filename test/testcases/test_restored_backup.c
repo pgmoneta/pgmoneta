@@ -97,7 +97,7 @@ MCTF_TEST(test_pgmoneta_restored_backup_start)
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup,
                "backup failed - check server is online and backup configuration");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup,
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup,
                "restore operation failed");
 
    /* --- get backup label to construct correct restore path --- */

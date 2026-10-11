@@ -107,7 +107,8 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->common.servers[server].name, label);
 
-   if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
+   if (!pgmoneta_art_contains_key(nodes, NODE_REPOSITORY_LOCKED) &&
+       !atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
    {
       pgmoneta_log_info("Delete: Server %s is active", config->common.servers[server].name);
       pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
@@ -120,7 +121,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   locked = true;
+   locked = !pgmoneta_art_contains_key(nodes, NODE_REPOSITORY_LOCKED);
    config->common.servers[server].active_delete = true;
 
    d = pgmoneta_get_server_backup(server);
@@ -224,10 +225,6 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
    free(d);
 
    free(child);
-
-   config->common.servers[server].active_delete = false;
-   atomic_store(&config->common.servers[server].repository, false);
-   pgmoneta_log_trace("Delete is ready for %s", config->common.servers[server].name);
 
    return 0;
 

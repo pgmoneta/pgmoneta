@@ -43,11 +43,13 @@ extern "C" {
  * Execute backup command on the server
  * @param server the server to perform backup on
  * @param incremental execute backup in incremental mode
+ * @param async execute backup in asynchronous mode
+ * @param response optional output for JSON response (NULL to ignore)
  * @param expected_error expected error code
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_backup(char* server, char* incremental, int expected_error);
+pgmoneta_tsclient_backup(char* server, char* incremental, bool async, struct json** response, int expected_error);
 
 /**
  * Execute list-backup command on the server
@@ -65,11 +67,12 @@ pgmoneta_tsclient_list_backup(char* server, char* sort_order, struct json** resp
  * @param server the server to perform restore on
  * @param backup_id the backup_id to perform restore on
  * @param position the position parameters
+ * @param async execute restore in asynchronous mode
  * @param expected_error expected error code
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_restore(char* server, char* backup_id, char* position, int expected_error);
+pgmoneta_tsclient_restore(char* server, char* backup_id, char* position, bool async, int expected_error);
 
 /**
  * Execute verify command on the server
@@ -90,21 +93,23 @@ pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* f
  * @param backup_id the backup
  * @param position the position
  * @param directory the directory
+ * @param async execute archive in asynchronous mode
  * @param expected_error expected error code
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_archive(char* server, char* backup_id, char* position, char* directory, int expected_error);
+pgmoneta_tsclient_archive(char* server, char* backup_id, char* position, char* directory, bool async, int expected_error);
 
 /**
  * Execute delete command on the server
  * @param server the server to perform delete on
  * @param backup_id the backup_id to delete
+ * @param async execute delete in asynchronous mode
  * @param expected_error expected error code
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_delete(char* server, char* backup_id, int expected_error);
+pgmoneta_tsclient_delete(char* server, char* backup_id, bool async, int expected_error);
 
 /**
  * Execute force delete command on the server
@@ -296,6 +301,90 @@ pgmoneta_tsclient_annotate(char* server, char* backup_id, char* action, char* ke
  */
 int
 pgmoneta_tsclient_mode(char* server, char* action, int expected_error);
+
+/**
+ * Get job information
+ * @param job_id the job id
+ * @param response optional output for JSON response (NULL to ignore)
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_job(char* job_id, struct json** response, int expected_error);
+
+/**
+ * Get job information for a specific server and command
+ * @param server the server
+ * @param command the command (backup, restore, archive, delete)
+ * @param response optional output for JSON response (NULL to ignore)
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_job_status(char* server, char* command, struct json** response, int expected_error);
+
+/**
+ * List all jobs
+ * @param response optional output for JSON response (NULL to ignore)
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_job_list_all(struct json** response, int expected_error);
+
+/**
+ * List all jobs for a specific server
+ * @param server the server
+ * @param response optional output for JSON response (NULL to ignore)
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_job_list_server(char* server, struct json** response, int expected_error);
+
+/**
+ * List all jobs with a specific status
+ * @param status the status (Running, Completed, Failed)
+ * @param response optional output for JSON response (NULL to ignore)
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_job_list_status(char* status, struct json** response, int expected_error);
+
+/**
+ * Remove a specific job
+ * @param job_id the job id
+ * @param response optional output for JSON response (NULL to ignore)
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_job_remove_job(char* job_id, struct json** response, int expected_error);
+
+/**
+ * Remove all jobs
+ * @param response optional output for JSON response (NULL to ignore)
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_job_remove_all(struct json** response, int expected_error);
+
+/**
+ * Send a raw job request for management protocol validation tests
+ * @param action optional job action
+ * @param job_id optional job id
+ * @param server optional server
+ * @param command optional workflow command
+ * @param status optional job status
+ * @param include_all whether to include the All field
+ * @param all value of the All field
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_job_raw(int action, char* job_id, char* server, char* command, char* status, bool include_all, bool all, int expected_error);
 
 #ifdef __cplusplus
 }

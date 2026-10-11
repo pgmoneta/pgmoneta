@@ -122,6 +122,7 @@ extern "C" {
 #define NODE_ERROR_CODE                  "error_code"          /* The error code */
 #define NODE_FAILED                      "failed"              /* The failed files in a manifest */
 #define NODE_FORCE                       "force"               /* force deletion of backup */
+#define NODE_REPOSITORY_LOCKED           "repository_locked"   /* Repository lock is held by the caller */
 #define NODE_INCREMENTAL_BASE            "incremental_base"    /* The base directory of incremental */
 #define NODE_INCREMENTAL_COMBINE         "incremental_combine" /* Whether to combine into one incremental backup */
 #define NODE_INCREMENTAL_LABEL           "incremental_label"   /* The label of the incremental backup */
@@ -174,6 +175,14 @@ struct workflow
  */
 struct workflow*
 pgmoneta_workflow_create(int workflow_type, struct backup* backup);
+
+/**
+ * Map a workflow step display name to a progress phase
+ * @param name The step name from the workflow
+ * @return The phase constant, or -1 if not tracked
+ */
+int
+pgmoneta_phase_from_workflow_name(char* name);
 
 /**
  * Create standard workflow nodes
