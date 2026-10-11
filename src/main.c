@@ -112,6 +112,7 @@ static void shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void coredump_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void sigchld_cb(struct ev_loop* loop, ev_signal* w, int revents);
+static void child_cb(struct ev_loop* loop, struct ev_child* w, int revents);
 static void retention_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void verification_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
@@ -334,6 +335,7 @@ main(int argc, char** argv)
    struct ev_periodic valid;
    struct ev_periodic wal_streaming;
    struct ev_periodic verification;
+   struct ev_child child;
    size_t shmem_size;
    size_t prometheus_cache_shmem_size = 0;
    struct main_configuration* config = NULL;
@@ -945,6 +947,10 @@ main(int argc, char** argv)
    /* Start SHA512 verification job */
    ev_periodic_init(&verification, verification_cb, 0., pgmoneta_time_convert(config->verification, FORMAT_TIME_S), 0);
    ev_periodic_start(main_loop, &verification);
+
+   /* libev reaps the children itself, so get their exit through a child watcher */
+   ev_child_init(&child, child_cb, 0, 0);
+   ev_child_start(main_loop, &child);
 
    pgmoneta_log_info("Started on %s", config->host);
    pgmoneta_log_debug("Management: %d", unix_management_socket);
@@ -2573,6 +2579,43 @@ sigchld_cb(struct ev_loop* loop __attribute__((unused)), ev_signal* w __attribut
    while (waitpid(-1, NULL, WNOHANG) > 0)
    {
       ;
+   }
+}
+
+/* A process that exits holding a repository lock, e.g. killed by a signal, can't release it */
+static void
+child_cb(struct ev_loop* loop __attribute__((unused)), struct ev_child* w, int revents __attribute__((unused)))
+{
+   pid_t pid = w->rpid;
+   int status = w->rstatus;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (config->common.servers[i].repository_pid != pid)
+      {
+         continue;
+      }
+
+      if (WIFSIGNALED(status))
+      {
+         pgmoneta_log_warn("Releasing the repository lock of %s held by process %d (killed by signal %d)",
+                           config->common.servers[i].name, pid, WTERMSIG(status));
+      }
+      else
+      {
+         pgmoneta_log_warn("Releasing the repository lock of %s held by process %d (exit code %d)",
+                           config->common.servers[i].name, pid, WEXITSTATUS(status));
+      }
+
+      config->common.servers[i].active_backup = false;
+      config->common.servers[i].active_restore = false;
+      config->common.servers[i].active_archive = false;
+      config->common.servers[i].active_delete = false;
+      config->common.servers[i].repository_pid = 0;
+      atomic_store(&config->common.servers[i].repository, false);
    }
 }
 
