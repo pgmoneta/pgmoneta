@@ -761,6 +761,7 @@ write_restore_postgresql_conf(const char* restore_dir, int port)
    fprintf(f, "listen_addresses = '*'\n");
    fprintf(f, "port = %d\n", port);
    fprintf(f, "shared_preload_libraries = ''\n");
+   fprintf(f, "logging_collector = off\n");
 
    fclose(f);
    return 0;
@@ -918,6 +919,15 @@ pgmoneta_start_restored_backup(const char* restore_dir, int port)
       {
          pgmoneta_log_error("pgmoneta_start_restored_backup: pg_ctl start failed (exit=%d): %s",
                             exit_code, output ? output : "(null)");
+         free(output);
+         output = NULL;
+
+         if (pgmoneta_snprintf(command, sizeof(command), "tail -n 50 %s/postgresql.log", pgdata) > 0 &&
+             pgmoneta_test_exec_command(command, &output, &exit_code) == 0)
+         {
+            pgmoneta_log_error("pgmoneta_start_restored_backup: %s/postgresql.log:\n%s",
+                               pgdata, output ? output : "(null)");
+         }
          free(output);
          active_restore_path[0] = '\0';
          return -1;
