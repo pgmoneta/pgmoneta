@@ -450,7 +450,11 @@ pgmoneta_wal(int srv, char** argv)
                         pgmoneta_log_error("Could not write %d bytes to WAL file %s", bytes_to_write, filename);
                         goto error;
                      }
-                     fflush(wal_file);
+                     if (fflush(wal_file) != 0)
+                     {
+                        pgmoneta_log_error("Could not write to WAL file %s: %s", filename, strerror(errno));
+                        goto error;
+                     }
 
                      if (sftp_wal_file != NULL)
                      {
@@ -475,8 +479,11 @@ pgmoneta_wal(int srv, char** argv)
                         wal_filename = pgmoneta_append(wal_filename, filename);
 
                         // the end of WAL segment
-                        fflush(wal_file);
-                        wal_close(d, filename, false, wal_file);
+                        if (wal_close(d, filename, false, wal_file))
+                        {
+                           wal_file = NULL;
+                           goto error;
+                        }
                         if (sftp_wal_file != NULL)
                         {
                            pgmoneta_sftp_wal_close(srv, filename, false, &sftp_wal_file);
@@ -525,8 +532,12 @@ pgmoneta_wal(int srv, char** argv)
                               }
                            }
                            curr_xlogoff += bytes_left;
-                           fwrite(msg->data + hdrlen + bytes_written, 1, bytes_left, wal_file);
-                           fflush(wal_file);
+                           if (fwrite(msg->data + hdrlen + bytes_written, 1, bytes_left, wal_file) != bytes_left ||
+                               fflush(wal_file) != 0)
+                           {
+                              pgmoneta_log_error("Could not write to WAL file %s: %s", filename, strerror(errno));
+                              goto error;
+                           }
                            if (sftp_wal_file != NULL)
                            {
                               sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_left);
@@ -571,7 +582,11 @@ pgmoneta_wal(int srv, char** argv)
             if (wal_file != NULL)
             {
                // Next file would be at a new timeline, so we treat the current wal file completed
-               wal_close(d, filename, false, wal_file);
+               if (wal_close(d, filename, false, wal_file))
+               {
+                  wal_file = NULL;
+                  goto error;
+               }
                wal_file = NULL;
                wal_close(wal_shipping, filename, false, wal_shipping_file);
                wal_shipping_file = NULL;
@@ -1068,8 +1083,11 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
    if (partial)
    {
       pgmoneta_log_info("Not renaming %s.partial as this segment is incomplete", filename);
-      fflush(file);
-      fclose(file);
+      if (fclose(file) != 0)
+      {
+         pgmoneta_log_error("Could not write WAL file %s.partial: %s", filename, strerror(errno));
+         return 1;
+      }
       return 0;
    }
 
@@ -1084,8 +1102,12 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
       pgmoneta_snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
    }
 
-   fflush(file);
-   fclose(file);
+   /* fclose() writes the last buffer; keep the .partial name if that fails */
+   if (fclose(file) != 0)
+   {
+      pgmoneta_log_error("Could not write WAL file %s: %s", tmp_file_path, strerror(errno));
+      return 1;
+   }
    file = NULL;
 
    if (rename(tmp_file_path, file_path) != 0)
