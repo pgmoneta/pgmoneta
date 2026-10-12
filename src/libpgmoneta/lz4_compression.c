@@ -731,7 +731,7 @@ lz4_compressor_decompress(struct compressor* compressor, void* out_buf, size_t o
    *out_size = 0;
 
    this = (struct lz4_compressor*)compressor;
-   if (this == NULL || this->super.in_buf == NULL)
+   if (this == NULL || (this->super.in_buf == NULL && this->super.in_size > 0))
    {
       *finished = true;
       goto error;
@@ -753,13 +753,22 @@ lz4_compressor_decompress(struct compressor* compressor, void* out_buf, size_t o
       // try reading more data here, our buffer is actually slightly larger than the claimed capacity because
       // compressed data could be larger, thus using sizeof instead of in_capacity
       bytes_to_read = MIN(sizeof(this->in_buf[this->in_buf_idx]) - this->in_size, this->super.in_size - this->super.in_pos);
-      memcpy(this->in_buf[this->in_buf_idx] + this->in_size, this->super.in_buf + this->super.in_pos, bytes_to_read);
+      if (bytes_to_read > 0)
+      {
+         memcpy(this->in_buf[this->in_buf_idx] + this->in_size, this->super.in_buf + this->super.in_pos, bytes_to_read);
+      }
       this->in_size += bytes_to_read;
       this->super.in_pos += bytes_to_read;
       if (this->in_size < 4)
       {
          if (this->super.last_chunk)
          {
+            /* no more blocks, e.g. an empty file; only a partial size header is an error */
+            if (this->in_size == 0)
+            {
+               *finished = true;
+               return 0;
+            }
             goto error;
          }
       }
@@ -827,7 +836,10 @@ lz4_compressor_decompress(struct compressor* compressor, void* out_buf, size_t o
       }
    }
 
-   *finished = this->super.in_size == this->super.in_pos && this->out_size == this->out_pos;
+   /* in_buf can hold more than one block once all the input is copied in, so keep going while a
+    * whole size header is buffered; a partial header or block needs more input */
+   *finished = this->super.in_size == this->super.in_pos && this->out_size == this->out_pos &&
+               !(this->state == LZ4_NEW_CHUNK && this->in_size >= 4);
    return 0;
 error:
    return 1;

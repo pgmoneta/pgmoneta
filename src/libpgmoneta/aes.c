@@ -2307,12 +2307,20 @@ noop_encryptor_decrypt(struct encryptor* encryptor, void* in_buf, size_t in_size
 {
    struct noop_encryptor* this = (struct noop_encryptor*)encryptor;
 
-   if (this == NULL || in_buf == NULL || in_size == 0)
+   if (this == NULL || (in_buf == NULL && in_size > 0))
    {
       goto error;
    }
 
    (void)last_chunk;
+
+   /* an empty file streams no data */
+   if (in_size == 0)
+   {
+      *out_buf = (void*)this->out_buf;
+      *out_size = 0;
+      return 0;
+   }
 
    if (ensure_capacity(&this->out_buf, &this->out_capacity, in_size))
    {

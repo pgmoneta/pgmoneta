@@ -47,6 +47,9 @@ MCTF_TEST(test_streamer)
 {
    char* dir = NULL;
    char* bigfile = NULL;
+   char* smallfile = NULL;
+   char* files[2] = {NULL};
+   FILE* f = NULL;
    char cmd[256] = {0};
    char retrospect_dir[MAX_PATH] = {0};
    dir = pgmoneta_append(dir, TEST_BASE_DIR);
@@ -55,6 +58,8 @@ MCTF_TEST(test_streamer)
    pgmoneta_mkdir(retrospect_dir);
    bigfile = pgmoneta_append(bigfile, dir);
    bigfile = pgmoneta_append(bigfile, "/bigfile.txt");
+   smallfile = pgmoneta_append(smallfile, dir);
+   smallfile = pgmoneta_append(smallfile, "/smallfile.txt");
    char buf[DEFAULT_BUFFER_SIZE] = {0};
    char backup_dest[MAX_PATH];
    char restore_dest[MAX_PATH];
@@ -72,62 +77,77 @@ MCTF_TEST(test_streamer)
    system(cmd);
 
    MCTF_ASSERT(pgmoneta_exists(bigfile), cleanup, "Failed to create %s", bigfile);
-   for (int i = 0; i < sizeof(compression_methods) / sizeof(COMPRESSION_NONE); i++)
+
+   /* a small file that compresses into several blocks, all read in one go */
+   f = fopen(smallfile, "wb");
+   MCTF_ASSERT(f != NULL, cleanup, "Failed to create %s", smallfile);
+   for (int i = 0; i < 65536; i++)
    {
-      int compression = compression_methods[i];
-      for (int j = 0; j < sizeof(encryption_methods) / sizeof(ENCRYPTION_NONE); j++)
+      fputc('U', f);
+   }
+   fclose(f);
+
+   files[0] = bigfile;
+   files[1] = smallfile;
+   for (int k = 0; k < 2; k++)
+   {
+      for (int i = 0; i < sizeof(compression_methods) / sizeof(COMPRESSION_NONE); i++)
       {
-         int encryption = encryption_methods[j];
-         memset(backup_dest, 0, sizeof(backup_dest));
-         memset(restore_dest, 0, sizeof(restore_dest));
-         pgmoneta_snprintf(backup_dest, sizeof(backup_dest), "%s/bigfile_backup_%s_%s", dir, translate_compression(compression), translate_encryption(encryption));
-         pgmoneta_snprintf(restore_dest, sizeof(restore_dest), "%s/bigfile_restore_%s_%s", dir, translate_compression(compression), translate_encryption(encryption));
-         /* backup */
-         MCTF_ASSERT(!pgmoneta_vfile_create_local(bigfile, "r", &reader), cleanup);
-         MCTF_ASSERT(!pgmoneta_vfile_create_local(backup_dest, "wb", &writer), cleanup);
-         MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_BACKUP, encryption, compression, &backup_streamer), cleanup);
-         pgmoneta_streamer_add_destination(backup_streamer, writer);
-
-         do
+         int compression = compression_methods[i];
+         for (int j = 0; j < sizeof(encryption_methods) / sizeof(ENCRYPTION_NONE); j++)
          {
-            MCTF_ASSERT(!reader->read(reader, buf, sizeof(buf), &num_read, &last_chunk), cleanup);
-            MCTF_ASSERT(!pgmoneta_streamer_write(backup_streamer, buf, num_read, last_chunk), cleanup);
+            int encryption = encryption_methods[j];
+            memset(backup_dest, 0, sizeof(backup_dest));
+            memset(restore_dest, 0, sizeof(restore_dest));
+            pgmoneta_snprintf(backup_dest, sizeof(backup_dest), "%s/%d_backup_%s_%s", dir, k, translate_compression(compression), translate_encryption(encryption));
+            pgmoneta_snprintf(restore_dest, sizeof(restore_dest), "%s/%d_restore_%s_%s", dir, k, translate_compression(compression), translate_encryption(encryption));
+            /* backup */
+            MCTF_ASSERT(!pgmoneta_vfile_create_local(files[k], "r", &reader), cleanup);
+            MCTF_ASSERT(!pgmoneta_vfile_create_local(backup_dest, "wb", &writer), cleanup);
+            MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_BACKUP, encryption, compression, &backup_streamer), cleanup);
+            pgmoneta_streamer_add_destination(backup_streamer, writer);
+
+            do
+            {
+               MCTF_ASSERT(!reader->read(reader, buf, sizeof(buf), &num_read, &last_chunk), cleanup);
+               MCTF_ASSERT(!pgmoneta_streamer_write(backup_streamer, buf, num_read, last_chunk), cleanup);
+            }
+            while (!last_chunk);
+
+            pgmoneta_streamer_destroy(backup_streamer);
+            pgmoneta_vfile_destroy(reader);
+            reader = NULL;
+            backup_streamer = NULL;
+
+            /* restore */
+            MCTF_ASSERT(!pgmoneta_vfile_create_local(backup_dest, "r", &reader), cleanup);
+            MCTF_ASSERT(!pgmoneta_vfile_create_local(restore_dest, "wb", &writer), cleanup);
+            MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_RESTORE, encryption, compression, &restore_streamer), cleanup);
+            pgmoneta_streamer_add_destination(restore_streamer, writer);
+
+            do
+            {
+               MCTF_ASSERT(!reader->read(reader, buf, sizeof(buf), &num_read, &last_chunk), cleanup);
+               MCTF_ASSERT(!pgmoneta_streamer_write(restore_streamer, buf, num_read, last_chunk), cleanup);
+            }
+            while (!last_chunk);
+
+            pgmoneta_streamer_destroy(restore_streamer);
+            pgmoneta_vfile_destroy(reader);
+            reader = NULL;
+            restore_streamer = NULL;
+
+            same = pgmoneta_compare_files(files[k], restore_dest);
+            if (!same)
+            {
+               /* save the test input to retrospect/ for inspection */
+               pgmoneta_copy_directory(-1, dir, retrospect_dir, NULL, NULL);
+            }
+
+            MCTF_ASSERT(same, cleanup, "Mismatch original file %s and retored file %s", files[k], restore_dest);
+            pgmoneta_delete_file(restore_dest, NULL);
+            pgmoneta_delete_file(backup_dest, NULL);
          }
-         while (!last_chunk);
-
-         pgmoneta_streamer_destroy(backup_streamer);
-         pgmoneta_vfile_destroy(reader);
-         reader = NULL;
-         backup_streamer = NULL;
-
-         /* restore */
-         MCTF_ASSERT(!pgmoneta_vfile_create_local(backup_dest, "r", &reader), cleanup);
-         MCTF_ASSERT(!pgmoneta_vfile_create_local(restore_dest, "wb", &writer), cleanup);
-         MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_RESTORE, encryption, compression, &restore_streamer), cleanup);
-         pgmoneta_streamer_add_destination(restore_streamer, writer);
-
-         do
-         {
-            MCTF_ASSERT(!reader->read(reader, buf, sizeof(buf), &num_read, &last_chunk), cleanup);
-            MCTF_ASSERT(!pgmoneta_streamer_write(restore_streamer, buf, num_read, last_chunk), cleanup);
-         }
-         while (!last_chunk);
-
-         pgmoneta_streamer_destroy(restore_streamer);
-         pgmoneta_vfile_destroy(reader);
-         reader = NULL;
-         restore_streamer = NULL;
-
-         same = pgmoneta_compare_files(bigfile, restore_dest);
-         if (!same)
-         {
-            /* save the test input to retrospect/ for inspection */
-            pgmoneta_copy_directory(-1, dir, retrospect_dir, NULL, NULL);
-         }
-
-         MCTF_ASSERT(same, cleanup, "Mismatch original file %s and retored file %s", bigfile, restore_dest);
-         pgmoneta_delete_file(restore_dest, NULL);
-         pgmoneta_delete_file(backup_dest, NULL);
       }
    }
 
@@ -135,8 +155,60 @@ cleanup:
    pgmoneta_delete_directory(dir);
    free(dir);
    free(bigfile);
+   free(smallfile);
    pgmoneta_vfile_destroy(reader);
    pgmoneta_streamer_destroy(backup_streamer);
+   pgmoneta_streamer_destroy(restore_streamer);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_streamer_restore_empty)
+{
+   char* dir = NULL;
+   char* emptyfile = NULL;
+   char restore_dest[MAX_PATH];
+   char buf[DEFAULT_BUFFER_SIZE] = {0};
+   struct vfile* reader = NULL;
+   struct vfile* writer = NULL;
+   struct streamer* restore_streamer = NULL;
+   bool last_chunk = false;
+   size_t num_read = 0;
+   FILE* f = NULL;
+
+   dir = pgmoneta_append(dir, TEST_BASE_DIR);
+   dir = pgmoneta_append(dir, "/streamer_empty");
+   emptyfile = pgmoneta_append(emptyfile, dir);
+   emptyfile = pgmoneta_append(emptyfile, "/emptyfile");
+   pgmoneta_mkdir(dir);
+
+   /* the lz4 file compressor writes nothing for an empty file, so a backup holds a 0-byte .lz4 */
+   f = fopen(emptyfile, "wb");
+   MCTF_ASSERT(f != NULL, cleanup, "Failed to create %s", emptyfile);
+   fclose(f);
+   pgmoneta_snprintf(restore_dest, sizeof(restore_dest), "%s/restore", dir);
+
+   MCTF_ASSERT(!pgmoneta_vfile_create_local(emptyfile, "r", &reader), cleanup);
+   MCTF_ASSERT(!pgmoneta_vfile_create_local(restore_dest, "wb", &writer), cleanup);
+   MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_RESTORE, ENCRYPTION_NONE, COMPRESSION_CLIENT_LZ4, &restore_streamer), cleanup);
+   pgmoneta_streamer_add_destination(restore_streamer, writer);
+
+   do
+   {
+      MCTF_ASSERT(!reader->read(reader, buf, sizeof(buf), &num_read, &last_chunk), cleanup);
+      MCTF_ASSERT(!pgmoneta_streamer_write(restore_streamer, buf, num_read, last_chunk), cleanup, "Restoring an empty lz4 file failed");
+   }
+   while (!last_chunk);
+
+   pgmoneta_streamer_destroy(restore_streamer);
+   restore_streamer = NULL;
+
+   MCTF_ASSERT(pgmoneta_exists(restore_dest) && pgmoneta_get_file_size(restore_dest) == 0, cleanup, "Restored empty file is missing or not empty");
+
+cleanup:
+   pgmoneta_delete_directory(dir);
+   free(dir);
+   free(emptyfile);
+   pgmoneta_vfile_destroy(reader);
    pgmoneta_streamer_destroy(restore_streamer);
    MCTF_FINISH();
 }
