@@ -45,6 +45,7 @@
 
 #include <archive.h>
 #include <archive_entry.h>
+#include <errno.h>
 #include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -430,8 +431,14 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
          fclose(file);
          goto error;
       }
-      fflush(file);
-      fclose(file);
+      /* fclose() writes the last buffer, so a full disk can show up only here */
+      if (fclose(file) != 0)
+      {
+         pgmoneta_log_error("could not write to file %s: %s", file_path, strerror(errno));
+         file = NULL;
+         goto error;
+      }
+      file = NULL;
 
       // extract the file
       if (pgmoneta_extract_backup_tar_file(file_path, directory, manifest_prefix, file_checksums, file_sizes))
@@ -617,8 +624,13 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                      file = NULL;
                      goto error;
                   }
-                  fflush(file);
-                  fclose(file);
+                  /* fclose() writes the last buffer, so a full disk can show up only here */
+                  if (fclose(file) != 0)
+                  {
+                     pgmoneta_log_error("could not write to file %s: %s", file_path, strerror(errno));
+                     file = NULL;
+                     goto error;
+                  }
                   file = NULL;
                   if (pgmoneta_extract_backup_tar_file(file_path, directory, manifest_prefix, file_checksums, file_sizes))
                   {
@@ -705,8 +717,13 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                      file = NULL;
                      goto error;
                   }
-                  fflush(file);
-                  fclose(file);
+                  /* fclose() writes the last buffer, so a full disk can show up only here */
+                  if (fclose(file) != 0)
+                  {
+                     pgmoneta_log_error("could not write to file %s: %s", file_path, strerror(errno));
+                     file = NULL;
+                     goto error;
+                  }
                   file = NULL;
                   if (pgmoneta_extract_backup_tar_file(file_path, directory, manifest_prefix, file_checksums, file_sizes))
                   {
@@ -775,14 +792,18 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
 
    if (file != NULL)
    {
+      if (fclose(file) != 0)
+      {
+         pgmoneta_log_error("could not write to file %s: %s", tmp_manifest_file_path, strerror(errno));
+         file = NULL;
+         goto error;
+      }
+      file = NULL;
       if (rename(tmp_manifest_file_path, manifest_file_path) != 0)
       {
          pgmoneta_log_error("could not rename file %s to %s", tmp_manifest_file_path, manifest_file_path);
          goto error;
       }
-      fflush(file);
-      fclose(file);
-      file = NULL;
    }
 
    // update symlink
