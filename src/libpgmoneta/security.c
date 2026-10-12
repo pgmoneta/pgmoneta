@@ -81,7 +81,6 @@
 #define NUMBER_OF_SECURITY_MESSAGES 5
 #define SECURITY_BUFFER_SIZE        16384 /* Must hold a PasswordMessage carrying a MAX_PASSWORD_LENGTH credential (cloud IAM tokens) */
 
-static signed char has_security;
 static ssize_t security_lengths[NUMBER_OF_SECURITY_MESSAGES];
 static char security_messages[NUMBER_OF_SECURITY_MESSAGES][SECURITY_BUFFER_SIZE];
 
@@ -101,26 +100,26 @@ static int server_scram256(char* username, char* password, SSL* ssl, int server_
 
 static char* get_admin_password(char* username);
 
-static int sasl_prep(char* password, char** password_prep);
-static int generate_nounce(char** nounce);
 static int scram_parse_iterations(char* str, int* iterations);
 static int get_scram_attribute(char attribute, char* input, size_t size, char** value);
-static int client_proof(char* password, char* salt, int salt_length, int iterations,
-                        char* client_first_message_bare, size_t client_first_message_bare_length,
-                        char* server_first_message, size_t server_first_message_length,
-                        char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-                        unsigned char** result, size_t* result_length);
+int pgmoneta_sasl_prep(char* password, char** password_prep);
+int pgmoneta_generate_nounce(char** nounce);
+int pgmoneta_client_proof(char* password, char* salt, int salt_length, int iterations,
+                          char* client_first_message_bare, size_t client_first_message_bare_length,
+                          char* server_first_message, size_t server_first_message_length,
+                          char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
+                          unsigned char** result, size_t* result_length);
 static int salted_password(char* password, char* salt, int salt_length, int iterations, unsigned char** result, int* result_length);
 static int salted_password_key(unsigned char* salted_password, int salted_password_length, char* key,
                                unsigned char** result, int* result_length);
 static int stored_key(unsigned char* client_key, int client_key_length, unsigned char** result, int* result_length);
-static int generate_salt(char** salt, int* size);
-static int server_signature(char* password, char* salt, int salt_length, int iterations,
-                            char* server_key, int server_key_length,
-                            char* client_first_message_bare, size_t client_first_message_bare_length,
-                            char* server_first_message, size_t server_first_message_length,
-                            char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-                            unsigned char** result, size_t* result_length);
+int pgmoneta_generate_salt(char** salt, int* size);
+int pgmoneta_server_signature(char* password, char* salt, int salt_length, int iterations,
+                              char* server_key, int server_key_length,
+                              char* client_first_message_bare, size_t client_first_message_bare_length,
+                              char* server_first_message, size_t server_first_message_length,
+                              char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
+                              unsigned char** result, size_t* result_length);
 
 static int create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
 
@@ -481,13 +480,13 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   status = sasl_prep(password, &password_prep);
+   status = pgmoneta_sasl_prep(password, &password_prep);
    if (status)
    {
       goto error;
    }
 
-   generate_nounce(&client_nounce);
+   pgmoneta_generate_nounce(&client_nounce);
 
    status = pgmoneta_create_auth_scram256_response(client_nounce, &sasl_response);
    if (status != MESSAGE_STATUS_OK)
@@ -549,11 +548,11 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    /* r=...,s=...,i=4096 */
    server_first_message = sasl_continue->data + 9;
 
-   if (client_proof(password_prep, salt, salt_length, iteration,
-                    client_first_message_bare, sasl_response->length - 26,
-                    server_first_message, sasl_continue->length - 9,
-                    &wo_proof[0], strlen(wo_proof),
-                    &proof, &proof_length))
+   if (pgmoneta_client_proof(password_prep, salt, salt_length, iteration,
+                             client_first_message_bare, sasl_response->length - 26,
+                             server_first_message, sasl_continue->length - 9,
+                             &wo_proof[0], strlen(wo_proof),
+                             &proof, &proof_length))
    {
       goto error;
    }
@@ -599,12 +598,12 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   if (server_signature(password_prep, salt, salt_length, iteration,
-                        NULL, 0,
-                        client_first_message_bare, sasl_response->length - 26,
-                        server_first_message, sasl_continue->length - 9,
-                        &wo_proof[0], strlen(wo_proof),
-                        &server_signature_calc, &server_signature_calc_length))
+   if (pgmoneta_server_signature(password_prep, salt, salt_length, iteration,
+                                 NULL, 0,
+                                 client_first_message_bare, sasl_response->length - 26,
+                                 server_first_message, sasl_continue->length - 9,
+                                 &wo_proof[0], strlen(wo_proof),
+                                 &server_signature_calc, &server_signature_calc_length))
    {
       goto error;
    }
@@ -885,8 +884,8 @@ retry:
       goto error;
    }
 
-   generate_nounce(&server_nounce);
-   generate_salt(&salt, &salt_length);
+   pgmoneta_generate_nounce(&server_nounce);
+   pgmoneta_generate_salt(&salt, &salt_length);
    if (pgmoneta_base64_encode(salt, salt_length, &base64_salt, &base64_salt_length))
    {
       goto error;
@@ -947,13 +946,13 @@ retry:
    memset(client_final_message_without_proof, 0, 58);
    memcpy(client_final_message_without_proof, msg->data + 5, 57);
 
-   sasl_prep(password, &password_prep);
+   pgmoneta_sasl_prep(password, &password_prep);
 
-   if (client_proof(password_prep, salt, salt_length, 4096,
-                    client_first_message_bare, strlen(client_first_message_bare),
-                    server_first_message, strlen(server_first_message),
-                    client_final_message_without_proof, strlen(client_final_message_without_proof),
-                    &client_proof_calc, &client_proof_calc_length))
+   if (pgmoneta_client_proof(password_prep, salt, salt_length, 4096,
+                             client_first_message_bare, strlen(client_first_message_bare),
+                             server_first_message, strlen(server_first_message),
+                             client_final_message_without_proof, strlen(client_final_message_without_proof),
+                             &client_proof_calc, &client_proof_calc_length))
    {
       goto error;
    }
@@ -964,12 +963,12 @@ retry:
       goto bad_password;
    }
 
-   if (server_signature(password_prep, salt, salt_length, 4096,
-                        NULL, 0,
-                        client_first_message_bare, strlen(client_first_message_bare),
-                        server_first_message, strlen(server_first_message),
-                        client_final_message_without_proof, strlen(client_final_message_without_proof),
-                        &server_signature_calc, &server_signature_calc_length))
+   if (pgmoneta_server_signature(password_prep, salt, salt_length, 4096,
+                                 NULL, 0,
+                                 client_first_message_bare, strlen(client_first_message_bare),
+                                 server_first_message, strlen(server_first_message),
+                                 client_final_message_without_proof, strlen(client_final_message_without_proof),
+                                 &server_signature_calc, &server_signature_calc_length))
    {
       goto error;
    }
@@ -1278,8 +1277,6 @@ server_trust(void)
 {
    pgmoneta_log_trace("server_trust");
 
-   has_security = SECURITY_TRUST;
-
    return AUTH_SUCCESS;
 }
 
@@ -1338,8 +1335,6 @@ server_password(char* username, char* password, SSL* ssl, int server_fd)
 
       security_lengths[auth_index] = auth_msg->length;
       memcpy(&security_messages[auth_index], auth_msg->data, auth_msg->length);
-
-      has_security = SECURITY_PASSWORD;
    }
    else
    {
@@ -1402,13 +1397,13 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
 
    pgmoneta_log_trace("server_scram256");
 
-   status = sasl_prep(password, &password_prep);
+   status = pgmoneta_sasl_prep(password, &password_prep);
    if (status)
    {
       goto error;
    }
 
-   generate_nounce(&client_nounce);
+   pgmoneta_generate_nounce(&client_nounce);
 
    status = pgmoneta_create_auth_scram256_response(client_nounce, &sasl_response);
    if (status != MESSAGE_STATUS_OK)
@@ -1487,11 +1482,11 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    /* r=...,s=...,i=4096 */
    server_first_message = security_messages[2] + 9;
 
-   if (client_proof(password_prep, salt, salt_length, iteration,
-                    client_first_message_bare, security_lengths[1] - 26,
-                    server_first_message, security_lengths[2] - 9,
-                    &wo_proof[0], strlen(wo_proof),
-                    &proof, &proof_length))
+   if (pgmoneta_client_proof(password_prep, salt, salt_length, iteration,
+                             client_first_message_bare, security_lengths[1] - 26,
+                             server_first_message, security_lengths[2] - 9,
+                             &wo_proof[0], strlen(wo_proof),
+                             &proof, &proof_length))
    {
       goto error;
    }
@@ -1559,12 +1554,12 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
-   if (server_signature(password_prep, salt, salt_length, iteration,
-                        NULL, 0,
-                        client_first_message_bare, security_lengths[1] - 26,
-                        server_first_message, security_lengths[2] - 9,
-                        &wo_proof[0], strlen(wo_proof),
-                        &server_signature_calc, &server_signature_calc_length))
+   if (pgmoneta_server_signature(password_prep, salt, salt_length, iteration,
+                                 NULL, 0,
+                                 client_first_message_bare, security_lengths[1] - 26,
+                                 server_first_message, security_lengths[2] - 9,
+                                 &wo_proof[0], strlen(wo_proof),
+                                 &server_signature_calc, &server_signature_calc_length))
    {
       goto error;
    }
@@ -1574,8 +1569,6 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    {
       goto bad_password;
    }
-
-   has_security = SECURITY_SCRAM256;
 
    free(salt);
    free(err);
@@ -2032,8 +2025,8 @@ error:
    return 1;
 }
 
-static int
-sasl_prep(char* password, char** password_prep)
+int
+pgmoneta_sasl_prep(char* password, char** password_prep)
 {
    size_t password_len;
 
@@ -2078,8 +2071,8 @@ error:
    return 1;
 }
 
-static int
-generate_nounce(char** nounce)
+int
+pgmoneta_generate_nounce(char** nounce)
 {
    size_t s = 18;
    unsigned char r[s + 1];
@@ -2224,12 +2217,12 @@ error:
    return 1;
 }
 
-static int
-client_proof(char* password, char* salt, int salt_length, int iterations,
-             char* client_first_message_bare, size_t client_first_message_bare_length,
-             char* server_first_message, size_t server_first_message_length,
-             char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-             unsigned char** result, size_t* result_length)
+int
+pgmoneta_client_proof(char* password, char* salt, int salt_length, int iterations,
+                      char* client_first_message_bare, size_t client_first_message_bare_length,
+                      char* server_first_message, size_t server_first_message_length,
+                      char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
+                      unsigned char** result, size_t* result_length)
 {
    size_t size = 32;
    unsigned char* s_p = NULL;
@@ -2550,8 +2543,8 @@ error:
    return 1;
 }
 
-static int
-generate_salt(char** salt, int* size)
+int
+pgmoneta_generate_salt(char** salt, int* size)
 {
    size_t s = 16;
    unsigned char* r = NULL;
@@ -2581,13 +2574,13 @@ error:
    return 1;
 }
 
-static int
-server_signature(char* password, char* salt, int salt_length, int iterations,
-                 char* s_key, int s_key_length,
-                 char* client_first_message_bare, size_t client_first_message_bare_length,
-                 char* server_first_message, size_t server_first_message_length,
-                 char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-                 unsigned char** result, size_t* result_length)
+int
+pgmoneta_server_signature(char* password, char* salt, int salt_length, int iterations,
+                          char* s_key, int s_key_length,
+                          char* client_first_message_bare, size_t client_first_message_bare_length,
+                          char* server_first_message, size_t server_first_message_length,
+                          char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
+                          unsigned char** result, size_t* result_length)
 {
    size_t size = 32;
    unsigned char* r = NULL;

@@ -92,6 +92,8 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn,
    partial_record->xlog_record_bytes_read = 0;
    partial_record->xlog_record = NULL;
    partial_record->data_buffer = NULL;
+   partial_record->from_seg = 0;
+   partial_record->lsn = 0;
    /* Look upon the WAL archive directory and summarize the WAL records in the range [start_lsn, end_lsn) */
    if (summarize_walfiles(srv, wal_dir, start_lsn, end_lsn, brt))
    {
