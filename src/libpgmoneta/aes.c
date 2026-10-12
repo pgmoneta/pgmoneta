@@ -1509,8 +1509,13 @@ cleanup:
 
    if (out != NULL)
    {
-      fflush(out);
-      fclose(out);
+      /* fclose() writes the last buffer, so a full disk can show up only here */
+      if (fclose(out) != 0 && ret == 0)
+      {
+         pgmoneta_log_error("encrypt_file: could not write %s: %s", tmp_to, strerror(errno));
+         ret = 1;
+      }
+      out = NULL;
    }
 
    if (ret == 0)
