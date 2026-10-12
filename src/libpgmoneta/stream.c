@@ -153,6 +153,31 @@ pgmoneta_streamer_write(struct streamer* streamer, void* buffer, size_t size, bo
    }
    while (size > 0);
 
+   if (last_chunk)
+   {
+      struct deque_iterator* iter = NULL;
+      struct vfile* f = NULL;
+
+      /* the destinations are complete; close them now so a failed final write is noticed */
+      pgmoneta_deque_iterator_create(streamer->destinations, &iter);
+      while (pgmoneta_deque_iterator_next(iter))
+      {
+         f = (struct vfile*)pgmoneta_value_data(iter->value);
+         if (f->close(f))
+         {
+            add_failed_destination(streamer, f);
+            pgmoneta_deque_iterator_remove(iter);
+         }
+      }
+      pgmoneta_deque_iterator_destroy(iter);
+
+      if (pgmoneta_deque_empty(streamer->destinations))
+      {
+         pgmoneta_log_error("Streamer: All destinations have failed");
+         goto error;
+      }
+   }
+
    if (last_chunk && streamer->failed_destinations != NULL && !pgmoneta_deque_empty(streamer->failed_destinations))
    {
       struct deque_iterator* fail_iter = NULL;

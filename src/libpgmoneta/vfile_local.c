@@ -38,7 +38,7 @@
 static int vfile_local_read(struct vfile* vfile, void* buffer, size_t capacity, size_t* size, bool* last_chunk);
 static int vfile_local_write(struct vfile* vfile, void* buffer, size_t size, bool last_chunk);
 static int vfile_local_delete(struct vfile* vfile);
-static void vfile_local_close(struct vfile* vfile);
+static int vfile_local_close(struct vfile* vfile);
 
 struct vfile_local
 {
@@ -154,20 +154,28 @@ error:
    return 1;
 }
 
-static void
+static int
 vfile_local_close(struct vfile* vfile)
 {
    struct vfile_local* this = NULL;
+   int ret = 0;
    this = (struct vfile_local*)vfile;
 
    if (this == NULL)
    {
-      return;
+      return 0;
    }
 
    if (this->fp != NULL)
    {
-      fclose(this->fp);
+      /* fclose() writes the last buffer, so a full disk can show up only here */
+      if (fclose(this->fp) != 0)
+      {
+         pgmoneta_log_error("vfile_local: Failed to write to file '%s': %s", this->file_path, strerror(errno));
+         ret = 1;
+      }
       this->fp = NULL;
    }
+
+   return ret;
 }
