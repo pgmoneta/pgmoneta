@@ -38,6 +38,7 @@
 
 /* system */
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -626,8 +627,13 @@ gz_decompress(char* from, char* to)
    }
    in = NULL;
 
-   fflush(out);
-   fclose(out);
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(out) != 0)
+   {
+      pgmoneta_log_error("GZIP: Could not write %s: %s", tmp_to, strerror(errno));
+      out = NULL;
+      goto error;
+   }
    out = NULL;
 
    pgmoneta_permission(tmp_to, 6, 0, 0);

@@ -509,8 +509,14 @@ lz4_decompress(char* from, char* to)
       buffInIndex = (buffInIndex + 1) % 2;
    }
 
-   fflush(fout);
-   fclose(fout);
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(fout) != 0)
+   {
+      pgmoneta_log_error("LZ4: Could not write %s: %s", tmp_to, strerror(errno));
+      fout = NULL;
+      pgmoneta_delete_file(tmp_to, NULL);
+      goto error;
+   }
    fout = NULL;
    fclose(fin);
    fin = NULL;

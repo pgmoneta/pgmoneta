@@ -599,3 +599,70 @@ cleanup:
    remove(output);
    MCTF_FINISH();
 }
+
+MCTF_TEST_NEGATIVE(test_compression_failed_final_write_decompress)
+{
+   struct
+   {
+      char* name;
+      char* compressed;
+      int (*compress)(char* from, char* to);
+      int (*decompress)(char* from, char* to);
+   } methods[] = {
+      {"lz4", "test_failed_final_write.lz4", pgmoneta_lz4c_file, pgmoneta_lz4d_file},
+      {"zstd", "test_failed_final_write.zstd", pgmoneta_zstandardc_file, pgmoneta_zstandardd_file},
+      {"bzip2", "test_failed_final_write.bz2", pgmoneta_bzip2_file, pgmoneta_bunzip2_file},
+      {"gzip", "test_failed_final_write.gz", pgmoneta_gzip_file, pgmoneta_gunzip_file},
+   };
+   char* input = "test_failed_final_write";
+   char* output = "test_failed_final_write.out";
+   char* compressed = NULL;
+   static char data[30000];
+   struct rlimit orig;
+   struct rlimit limit;
+   void (*old_handler)(int) = SIG_ERR;
+   int ret = 0;
+
+   for (size_t i = 0; i < sizeof(data); i++)
+   {
+      data[i] = (char)(rand() & 0xff);
+   }
+
+   MCTF_ASSERT_INT_EQ(getrlimit(RLIMIT_FSIZE, &orig), 0, cleanup, "getrlimit failed");
+   old_handler = signal(SIGXFSZ, SIG_IGN);
+
+   for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++)
+   {
+      compressed = methods[i].compressed;
+      MCTF_ASSERT_INT_EQ(write_test_input(input, data, sizeof(data)), 0, cleanup, "could not write %s", input);
+      MCTF_ASSERT_INT_EQ(methods[i].compress(input, compressed), 0, cleanup, "%s: compression failed", methods[i].name);
+
+      /* everything but the last, partial buffer of the decompressed output fits */
+      limit = orig;
+      limit.rlim_cur = sizeof(data) / 4096 * 4096;
+
+      MCTF_ASSERT_INT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0, cleanup, "setrlimit failed");
+      ret = methods[i].decompress(compressed, output);
+      setrlimit(RLIMIT_FSIZE, &orig);
+
+      MCTF_ASSERT(ret != 0, cleanup, "%s: a failed final write was reported as success", methods[i].name);
+      MCTF_ASSERT(pgmoneta_exists(compressed), cleanup, "%s: the compressed file was deleted", methods[i].name);
+      MCTF_ASSERT(!pgmoneta_exists(output), cleanup, "%s: a truncated output was kept", methods[i].name);
+      remove(compressed);
+      compressed = NULL;
+   }
+
+cleanup:
+   setrlimit(RLIMIT_FSIZE, &orig);
+   if (old_handler != SIG_ERR)
+   {
+      signal(SIGXFSZ, old_handler);
+   }
+   if (compressed != NULL)
+   {
+      remove(compressed);
+   }
+   remove(input);
+   remove(output);
+   MCTF_FINISH();
+}
