@@ -208,12 +208,24 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
 
    if (server_backup != NULL && backup != NULL)
    {
-      pgmoneta_save_info(server_backup, backup);
+      if (pgmoneta_save_info(server_backup, backup))
+      {
+         goto error;
+      }
    }
 
-   fflush(sha512_file);
-   fsync(fileno(sha512_file));
-   fclose(sha512_file);
+   if (fflush(sha512_file) != 0 || fsync(fileno(sha512_file)) != 0)
+   {
+      pgmoneta_log_error("Could not write %s: %s", sha512_path, strerror(errno));
+      goto error;
+   }
+   if (fclose(sha512_file) != 0)
+   {
+      pgmoneta_log_error("Could not write %s: %s", sha512_path, strerror(errno));
+      sha512_file = NULL;
+      goto error;
+   }
+   sha512_file = NULL;
 
    free(sha512_path);
    free(root);
@@ -489,16 +501,29 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
    {
       fsync(fileno(source_file));
       fclose(source_file);
+      source_file = NULL;
    }
 
    if (dest_file != NULL)
    {
-      fflush(dest_file);
-      fsync(fileno(dest_file));
-      fclose(dest_file);
+      if (fflush(dest_file) != 0 || fsync(fileno(dest_file)) != 0)
+      {
+         pgmoneta_log_error("Could not write %s: %s", sha512_tmp_path, strerror(errno));
+         goto error;
+      }
+      if (fclose(dest_file) != 0)
+      {
+         pgmoneta_log_error("Could not write %s: %s", sha512_tmp_path, strerror(errno));
+         dest_file = NULL;
+         goto error;
+      }
+      dest_file = NULL;
    }
 
-   pgmoneta_move_file(sha512_tmp_path, sha512_path);
+   if (pgmoneta_move_file(sha512_tmp_path, sha512_path))
+   {
+      goto error;
+   }
    pgmoneta_permission(sha512_path, 6, 0, 0);
 
    pgmoneta_log_trace("Updated SHA512 hash for %s", filename);

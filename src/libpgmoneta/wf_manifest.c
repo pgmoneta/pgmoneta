@@ -307,7 +307,12 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    pgmoneta_json_reader_close(reader);
-   pgmoneta_csv_writer_destroy(writer);
+   reader = NULL;
+   if (pgmoneta_csv_writer_destroy(writer))
+   {
+      writer = NULL;
+      goto error;
+   }
    pgmoneta_json_destroy(entry);
    free(manifest);
    free(manifest_orig);

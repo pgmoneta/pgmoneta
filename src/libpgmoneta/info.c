@@ -1448,14 +1448,26 @@ pgmoneta_save_info(char* directory, struct backup* backup)
 
    pgmoneta_permission(bck_info_file, 6, 0, 0);
 
-   fflush(sfile);
-   fsync(fileno(sfile));
-   fclose(sfile);
+   if (fflush(sfile) != 0 || fsync(fileno(sfile)) != 0)
+   {
+      pgmoneta_log_error("Could not write %s: %s", bck_info_file, strerror(errno));
+      goto error;
+   }
+   if (fclose(sfile) != 0)
+   {
+      pgmoneta_log_error("Could not write %s: %s", bck_info_file, strerror(errno));
+      sfile = NULL;
+      goto error;
+   }
+   sfile = NULL;
 
    bck_root_dir = pgmoneta_append(bck_root_dir, directory);
    bck_root_dir = pgmoneta_append(bck_root_dir, backup->label);
    pgmoneta_log_trace("Updating SHA512 for %s", bck_root_dir);
-   pgmoneta_update_sha512(bck_root_dir, "backup.info");
+   if (pgmoneta_update_sha512(bck_root_dir, "backup.info"))
+   {
+      goto error;
+   }
 
    free(bck_root_dir);
    free(bck_info_file);

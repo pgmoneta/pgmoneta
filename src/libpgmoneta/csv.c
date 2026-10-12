@@ -25,9 +25,11 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <logging.h>
 #include <utils.h>
 
 #include <csv.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -199,15 +201,18 @@ error:
 int
 pgmoneta_csv_writer_destroy(struct csv_writer* writer)
 {
+   int ret = 0;
+
    if (writer == NULL)
    {
       return 0;
    }
-   if (writer->file != NULL)
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (writer->file != NULL && fclose(writer->file) != 0)
    {
-      fflush(writer->file);
-      fclose(writer->file);
+      pgmoneta_log_error("CSV: could not write file: %s", strerror(errno));
+      ret = 1;
    }
    free(writer);
-   return 0;
+   return ret;
 }
