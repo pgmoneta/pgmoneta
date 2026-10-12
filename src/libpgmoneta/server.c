@@ -39,6 +39,7 @@
 #include <utils.h>
 
 /* system */
+#include <errno.h>
 #include <ev.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -736,13 +737,19 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char* backup_data, ch
       }
 
       bytes_written = fwrite(label_data, 1, strlen(label_data), file);
-      if (bytes_written <= 0)
+      if (bytes_written != strlen(label_data))
       {
          pgmoneta_log_error("Error writing the file backup_label");
          goto error;
       }
-      fflush(file);
-      fclose(file);
+      /* fclose() writes the last buffer, so a full disk can show up only here */
+      if (fclose(file) != 0)
+      {
+         pgmoneta_log_error("Error writing the file backup_label: %s", strerror(errno));
+         file = NULL;
+         goto error;
+      }
+      file = NULL;
    }
 
    *lsn = stop_backup_lsn;

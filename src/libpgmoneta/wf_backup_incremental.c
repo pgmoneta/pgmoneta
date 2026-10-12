@@ -1275,7 +1275,7 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
          write_buffer = pgmoneta_append(write_buffer, buf);
          write_buffer = pgmoneta_append(write_buffer, "\n");
 
-         if (fwrite(write_buffer, 1, strlen(write_buffer), label_file) <= 0)
+         if (fwrite(write_buffer, 1, strlen(write_buffer), label_file) != strlen(write_buffer))
          {
             pgmoneta_log_error("Error writing line to: %s", label_file_path);
             goto error;
@@ -1299,7 +1299,7 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
          write_buffer = pgmoneta_append(write_buffer, buf);
          write_buffer = pgmoneta_append(write_buffer, "\n");
 
-         if (fwrite(write_buffer, 1, strlen(write_buffer), label_file) <= 0)
+         if (fwrite(write_buffer, 1, strlen(write_buffer), label_file) != strlen(write_buffer))
          {
             pgmoneta_log_error("Error writing line to: %s", label_file_path);
             goto error;
@@ -1310,9 +1310,15 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
       memset(read_buffer, 0, sizeof(read_buffer));
    }
 
-   fflush(label_file);
-   fclose(label_file);
    fclose(prev_label_file);
+   prev_label_file = NULL;
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(label_file) != 0)
+   {
+      pgmoneta_log_error("Incremental backup: could not write %s: %s", label_file_path, strerror(errno));
+      label_file = NULL;
+      goto error;
+   }
    return 0;
 error:
    if (label_file)
