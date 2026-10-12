@@ -341,3 +341,30 @@ cleanup:
    pgmoneta_test_teardown();
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_json_iterator_failure)
+{
+   struct json* item = NULL;
+   struct json* empty = NULL;
+   struct json_iterator* iter = NULL;
+
+   pgmoneta_test_setup();
+
+   pgmoneta_json_create(&item);
+   pgmoneta_json_create(&empty);
+
+   pgmoneta_json_put(item, "1", 1, ValueInt32);
+
+   MCTF_ASSERT(!pgmoneta_json_iterator_create(item, &iter), cleanup, "iterator create failed");
+   pgmoneta_json_iterator_destroy(iter);
+
+   MCTF_ASSERT(pgmoneta_json_iterator_create(empty, &iter), cleanup, "should fail for unknown type");
+   MCTF_ASSERT(iter == NULL, cleanup, "iterator should be NULL on failure");
+
+cleanup:
+   pgmoneta_json_iterator_destroy(iter);
+   pgmoneta_json_destroy(item);
+   pgmoneta_json_destroy(empty);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
