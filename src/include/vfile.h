@@ -84,7 +84,7 @@ struct vfile
     * @param vfile The vfile
     * @return 0 if success, 1 if otherwise
     */
-   void (*close)(struct vfile* vfile);
+   int (*close)(struct vfile* vfile);
 };
 
 /**
