@@ -376,7 +376,8 @@ bzip2_compress(char* from, int level, char* to)
 error_zip:
    if (zip_file != NULL)
    {
-      BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
+      /* abandon: don't finish a stream we are about to delete */
+      BZ2_bzWriteClose(&bzip2_err, zip_file, 1, NULL, NULL);
    }
 
 error:
