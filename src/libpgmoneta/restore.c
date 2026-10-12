@@ -2170,8 +2170,14 @@ write_reconstructed_file_full(char* output_file_path,
    }
    if (wfp != NULL)
    {
-      fflush(wfp);
-      fclose(wfp);
+      /* fclose() writes the last buffer, so a full disk can show up only here */
+      if (fclose(wfp) != 0)
+      {
+         pgmoneta_log_error("reconstruct: fail to write to file %s: %s", output_file_path, strerror(errno));
+         wfp = NULL;
+         goto error;
+      }
+      wfp = NULL;
    }
    return 0;
 error:
@@ -2277,8 +2283,14 @@ write_reconstructed_file_incremental(char* output_file_path,
    free(header);
    if (wfp != NULL)
    {
-      fflush(wfp);
-      fclose(wfp);
+      /* fclose() writes the last buffer, so a full disk can show up only here */
+      if (fclose(wfp) != 0)
+      {
+         pgmoneta_log_error("reconstruct: fail to write to file %s: %s", output_file_path, strerror(errno));
+         wfp = NULL;
+         goto error;
+      }
+      wfp = NULL;
    }
    return 0;
 
@@ -2349,8 +2361,14 @@ write_backup_label(char* from_dir, char* to_dir, char* lsn_entry, char* tli_entr
    }
 
    fclose(from);
-   fflush(to);
-   fclose(to);
+   from = NULL;
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(to) != 0)
+   {
+      pgmoneta_log_error("Write backup label, could not write to file %s: %s", to_path, strerror(errno));
+      to = NULL;
+      goto error;
+   }
    return 0;
 error:
    if (from != NULL)
