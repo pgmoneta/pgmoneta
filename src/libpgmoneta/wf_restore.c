@@ -59,7 +59,7 @@ static int restore_excluded_files_execute(char*, struct art*);
 static int restore_excluded_files_teardown(char*, struct art*);
 
 static char* get_user_password(char* username);
-static void create_standby_signal(char* basedir);
+static int create_standby_signal(char* basedir);
 
 struct workflow*
 pgmoneta_create_restore(void)
@@ -604,16 +604,31 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
       if (ffile != NULL)
       {
          fclose(ffile);
+         ffile = NULL;
       }
       if (tfile != NULL)
       {
-         fflush(tfile);
-         fclose(tfile);
+         /* a failed fputs() leaves the error flag set; fclose() writes the last buffer */
+         int write_failed = ferror(tfile);
+
+         if (fclose(tfile) != 0 || write_failed)
+         {
+            pgmoneta_log_error("Could not write %s", t);
+            tfile = NULL;
+            goto error;
+         }
+         tfile = NULL;
       }
 
-      pgmoneta_move_file(t, f);
+      if (pgmoneta_move_file(t, f))
+      {
+         goto error;
+      }
 
-      create_standby_signal(base);
+      if (create_standby_signal(base))
+      {
+         goto error;
+      }
    }
    else
    {
@@ -657,14 +672,26 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
          if (ffile != NULL)
          {
             fclose(ffile);
+            ffile = NULL;
          }
          if (tfile != NULL)
          {
-            fflush(tfile);
-            fclose(tfile);
+            /* a failed fputs() leaves the error flag set; fclose() writes the last buffer */
+            int write_failed = ferror(tfile);
+
+            if (fclose(tfile) != 0 || write_failed)
+            {
+               pgmoneta_log_error("Could not write %s", t);
+               tfile = NULL;
+               goto error;
+            }
+            tfile = NULL;
          }
 
-         pgmoneta_move_file(t, f);
+         if (pgmoneta_move_file(t, f))
+         {
+            goto error;
+         }
       }
 
       path = pgmoneta_append(path, base);
@@ -1007,7 +1034,7 @@ get_user_password(char* username)
    return NULL;
 }
 
-static void
+static int
 create_standby_signal(char* basedir)
 {
    char* f = NULL;
@@ -1023,12 +1050,11 @@ create_standby_signal(char* basedir)
    if ((fd = creat(f, 0600)) < 0)
    {
       pgmoneta_log_error("Unable to create: %s", f);
+      free(f);
+      return 1;
    }
 
-   if (fd > 0)
-   {
-      close(fd);
-   }
-
+   close(fd);
    free(f);
+   return 0;
 }
