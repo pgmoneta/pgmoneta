@@ -35,10 +35,12 @@
 #include <tscommon.h>
 #include <utils.h>
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <openssl/evp.h>
@@ -965,5 +967,78 @@ MCTF_TEST_NEGATIVE(test_aes_cbc_decrypt_failures)
 cleanup:
    free(envelope);
    free(plaintext);
+   MCTF_FINISH();
+}
+
+static int
+write_test_file(char* path, char* data, size_t size)
+{
+   FILE* f = fopen(path, "wb");
+
+   if (f == NULL)
+   {
+      return 1;
+   }
+   if (fwrite(data, 1, size, f) != size)
+   {
+      fclose(f);
+      return 1;
+   }
+   return fclose(f) != 0;
+}
+
+MCTF_TEST_NEGATIVE(test_aes_failed_final_write)
+{
+   char* input = "test_aes_final_write";
+   char* encrypted = "test_aes_final_write.aes";
+   char* output = "test_aes_final_write.out";
+   static char data[30000];
+   struct rlimit orig;
+   struct rlimit limit;
+   void (*old_handler)(int) = SIG_ERR;
+   size_t size = 0;
+   int ret = 0;
+
+   /* incompressible input, so the output spans several stdio buffers */
+   for (size_t i = 0; i < sizeof(data); i++)
+   {
+      data[i] = (char)(rand() & 0xff);
+   }
+
+   MCTF_ASSERT_INT_EQ(getrlimit(RLIMIT_FSIZE, &orig), 0, cleanup, "getrlimit failed");
+   old_handler = signal(SIGXFSZ, SIG_IGN);
+
+   /* encrypt: everything but the last, partial buffer fits */
+   MCTF_ASSERT_INT_EQ(write_test_file(input, data, sizeof(data)), 0, cleanup, "could not write %s", input);
+   MCTF_ASSERT_INT_EQ(pgmoneta_encrypt_file(input, encrypted, NULL), 0, cleanup, "encryption failed");
+   size = pgmoneta_get_file_size(encrypted);
+   MCTF_ASSERT_INT_EQ(write_test_file(input, data, sizeof(data)), 0, cleanup, "could not write %s", input);
+   limit = orig;
+   limit.rlim_cur = size / 4096 * 4096;
+   MCTF_ASSERT_INT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0, cleanup, "setrlimit failed");
+   ret = pgmoneta_encrypt_file(input, output, NULL);
+   setrlimit(RLIMIT_FSIZE, &orig);
+   MCTF_ASSERT(ret != 0, cleanup, "encrypt: a failed final write was reported as success");
+   MCTF_ASSERT(pgmoneta_exists(input), cleanup, "encrypt: the source was deleted");
+   MCTF_ASSERT(!pgmoneta_exists(output), cleanup, "encrypt: a truncated output was kept");
+
+   /* decrypt the complete file from above with the same kind of limit */
+   limit.rlim_cur = sizeof(data) / 4096 * 4096;
+   MCTF_ASSERT_INT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0, cleanup, "setrlimit failed");
+   ret = pgmoneta_decrypt_file(encrypted, output, NULL);
+   setrlimit(RLIMIT_FSIZE, &orig);
+   MCTF_ASSERT(ret != 0, cleanup, "decrypt: a failed final write was reported as success");
+   MCTF_ASSERT(pgmoneta_exists(encrypted), cleanup, "decrypt: the encrypted file was deleted");
+   MCTF_ASSERT(!pgmoneta_exists(output), cleanup, "decrypt: a truncated output was kept");
+
+cleanup:
+   setrlimit(RLIMIT_FSIZE, &orig);
+   if (old_handler != SIG_ERR)
+   {
+      signal(SIGXFSZ, old_handler);
+   }
+   remove(input);
+   remove(encrypted);
+   remove(output);
    MCTF_FINISH();
 }
