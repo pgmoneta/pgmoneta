@@ -454,8 +454,14 @@ bzip2_decompress(char* from, char* to)
 
    fclose(from_ptr);
    from_ptr = NULL;
-   fflush(to_ptr);
-   fclose(to_ptr);
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(to_ptr) != 0)
+   {
+      pgmoneta_log_error("Bzip2: Could not write %s: %s", tmp_to, strerror(errno));
+      to_ptr = NULL;
+      pgmoneta_delete_file(tmp_to, NULL);
+      goto error;
+   }
    to_ptr = NULL;
 
    pgmoneta_permission(tmp_to, 6, 0, 0);
@@ -543,8 +549,16 @@ bzip2_decompress_file(char* from, char* to)
    zip_file = NULL;
 
    fclose(from_ptr);
-   fflush(to_ptr);
-   fclose(to_ptr);
+   from_ptr = NULL;
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(to_ptr) != 0)
+   {
+      pgmoneta_log_error("Bzip2: Could not write %s: %s", to, strerror(errno));
+      to_ptr = NULL;
+      pgmoneta_delete_file(to, NULL);
+      goto error;
+   }
+   to_ptr = NULL;
 
    return 0;
 
