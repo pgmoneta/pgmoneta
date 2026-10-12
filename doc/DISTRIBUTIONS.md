@@ -7,7 +7,7 @@
 * [cmake](https://cmake.org)
 * [make](https://www.gnu.org/software/make/)
 * [libev](http://software.schmorp.de/pkg/libev.html)
-* [OpenSSL](http://www.openssl.org/)
+* [OpenSSL 3.0+](http://www.openssl.org/)
 * [zlib](https://zlib.net)
 * [zstd](http://www.zstd.net)
 * [lz4](https://lz4.github.io/lz4/)
