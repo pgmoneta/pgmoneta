@@ -2476,20 +2476,29 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
       }
       pgmoneta_consume_copy_stream_end(buffer, msg);
    }
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(file) != 0)
+   {
+      pgmoneta_log_error("could not write file %s: %s", tmp_file_path, strerror(errno));
+      file = NULL;
+      goto error;
+   }
+   file = NULL;
    // finish, remove the .tmp suffix
    if (rename(tmp_file_path, file_path) != 0)
    {
       pgmoneta_log_error("could not rename file %s to %s", tmp_file_path, file_path);
       goto error;
    }
-   fflush(file);
-   fclose(file);
    pgmoneta_free_message(msg);
    return 0;
 
 error:
-   fflush(file);
-   fclose(file);
+   if (file != NULL)
+   {
+      fflush(file);
+      fclose(file);
+   }
    pgmoneta_free_message(msg);
    return 1;
 }
