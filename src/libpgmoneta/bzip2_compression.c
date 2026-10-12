@@ -345,11 +345,22 @@ bzip2_compress(char* from, int level, char* to)
 
    BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
    zip_file = NULL;
+   if (bzip2_err != BZ_OK)
+   {
+      pgmoneta_log_error("Bzip2: Could not write %s (%d)", tmp_to, bzip2_err);
+      goto error;
+   }
 
    fclose(from_ptr);
    from_ptr = NULL;
-   fflush(to_ptr);
-   fclose(to_ptr);
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(to_ptr) != 0)
+   {
+      pgmoneta_log_error("Bzip2: Could not write %s: %s", tmp_to, strerror(errno));
+      to_ptr = NULL;
+      pgmoneta_delete_file(tmp_to, NULL);
+      goto error;
+   }
    to_ptr = NULL;
 
    pgmoneta_permission(tmp_to, 6, 0, 0);

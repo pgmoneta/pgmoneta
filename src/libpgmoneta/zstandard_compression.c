@@ -597,8 +597,14 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
       }
    }
 
-   fflush(fout);
-   fclose(fout);
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(fout) != 0)
+   {
+      pgmoneta_log_error("ZSTD: Could not write %s: %s", tmp_to, strerror(errno));
+      fout = NULL;
+      pgmoneta_delete_file(tmp_to, NULL);
+      goto error;
+   }
    fout = NULL;
    fclose(fin);
    fin = NULL;
