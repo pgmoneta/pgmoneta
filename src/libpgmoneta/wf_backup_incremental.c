@@ -1605,11 +1605,16 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
    bytes_written += padding_bytes;
 
 done:
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(file) != 0)
+   {
+      pgmoneta_log_error("Write incremental file: could not write %s: %s", filepath, strerror(errno));
+      file = NULL;
+      goto error;
+   }
    free(filepath);
    free(file_name);
    free(rel_path);
-   fflush(file);
-   fclose(file);
    return 0;
 
 error:
@@ -1681,9 +1686,14 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
       binary_data = NULL;
    }
 
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(file) != 0)
+   {
+      pgmoneta_log_error("Write full file: could not write %s: %s", relative_filename, strerror(errno));
+      file = NULL;
+      goto error;
+   }
    free(filepath);
-   fflush(file);
-   fclose(file);
    return 0;
 error:
    free(binary_data);
