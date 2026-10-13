@@ -944,6 +944,7 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
    struct query_response* timeline_history_response = NULL;
    FILE* history_file = NULL;
    char* history_content = NULL;
+   bool history_flushed = true;
    char path[MAX_PATH];
 
    if (basedir == NULL || strlen(basedir) == 0 || !pgmoneta_exists(basedir))
@@ -977,16 +978,23 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
    {
       goto error;
    }
-   fwrite(history_content, 1, strlen(history_content) + 1, history_file);
-   fflush(history_file);
+   history_flushed = false;
+   if (fwrite(history_content, 1, strlen(history_content), history_file) != strlen(history_content))
+   {
+      pgmoneta_log_error("Could not write %s: %s", path, strerror(errno));
+      goto error;
+   }
+   /* fclose() writes the last buffer, so a full disk can show up only here */
+   if (fclose(history_file) != 0)
+   {
+      pgmoneta_log_error("Could not write %s: %s", path, strerror(errno));
+      history_file = NULL;
+      goto error;
+   }
+   history_flushed = true;
 
    pgmoneta_free_message(timeline_history_msg);
    pgmoneta_free_query_response(timeline_history_response);
-   if (history_file != NULL)
-   {
-      fflush(history_file);
-      fclose(history_file);
-   }
    return 0;
 
 error:
@@ -995,6 +1003,11 @@ error:
    if (history_file != NULL)
    {
       fclose(history_file);
+   }
+   /* An existing history file is never fetched again, so don't keep a partial one */
+   if (!history_flushed)
+   {
+      remove(path);
    }
    return 1;
 }
