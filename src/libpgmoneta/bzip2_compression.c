@@ -344,12 +344,12 @@ bzip2_compress(char* from, int level, char* to)
    }
 
    BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
-   zip_file = NULL;
    if (bzip2_err != BZ_OK)
    {
       pgmoneta_log_error("Bzip2: Could not write %s (%d)", tmp_to, bzip2_err);
-      goto error;
+      goto error_zip;
    }
+   zip_file = NULL;
 
    fclose(from_ptr);
    from_ptr = NULL;
@@ -376,6 +376,8 @@ bzip2_compress(char* from, int level, char* to)
 error_zip:
    if (zip_file != NULL)
    {
+      /* BZ2_bzWriteClose() returns without freeing the stream while the FILE has its error flag set */
+      clearerr(to_ptr);
       /* abandon: don't finish a stream we are about to delete */
       BZ2_bzWriteClose(&bzip2_err, zip_file, 1, NULL, NULL);
    }
