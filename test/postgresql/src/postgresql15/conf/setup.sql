@@ -36,6 +36,7 @@ CREATE EXTENSION pgmoneta_ext;
 
 GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_file(text) TO PG_REPL_USER_NAME;
 GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_files(text) TO PG_REPL_USER_NAME;
+GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_blocks(text, bigint[], integer) TO PG_REPL_USER_NAME;
 
 -- GRANT REPL_USER privilege to fetch file from server
 GRANT pg_read_server_files TO PG_REPL_USER_NAME;
