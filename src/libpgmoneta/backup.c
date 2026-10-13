@@ -42,6 +42,9 @@
 #include <wal.h>
 #include <workflow.h>
 
+/* system */
+#include <unistd.h>
+
 void
 pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
