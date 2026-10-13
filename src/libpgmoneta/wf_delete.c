@@ -44,6 +44,7 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <unistd.h>
 
 static void relink_newer_backups(int server, struct backup** backups, int number_of_backups, int index, int next_index);
 
