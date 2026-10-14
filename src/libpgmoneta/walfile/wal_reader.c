@@ -390,10 +390,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
    if (long_header->std.xlp_rem_len > 0)
    {
-      next_record = MAXALIGN(
-         ftell(file) +
-         ((long_header->std.xlp_rem_len / long_header->xlp_xlog_blcksz) * SIZE_OF_XLOG_SHORT_PHD) +
-         long_header->std.xlp_rem_len % long_header->xlp_xlog_blcksz);
+      next_record = MAXALIGN(SIZE_OF_XLOG_LONG_PHD + long_header->std.xlp_rem_len);
 
       if (partial_record->xlog_record_bytes_read == 0)
       {

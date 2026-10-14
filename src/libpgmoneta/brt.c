@@ -238,7 +238,8 @@ pgmoneta_brt_entry_get_blocks(block_ref_table_entry* entry, block_number start_b
                /* Exit if blocks array get out of space */
                if (nresults == nblocks)
                {
-                  return nresults;
+                  *n = nresults;
+                  return 0;
                }
             }
          }
@@ -255,7 +256,8 @@ pgmoneta_brt_entry_get_blocks(block_ref_table_entry* entry, block_number start_b
                /* Exit if blocks array get out of space */
                if (nresults == nblocks)
                {
-                  return nresults;
+                  *n = nresults;
+                  return 0;
                }
             }
          }
