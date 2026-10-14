@@ -108,7 +108,11 @@ pgmoneta_tar(char* src, char* dst)
       goto error;
    }
 
-   archive_write_close(a);
+   if (archive_write_close(a) != ARCHIVE_OK)
+   {
+      pgmoneta_log_error("Could not write tar file %s: %s", dst, archive_error_string(a));
+      goto error;
+   }
    archive_write_free(a);
 
    return 0;
@@ -118,6 +122,11 @@ error:
    {
       archive_write_close(a);
       archive_write_free(a);
+
+      if (pgmoneta_exists(dst))
+      {
+         pgmoneta_delete_file(dst, NULL);
+      }
    }
 
    return 1;
