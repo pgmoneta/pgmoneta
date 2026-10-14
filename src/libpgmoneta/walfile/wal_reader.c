@@ -295,6 +295,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    char* temp_buffer = NULL;
    u_int32_t temp_next_record = 0;
    bool initialized = false;
+   bool header_split = false;
    int idx = 0;
    struct deque_iterator* iter = NULL;
    xlog_rec_ptr* lsn_array = NULL;
@@ -470,10 +471,12 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          continue;
       }
       fseek(file, next_record, SEEK_SET);
+      header_split = false;
 
       // Check if record crosses the page boundary
       if (ftell(file) + SIZE_OF_XLOG_RECORD > wal_file->long_phd->xlp_xlog_blcksz * (page_number + 1))
       {
+         header_split = true;
          MALLOC(temp_buffer, SIZE_OF_XLOG_RECORD);
          uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
          bytes_read = fread(temp_buffer, 1, end_of_page - ftell(file), file);
@@ -532,7 +535,8 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          break;
       }
       uint32_t data_length = record->xl_tot_len - SIZE_OF_XLOG_RECORD;
-      xlog_rec_ptr lsn = ftell(file) + base - SIZE_OF_XLOG_RECORD;
+      /* A header split by a page boundary has the next page's header in between */
+      xlog_rec_ptr lsn = ftell(file) + base - SIZE_OF_XLOG_RECORD - (header_split ? SIZE_OF_XLOG_SHORT_PHD : 0);
       next_record = ftell(file) + MAXALIGN(record->xl_tot_len - SIZE_OF_XLOG_RECORD);
       uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
 
