@@ -264,12 +264,18 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
     * run that happens to list the files which did not match. */
    if (number_of_failed > 0)
    {
+      struct json* outcome = NULL;
+
       pgmoneta_log_error("Verify: %s/%s failed for %d file%s",
                          config->common.servers[server].name, label,
                          number_of_failed, number_of_failed == 1 ? "" : "s");
 
-      pgmoneta_management_response_error_with_nodes(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_VERIFY_ERROR, NAME, compression, encryption, payload, nodes);
-
+      /* Send the failure with the response that lists the files */
+      if (pgmoneta_management_create_outcome_failure(payload, MANAGEMENT_ERROR_VERIFY_ERROR, NAME, &outcome) ||
+          pgmoneta_management_write_json(ssl, client_fd, compression, encryption, payload))
+      {
+         pgmoneta_log_error("Verify: Error sending response for %s/%s", config->common.servers[server].name, identifier);
+      }
       goto error;
    }
 
