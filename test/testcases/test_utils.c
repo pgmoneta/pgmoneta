@@ -178,6 +178,22 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_has_suffix)
+{
+   bool out = false;
+
+   MCTF_ASSERT(pgmoneta_has_suffix("base/1/112.zstd", ".zstd", &out) == 0 && out, cleanup, "has_suffix positive case 1 failed");
+   MCTF_ASSERT(pgmoneta_has_suffix("base/1/112.zstd.aes", ".zstd.aes", &out) == 0 && out, cleanup, "has_suffix positive case 2 failed");
+   MCTF_ASSERT(pgmoneta_has_suffix("base/1/112", ".zstd", &out) == 0 && !out, cleanup, "has_suffix negative case failed");
+   MCTF_ASSERT(pgmoneta_has_suffix("base/1/112", "", &out) == 0 && !out, cleanup, "has_suffix empty suffix case failed");
+   MCTF_ASSERT(pgmoneta_has_suffix("base/1/112", NULL, &out) == 0 && !out, cleanup, "has_suffix NULL suffix case failed");
+   MCTF_ASSERT(pgmoneta_has_suffix(NULL, ".zstd", &out) == 1 && !out, cleanup, "has_suffix NULL string case failed");
+   MCTF_ASSERT(pgmoneta_has_suffix("base/1/112.zstd", ".zstd", NULL) == 1, cleanup, "has_suffix NULL out case failed");
+
+cleanup:
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_contains)
 {
    MCTF_ASSERT(pgmoneta_contains("hello world", "lo wo"), cleanup, "contains positive case 1 failed");

@@ -56,7 +56,6 @@ static int copy_wal_execute(char*, struct art*);
 
 static char* restore_excluded_files_name(void);
 static int restore_excluded_files_execute(char*, struct art*);
-static int restore_excluded_files_teardown(char*, struct art*);
 
 static char* get_user_password(char* username);
 static int create_standby_signal(char* basedir);
@@ -160,7 +159,7 @@ pgmoneta_restore_excluded_files(void)
    wf->name = &restore_excluded_files_name;
    wf->setup = &pgmoneta_common_setup;
    wf->execute = &restore_excluded_files_execute;
-   wf->teardown = &restore_excluded_files_teardown;
+   wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
    return wf;
@@ -892,6 +891,11 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
 
       pgmoneta_log_trace("Excluded: %s -> %s", from_file, to_file);
 
+      /* Nothing is left to remove afterwards: a compressed or encrypted copy
+       * that the restore step put in the target is extracted, and removed, by
+       * the decompression/decryption step, and without compression and
+       * encryption the file written here is the only copy */
+
       if (pgmoneta_extract_file(from_file, 0, true, NULL, &to_file))
       {
          pgmoneta_log_error("Restore: Could not copy file %s to %s", from_file, to_file);
@@ -928,88 +932,6 @@ error:
    }
    free(restore_last_files_names);
    free(from);
-   free(to);
-   free(suffix);
-
-   return 1;
-}
-
-static int
-restore_excluded_files_teardown(char* name __attribute__((unused)), struct art* nodes)
-{
-   int server = -1;
-   char* identifier = NULL;
-   char** restore_last_files_names = NULL;
-   char* to = NULL;
-   char* suffix = NULL;
-   struct backup* backup = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_dump_art(nodes);
-
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
-#endif
-
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
-
-   pgmoneta_log_debug("Excluded (teardown): %s/%s", config->common.servers[server].name, identifier);
-
-   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
-
-   to = pgmoneta_append(to, (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
-
-   if (pgmoneta_extraction_get_suffix(backup->compression, backup->encryption, &suffix))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
-   {
-      goto error;
-   }
-
-   for (int i = 0; restore_last_files_names[i] != NULL; i++)
-   {
-      char* to_file = NULL;
-
-      to_file = pgmoneta_append(to_file, to);
-      to_file = pgmoneta_append(to_file, restore_last_files_names[i]);
-      to_file = pgmoneta_append(to_file, suffix);
-
-      if (pgmoneta_exists(to_file))
-      {
-         pgmoneta_delete_file(to_file, NULL);
-      }
-      else
-      {
-         pgmoneta_log_debug("%s doesn't exists", to_file);
-      }
-
-      free(to_file);
-      to_file = NULL;
-   }
-
-   for (int i = 0; restore_last_files_names[i] != NULL; i++)
-   {
-      free(restore_last_files_names[i]);
-   }
-   free(restore_last_files_names);
-   free(to);
-   free(suffix);
-
-   return 0;
-
-error:
-   for (int i = 0; restore_last_files_names[i] != NULL; i++)
-   {
-      free(restore_last_files_names[i]);
-   }
-   free(restore_last_files_names);
    free(to);
    free(suffix);
 

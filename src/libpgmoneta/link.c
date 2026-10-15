@@ -497,6 +497,7 @@ trim_suffix(char* str)
    struct main_configuration* config;
    char* res = NULL;
    char* suffix = NULL;
+   bool has_suffix = false;
 
    if (str == NULL)
    {
@@ -517,7 +518,7 @@ trim_suffix(char* str)
       return pgmoneta_append(NULL, str);
    }
 
-   if (suffix != NULL && strlen(suffix) > 0)
+   if (!pgmoneta_has_suffix(str, suffix, &has_suffix) && has_suffix)
    {
       res = pgmoneta_remove_suffix(str, suffix);
    }
