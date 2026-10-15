@@ -305,6 +305,15 @@ Information about installed extensions on server
 | version | The version of the extension |
 | comment | Description of the extension's functionality |
 
+## pgmoneta_server_database_size
+
+The size in bytes of each database on the server
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+| database | The name of the database |
+
 ## pgmoneta_extension_pgmoneta_ext
 
 Status of the pgmoneta extension
