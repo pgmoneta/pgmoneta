@@ -39,7 +39,7 @@ ENV GITHUB_REPO="https://github.com/pgmoneta/pgmoneta_ext.git"
 
 # Base installation from the template
 RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
-RUN dnf -y install --nogpgcheck --allowerasing https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+RUN dnf -y install --nogpgcheck --allowerasing https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-$(uname -m)/pgdg-redhat-repo-latest.noarch.rpm
 RUN dnf -qy --nogpgcheck module disable postgresql 2>/dev/null || true
 RUN dnf -y upgrade
 RUN dnf install -y dnf-plugins-core
