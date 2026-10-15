@@ -87,6 +87,14 @@ Typical use:
 EOF
 }
 
+need_value() {
+   if [[ -z "${2:-}" || "$2" == -* ]]; then
+      echo "error: $1 needs a value"
+      usage
+      exit 1
+   fi
+}
+
 detect_container_engine() {
    if command -v podman &>/dev/null; then
       CONTAINER_ENGINE="podman"
@@ -282,20 +290,28 @@ POSITIONAL=()
 while [[ $# -gt 0 ]]; do
    case "$1" in
       -c | --case)
-         CASE_FILTER="${2:-}"
+         need_value "$@"
+         CASE_FILTER="$2"
          shift 2
          ;;
       -i | --iterations)
-         ITERATIONS="${2:-}"
+         need_value "$@"
+         ITERATIONS="$2"
          shift 2
          ;;
       -s | --scale)
-         SCALE="${2:-}"
+         need_value "$@"
+         SCALE="$2"
          shift 2
          ;;
       -h | --help)
          usage
          exit 0
+         ;;
+      -*)
+         echo "error: unknown option '$1'"
+         usage
+         exit 1
          ;;
       *)
          POSITIONAL+=("$1")
