@@ -33,7 +33,9 @@
 #include <walfile/wal_reader.h>
 
 #include <dirent.h>
+#include <errno.h>
 #include <libgen.h>
+#include <string.h>
 
 struct partial_xlog_record* partial_record = NULL;
 
@@ -171,6 +173,7 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
    size_t space_left = 0;
    size_t to_write = 0;
    size_t current_size = 0;
+   bool created = false;
 
    if (!wf || !path)
    {
@@ -184,6 +187,7 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
       error_code = PGMONETA_WAL_ERR_IO;
       goto error;
    }
+   created = true;
 
    if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
    {
@@ -320,8 +324,16 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
       free(zeros);
    }
 
+   /* fclose() writes the last buffer */
+   if (fclose(file) != 0)
+   {
+      file = NULL;
+      pgmoneta_log_error("Could not write WAL file %s: %s", path, strerror(errno));
+      error_code = PGMONETA_WAL_ERR_IO;
+      goto error;
+   }
+
    pgmoneta_deque_iterator_destroy(record_iterator);
-   fclose(file);
    free(encoded_record);
    return PGMONETA_WAL_SUCCESS;
 
@@ -329,6 +341,10 @@ error:
    if (file)
    {
       fclose(file);
+   }
+   if (created)
+   {
+      pgmoneta_delete_file(path, NULL);
    }
    free(encoded_record);
    pgmoneta_deque_iterator_destroy(record_iterator);
