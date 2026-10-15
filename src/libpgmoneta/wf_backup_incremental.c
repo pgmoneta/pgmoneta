@@ -153,7 +153,7 @@ static int write_blocks(SSL* ssl, int socket, FILE* file, char* relative_filenam
  */
 static int write_empty_file(char* backup_data, char* relative_filename);
 /**
- * Check that the server has pgmoneta_ext_get_blocks()
+ * Check that the server has pgmoneta_ext_get_blocks() and that the user may execute it
  */
 static bool has_get_blocks(SSL* ssl, int socket);
 /**
@@ -336,7 +336,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
 
    if (!has_get_blocks(ssl, socket))
    {
-      pgmoneta_log_error("Incremental backup: pgmoneta_ext 0.1.2 or later is required for %s", config->common.servers[server].name);
+      pgmoneta_log_error("Incremental backup: pgmoneta_ext 0.1.2 or later, and EXECUTE on pgmoneta_ext_get_blocks() for the replication user, is required for %s", config->common.servers[server].name);
       goto error;
    }
 
@@ -2372,7 +2372,7 @@ has_get_blocks(SSL* ssl, int socket)
    struct query_response* qr = NULL;
    bool found = false;
 
-   pgmoneta_create_query_message("SELECT 1 FROM pg_proc WHERE proname = 'pgmoneta_ext_get_blocks';", &msg);
+   pgmoneta_create_query_message("SELECT 1 FROM pg_proc WHERE proname = 'pgmoneta_ext_get_blocks' AND has_function_privilege(oid, 'EXECUTE');", &msg);
    if (msg != NULL && !pgmoneta_query_execute(ssl, socket, msg, &qr) && qr != NULL && qr->tuples != NULL)
    {
       found = true;
