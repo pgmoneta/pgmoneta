@@ -1037,6 +1037,16 @@ bool
 pgmoneta_ends_with(char* str, char* suffix);
 
 /**
+ * Does a string end with a suffix that isn't empty
+ * @param s The string
+ * @param suffix The suffix, NULL or empty for none
+ * @param out True if suffix isn't empty and s ends with it
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_has_suffix(char* s, char* suffix, bool* out);
+
+/**
  * Does a string contain another string
  * @param str The string
  * @param s The search string
