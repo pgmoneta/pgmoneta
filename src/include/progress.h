@@ -64,6 +64,7 @@ extern "C" {
 #define MAX_PHASES                              10 /**< Maximum number of tracked phases */
 
 struct workflow;
+struct json;
 
 /** @struct progress
  * The progress of a workflow
@@ -83,14 +84,6 @@ struct progress
 };
 
 /**
- * Map a workflow step display name to a progress phase
- * @param name The step name from the workflow
- * @return The phase constant, or -1 if not tracked
- */
-int
-pgmoneta_progress_phase_from_workflow_name(char* name);
-
-/**
  * ART node key storing the cumulative percentage limit for a phase
  * @param phase The phase constant
  * @return The key string, or NULL if unknown
@@ -105,6 +98,15 @@ pgmoneta_progress_limit_node_key(int phase);
  */
 bool
 pgmoneta_is_progress_enabled(int server);
+
+/**
+ * Add the current progress data for a server to a JSON response
+ * @param server The server index
+ * @param response The response JSON object
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_progress_add_response(int server, struct json* response);
 
 /**
  * Initialize progress tracking for a workflow
