@@ -46,6 +46,7 @@
 static char* summary_file_name(uint64_t s_lsn, uint64_t e_lsn);
 static int summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
 static int summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
+static int check_wal_segments(struct deque* files, uint64_t start_lsn, uint64_t end_lsn, int wal_size);
 static char* get_wal_file_name(char* dir_path, char* file);
 
 /**
@@ -309,6 +310,11 @@ retry1:
    dlog = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("WAL files: %s", dlog);
 
+   if (check_wal_segments(files, start_lsn, end_lsn, config->common.servers[srv].wal_size))
+   {
+      goto error;
+   }
+
    pgmoneta_deque_iterator_create(files, &file_iterator);
    while (pgmoneta_deque_iterator_next(file_iterator))
    {
@@ -512,4 +518,53 @@ get_wal_file_name(char* dir_path, char* file)
    free(suffix);
 
    return fn;
+}
+
+/* Every segment with records in [start_lsn, end_lsn) must be there (on any timeline), or the summary misses the changes in it */
+static int
+check_wal_segments(struct deque* files, uint64_t start_lsn, uint64_t end_lsn, int wal_size)
+{
+   struct deque_iterator* iter = NULL;
+   xlog_seg_no first = 0;
+   xlog_seg_no last = 0;
+
+   if (wal_size <= 0 || end_lsn <= start_lsn || end_lsn <= SIZE_OF_XLOG_LONG_PHD)
+   {
+      return 0;
+   }
+
+   first = start_lsn / wal_size;
+   /* The segment of end_lsn is only needed when records start before end_lsn in it, not just its page header */
+   last = (end_lsn - SIZE_OF_XLOG_LONG_PHD - 1) / wal_size;
+
+   for (xlog_seg_no seg = first; seg <= last; seg++)
+   {
+      bool found = false;
+
+      if (pgmoneta_deque_iterator_create(files, &iter))
+      {
+         return 1;
+      }
+      while (!found && pgmoneta_deque_iterator_next(iter))
+      {
+         xlog_seg_no seg_no = 0;
+
+         if (pgmoneta_validate_wal_filename((char*)iter->value->data, NULL, &seg_no, wal_size) == 0 && seg_no == seg)
+         {
+            found = true;
+         }
+      }
+      pgmoneta_deque_iterator_destroy(iter);
+      iter = NULL;
+
+      if (!found)
+      {
+         pgmoneta_log_error("WAL summary: no WAL segment %08X%08X in the archive (needed for %X/%X - %X/%X)",
+                            (uint32_t)(seg / (0x100000000ULL / wal_size)), (uint32_t)(seg % (0x100000000ULL / wal_size)),
+                            LSN_FORMAT_ARGS(start_lsn), LSN_FORMAT_ARGS(end_lsn));
+         return 1;
+      }
+   }
+
+   return 0;
 }
