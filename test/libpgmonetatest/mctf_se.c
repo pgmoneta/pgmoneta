@@ -91,6 +91,11 @@ static char user_conf[MAX_PATH];
 static char cli_bin[MAX_PATH];
 static char daemon_bin[MAX_PATH];
 
+/* Optional storage_engine override for the managed pgmoneta.conf
+ * (e.g. "local, s3" on top of the Garage backend). NULL means the
+ * default: join the active drivers' storage_engine values. */
+static const char* storage_engine_override = NULL;
+
 static int write_confs(void);
 static int daemon_up(void);
 static void dump_managed_log(void);
@@ -125,9 +130,16 @@ write_confs(void)
    fprintf(f, "encryption = none\n");
    fprintf(f, "workers = 4\n");
    fprintf(f, "storage_engine = ");
-   for (int i = 0; i < n_active; i++)
+   if (storage_engine_override != NULL)
    {
-      fprintf(f, "%s%s", i > 0 ? ", " : "", storage[i].driver->storage_engine);
+      fprintf(f, "%s", storage_engine_override);
+   }
+   else
+   {
+      for (int i = 0; i < n_active; i++)
+      {
+         fprintf(f, "%s%s", i > 0 ? ", " : "", storage[i].driver->storage_engine);
+      }
    }
    fprintf(f, "\n");
    fprintf(f, "log_type = file\n");
@@ -386,7 +398,22 @@ mctf_se_up(int backend)
       return MCTF_FAIL;
    }
 
+   storage_engine_override = NULL;
    return se_up_common(&backend, 1, registry[backend]->name);
+}
+
+int
+mctf_se_up_with_engine(int backend, const char* storage_engine, const char* name)
+{
+   if ((size_t)backend >= sizeof(registry) / sizeof(registry[0]) ||
+       registry[backend] == NULL)
+   {
+      pgmoneta_log_error("mctf_se: unknown backend %d", backend);
+      return MCTF_FAIL;
+   }
+
+   storage_engine_override = storage_engine;
+   return se_up_common(&backend, 1, name != NULL ? name : registry[backend]->name);
 }
 
 int
@@ -407,9 +434,11 @@ mctf_se_down(void)
 {
    if (!storage_active)
    {
+      storage_engine_override = NULL;
       return;
    }
    storage_active = false;
+   storage_engine_override = NULL;
 
    daemon_down();
 
