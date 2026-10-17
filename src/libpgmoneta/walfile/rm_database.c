@@ -71,7 +71,7 @@ pgmoneta_wal_database_desc(char* buf, struct decoded_xlog_record* record)
    char* rec = XLOG_REC_GET_DATA(record);
    uint8_t info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
 
-   if (server_config->version >= 17)
+   if (server_config->version >= 15)
    {
       buf = database_desc_v17(buf, rec, info);
       return buf;
