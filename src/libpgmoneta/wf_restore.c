@@ -981,7 +981,8 @@ restore_excluded_files_teardown(char* name __attribute__((unused)), struct art* 
       to_file = pgmoneta_append(to_file, restore_last_files_names[i]);
       to_file = pgmoneta_append(to_file, suffix);
 
-      if (pgmoneta_exists(to_file))
+      /* without a suffix to_file is the restored file itself */
+      if (suffix != NULL && strlen(suffix) > 0 && pgmoneta_exists(to_file))
       {
          pgmoneta_delete_file(to_file, NULL);
       }
