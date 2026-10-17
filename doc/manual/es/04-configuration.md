@@ -167,6 +167,7 @@ Nota: Si `host` comienza con un `/`, representa una ruta y `pgmoneta` se conecta
 | :------- | :------ | :--- | :------- | :---------- |
 | max_rate | 0 | Int | No | La velocidad máxima de transferencia de backup en bytes por segundo. Usa 0 para desactivar |
 | progress | off | Bool | No | Habilitar seguimiento del progreso de operaciones de backup y restore |
+| authentication_timeout | 5 | String | No | El número de segundos permitidos para la autenticación. Si este valor se especifica sin unidades, se toma como segundos. Soporta los siguientes sufijos de unidades: 'S' para segundos (por defecto), 'M' para minutos, 'H' para horas, 'D' para días y 'W' para semanas. |
 | blocking_timeout | 30 | String | No | El número de segundos que el proceso se bloqueará esperando una conexión. Si este valor se especifica sin unidades, se toma como segundos. Establecer este parámetro a 0 lo desactiva. Soporta los siguientes sufijos de unidades: 'S' para segundos (por defecto), 'M' para minutos, 'H' para horas, 'D' para días y 'W' para semanas. |
 | keep_alive | on | Bool | No | Tener `SO_KEEPALIVE` en sockets |
 | nodelay | on | Bool | No | Tener `TCP_NODELAY` en sockets |
