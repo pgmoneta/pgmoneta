@@ -346,21 +346,22 @@ do_verify(struct worker_common* wc)
    }
    f = pgmoneta_append(f, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_FILENAME));
 
+   /* a file in the manifest that is missing or unreadable fails the verify like a wrong hash */
    if (!pgmoneta_exists(f))
    {
-      goto error;
+      pgmoneta_log_error("Verify: %s is missing", f);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_STATUS, (uintptr_t)"Missing", ValueString);
+      failed = true;
    }
-
-   if (!pgmoneta_create_sha512_file(f, &hash_cal))
+   else if (pgmoneta_create_sha512_file(f, &hash_cal))
    {
-      if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
-      {
-         failed = true;
-      }
+      pgmoneta_log_error("Verify: Unable to calculate hash for %s", f);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_STATUS, (uintptr_t)"Could not be read", ValueString);
+      failed = true;
    }
-   else
+   else if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
    {
-      goto error;
+      failed = true;
    }
 
    /* The hash says the file is the one that was backed up. The page checksums
@@ -433,26 +434,6 @@ do_verify(struct worker_common* wc)
    {
       pgmoneta_json_destroy(j);
    }
-
-   if (pgmoneta_is_progress_enabled(wi->level))
-   {
-      pgmoneta_progress_increment(wi->level, 1);
-   }
-
-   wi->data = NULL;
-   wi->failed = NULL;
-   wi->all = NULL;
-
-   free(hash_cal);
-   free(f);
-   free(wi);
-
-   return;
-
-error:
-   pgmoneta_log_error("Unable to calculate hash for %s", f);
-
-   pgmoneta_json_destroy(wi->data);
 
    if (pgmoneta_is_progress_enabled(wi->level))
    {
