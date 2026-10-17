@@ -660,10 +660,11 @@ wf_restore(struct backup* backup)
    current->next = pgmoneta_create_copy_wal();
    current = current->next;
 
-   current->next = pgmoneta_create_recovery_info();
+   /* recovery info edits postgresql.conf, so the held-back files must be in place first */
+   current->next = pgmoneta_restore_excluded_files();
    current = current->next;
 
-   current->next = pgmoneta_restore_excluded_files();
+   current->next = pgmoneta_create_recovery_info();
    current = current->next;
 
    current->next = pgmoneta_create_permissions(PERMISSION_TYPE_RESTORE);
