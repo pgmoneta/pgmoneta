@@ -166,6 +166,10 @@ pgmoneta-cli list-backup primary --sort desc
 
 Restore a backup from a server
 
+Before restoring, the backup and the backups it is built on are checked against the hashes
+recorded when they were taken. A file that is missing or different fails the restore, and the
+log names it.
+
 Command
 
 ``` sh

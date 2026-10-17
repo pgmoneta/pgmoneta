@@ -38,6 +38,7 @@
 #include <security.h>
 #include <storage.h>
 #include <utils.h>
+#include <verify.h>
 #include <workflow.h>
 
 /* system */
@@ -346,17 +347,8 @@ pgmoneta_sha512_verification(char** argv)
    struct backup** backups = NULL;
    struct deque* labels = NULL;
    struct art* s3_labels = NULL;
-   char* sha512_path = NULL;
-   FILE* sha512_file = NULL;
-   char buffer[4096];
-   char* root = NULL;
-   char* filename = NULL;
-   char* hash = NULL;
-   char* calculated_hash = NULL;
-   char* absolute_file_path = NULL;
    bool active = false;
    bool locked = false;
-   int line = 0;
    int err = 0;
    char* elapsed = NULL;
    struct timespec start_t;
@@ -439,8 +431,6 @@ pgmoneta_sha512_verification(char** argv)
             success = false;
             continue;
          }
-         root = pgmoneta_get_server_backup_identifier(server, backups[i]->label);
-
          if ((config->storage_engine & STORAGE_ENGINE_S3) &&
              s3_labels != NULL && pgmoneta_art_contains_key(s3_labels, backups[i]->label))
          {
@@ -454,99 +444,17 @@ pgmoneta_sha512_verification(char** argv)
          }
          else
          {
-            sha512_path = pgmoneta_append(sha512_path, root);
-            if (!pgmoneta_ends_with(sha512_path, "/"))
-            {
-               sha512_path = pgmoneta_append_char(sha512_path, '/');
-            }
-            sha512_path = pgmoneta_append(sha512_path, "backup.sha512");
+            int r = pgmoneta_verify_sha512(server, backups[i]->label, NULL);
 
-            sha512_file = fopen(sha512_path, "r");
-            if (sha512_file == NULL)
+            if (r == 2)
             {
-               pgmoneta_log_error("Verification: %s / Could not open file %s: %s",
-                                  config->common.servers[server].name, sha512_path,
-                                  strerror(errno));
+               pgmoneta_log_error("Verification: %s/%s has no backup.sha512",
+                                  config->common.servers[server].name, backups[i]->label);
+            }
+            if (r != 0)
+            {
                err = 1;
                success = false;
-               goto backup_cleanup;
-            }
-
-            line = 0;
-            while (fgets(&buffer[0], sizeof(buffer), sha512_file) != NULL)
-            {
-               char* entry = NULL;
-
-               line++;
-               entry = strtok(&buffer[0], " ");
-               if (entry == NULL)
-               {
-                  pgmoneta_log_error("Verification: %s / %s: formatting error at line %d",
-                                     config->common.servers[server].name, sha512_path, sha512_path,
-                                     line);
-                  err = 1;
-                  success = false;
-                  goto cleanup;
-               }
-
-               hash = NULL;
-               if (pgmoneta_copy_string(entry, &hash))
-               {
-                  pgmoneta_log_error("Verification: %s / Memory allocation error for hash",
-                                     config->common.servers[server].name);
-                  err = 1;
-                  success = false;
-                  goto cleanup;
-               }
-
-               entry = strtok(NULL, "\n");
-               if (entry == NULL || strlen(entry) < 3)
-               {
-                  pgmoneta_log_error("Verification: %s/%s %s formatting error at line %d",
-                                     config->common.servers[server].name,
-                                     backups[i]->label, sha512_path, line);
-                  err = 1;
-                  success = false;
-                  goto cleanup;
-               }
-
-               // skip the " *." or " */"
-               filename = entry + 3;
-
-               absolute_file_path = pgmoneta_append(absolute_file_path, root);
-               if (!pgmoneta_ends_with(absolute_file_path, "/"))
-               {
-                  absolute_file_path = pgmoneta_append(absolute_file_path, "/");
-               }
-
-               absolute_file_path = pgmoneta_append(absolute_file_path, filename);
-
-               if (pgmoneta_create_sha512_file(absolute_file_path, &calculated_hash))
-               {
-                  pgmoneta_log_error("Verification: %s / Could not create hash for %s",
-                                     config->common.servers[server].name, absolute_file_path);
-                  err = 1;
-                  success = false;
-                  goto cleanup;
-               }
-
-               if (strcmp(hash, calculated_hash) != 0)
-               {
-                  pgmoneta_log_error("Verification: %s / Hash mismatch for %s | Expected: %s | Got: %s",
-                                     config->common.servers[server].name,
-                                     absolute_file_path, hash, calculated_hash);
-                  err = 1;
-               }
-
-cleanup:
-               free(hash);
-               hash = NULL;
-
-               free(absolute_file_path);
-               absolute_file_path = NULL;
-
-               free(calculated_hash);
-               calculated_hash = NULL;
             }
          }
 
@@ -576,18 +484,6 @@ cleanup:
             free(bck_dir);
          }
          free(elapsed);
-
-backup_cleanup:
-         if (sha512_file != NULL)
-         {
-            fclose(sha512_file);
-            sha512_file = NULL;
-         }
-         free(sha512_path);
-         sha512_path = NULL;
-
-         free(root);
-         root = NULL;
       }
 
 server_cleanup:
@@ -620,4 +516,180 @@ server_cleanup:
 
    pgmoneta_stop_logging();
    exit(err);
+}
+
+int
+pgmoneta_verify_sha512(int server, char* label, struct deque* failed)
+{
+   char* root = NULL;
+   char* sha512_path = NULL;
+   FILE* sha512_file = NULL;
+   char buffer[4096];
+   int line = 0;
+   int ret = 0;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   root = pgmoneta_get_server_backup_identifier(server, label);
+
+   sha512_path = pgmoneta_append(sha512_path, root);
+   if (!pgmoneta_ends_with(sha512_path, "/"))
+   {
+      sha512_path = pgmoneta_append_char(sha512_path, '/');
+   }
+   sha512_path = pgmoneta_append(sha512_path, "backup.sha512");
+
+   if (!pgmoneta_exists(sha512_path))
+   {
+      ret = 2;
+      goto done;
+   }
+
+   sha512_file = fopen(sha512_path, "r");
+   if (sha512_file == NULL)
+   {
+      pgmoneta_log_error("Verify: %s/%s: could not open %s: %s",
+                         config->common.servers[server].name, label, sha512_path, strerror(errno));
+      ret = 1;
+      goto done;
+   }
+
+   while (fgets(&buffer[0], sizeof(buffer), sha512_file) != NULL)
+   {
+      char* hash = NULL;
+      char* filename = NULL;
+      char* path = NULL;
+      char* calculated = NULL;
+      char* status = NULL;
+
+      line++;
+
+      hash = strtok(&buffer[0], " ");
+      filename = strtok(NULL, "\n");
+      if (hash == NULL || filename == NULL || strlen(filename) < 3)
+      {
+         pgmoneta_log_error("Verify: %s/%s: %s formatting error at line %d",
+                            config->common.servers[server].name, label, sha512_path, line);
+         ret = 1;
+         continue;
+      }
+
+      /* skip the "*./" in front of the path */
+      filename += 3;
+
+      /* backup.info is rewritten after the backup (retain, annotate, verification) */
+      if (pgmoneta_compare_string(filename, "backup.info"))
+      {
+         continue;
+      }
+
+      path = pgmoneta_append(path, root);
+      if (!pgmoneta_ends_with(path, "/"))
+      {
+         path = pgmoneta_append(path, "/");
+      }
+      path = pgmoneta_append(path, filename);
+
+      if (!pgmoneta_exists(path))
+      {
+         status = "Missing";
+      }
+      else if (pgmoneta_create_sha512_file(path, &calculated))
+      {
+         status = "Could not be read";
+      }
+      else if (strcmp(hash, calculated) != 0)
+      {
+         status = "Hash mismatch";
+      }
+
+      if (status != NULL)
+      {
+         pgmoneta_log_error("Verify: %s/%s: %s: %s", config->common.servers[server].name, label, filename, status);
+         ret = 1;
+
+         if (failed != NULL)
+         {
+            struct json* j = NULL;
+
+            if (!pgmoneta_json_create(&j))
+            {
+               pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)root, ValueString);
+               pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)filename, ValueString);
+               pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_ORIGINAL, (uintptr_t)hash, ValueString);
+               pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_CALCULATED, (uintptr_t)(calculated != NULL ? calculated : "Unknown"), ValueString);
+               pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM, (uintptr_t)"SHA512", ValueString);
+               pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_STATUS, (uintptr_t)status, ValueString);
+               pgmoneta_deque_add(failed, path, (uintptr_t)j, ValueJSON);
+            }
+         }
+      }
+
+      free(path);
+      free(calculated);
+   }
+
+done:
+   if (sha512_file != NULL)
+   {
+      fclose(sha512_file);
+   }
+   free(sha512_path);
+   free(root);
+
+   return ret;
+}
+
+int
+pgmoneta_verify_sha512_chain(int server, char* label, bool self, struct deque* failed)
+{
+   char current[MISC_LENGTH];
+   char* backup_dir = NULL;
+   struct backup* bck = NULL;
+   int ret = 0;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   backup_dir = pgmoneta_get_server_backup(server);
+   pgmoneta_snprintf(current, sizeof(current), "%s", label);
+
+   while (true)
+   {
+      if (pgmoneta_load_info(backup_dir, current, &bck) || bck == NULL)
+      {
+         pgmoneta_log_error("Verify: %s: unable to find backup %s", config->common.servers[server].name, current);
+         ret = 1;
+         break;
+      }
+
+      if (self || !pgmoneta_compare_string(current, label))
+      {
+         int r = pgmoneta_verify_sha512(server, current, failed);
+
+         if (r == 2)
+         {
+            pgmoneta_log_warn("Verify: %s/%s has no backup.sha512, not checked", config->common.servers[server].name, current);
+         }
+         else if (r != 0)
+         {
+            ret = 1;
+         }
+      }
+
+      if (bck->type != TYPE_INCREMENTAL)
+      {
+         break;
+      }
+
+      pgmoneta_snprintf(current, sizeof(current), "%s", bck->parent_label);
+      free(bck);
+      bck = NULL;
+   }
+
+   free(bck);
+   free(backup_dir);
+
+   return ret;
 }

@@ -40,6 +40,7 @@
 #include <security.h>
 #include <utils.h>
 #include <value.h>
+#include <verify.h>
 #include <workers.h>
 #include <workflow.h>
 
@@ -59,6 +60,7 @@
 #define RESTORE_NO_DISK_SPACE 2
 #define RESTORE_TYPE_UNKNOWN  3
 #define RESTORE_ERROR         4
+#define RESTORE_DAMAGED       5
 #define MAX_PATH_CONCAT       (MAX_PATH * 2)
 #define TMP_SUFFIX            ".tmp"
 
@@ -749,6 +751,11 @@ job_error:
       pgmoneta_log_warn("Restore: No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
+   else if (ret == RESTORE_DAMAGED)
+   {
+      ec = MANAGEMENT_ERROR_RESTORE_ERROR;
+      goto error;
+   }
    else
    {
       ec = MANAGEMENT_ERROR_RESTORE_NODISK;
@@ -903,6 +910,14 @@ pgmoneta_restore_backup(struct art* nodes)
    else
    {
       pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, false, ValueBool);
+   }
+
+   /* a damaged backup, or one it is built on, is refused instead of restored as it is */
+   if (pgmoneta_verify_sha512_chain(server, label, true, NULL))
+   {
+      pgmoneta_log_error("Restore: %s/%s or a backup it is built on does not match its backup.sha512",
+                         ((struct main_configuration*)shmem)->common.servers[server].name, label);
+      return RESTORE_DAMAGED;
    }
 
    if (backup->type == TYPE_FULL)
