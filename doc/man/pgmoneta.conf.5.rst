@@ -205,6 +205,12 @@ log_line_prefix
 log_mode
   Append to or create the log file (append, create). Default is append
 
+authentication_timeout
+  The number of seconds allowed for authentication. If this value is specified without units,
+  it is taken as seconds. It supports the following units as suffixes:
+  'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks.
+  Default is 5
+
 blocking_timeout
   The number of seconds the process will be blocking for a connection. If this value is specified without units,
   it is taken as seconds. Setting this parameter to 0 disables it. It supports the following units as suffixes:
