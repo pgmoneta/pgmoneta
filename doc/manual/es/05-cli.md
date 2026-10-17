@@ -243,6 +243,9 @@ creó con sumas de verificación de datos, también se comprueban las páginas d
 relación, lo que detecta una página que ya estaba dañada cuando se hizo el backup en lugar de
 una dañada después. El comando falla si algún archivo no se verifica.
 
+Para un backup incremental también se comprueban con sus hashes los backups en los que se
+basa, y sus archivos fallidos se listan con los demás.
+
 Comando
 
 ``` sh

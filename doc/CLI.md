@@ -231,6 +231,9 @@ created with data checksums then the pages of its relation files are checked as 
 catches a page that was already damaged when the backup was made rather than one damaged
 since. The command fails if any file does not verify.
 
+For an incremental backup the backups it is built on are checked against their hashes too,
+and their failed files are listed with the others.
+
 Command
 
 ```sh

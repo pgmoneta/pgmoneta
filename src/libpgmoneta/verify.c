@@ -184,6 +184,12 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    f = (struct deque*)pgmoneta_art_search(nodes, NODE_FAILED);
    a = (struct deque*)pgmoneta_art_search(nodes, NODE_ALL);
 
+   /* an incremental is restored with the backups it is built on, so check those too */
+   if (backup->type == TYPE_INCREMENTAL && f != NULL)
+   {
+      pgmoneta_verify_sha512_chain(server, backup->label, false, f);
+   }
+
    if (pgmoneta_json_create(&failed))
    {
       goto error;
