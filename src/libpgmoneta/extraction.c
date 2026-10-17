@@ -38,7 +38,6 @@
 #include <vfile.h>
 #include <workers.h>
 
-#include <libgen.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -137,7 +136,7 @@ stream_restore_file(char* src, char* dst, int encryption, int compression, struc
    struct vfile* reader = NULL;
    struct vfile* writer = NULL;
    bool writer_added = false;
-   char buf[BUFFER_SIZE];
+   char* buf = NULL;
    size_t num_read = 0;
    bool last_chunk = false;
    char* dir_path = NULL;
@@ -146,15 +145,30 @@ stream_restore_file(char* src, char* dst, int encryption, int compression, struc
    dir_path = pgmoneta_append(dir_path, dst);
    if (dir_path != NULL)
    {
-      char* parent = dirname(dir_path);
-      if (pgmoneta_mkdir(parent))
+      /* Not dirname(): on macOS all threads share its result buffer */
+      char* slash = strrchr(dir_path, '/');
+
+      if (slash != NULL && slash != dir_path)
       {
-         pgmoneta_log_error("extraction: failed to create parent directory for %s", dst);
-         free(dir_path);
-         goto error;
+         *slash = '\0';
+
+         if (pgmoneta_mkdir(dir_path))
+         {
+            pgmoneta_log_error("extraction: failed to create parent directory for %s", dst);
+            free(dir_path);
+            goto error;
+         }
       }
       free(dir_path);
       dir_path = NULL;
+   }
+
+   /* Too big for the stack of a worker thread on macOS */
+   buf = malloc(BUFFER_SIZE);
+   if (buf == NULL)
+   {
+      pgmoneta_log_error("extraction: failed to allocate buffer for %s", src);
+      goto error;
    }
 
    if (pgmoneta_vfile_create_local(src, "r", &reader))
@@ -184,7 +198,7 @@ stream_restore_file(char* src, char* dst, int encryption, int compression, struc
 
    do
    {
-      if (reader->read(reader, buf, sizeof(buf), &num_read, &last_chunk))
+      if (reader->read(reader, buf, BUFFER_SIZE, &num_read, &last_chunk))
       {
          pgmoneta_log_error("extraction: failed to read from %s", src);
          goto error;
@@ -200,6 +214,7 @@ stream_restore_file(char* src, char* dst, int encryption, int compression, struc
 
    pgmoneta_vfile_destroy(reader);
    pgmoneta_streamer_destroy(strm);
+   free(buf);
 
    return 0;
 
@@ -211,6 +226,7 @@ error:
       pgmoneta_vfile_destroy(writer);
    }
    pgmoneta_streamer_destroy(strm);
+   free(buf);
    return 1;
 }
 

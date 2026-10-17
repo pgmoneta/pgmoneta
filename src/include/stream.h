@@ -53,6 +53,7 @@ struct streamer
    struct deque* destinations;        /**< The streaming destinations */
    struct deque* failed_destinations; /**< The failed destinations */
    char buffer[BUFFER_SIZE];          /**< The internal buffer */
+   char output[BUFFER_SIZE];          /**< The compressor output buffer */
    size_t size;                       /**< The buffer data size */
    size_t capacity;                   /**< The buffer capacity */
    size_t written;                    /**< Total data streamed */
