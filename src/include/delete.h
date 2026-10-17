@@ -54,6 +54,44 @@ pgmoneta_delete(int srv, char* backup_id);
 int
 pgmoneta_delete_wal(int srv);
 
+/**
+ * Delete the backups of a server that are marked as incomplete,
+ * locally and on the remote storage engines.
+ * Only safe when no backup of the server can be running
+ * @param srv The server index
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_incomplete_backups(int srv);
+
+/**
+ * Delete a backup that is marked as incomplete, locally and on the remote
+ * storage engines. The marker stays until the remote cleanup succeeds
+ * @param srv The server index
+ * @param label The backup label
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_incomplete_backup(int srv, char* label);
+
+/**
+ * Delete the backup directories of a server that have no backup.info.
+ * Only safe when no backup or restore can be running
+ * @param srv The server index
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_backups_without_metadata(int srv);
+
+/**
+ * Delete the incomplete backup of a backup process that died,
+ * then release the repository lock
+ * @param argv The argv
+ * @param srv The server index
+ */
+void
+pgmoneta_delete_failed_backup(char** argv, int srv);
+
 #ifdef __cplusplus
 }
 #endif

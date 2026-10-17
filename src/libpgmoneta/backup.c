@@ -32,6 +32,7 @@
 #include <art.h>
 #include <backup.h>
 #include <compression.h>
+#include <delete.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
@@ -66,6 +67,8 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    char* server_backup = NULL;
    char* root = NULL;
    char* d = NULL;
+   char* incomplete = NULL;
+   FILE* marker = NULL;
    char* backup_data = NULL;
    bool backup_incremental = false;
    int number_of_backups = 0;
@@ -146,6 +149,19 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    }
 
    date = pgmoneta_append(date, &date_str[0]);
+
+   d = pgmoneta_get_server_backup(server);
+   if (d != NULL && !pgmoneta_mkdir(d))
+   {
+      incomplete = pgmoneta_format_and_append(NULL, "%s%s%s", d, &date_str[0], BACKUP_INCOMPLETE_SUFFIX);
+   }
+
+   if (incomplete == NULL || pgmoneta_fopen_secure(incomplete, "w", &marker))
+   {
+      pgmoneta_log_error("Backup: Could not mark %s/%s as incomplete", config->common.servers[server].name, &date_str[0]);
+      goto error;
+   }
+   fclose(marker);
 
    if (pgmoneta_art_create(&nodes))
    {
@@ -303,11 +319,18 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
+   /* The backup is complete, so nothing after this may remove it */
+   pgmoneta_delete_file(incomplete, NULL);
+   if (pgmoneta_exists(incomplete))
+   {
+      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
+      pgmoneta_log_error("Backup: Could not remove %s", incomplete);
+      goto error;
+   }
+
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      ec = MANAGEMENT_ERROR_BACKUP_NETWORK;
       pgmoneta_log_error("Backup: Error sending response for %s", config->common.servers[server].name);
-      goto error;
    }
 
    pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->common.servers[server].name, date, elapsed);
@@ -335,6 +358,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    free(root);
    free(incremental_base);
    free(d);
+   free(incomplete);
 
    pgmoneta_disconnect(client_fd);
 
@@ -349,6 +373,15 @@ error:
       pgmoneta_progress_teardown(server);
    }
 
+   pgmoneta_management_response_error_with_nodes(NULL, client_fd, config->common.servers[server].name,
+                                                 ec != -1 ? ec : MANAGEMENT_ERROR_BACKUP_ERROR,
+                                                 en != NULL ? en : WORKFLOW_NAME_BACKUP, compression, encryption, payload, nodes);
+
+   if (pgmoneta_exists(incomplete))
+   {
+      pgmoneta_delete_incomplete_backup(server, &date_str[0]);
+   }
+
    if (locked)
    {
       config->common.servers[server].active_backup = false;
@@ -356,14 +389,6 @@ error:
       atomic_store(&config->common.servers[server].repository, false);
    }
 
-   pgmoneta_management_response_error_with_nodes(NULL, client_fd, config->common.servers[server].name,
-                                                 ec != -1 ? ec : MANAGEMENT_ERROR_BACKUP_ERROR,
-                                                 en != NULL ? en : WORKFLOW_NAME_BACKUP, compression, encryption, payload, nodes);
-
-   if (pgmoneta_exists(root))
-   {
-      pgmoneta_delete_directory(root);
-   }
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
@@ -382,6 +407,7 @@ error:
    free(root);
    free(incremental_base);
    free(d);
+   free(incomplete);
 
    pgmoneta_disconnect(client_fd);
 

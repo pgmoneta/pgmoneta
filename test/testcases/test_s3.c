@@ -41,6 +41,7 @@
 #include <tscommon.h>
 #include <utils.h>
 
+#include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -886,5 +887,194 @@ MCTF_INTEGRATION_TEST(test_s3_delete_one_backup_keeps_the_other)
 cleanup:
    free(first_listing);
    free(second_listing);
+   MCTF_FINISH();
+}
+
+/*
+ * A restore that fails while downloading must keep the local backup.info,
+ * otherwise the backup looks unfinished and gets removed.
+ */
+MCTF_INTEGRATION_TEST(test_s3_failed_restore_keeps_local_metadata)
+{
+   char stub[MAX_PATH];
+   char cmd[2 * MAX_PATH];
+   char* output = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   pgmoneta_snprintf(stub, sizeof(stub), "%s/backup/primary/backup/%s", mctf_se_run_dir(), shared_label);
+
+   /* a directory where the download writes backup.sha512 makes the restore fail right away */
+   MCTF_ASSERT(mctf_sh(NULL, "test -f %s/backup.info && mkdir %s/backup.sha512.tmp", stub, stub) == 0,
+               cleanup, "could not prepare the failing restore");
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "s3 restore primary %s %s", shared_label, TEST_RESTORE_DIR);
+   mctf_se_cli(cmd, &output);
+   MCTF_ASSERT_PTR_NONNULL(output, cleanup, "no output from s3 restore");
+   MCTF_ASSERT(strstr(output, "Status: false") != NULL, cleanup, "s3 restore did not fail");
+
+   MCTF_ASSERT(mctf_sh(NULL, "test -f %s/backup.info", stub) == 0, cleanup, "the failed restore removed backup.info");
+
+cleanup:
+   mctf_sh(NULL, "rm -rf %s/backup.sha512.tmp", stub);
+   free(output);
+   MCTF_FINISH();
+}
+
+/*
+ * A download that fails half way must not leave data behind, otherwise a
+ * restore of the backup would take the partial data for the real one.
+ */
+MCTF_INTEGRATION_TEST(test_s3_failed_download_removes_partial_data)
+{
+   char stub[MAX_PATH];
+   char cmd[2 * MAX_PATH];
+   char* output = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   pgmoneta_snprintf(stub, sizeof(stub), "%s/backup/primary/backup/%s", mctf_se_run_dir(), shared_label);
+
+   /* a directory where the download puts data/PG_VERSION.zstd (the managed instance uses zstd)
+    * makes it fail after other files are fetched */
+   MCTF_ASSERT(mctf_sh(NULL, "test ! -e %s/data && mkdir -p %s/data/PG_VERSION.zstd", stub, stub) == 0,
+               cleanup, "could not prepare the failing download");
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "s3 restore primary %s %s", shared_label, TEST_RESTORE_DIR);
+   mctf_se_cli(cmd, &output);
+   MCTF_ASSERT_PTR_NONNULL(output, cleanup, "no output from s3 restore");
+   MCTF_ASSERT(strstr(output, "Status: false") != NULL, cleanup, "s3 restore did not fail");
+
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/data", stub) != 0, cleanup, "the failed download left data behind");
+   MCTF_ASSERT(mctf_sh(NULL, "test -f %s/backup.info", stub) == 0, cleanup, "the failed download removed backup.info");
+
+cleanup:
+   mctf_sh(NULL, "rm -rf %s/data", stub);
+   free(output);
+   MCTF_FINISH();
+}
+
+/*
+ * A backup that dies after backup.info is written can already be uploaded,
+ * so removing it has to remove it from S3 too.
+ */
+MCTF_INTEGRATION_TEST(test_s3_incomplete_backup_removed)
+{
+   char label[256] = {0};
+   char newest[256] = {0};
+   char backup_dir[MAX_PATH];
+   char* listing = NULL;
+   pid_t backup = 0;
+   bool throttled = false;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/primary/backup", mctf_se_run_dir());
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+   MCTF_ASSERT(mctf_sh(NULL, "touch %s/%s.incomplete", backup_dir, label) == 0, cleanup,
+               "could not mark the backup as incomplete");
+
+   /* incomplete backups are removed when a backup process dies */
+   MCTF_ASSERT(mctf_se_cli("conf set server.primary.max_rate 32768", NULL) == 0, cleanup, "could not slow down backups");
+   throttled = true;
+   MCTF_ASSERT(mctf_se_cli("backup primary >/dev/null 2>&1 &", NULL) == 0, cleanup, "could not start a backup");
+
+   for (int i = 0; i < 100 && backup <= 0; i++)
+   {
+      SLEEP(100000000L);
+      if (newest_backup_label(newest, sizeof(newest)) == MCTF_OK && strcmp(newest, label) > 0)
+      {
+         backup = pgmoneta_test_find_process("backup/primary");
+      }
+   }
+   MCTF_ASSERT(backup > 0, cleanup, "the backup did not start");
+
+   MCTF_ASSERT(!kill(backup, SIGKILL), cleanup, "could not kill the backup");
+   backup = 0;
+
+   for (int i = 0; i < 300 && (mctf_sh(NULL, "test -e %s/%s", backup_dir, label) == 0 || pgmoneta_test_find_process("cleanup/primary") > 0); i++)
+   {
+      SLEEP(100000000L);
+   }
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s", backup_dir, label) != 0, cleanup, "the incomplete backup is still on disk");
+   MCTF_ASSERT(assert_no_s3_objects("primary", label, &listing) == MCTF_OK, cleanup,
+               "the incomplete backup is still in S3, or s3 ls did not report success");
+
+cleanup:
+   if (backup > 0)
+   {
+      kill(backup, SIGKILL);
+   }
+   if (throttled)
+   {
+      mctf_se_cli("conf set server.primary.max_rate 0", NULL);
+   }
+   free(listing);
+   MCTF_FINISH();
+}
+
+/*
+ * Startup removes what a crash of pgmoneta left behind: a backup that was
+ * still being taken, a backup whose cleanup had already deleted backup.info,
+ * both also from S3, and a backup directory without backup.info.
+ */
+MCTF_INTEGRATION_TEST(test_s3_restart_removes_incomplete_backups)
+{
+   char label[256] = {0};
+   char cleaned[256] = {0};
+   char backup_dir[MAX_PATH];
+   char* listing = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/primary/backup", mctf_se_run_dir());
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+   MCTF_ASSERT(take_backup_and_get_label("primary", cleaned, sizeof(cleaned)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+   MCTF_ASSERT(mctf_sh(NULL, "touch %s/%s.incomplete && mkdir -p %s/20000101000000/data", backup_dir, label, backup_dir) == 0,
+               cleanup, "could not create the leftovers of a crash");
+   MCTF_ASSERT(mctf_sh(NULL, "echo remote > %s/%s.incomplete && rm %s/%s/backup.info", backup_dir, cleaned, backup_dir, cleaned) == 0,
+               cleanup, "could not create the leftovers of an interrupted cleanup");
+
+   MCTF_ASSERT(mctf_se_restart() == MCTF_OK, cleanup, "could not restart pgmoneta");
+
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s", backup_dir, label) != 0, cleanup, "the incomplete backup is still on disk");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s.incomplete", backup_dir, label) != 0, cleanup, "the incomplete marker is still on disk");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/20000101000000", backup_dir) != 0, cleanup,
+               "the backup directory without backup.info is still on disk");
+   MCTF_ASSERT(assert_no_s3_objects("primary", label, &listing) == MCTF_OK, cleanup,
+               "the incomplete backup is still in S3, or s3 ls did not report success");
+   free(listing);
+   listing = NULL;
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s", backup_dir, cleaned) != 0, cleanup, "the cleaned up backup is still on disk");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s.incomplete", backup_dir, cleaned) != 0, cleanup, "the cleaned up marker is still on disk");
+   MCTF_ASSERT(assert_no_s3_objects("primary", cleaned, &listing) == MCTF_OK, cleanup,
+               "the cleaned up backup is still in S3, or s3 ls did not report success");
+   MCTF_ASSERT(mctf_se_has_local_metadata("primary"), cleanup, "a complete backup was removed");
+
+cleanup:
+   free(listing);
    MCTF_FINISH();
 }

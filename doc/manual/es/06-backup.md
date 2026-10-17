@@ -91,6 +91,12 @@ pgmoneta-cli list-backup primary --sort desc
 
 para orden descendente (más nuevos primero).
 
+## Backups interrumpidos
+
+Mientras se hace un backup, un archivo `<label>.incomplete` está junto a su directorio, y el backup solo aparece en la lista una vez que se ha escrito su archivo `backup.info`.
+
+Si el proceso que hace el backup muere antes de que el backup esté completo (`kill -9`, el OOM killer), [**pgmoneta**][pgmoneta] elimina el backup de inmediato, incluido lo que ya se había subido a S3, y deja una advertencia en el log. Si [**pgmoneta**][pgmoneta] se detiene (caída, corte de energía), elimina el backup la próxima vez que arranca, junto con cualquier directorio de backup que no tenga `backup.info`.
+
 ## Crear un backup incremental
 
 Podemos hacer un backup incremental del servidor primario con el siguiente comando
