@@ -32,6 +32,7 @@
 #include <backup.h>
 #include <files.h>
 #include <logging.h>
+#include <lz4_compression.h>
 #include <management.h>
 #include <manifest.h>
 #include <network.h>
@@ -912,6 +913,18 @@ pgmoneta_extract_backup_tar_file(char* file_path, char* destination, char* manif
       {
          pgmoneta_log_error("Failed to create streamer");
          goto error;
+      }
+
+      /* PostgreSQL sends a server-lz4 archive as an LZ4 frame, not in pgmoneta's own lz4 block format */
+      if (config->compression_type == COMPRESSION_SERVER_LZ4)
+      {
+         pgmoneta_compressor_destroy(restore_strm->compressor);
+         restore_strm->compressor = NULL;
+         if (pgmoneta_lz4_frame_decompressor_create(&restore_strm->compressor))
+         {
+            pgmoneta_log_error("Failed to create the lz4 frame decompressor");
+            goto error;
+         }
       }
 
       if (restore_strm->get_dest_file_name(restore_strm, file_path, &archive_name))
