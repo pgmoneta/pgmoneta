@@ -94,6 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: rockylinux/rockylinux:10
+      options: --cap-add=SYS_PTRACE
 
     strategy:
       matrix:
@@ -140,7 +141,8 @@ jobs:
             check check-devel llvm \
             libasan libubsan \
             net-tools procps-ng ncurses-devel \
-            util-linux sudo which zstd
+            util-linux sudo which zstd \
+            gdb strace iproute
 
       - name: Mark workspace as safe for git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -191,6 +193,7 @@ jobs:
         run: |
           export TEST_PG_VERSION=${{ matrix.pg_version }}
           if [ "${{ matrix.compiler }}" = "clang" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
+            bash .github/hang_watchdog.sh ${{ matrix.pg_version }} &
             su - runner -c "cd $GITHUB_WORKSPACE && export TEST_PG_VERSION=${{ matrix.pg_version }} && export PATH=/usr/pgsql-${{ matrix.pg_version }}/bin:\$PATH && bash ./test/check.sh ci"
           fi
 
