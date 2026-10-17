@@ -40,6 +40,9 @@ extern "C" {
 
 #include <stdlib.h>
 
+/* A backup being taken has a file with this suffix next to its directory until it is complete */
+#define BACKUP_INCOMPLETE_SUFFIX ".incomplete"
+
 /**
  * Create a backup
  * @param client_fd The client
