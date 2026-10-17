@@ -57,7 +57,7 @@ extern "C" {
  */
 struct xl_clog_truncate_17
 {
-   int pageno;                /**< The page number of the CLOG to truncate */
+   int64_t pageno;            /**< The page number of the CLOG to truncate */
    transaction_id oldestXact; /**< The oldest transaction ID to retain */
    oid oldestXactDb;          /**< The database ID of the oldest transaction */
 };
@@ -76,7 +76,7 @@ struct xl_clog_truncate_17
  */
 struct xl_clog_truncate_16
 {
-   int64_t pageno;            /**< The page number of the CLOG to truncate */
+   int pageno;                /**< The page number of the CLOG to truncate */
    transaction_id oldestXact; /**< The oldest transaction ID to retain */
    oid oldestXactDb;          /**< The database ID of the oldest transaction */
 };

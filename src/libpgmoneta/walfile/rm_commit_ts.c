@@ -50,8 +50,8 @@ void
 xl_commit_ts_truncate_parse_v16(struct xl_commit_ts_truncate* wrapper, char* rec)
 {
    char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v16.pageno, ptr, sizeof(int64_t));
-   ptr += sizeof(int64_t);
+   memcpy(&wrapper->data.v16.pageno, ptr, sizeof(int));
+   ptr += sizeof(int);
    memcpy(&wrapper->data.v16.oldestXid, ptr, sizeof(transaction_id));
 }
 
@@ -59,8 +59,8 @@ void
 xl_commit_ts_truncate_parse_v17(struct xl_commit_ts_truncate* wrapper, char* rec)
 {
    char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v17.pageno, ptr, sizeof(int));
-   ptr += sizeof(int);
+   memcpy(&wrapper->data.v17.pageno, ptr, sizeof(int64_t));
+   ptr += sizeof(int64_t);
    memcpy(&wrapper->data.v17.oldestXid, ptr, sizeof(transaction_id));
 }
 
@@ -74,7 +74,7 @@ xl_commit_ts_truncate_format_v16(struct xl_commit_ts_truncate* wrapper, char* bu
 char*
 xl_commit_ts_truncate_format_v17(struct xl_commit_ts_truncate* wrapper, char* buf)
 {
-   return pgmoneta_format_and_append(buf, "pageno %d, oldest_xid %u",
+   return pgmoneta_format_and_append(buf, "pageno %" PRId64 ", oldest_xid %u",
                                      wrapper->data.v17.pageno, wrapper->data.v17.oldestXid);
 }
 
@@ -86,14 +86,25 @@ pgmoneta_wal_commit_ts_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == COMMIT_TS_ZEROPAGE)
    {
-      int64_t pageno;
+      int64_t pageno = 0;
 
-      memcpy(&pageno, rec, server_config->version >= 17 ? sizeof(int) : sizeof(int64_t));
-      buf = pgmoneta_format_and_append(buf, "%d", pageno);
+      if (server_config->version >= 17)
+      {
+         memcpy(&pageno, rec, sizeof(int64_t));
+      }
+      else
+      {
+         int pageno_v16 = 0;
+
+         memcpy(&pageno_v16, rec, sizeof(int));
+         pageno = pageno_v16;
+      }
+      buf = pgmoneta_format_and_append(buf, "%" PRId64, pageno);
    }
    else if (info == COMMIT_TS_TRUNCATE)
    {
       struct xl_commit_ts_truncate* trunc = create_xl_commit_ts_truncate();
+      trunc->parse(trunc, rec);
       buf = trunc->format(trunc, buf);
       free(trunc);
    }

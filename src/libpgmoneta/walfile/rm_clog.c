@@ -53,8 +53,8 @@ void
 xl_clog_truncate_parse_v16(struct xl_clog_truncate* wrapper, char* rec)
 {
    char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v16.pageno, ptr, sizeof(int64_t));
-   ptr += sizeof(int64_t);
+   memcpy(&wrapper->data.v16.pageno, ptr, sizeof(int));
+   ptr += sizeof(int);
    memcpy(&wrapper->data.v16.oldestXact, ptr, sizeof(transaction_id));
    ptr += sizeof(transaction_id);
    memcpy(&wrapper->data.v16.oldestXactDb, ptr, sizeof(oid));
@@ -63,8 +63,8 @@ void
 xl_clog_truncate_parse_v17(struct xl_clog_truncate* wrapper, char* rec)
 {
    char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v17.pageno, ptr, sizeof(int));
-   ptr += sizeof(int);
+   memcpy(&wrapper->data.v17.pageno, ptr, sizeof(int64_t));
+   ptr += sizeof(int64_t);
    memcpy(&wrapper->data.v17.oldestXact, ptr, sizeof(transaction_id));
    ptr += sizeof(transaction_id);
    memcpy(&wrapper->data.v17.oldestXactDb, ptr, sizeof(oid));
@@ -73,7 +73,7 @@ xl_clog_truncate_parse_v17(struct xl_clog_truncate* wrapper, char* rec)
 char*
 xl_clog_truncate_format_v16(struct xl_clog_truncate* wrapper, char* buf)
 {
-   return pgmoneta_format_and_append(buf, "page %ld; oldestXact %u",
+   return pgmoneta_format_and_append(buf, "page %d; oldestXact %u",
                                      wrapper->data.v16.pageno,
                                      wrapper->data.v16.oldestXact);
 }
@@ -81,7 +81,7 @@ xl_clog_truncate_format_v16(struct xl_clog_truncate* wrapper, char* buf)
 char*
 xl_clog_truncate_format_v17(struct xl_clog_truncate* wrapper, char* buf)
 {
-   return pgmoneta_format_and_append(buf, "page %d; oldestXact %u",
+   return pgmoneta_format_and_append(buf, "page %" PRId64 "; oldestXact %u",
                                      wrapper->data.v17.pageno,
                                      wrapper->data.v17.oldestXact);
 }
@@ -94,10 +94,20 @@ pgmoneta_wal_clog_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == CLOG_ZEROPAGE)
    {
-      int64_t pageno;
+      int64_t pageno = 0;
 
-      memcpy(&pageno, rec, server_config->version >= 17 ? sizeof(int) : sizeof(int64_t));
-      buf = pgmoneta_format_and_append(buf, "page %d", pageno);
+      if (server_config->version >= 17)
+      {
+         memcpy(&pageno, rec, sizeof(int64_t));
+      }
+      else
+      {
+         int pageno_v16 = 0;
+
+         memcpy(&pageno_v16, rec, sizeof(int));
+         pageno = pageno_v16;
+      }
+      buf = pgmoneta_format_and_append(buf, "page %" PRId64, pageno);
    }
    else if (info == CLOG_TRUNCATE)
    {
