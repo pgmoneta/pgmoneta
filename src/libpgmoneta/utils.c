@@ -2747,6 +2747,7 @@ copy_file(struct worker_input* fi)
    ssize_t nread = -1;
    int permissions = -1;
    char* dn = NULL;
+   char* slash = NULL;
    char* to = NULL;
    bool use_direct_io = false;
    bool aligned_buffer = false;
@@ -2864,12 +2865,19 @@ copy_file(struct worker_input* fi)
    }
 
    pgmoneta_copy_string(fi->to, &to);
-   pgmoneta_copy_string(dirname(fi->to), &dn);
+   pgmoneta_copy_string(fi->to, &dn);
 
-   if (pgmoneta_mkdir(dn))
+   /* Not dirname() as on macOS all threads share its result buffer */
+   slash = dn != NULL ? strrchr(dn, '/') : NULL;
+   if (slash != NULL && slash != dn)
    {
-      pgmoneta_log_error("Could not create directory: %s", dn);
-      goto error;
+      *slash = '\0';
+
+      if (pgmoneta_mkdir(dn))
+      {
+         pgmoneta_log_error("Could not create directory: %s", dn);
+         goto error;
+      }
    }
 
    fd_to = open(to, flags_to, permissions);
