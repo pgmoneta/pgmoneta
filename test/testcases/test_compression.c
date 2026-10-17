@@ -34,6 +34,7 @@
 #include <lz4_compression.h>
 #include <zstandard_compression.h>
 #include <configuration.h>
+#include <stream.h>
 #include <tsclient.h>
 #include <tscommon.h>
 #include <mctf.h>
@@ -46,10 +47,14 @@
 #include <utils.h>
 #include <tsclient_helpers.h>
 
+#include <lz4frame.h>
+
 /* Server-Side Compression Tests */
 
+#define SERVER_ZSTD_AES "\ncompression = server-zstd\nencryption = aes\n"
+
 static int
-inject_pgmoneta_compression_encryption(const char* path)
+inject_pgmoneta_compression_encryption(const char* path, const char* injection)
 {
    FILE* in = NULL;
    FILE* out = NULL;
@@ -61,7 +66,6 @@ inject_pgmoneta_compression_encryption(const char* path)
    size_t prefix_len = 0;
    size_t suffix_len = 0;
    const char* needle = "\ncompression = zstd\n";
-   const char* injection = "\ncompression = server-zstd\nencryption = aes\n";
    int ret = 1;
 
    in = fopen(path, "r");
@@ -262,7 +266,7 @@ MCTF_TEST(test_pgmoneta_server_zstd_backup_restore)
    config = (struct main_configuration*)shmem;
 
    /* Inject settings in the [pgmoneta] section to avoid [primary] parse errors. */
-   MCTF_ASSERT(inject_pgmoneta_compression_encryption(config->common.configuration_path) == 0,
+   MCTF_ASSERT(inject_pgmoneta_compression_encryption(config->common.configuration_path, SERVER_ZSTD_AES) == 0,
                cleanup,
                "failed to update pgmoneta.conf for server-zstd + aes: %s",
                config->common.configuration_path);
@@ -283,6 +287,108 @@ MCTF_TEST(test_pgmoneta_server_zstd_backup_restore)
                cleanup, "restore of server-zstd compressed backup failed");
 
 cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+static int
+server_lz4_backup_restore(const char* injection, bool incremental)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   if (inject_pgmoneta_compression_encryption(config->common.configuration_path, injection))
+   {
+      return 1;
+   }
+
+   if (pgmoneta_tsclient_reload(0) ||
+       pgmoneta_tsclient_mode("primary", "online", 0) ||
+       pgmoneta_tsclient_backup("primary", NULL, 0))
+   {
+      return 1;
+   }
+
+   if (incremental && pgmoneta_tsclient_backup("primary", "newest", 0))
+   {
+      return 1;
+   }
+
+   return pgmoneta_tsclient_restore("primary", "newest", "current", 0);
+}
+
+static int
+test_pg_version(void)
+{
+   char* pg_version_str = getenv("TEST_PG_VERSION");
+
+   if (pg_version_str == NULL || strlen(pg_version_str) == 0)
+   {
+      return 0;
+   }
+
+   return atoi(pg_version_str);
+}
+
+MCTF_TEST(test_pgmoneta_server_lz4_backup_restore)
+{
+   pgmoneta_test_setup();
+
+   if (test_pg_version() < 15)
+   {
+      MCTF_SKIP("server-side backup compression requires PostgreSQL 15+");
+   }
+
+   MCTF_ASSERT(server_lz4_backup_restore("\ncompression = server-lz4\n", false) == 0,
+               cleanup, "backup and restore with server-lz4 failed");
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_server_lz4_aes_backup_restore)
+{
+   pgmoneta_test_setup();
+
+   if (test_pg_version() < 15)
+   {
+      MCTF_SKIP("server-side backup compression requires PostgreSQL 15+");
+   }
+
+   MCTF_ASSERT(server_lz4_backup_restore("\ncompression = server-lz4\nencryption = aes\n", false) == 0,
+               cleanup, "backup and restore with server-lz4 and aes failed");
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_server_lz4_incremental_backup_restore)
+{
+   struct json* response = NULL;
+   struct json* b1 = NULL;
+
+   pgmoneta_test_setup();
+
+   /* PostgreSQL 14-16 incrementals are read through pgmoneta_ext, not received as a server archive */
+   if (test_pg_version() < 17)
+   {
+      MCTF_SKIP("server-side incremental archives require PostgreSQL 17+");
+   }
+
+   MCTF_ASSERT(server_lz4_backup_restore("\ncompression = server-lz4\n", true) == 0,
+               cleanup, "incremental backup and restore with server-lz4 failed");
+
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
+   b1 = pgmoneta_tsclient_get_backup(response, 1);
+   MCTF_ASSERT_PTR_NONNULL(b1, cleanup, "backup 1 null");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b1), "INCREMENTAL", cleanup, "backup 1 type mismatch");
+
+cleanup:
+   if (response != NULL)
+   {
+      pgmoneta_json_destroy(response);
+   }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }
@@ -327,7 +433,7 @@ MCTF_TEST(test_not_double_compression_full_backup)
    config = (struct main_configuration*)shmem;
 
    /* Inject settings in the [pgmoneta] section to avoid [primary] parse errors. */
-   MCTF_ASSERT(inject_pgmoneta_compression_encryption(config->common.configuration_path) == 0,
+   MCTF_ASSERT(inject_pgmoneta_compression_encryption(config->common.configuration_path, SERVER_ZSTD_AES) == 0,
                cleanup,
                "failed to update pgmoneta.conf for server-zstd + aes: %s",
                config->common.configuration_path);
@@ -394,7 +500,7 @@ MCTF_TEST(test_not_double_compression_incremental_backup)
    config = (struct main_configuration*)shmem;
 
    /* Inject settings in the [pgmoneta] section to avoid [primary] parse errors. */
-   MCTF_ASSERT(inject_pgmoneta_compression_encryption(config->common.configuration_path) == 0,
+   MCTF_ASSERT(inject_pgmoneta_compression_encryption(config->common.configuration_path, SERVER_ZSTD_AES) == 0,
                cleanup,
                "failed to update pgmoneta.conf for server-zstd + aes: %s",
                config->common.configuration_path);
@@ -459,7 +565,7 @@ MCTF_TEST(test_not_double_compression_wal_files)
    config = (struct main_configuration*)shmem;
 
    /* Inject settings in the [pgmoneta] section to avoid [primary] parse errors. */
-   MCTF_ASSERT(inject_pgmoneta_compression_encryption(config->common.configuration_path) == 0,
+   MCTF_ASSERT(inject_pgmoneta_compression_encryption(config->common.configuration_path, SERVER_ZSTD_AES) == 0,
                cleanup,
                "failed to update pgmoneta.conf for server-zstd + aes: %s",
                config->common.configuration_path);
@@ -664,5 +770,258 @@ cleanup:
    }
    remove(input);
    remove(output);
+   MCTF_FINISH();
+}
+
+#define LZ4_FRAME_DECODED  0
+#define LZ4_FRAME_ERROR    1
+#define LZ4_FRAME_MISMATCH 2
+
+static unsigned char*
+lz4_frame_test_data(size_t size)
+{
+   unsigned char* data = malloc(size > 0 ? size : 1);
+   uint32_t seed = 1399;
+
+   if (data == NULL)
+   {
+      return NULL;
+   }
+
+   /* alternate runs that do and don't compress, so the frame has both kinds of block */
+   for (size_t i = 0; i < size; i++)
+   {
+      seed = seed * 1103515245 + 12345;
+      data[i] = (i / 4096) % 2 == 0 ? (unsigned char)(seed >> 16) : 'p';
+   }
+
+   return data;
+}
+
+static char*
+lz4_frames(unsigned char* data, size_t size, LZ4F_preferences_t* prefs, int count, size_t* frames_size)
+{
+   size_t bound = LZ4F_compressFrameBound(size, prefs);
+   size_t frame_size = 0;
+   char* frames = malloc(bound * count);
+
+   if (frames == NULL)
+   {
+      return NULL;
+   }
+
+   frame_size = LZ4F_compressFrame(frames, bound, data, size, prefs);
+   if (LZ4F_isError(frame_size))
+   {
+      free(frames);
+      return NULL;
+   }
+
+   for (int i = 1; i < count; i++)
+   {
+      memcpy(frames + i * frame_size, frames, frame_size);
+   }
+
+   *frames_size = frame_size * count;
+   return frames;
+}
+
+/* drives the decompressor like restore_stream_cb() does, with chunk bytes of input per call */
+static int
+lz4_frame_decode(char* src, size_t src_size, size_t chunk, size_t out_capacity, unsigned char* expected, size_t expected_size)
+{
+   struct compressor* decompressor = NULL;
+   char* out = NULL;
+   size_t pos = 0;
+   size_t total = 0;
+   size_t n = 0;
+   size_t produced = 0;
+   bool last = false;
+   bool finished = false;
+   int ret = LZ4_FRAME_ERROR;
+
+   out = malloc(out_capacity);
+   if (out == NULL || pgmoneta_lz4_frame_decompressor_create(&decompressor))
+   {
+      goto done;
+   }
+
+   do
+   {
+      n = MIN(chunk, src_size - pos);
+      last = pos + n == src_size;
+      pgmoneta_compressor_prepare(decompressor, src + pos, n, last);
+      finished = false;
+      while (!finished)
+      {
+         if (decompressor->decompress(decompressor, out, out_capacity, &produced, &finished))
+         {
+            goto done;
+         }
+         if (total + produced > expected_size || memcmp(out, expected + total, produced) != 0)
+         {
+            ret = LZ4_FRAME_MISMATCH;
+            goto done;
+         }
+         total += produced;
+      }
+      pos += n;
+   }
+   while (!last);
+
+   ret = total == expected_size ? LZ4_FRAME_DECODED : LZ4_FRAME_MISMATCH;
+
+done:
+   pgmoneta_compressor_destroy(decompressor);
+   free(out);
+   return ret;
+}
+
+MCTF_TEST(test_compression_lz4_frame_decode)
+{
+   size_t size = 4 * 1024 * 1024 + 123;
+   unsigned char* data = NULL;
+   unsigned char* twice = NULL;
+   char* frames = NULL;
+   size_t frames_size = 0;
+
+   data = lz4_frame_test_data(size);
+   MCTF_ASSERT_PTR_NONNULL(data, cleanup, "allocation failed");
+
+   frames = lz4_frames(data, size, NULL, 1, &frames_size);
+   MCTF_ASSERT_PTR_NONNULL(frames, cleanup, "could not create an LZ4 frame");
+
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size, BUFFER_SIZE, BUFFER_SIZE, data, size), LZ4_FRAME_DECODED,
+                      cleanup, "decoding in streamer sized pieces failed");
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size, 4093, 65536, data, size), LZ4_FRAME_DECODED,
+                      cleanup, "decoding in 4093 byte pieces failed");
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size, 4093, 1000, data, size), LZ4_FRAME_DECODED,
+                      cleanup, "decoding into a small output buffer failed");
+   free(frames);
+   frames = NULL;
+
+   /* frames back to back are decoded one after the other, like lz4 -d does */
+   twice = malloc(2 * size);
+   MCTF_ASSERT_PTR_NONNULL(twice, cleanup, "allocation failed");
+   memcpy(twice, data, size);
+   memcpy(twice + size, data, size);
+   frames = lz4_frames(data, size, NULL, 2, &frames_size);
+   MCTF_ASSERT_PTR_NONNULL(frames, cleanup, "could not create LZ4 frames");
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size, BUFFER_SIZE, BUFFER_SIZE, twice, 2 * size), LZ4_FRAME_DECODED,
+                      cleanup, "decoding two frames failed");
+
+cleanup:
+   free(frames);
+   free(twice);
+   free(data);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_compression_lz4_frame_decode_checksums)
+{
+   size_t size = 300 * 1024;
+   unsigned char* data = NULL;
+   char* frames = NULL;
+   size_t frames_size = 0;
+   LZ4F_preferences_t prefs;
+
+   data = lz4_frame_test_data(size);
+   MCTF_ASSERT_PTR_NONNULL(data, cleanup, "allocation failed");
+
+   memset(&prefs, 0, sizeof(prefs));
+   prefs.frameInfo.blockSizeID = LZ4F_max256KB;
+   prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+   prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+   prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+   prefs.frameInfo.contentSize = size;
+   prefs.compressionLevel = 12;
+
+   frames = lz4_frames(data, size, &prefs, 1, &frames_size);
+   MCTF_ASSERT_PTR_NONNULL(frames, cleanup, "could not create an LZ4 frame");
+
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size, 1, 65536, data, size), LZ4_FRAME_DECODED,
+                      cleanup, "decoding one byte at a time failed");
+
+cleanup:
+   free(frames);
+   free(data);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_compression_lz4_frame_decode_empty)
+{
+   unsigned char data[1] = {0};
+   char* frames = NULL;
+   size_t frames_size = 0;
+
+   frames = lz4_frames(data, 0, NULL, 1, &frames_size);
+   MCTF_ASSERT_PTR_NONNULL(frames, cleanup, "could not create an empty LZ4 frame");
+
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size, BUFFER_SIZE, BUFFER_SIZE, data, 0), LZ4_FRAME_DECODED,
+                      cleanup, "decoding an empty frame failed");
+
+cleanup:
+   free(frames);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_compression_lz4_frame_decode_fills_output)
+{
+   /* the frame ends exactly when the output buffer is full, so the caller asks once more without input */
+   unsigned char data[65536];
+   char* frames = NULL;
+   size_t frames_size = 0;
+
+   memset(data, 'p', sizeof(data));
+
+   frames = lz4_frames(data, sizeof(data), NULL, 1, &frames_size);
+   MCTF_ASSERT_PTR_NONNULL(frames, cleanup, "could not create an LZ4 frame");
+
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size, frames_size, sizeof(data), data, sizeof(data)), LZ4_FRAME_DECODED,
+                      cleanup, "decoding a frame that fills the output buffer failed");
+
+cleanup:
+   free(frames);
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_compression_lz4_frame_decode_invalid)
+{
+   size_t size = 300 * 1024;
+   unsigned char* data = NULL;
+   char* frames = NULL;
+   size_t frames_size = 0;
+   LZ4F_preferences_t prefs;
+   /* an empty file in pgmoneta's own lz4 block format */
+   char block_format[] = {0x01, 0x00, 0x00, 0x00, 0x00};
+
+   data = lz4_frame_test_data(size);
+   MCTF_ASSERT_PTR_NONNULL(data, cleanup, "allocation failed");
+
+   frames = lz4_frames(data, size, NULL, 1, &frames_size);
+   MCTF_ASSERT_PTR_NONNULL(frames, cleanup, "could not create an LZ4 frame");
+
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size - 4, BUFFER_SIZE, BUFFER_SIZE, data, size), LZ4_FRAME_ERROR,
+                      cleanup, "a frame without its end mark was accepted");
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size / 2, BUFFER_SIZE, BUFFER_SIZE, data, size), LZ4_FRAME_ERROR,
+                      cleanup, "a frame cut in a block was accepted");
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, 0, BUFFER_SIZE, BUFFER_SIZE, data, size), LZ4_FRAME_ERROR,
+                      cleanup, "input without a frame was accepted");
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(block_format, sizeof(block_format), BUFFER_SIZE, BUFFER_SIZE, data, 0), LZ4_FRAME_ERROR,
+                      cleanup, "pgmoneta's lz4 block format was accepted as a frame");
+   free(frames);
+   frames = NULL;
+
+   memset(&prefs, 0, sizeof(prefs));
+   prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+   frames = lz4_frames(data, size, &prefs, 1, &frames_size);
+   MCTF_ASSERT_PTR_NONNULL(frames, cleanup, "could not create an LZ4 frame");
+   frames[frames_size - 2] ^= 0xFF;
+   MCTF_ASSERT_INT_EQ(lz4_frame_decode(frames, frames_size, BUFFER_SIZE, BUFFER_SIZE, data, size), LZ4_FRAME_ERROR,
+                      cleanup, "a frame with a wrong content checksum was accepted");
+
+cleanup:
+   free(frames);
+   free(data);
    MCTF_FINISH();
 }
