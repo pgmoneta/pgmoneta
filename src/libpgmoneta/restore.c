@@ -913,7 +913,9 @@ pgmoneta_restore_backup(struct art* nodes)
    }
 
    /* a damaged backup, or one it is built on, is refused instead of restored as it is */
-   if (pgmoneta_verify_sha512_chain(server, label, true, NULL))
+   if (pgmoneta_verify_sha512_chain(server, label, true,
+                                    pgmoneta_art_contains_key(nodes, NODE_STAGED) && (bool)pgmoneta_art_search(nodes, NODE_STAGED),
+                                    NULL))
    {
       pgmoneta_log_error("Restore: %s/%s or a backup it is built on does not match its backup.sha512",
                          ((struct main_configuration*)shmem)->common.servers[server].name, label);

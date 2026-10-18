@@ -187,7 +187,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    /* an incremental is restored with the backups it is built on, so check those too */
    if (backup->type == TYPE_INCREMENTAL && f != NULL)
    {
-      pgmoneta_verify_sha512_chain(server, backup->label, false, f);
+      pgmoneta_verify_sha512_chain(server, backup->label, false, false, f);
    }
 
    if (pgmoneta_json_create(&failed))
@@ -450,7 +450,7 @@ pgmoneta_sha512_verification(char** argv)
          }
          else
          {
-            int r = pgmoneta_verify_sha512(server, backups[i]->label, NULL);
+            int r = pgmoneta_verify_sha512(server, backups[i]->label, false, NULL);
 
             if (r == 2)
             {
@@ -525,7 +525,7 @@ server_cleanup:
 }
 
 int
-pgmoneta_verify_sha512(int server, char* label, struct deque* failed)
+pgmoneta_verify_sha512(int server, char* label, bool missing_ok, struct deque* failed)
 {
    char* root = NULL;
    char* sha512_path = NULL;
@@ -599,6 +599,12 @@ pgmoneta_verify_sha512(int server, char* label, struct deque* failed)
 
       if (!pgmoneta_exists(path))
       {
+         if (missing_ok)
+         {
+            /* a remote restore only stages the files it needs */
+            free(path);
+            continue;
+         }
          status = "Missing";
       }
       else if (pgmoneta_create_sha512_file(path, &calculated))
@@ -648,7 +654,7 @@ done:
 }
 
 int
-pgmoneta_verify_sha512_chain(int server, char* label, bool self, struct deque* failed)
+pgmoneta_verify_sha512_chain(int server, char* label, bool self, bool missing_ok, struct deque* failed)
 {
    char current[MISC_LENGTH];
    char* backup_dir = NULL;
@@ -672,7 +678,7 @@ pgmoneta_verify_sha512_chain(int server, char* label, bool self, struct deque* f
 
       if (self || !pgmoneta_compare_string(current, label))
       {
-         int r = pgmoneta_verify_sha512(server, current, failed);
+         int r = pgmoneta_verify_sha512(server, current, missing_ok, failed);
 
          if (r == 2)
          {
