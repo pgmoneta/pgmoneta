@@ -211,7 +211,7 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
    double total_seconds;
    char* directory = NULL;
    char* position = NULL;
-   char* local_data = NULL;
+   char* staging = NULL;
    struct art* nodes = NULL;
    struct backup* backup = NULL;
    struct json* req = NULL;
@@ -267,10 +267,16 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
       goto error;
    }
 
-   if (pgmoneta_storage_remote_download(server, prefix))
+   if (pgmoneta_storage_remote_download(server, prefix, &staging))
    {
       ec = MANAGEMENT_ERROR_RESTORE_S3_DOWNLOAD;
       pgmoneta_log_error("S3 restore: failed to stage %s/%s", config->common.servers[server].name, prefix);
+      goto error;
+   }
+
+   if (pgmoneta_art_insert(nodes, NODE_SERVER_BACKUP, (uintptr_t)staging, ValueString))
+   {
+      ec = MANAGEMENT_ERROR_RESTORE_S3_WORKFLOW;
       goto error;
    }
 
@@ -302,8 +308,7 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
       goto error;
    }
 
-   local_data = pgmoneta_get_server_backup_identifier_data(server, prefix);
-   pgmoneta_delete_directory(local_data);
+   pgmoneta_delete_directory(staging);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
@@ -324,7 +329,7 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
    pgmoneta_json_destroy(payload);
    pgmoneta_art_destroy(nodes);
    free(elapsed);
-   free(local_data);
+   free(staging);
 
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
@@ -340,13 +345,13 @@ error:
    pgmoneta_art_destroy(nodes);
    free(elapsed);
 
-   if (local_data != NULL)
+   if (staging != NULL)
    {
-      pgmoneta_delete_directory(local_data);
+      pgmoneta_delete_directory(staging);
    }
 
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
-   free(local_data);
+   free(staging);
    exit(1);
 }
