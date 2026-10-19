@@ -33,6 +33,7 @@
 #include <compression.h>
 #include <configuration.h>
 #include <deque.h>
+#include <info.h>
 #include <mctf.h>
 #include <progress.h>
 #include <restore.h>
@@ -586,6 +587,55 @@ cleanup:
    {
       pgmoneta_art_destroy(nodes);
    }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_progress_setup_post_rollup_untracked)
+{
+   struct art* nodes = NULL;
+   struct main_configuration* config;
+   struct workflow* workflow = NULL;
+   struct backup* backup = NULL;
+   struct progress* p;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_load_conf(TEST_CONF_DIR "/progress/02.conf"), 0,
+                      cleanup, "failed to read 02.conf");
+
+   config = (struct main_configuration*)shmem;
+   config->common.servers[0].progress_enabled = true;
+   p = &config->common.servers[0].progress;
+   atomic_store(&p->state, WORKFLOW_PROGRESS_NONE);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_art_create(&nodes), 0,
+                      cleanup, "failed to create art");
+
+   backup = calloc(1, sizeof(struct backup));
+   MCTF_ASSERT_PTR_NONNULL(backup, cleanup, "failed to allocate backup");
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_POST_ROLLUP, backup);
+   MCTF_ASSERT_PTR_NONNULL(workflow, cleanup, "failed to create post rollup workflow");
+   pgmoneta_progress_setup(0, workflow, nodes, WORKFLOW_TYPE_POST_ROLLUP);
+
+   /* POST_ROLLUP has no weight model, so no phase limits may be stored */
+   MCTF_ASSERT(!pgmoneta_art_contains_key(nodes, NODE_PROGRESS_LIMIT_MANIFEST),
+               cleanup, "post rollup should not store a manifest limit");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(nodes, NODE_PROGRESS_LIMIT_PERMISSIONS),
+               cleanup, "post rollup should not store a permissions limit");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(nodes, NODE_PROGRESS_LIMIT_SHA512),
+               cleanup, "post rollup should not store a sha512 limit");
+   MCTF_ASSERT_INT_EQ((int)atomic_load(&p->state), WORKFLOW_PROGRESS_NONE,
+                      cleanup, "post rollup should not start progress tracking");
+
+cleanup:
+   if (workflow != NULL)
+   {
+      pgmoneta_workflow_destroy(workflow);
+   }
+   if (nodes != NULL)
+   {
+      pgmoneta_art_destroy(nodes);
+   }
+   free(backup);
    MCTF_FINISH();
 }
 
