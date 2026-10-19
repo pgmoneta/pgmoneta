@@ -2572,7 +2572,8 @@ restore_backup_full(struct art* nodes)
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
 
-   backup_wal_dir = pgmoneta_get_server_backup_identifier_data_wal(server, backup->label);
+   backup_wal_dir = pgmoneta_append(backup_wal_dir, (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA));
+   backup_wal_dir = pgmoneta_append(backup_wal_dir, "pg_wal/");
    required_space += pgmoneta_directory_size(backup_wal_dir);
    free(backup_wal_dir);
 

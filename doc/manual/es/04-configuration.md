@@ -70,7 +70,7 @@ Nota: Si `host` comienza con un `/`, representa una ruta y `pgmoneta` se conecta
 
 | Propiedad | Predeterminado | Unidad | Requerido | Descripción |
 | :------- | :------ | :--- | :------- | :---------- |
-| workspace | /tmp/pgmoneta-workspace/ | String | No | El directorio para el espacio de trabajo que el backup incremental puede usar para su trabajo |
+| workspace | `$TMPDIR/pgmoneta-workspace-<uid>/` | String | No | El directorio para el espacio de trabajo que el backup incremental puede usar para su trabajo, y donde se preparan las restauraciones desde almacenamiento de objetos, por lo que necesita espacio para el backup descargado. `$TMPDIR` es `/tmp` por defecto |
 
 **Almacenamiento**
 

@@ -192,13 +192,13 @@ pgmoneta-cli restore primary newest timeline=2 /tmp
 
 Restore a backup directly from S3 to a target directory.
 
-This subcommand stages a backup from S3 locally and then runs the normal restore workflow. The flow is:
+This subcommand stages a full backup from S3 in a temporary directory in the workspace and then runs the normal restore workflow. The local backup directory is not touched, and incremental backups are refused. The flow is:
 
 * Download `backup.sha512`, `backup.info`, and `backup.manifest` from S3
 * Verify `backup.info` integrity using the SHA512 checksum
 * Download all data files listed in the manifest, applying the correct compression and encryption extensions
 * Restore the staged backup into the requested target directory using the standard restore workflow
-* Remove the staged local copy after a successful restore
+* Remove the staging directory once the restore finishes
 
 Command
 
@@ -552,7 +552,7 @@ pgmoneta-cli s3 <action> <arguments>
 Subcommand
 
 - `ls` : List all the files in s3
-- `restore` : Download a backup from s3 to the local backup directory
+- `restore` : Restore a backup directly from S3 into a target directory
 
 Example
 
@@ -580,7 +580,7 @@ Restore a backup directly from S3 into a target directory.
 - Downloads and verifies `backup.info` integrity via SHA512
 - Downloads all data files with correct compression/encryption extensions
 - Restores the staged backup into the requested directory
-- Cleans up the staged local copy after success
+- Cleans up the staging directory in the workspace
 
 Examples
 

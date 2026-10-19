@@ -201,7 +201,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
 
    if (identifier != NULL)
    {
-      backup_dir = pgmoneta_get_server_backup(server);
+      backup_dir = pgmoneta_append(backup_dir, (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP));
 
       if (pgmoneta_load_info(backup_dir, identifier, &bck))
       {
