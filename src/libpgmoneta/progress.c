@@ -565,7 +565,7 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
          break;
       case WORKFLOW_TYPE_ARCHIVE:
          /* TODO: Implement adaptive/fallback weights for archive */
-         break;
+         return;
       case WORKFLOW_TYPE_VERIFY:
          calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
@@ -573,7 +573,8 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
          calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
       default:
-         break;
+         /* No weight model (e.g. WORKFLOW_TYPE_POST_ROLLUP), so don't track progress */
+         return;
    }
 
    if (prev != NULL)
