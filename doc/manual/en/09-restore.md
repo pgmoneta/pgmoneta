@@ -104,7 +104,7 @@ Example:
 pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 
-This stages the backup files from S3, verifies `backup.info` integrity via SHA512, restores the backup into the requested target directory, and removes the staged local copy after success.
+This stages the backup files from S3 in a temporary directory in the workspace, verifies `backup.info` integrity via SHA512, restores the backup into the requested target directory, and removes the staging directory afterwards. Only full backups can be restored this way.
 ```
 pgmoneta-cli restore primary 20260316000957 current /tmp
 ```
