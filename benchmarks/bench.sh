@@ -55,6 +55,8 @@ PG_USER_PASSWORD=mypass
 PG_REPL_USER_NAME=repl
 PG_REPL_PASSWORD=replpass
 
+# Same limit as BENCH_MAX_ITERATIONS in benchmarks/include/bench.h
+MAX_ITERATIONS=100
 ITERATIONS="${BENCH_ITERATIONS:-5}"
 SCALE="${BENCH_SCALE:-0}"
 CASE_FILTER=""
@@ -90,6 +92,29 @@ EOF
 need_value() {
    if [[ -z "${2:-}" || "$2" == -* ]]; then
       echo "error: $1 needs a value"
+      usage
+      exit 1
+   fi
+}
+
+# Check -i and -s before the build and the container start, which is where a
+# bad value would otherwise fail.
+check_run_options() {
+   if [[ ! "$ITERATIONS" =~ ^[1-9][0-9]{0,8}$ ]] || ((ITERATIONS > MAX_ITERATIONS)); then
+      echo "error: iterations must be a number from 1 to $MAX_ITERATIONS, got '$ITERATIONS'"
+      usage
+      exit 1
+   fi
+   if [[ ! "$SCALE" =~ ^(0|[1-9][0-9]{0,8})$ ]]; then
+      echo "error: scale must be a number from 0 up, got '$SCALE'"
+      usage
+      exit 1
+   fi
+}
+
+no_arguments() {
+   if [[ ${#POSITIONAL[@]} -gt 0 ]]; then
+      echo "error: $SUBCOMMAND takes no arguments, got '${POSITIONAL[*]}'"
       usage
       exit 1
    fi
@@ -322,11 +347,13 @@ done
 
 case "$SUBCOMMAND" in
    run)
+      no_arguments
+      check_run_options
       do_run
       ;;
    compare)
-      if [[ ${#POSITIONAL[@]} -lt 2 ]]; then
-         echo "error: compare needs BASELINE and CANDIDATE"
+      if [[ ${#POSITIONAL[@]} -ne 2 ]]; then
+         echo "error: compare needs exactly BASELINE and CANDIDATE"
          exit 1
       fi
       if [[ -z "$CASE_FILTER" ]]; then
@@ -338,10 +365,12 @@ case "$SUBCOMMAND" in
          --case "$CASE_FILTER" --results "$RESULTS_DIR"
       ;;
    list)
+      no_arguments
       ensure_binary
       "$BENCH_BIN" list
       ;;
    clean)
+      no_arguments
       detect_container_engine
       stop_postgresql
       rm -rf "$BUILD_DIR" "$ROOT_DIR"
