@@ -138,6 +138,7 @@ if (check)
   else()
     target_link_libraries(pgmoneta-test pthread rt m pgmoneta)
   endif()
+  target_link_libraries(pgmoneta-test ${LZ4_LIBRARIES})
 
   add_custom_target(custom_clean
     COMMAND ${CMAKE_COMMAND} -E remove -f *.o pgmoneta-test
