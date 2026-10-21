@@ -47,6 +47,7 @@ extern "C" {
 
 /* Main configuration fields */
 #define CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH         "admin_configuration_path"
+#define CONFIGURATION_ARGUMENT_AUTHENTICATION_TIMEOUT  "authentication_timeout"
 #define CONFIGURATION_ARGUMENT_AZURE_BASE_DIR          "azure_base_dir"
 #define CONFIGURATION_ARGUMENT_AZURE_CONTAINER         "azure_container"
 #define CONFIGURATION_ARGUMENT_AZURE_SHARED_KEY        "azure_shared_key"
