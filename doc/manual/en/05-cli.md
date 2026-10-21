@@ -166,6 +166,10 @@ pgmoneta-cli list-backup primary --sort desc
 
 Restore a backup from a server
 
+Before restoring, the backup and the backups it is built on are checked against the hashes
+recorded when they were taken. A file that is missing or different fails the restore, and the
+log names it.
+
 Command
 
 ``` sh
@@ -238,6 +242,9 @@ Each file is checked against the hash recorded when the backup was taken. If the
 was created with data checksums then the pages of its relation files are checked as well,
 which catches a page that was already damaged when the backup was made rather than one
 damaged since. The command fails if any file does not verify.
+
+For an incremental backup the backups it is built on are checked against their hashes too,
+and their failed files are listed with the others.
 
 Command
 

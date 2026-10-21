@@ -131,6 +131,7 @@ extern "C" {
 #define NODE_PRIMARY                     "primary"             /* Is the server a primary */
 #define NODE_RECOVERY_INFO               "recovery_info"       /* The recovery information */
 #define NODE_SERVER_BACKUP               "server_backup"       /* The backup directory of the server */
+#define NODE_STAGED                      "staged"              /* The backup was staged from a remote storage engine */
 #define NODE_S3_OBJECTS                  "s3_objects"          /* The list of S3 objects */
 #define NODE_SERVER_BASE                 "server_base"         /* The base directory of the server */
 #define NODE_SERVER_ID                   "server_id"           /* The server number */

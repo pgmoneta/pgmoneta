@@ -166,6 +166,10 @@ pgmoneta-cli list-backup primary --sort desc
 
 Restaurar un backup de un servidor
 
+Antes de restaurar, el backup y los backups en los que se basa se comprueban con los hashes
+registrados cuando se tomaron. Un archivo que falta o es distinto hace fallar la restauración,
+y el registro lo nombra.
+
 Comando
 
 ``` sh
@@ -238,6 +242,9 @@ Cada archivo se comprueba con el hash registrado cuando se tomó el backup. Si e
 creó con sumas de verificación de datos, también se comprueban las páginas de sus archivos de
 relación, lo que detecta una página que ya estaba dañada cuando se hizo el backup en lugar de
 una dañada después. El comando falla si algún archivo no se verifica.
+
+Para un backup incremental también se comprueban con sus hashes los backups en los que se
+basa, y sus archivos fallidos se listan con los demás.
 
 Comando
 
