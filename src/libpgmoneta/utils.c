@@ -3934,6 +3934,30 @@ pgmoneta_ends_with(char* str, char* suffix)
    return false;
 }
 
+int
+pgmoneta_has_suffix(char* s, char* suffix, bool* out)
+{
+   if (out == NULL)
+   {
+      return 1;
+   }
+
+   *out = false;
+
+   if (s == NULL)
+   {
+      return 1;
+   }
+
+   /* pgmoneta_ends_with() is true for an empty suffix */
+   if (suffix != NULL && strlen(suffix) > 0)
+   {
+      *out = pgmoneta_ends_with(s, suffix);
+   }
+
+   return 0;
+}
+
 bool
 pgmoneta_contains(char* str, char* s)
 {
