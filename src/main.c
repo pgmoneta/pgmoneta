@@ -2604,7 +2604,7 @@ sigchld_cb(struct ev_loop* loop __attribute__((unused)), ev_signal* w __attribut
    }
 }
 
-/* A process that exits holding a repository lock, e.g. killed by a signal, can't release it */
+/* A process that exits holding a repository lock or an async job, e.g. killed by a signal, can't release them */
 static void
 child_cb(struct ev_loop* loop __attribute__((unused)), struct ev_child* w, int revents __attribute__((unused)))
 {
@@ -2613,6 +2613,8 @@ child_cb(struct ev_loop* loop __attribute__((unused)), struct ev_child* w, int r
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
+
+   pgmoneta_job_owner_exited(pid);
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
