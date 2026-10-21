@@ -65,6 +65,7 @@ Ahmed Kamal <ahmedkamal200427@gmail.com>
 Rohan Mishra <kmrrohan29@gmail.com>
 Mostafa Mahmoud <mm1471800@gmail.com>
 Mohamed Sobea <mohameed.sobea@gmail.com>
+Sakir Ahmed <sakirahmed690078@gmail.com>
 ```
 
 ## Committers

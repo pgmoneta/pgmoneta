@@ -73,6 +73,7 @@ Justin Charles <charlesjustin2124@gmail.com>
 Mohamed Hamed <alkmohamed40@gmail.com>
 Mohamed Sobea <mohameed.sobea@gmail.com>
 Ameya Gupta <ameya7072@gmail.com>
+Sakir Ahmed <sakirahmed690078@gmail.com>
 ```
 
 ## Committers

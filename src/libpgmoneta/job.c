@@ -283,6 +283,56 @@ pgmoneta_job_finish(int server, struct json* payload)
 }
 
 int
+pgmoneta_job_fail_dead_owner(int server, pid_t pid, int32_t error, char* workflow)
+{
+   struct json* root = NULL;
+   struct json* response = NULL;
+   struct json* outcome = NULL;
+   struct main_configuration* config;
+
+   if (!pgmoneta_job_is_active(server))
+   {
+      return 0;
+   }
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->common.servers[server].job.owner_pid != pid)
+   {
+      return 0;
+   }
+
+   if (pgmoneta_json_create(&root))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_create_response(root, server, &response) ||
+       pgmoneta_management_create_outcome_failure(root, error, workflow, &outcome))
+   {
+      goto error;
+   }
+
+   pgmoneta_job_update_state(server, JOB_STATE_FAILED);
+
+   if (pgmoneta_job_finish(server, root))
+   {
+      pgmoneta_log_error("Could not save the failed job %s", config->common.servers[server].job.id);
+      goto error;
+   }
+
+   pgmoneta_json_destroy(root);
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(root);
+
+   return 1;
+}
+
+int
 pgmoneta_job_add_async_data(int server, struct json* response)
 {
    if (server < 0 || server >= NUMBER_OF_SERVERS)

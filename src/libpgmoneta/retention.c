@@ -28,16 +28,22 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <delete.h>
 #include <logging.h>
 #include <management.h>
 #include <utils.h>
 #include <workflow.h>
+
+/* system */
+#include <stdatomic.h>
+#include <unistd.h>
 
 #define NAME "retention"
 
 void
 pgmoneta_retention(char** argv)
 {
+   bool active = false;
    int server = 0;
    int ec = -1;
    char* en = NULL;
@@ -53,6 +59,21 @@ pgmoneta_retention(char** argv)
 
    for (server = 0; server < config->common.number_of_servers; server++)
    {
+      active = false;
+
+      /* What a backup that did not finish left behind is otherwise only retried at the next start */
+      if (atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
+      {
+         config->common.servers[server].active_retention = true;
+         config->common.servers[server].repository_pid = getpid();
+
+         pgmoneta_delete_incomplete_backups(server, false);
+
+         config->common.servers[server].active_retention = false;
+         config->common.servers[server].repository_pid = 0;
+         atomic_store(&config->common.servers[server].repository, false);
+      }
+
       if (!config->common.servers[server].online)
       {
          pgmoneta_log_debug("Retention: Server %s is offline", config->common.servers[server].name);

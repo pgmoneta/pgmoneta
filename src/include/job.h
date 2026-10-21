@@ -100,6 +100,19 @@ void
 pgmoneta_job_cleanup(int server);
 
 /**
+ * @brief Marks the job of a server as failed and saves it, when it is owned
+ * by a process that died before it could do that itself
+ *
+ * @param server The server index
+ * @param pid The process that died
+ * @param error The error code
+ * @param workflow The workflow name
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_job_fail_dead_owner(int server, pid_t pid, int32_t error, char* workflow);
+
+/**
  * @brief Finishes the job for a given server
  * 
  * @param server The server index

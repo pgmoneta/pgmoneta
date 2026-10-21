@@ -185,6 +185,14 @@ int
 pgmoneta_test_exec_command(const char* command, char** output, int* exit_code);
 
 /**
+ * Find the newest running pgmoneta process with a title
+ * @param title The title without the "pgmoneta: " prefix, like "backup/primary"
+ * @return The process id, or 0 if there is no such process
+ */
+pid_t
+pgmoneta_test_find_process(char* title);
+
+/**
  * Start a PostgreSQL server from a restored backup directory.
  * Ensures required subdirectories exist, keeps the original pg_hba.conf
  * from the backup, and waits for pg_isready to succeed.

@@ -425,6 +425,35 @@ mctf_se_down(void)
 }
 
 int
+mctf_se_restart(void)
+{
+   int i;
+
+   if (!storage_active)
+   {
+      return MCTF_FAIL;
+   }
+
+   daemon_down();
+
+   for (i = 0; i < MANAGED_DAEMON_RETRIES; i++)
+   {
+      if (mctf_sh(NULL, "test -e %s/pgmoneta.pid", run_dir) != 0)
+      {
+         break;
+      }
+      sleep(1);
+   }
+   if (i == MANAGED_DAEMON_RETRIES)
+   {
+      pgmoneta_log_error("mctf_se: managed pgmoneta did not shut down");
+      return MCTF_FAIL;
+   }
+
+   return daemon_up();
+}
+
+int
 mctf_se_cli(const char* args, char** output)
 {
    if (!storage_active || cli_bin[0] == '\0')

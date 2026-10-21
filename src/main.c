@@ -953,6 +953,13 @@ main(int argc, char** argv)
    ev_child_init(&child, child_cb, 0, 0);
    ev_child_start(main_loop, &child);
 
+   /* No backup or restore can be running before the loop starts, so what is
+    * marked incomplete or has no backup.info was left by one that never finished */
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      pgmoneta_delete_incomplete_backups(i, true);
+   }
+
    pgmoneta_log_info("Started on %s", config->host);
    pgmoneta_log_debug("Management: %d", unix_management_socket);
    for (int i = 0; i < metrics_fds_length; i++)
@@ -2610,6 +2617,8 @@ child_cb(struct ev_loop* loop __attribute__((unused)), struct ev_child* w, int r
 {
    pid_t pid = w->rpid;
    int status = w->rstatus;
+   pid_t cleanup;
+   pid_t holder;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -2632,10 +2641,34 @@ child_cb(struct ev_loop* loop __attribute__((unused)), struct ev_child* w, int r
                            config->common.servers[i].name, pid, WEXITSTATUS(status));
       }
 
+      if (config->common.servers[i].active_backup)
+      {
+         config->common.servers[i].active_backup = false;
+         config->common.servers[i].active_delete = true;
+
+         cleanup = fork();
+
+         if (cleanup == 0)
+         {
+            shutdown_ports(false);
+            pgmoneta_delete_failed_backup(argv_ptr, i, pid);
+         }
+         else if (cleanup > 0)
+         {
+            /* Hand the lock to the cleanup process, unless it has already released it */
+            holder = pid;
+            atomic_compare_exchange_strong(&config->common.servers[i].repository_pid, &holder, cleanup);
+            continue;
+         }
+
+         pgmoneta_log_error("Could not start the cleanup of %s", config->common.servers[i].name);
+      }
+
       config->common.servers[i].active_backup = false;
       config->common.servers[i].active_restore = false;
       config->common.servers[i].active_archive = false;
       config->common.servers[i].active_delete = false;
+      config->common.servers[i].active_retention = false;
       config->common.servers[i].repository_pid = 0;
       atomic_store(&config->common.servers[i].repository, false);
    }
