@@ -41,7 +41,6 @@
 #include <workers.h>
 
 /* system */
-#include <libgen.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -172,12 +171,18 @@ object_download_one_file(struct object_transfer_task* task)
    tmp_local = pgmoneta_append(tmp_local, ".tmp");
 
    parent_copy = pgmoneta_append(parent_copy, tmp_local);
-   parent = dirname(parent_copy);
-   if (pgmoneta_mkdir(parent))
+   /* Not dirname(): on macOS all threads share its result buffer */
+   parent = parent_copy != NULL ? strrchr(parent_copy, '/') : NULL;
+   if (parent != NULL && parent != parent_copy)
    {
-      pgmoneta_log_error("%s download: failed to create parent directory for %s",
-                         task->ops->name, tmp_local);
-      goto error;
+      *parent = '\0';
+
+      if (pgmoneta_mkdir(parent_copy))
+      {
+         pgmoneta_log_error("%s download: failed to create parent directory for %s",
+                            task->ops->name, tmp_local);
+         goto error;
+      }
    }
 
    if (pgmoneta_exists(tmp_local))
