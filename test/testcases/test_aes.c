@@ -29,6 +29,7 @@
 #include <pgmoneta.h>
 #include <aes.h>
 #include <configuration.h>
+#include <fault_inject.h>
 #include <management.h>
 #include <mctf.h>
 #include <shmem.h>
@@ -994,10 +995,8 @@ MCTF_TEST_NEGATIVE(test_aes_failed_final_write)
    char* output = "test_aes_final_write.out";
    static char data[30000];
    struct rlimit orig;
-   struct rlimit limit;
    void (*old_handler)(int) = SIG_ERR;
    size_t size = 0;
-   int ret = 0;
 
    /* incompressible input, so the output spans several stdio buffers */
    for (size_t i = 0; i < sizeof(data); i++)
@@ -1005,38 +1004,23 @@ MCTF_TEST_NEGATIVE(test_aes_failed_final_write)
       data[i] = (char)(rand() & 0xff);
    }
 
-   MCTF_ASSERT_INT_EQ(getrlimit(RLIMIT_FSIZE, &orig), 0, cleanup, "getrlimit failed");
-   old_handler = signal(SIGXFSZ, SIG_IGN);
+   PGMONETA_FAULT_BEGIN(orig, old_handler);
 
-   /* encrypt: everything but the last, partial buffer fits */
+   /* encrypt: everything but the last, partial buffer fits; the source is deleted
+    * on success, so re-create it before the fault-injected run */
    MCTF_ASSERT_INT_EQ(write_test_file(input, data, sizeof(data)), 0, cleanup, "could not write %s", input);
    MCTF_ASSERT_INT_EQ(pgmoneta_encrypt_file(input, encrypted, NULL), 0, cleanup, "encryption failed");
    size = pgmoneta_get_file_size(encrypted);
    MCTF_ASSERT_INT_EQ(write_test_file(input, data, sizeof(data)), 0, cleanup, "could not write %s", input);
-   limit = orig;
-   limit.rlim_cur = size / 4096 * 4096;
-   MCTF_ASSERT_INT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0, cleanup, "setrlimit failed");
-   ret = pgmoneta_encrypt_file(input, output, NULL);
-   setrlimit(RLIMIT_FSIZE, &orig);
-   MCTF_ASSERT(ret != 0, cleanup, "encrypt: a failed final write was reported as success");
-   MCTF_ASSERT(pgmoneta_exists(input), cleanup, "encrypt: the source was deleted");
-   MCTF_ASSERT(!pgmoneta_exists(output), cleanup, "encrypt: a truncated output was kept");
+   PGMONETA_ASSERT_TRUNCATED_WRITE_FAILS(orig, size, pgmoneta_encrypt_file(input, output, NULL),
+                                         input, output, "encrypt");
 
-   /* decrypt the complete file from above with the same kind of limit */
-   limit.rlim_cur = sizeof(data) / 4096 * 4096;
-   MCTF_ASSERT_INT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0, cleanup, "setrlimit failed");
-   ret = pgmoneta_decrypt_file(encrypted, output, NULL);
-   setrlimit(RLIMIT_FSIZE, &orig);
-   MCTF_ASSERT(ret != 0, cleanup, "decrypt: a failed final write was reported as success");
-   MCTF_ASSERT(pgmoneta_exists(encrypted), cleanup, "decrypt: the encrypted file was deleted");
-   MCTF_ASSERT(!pgmoneta_exists(output), cleanup, "decrypt: a truncated output was kept");
+   /* decrypt the complete file from above; its plaintext is `sizeof(data)` */
+   PGMONETA_ASSERT_TRUNCATED_WRITE_FAILS(orig, sizeof(data), pgmoneta_decrypt_file(encrypted, output, NULL),
+                                         encrypted, output, "decrypt");
 
 cleanup:
-   setrlimit(RLIMIT_FSIZE, &orig);
-   if (old_handler != SIG_ERR)
-   {
-      signal(SIGXFSZ, old_handler);
-   }
+   PGMONETA_FAULT_END(orig, old_handler);
    remove(input);
    remove(encrypted);
    remove(output);
