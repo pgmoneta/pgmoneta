@@ -468,7 +468,7 @@ pgmoneta_get_tmpdir(void);
 
 /**
  * Get the user name
- * @return The user name
+ * @return The user name, owned by getpwuid(); don't free it
  */
 char*
 pgmoneta_get_user_name(void);

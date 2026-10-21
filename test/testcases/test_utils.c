@@ -1945,8 +1945,6 @@ MCTF_TEST(test_utils_missing_basic)
 
    user = pgmoneta_get_user_name();
    MCTF_ASSERT_PTR_NONNULL(user, cleanup, "get_user_name failed");
-   free(user);
-   user = NULL;
 
    home = pgmoneta_get_home_directory();
    MCTF_ASSERT_PTR_NONNULL(home, cleanup, "get_home_directory failed");
@@ -1981,11 +1979,6 @@ cleanup:
    {
       free(ts_str);
       ts_str = NULL;
-   }
-   if (user != NULL)
-   {
-      free(user);
-      user = NULL;
    }
    if (home != NULL)
    {
