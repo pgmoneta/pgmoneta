@@ -91,6 +91,7 @@ pgmoneta_wal(int srv, char** argv)
    char* wal_shipping = NULL;
    uint32_t timeline = 0;
    uint32_t cur_timeline = 0;
+   bool end_of_timeline = false;
    int hdrlen = 1 + 8 + 8 + 8;
    size_t bytes_left = 0;
    char* xlogpos = NULL;
@@ -326,6 +327,7 @@ pgmoneta_wal(int srv, char** argv)
       pgmoneta_snprintf(config->common.servers[srv].current_wal_lsn, MISC_LENGTH, "%s", cmd);
 
       type = 0;
+      end_of_timeline = false;
 
       // wait for the CopyBothResponse message
 
@@ -344,13 +346,22 @@ pgmoneta_wal(int srv, char** argv)
             pgmoneta_log_error_response_message(msg);
             goto error;
          }
+         if (type == 'T')
+         {
+            /* The start is where the timeline ended, so the server sends the next
+             * timeline right away instead of entering COPY mode. Leave the
+             * RowDescription in the buffer for the end of timeline handling. */
+            pgmoneta_log_info("Timeline %u ends at %s for server %s", timeline, cmd, config->common.servers[srv].name);
+            end_of_timeline = true;
+            break;
+         }
          pgmoneta_consume_copy_stream_end(buffer, msg);
       }
 
       type = 0;
 
       // start streaming current timeline's WAL segments
-      while (config->running && pgmoneta_server_is_online(srv))
+      while (!end_of_timeline && config->running && pgmoneta_server_is_online(srv))
       {
          ret = pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
          // the streaming may have stopped because user terminated it
