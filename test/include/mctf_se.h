@@ -139,6 +139,14 @@ void
 mctf_se_down(void);
 
 /**
+ * Shut the managed pgmoneta instance down and start it again with the same
+ * configuration and backup directory, keeping the backends running.
+ * @return MCTF_OK on success, otherwise MCTF_FAIL
+ */
+int
+mctf_se_restart(void);
+
+/**
  * Run "pgmoneta-cli -c <managed cli conf> <args>" against the managed
  * instance and return the process exit code.
  *

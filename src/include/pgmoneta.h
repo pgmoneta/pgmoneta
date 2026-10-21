@@ -352,7 +352,7 @@ struct server
    int retention_years;                                           /**< The retention years for the server */
    int create_slot;                                               /**< Create a slot */
    atomic_bool repository;                                        /**< Repository lock */
-   pid_t repository_pid;                                          /**< The process holding the repository lock */
+   atomic_int repository_pid;                                     /**< The process holding the repository lock */
    atomic_bool wal_repository;                                    /**< WAL repository lock */
    bool active_backup;                                            /**< Is there an active backup */
    bool active_restore;                                           /**< Is there an active restore */
