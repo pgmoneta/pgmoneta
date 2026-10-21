@@ -200,7 +200,10 @@ pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque
          }
 
          pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-         pgmoneta_encrypt_data(server, path, workers, excludes);
+         if (pgmoneta_encrypt_data(server, path, workers, excludes))
+         {
+            goto error;
+         }
       }
       else
       {
@@ -234,32 +237,35 @@ pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque
             {
                struct worker_input* wi = NULL;
 
-               if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
+               /* without workers there is no outcome to record a failure in */
+               if (workers == NULL)
                {
-                  if (workers != NULL)
+                  if (pgmoneta_encrypt_file(from, to, NULL))
                   {
-                     if (pgmoneta_workers_outcome_ok(workers))
-                     {
-                        pgmoneta_workers_add(workers, do_encrypt_file, (struct worker_common*)wi);
-                     }
-                     else
-                     {
-                        do_encrypt_file((struct worker_common*)wi);
-                     }
+                     pgmoneta_log_error("Could not encrypt %s", from);
+                     goto error;
+                  }
+               }
+               else if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
+               {
+                  if (pgmoneta_workers_outcome_ok(workers))
+                  {
+                     pgmoneta_workers_add(workers, do_encrypt_file, (struct worker_common*)wi);
                   }
                   else
                   {
                      do_encrypt_file((struct worker_common*)wi);
                   }
-
-                  if (progress_enabled)
-                  {
-                     pgmoneta_progress_increment(server, 1);
-                  }
                }
                else
                {
                   pgmoneta_log_error("Could not create a worker instance: %s -> %s", from, to);
+                  goto error;
+               }
+
+               if (progress_enabled)
+               {
+                  pgmoneta_progress_increment(server, 1);
                }
             }
 
@@ -277,6 +283,11 @@ pgmoneta_encrypt_data(int server, char* d, struct workers* workers, struct deque
    return 0;
 
 error:
+
+   pgmoneta_workers_wait(workers);
+
+   free(from);
+   free(to);
 
    if (dir != NULL)
    {
