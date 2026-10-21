@@ -282,6 +282,44 @@ pgmoneta_job_finish(int server, struct json* payload)
    return 0;
 }
 
+void
+pgmoneta_job_owner_exited(pid_t pid)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      struct json* payload = NULL;
+      struct json* outcome = NULL;
+      struct json* response = NULL;
+      struct job* job = &config->common.servers[i].job;
+
+      if (!pgmoneta_job_is_active(i) || job->owner_pid != pid)
+      {
+         continue;
+      }
+
+      pgmoneta_log_warn("Job %s failed: its process %d exited without finishing it", job->id, pid);
+
+      /* Persist it like a job that failed with an error, so it can still be queried */
+      pgmoneta_job_update_state(i, JOB_STATE_FAILED);
+
+      if (pgmoneta_json_create(&payload) ||
+          pgmoneta_management_create_outcome_failure(payload, MANAGEMENT_ERROR_JOB_ERROR,
+                                                     (char*)job_command_name(job_management_tp_wkflw_tp(job->workflow_type)), &outcome) ||
+          pgmoneta_management_create_response(payload, i, &response) ||
+          pgmoneta_job_finish(i, payload))
+      {
+         pgmoneta_log_error("Job %s: could not store it as failed", job->id);
+         pgmoneta_job_cleanup(i);
+      }
+
+      pgmoneta_json_destroy(payload);
+   }
+}
+
 int
 pgmoneta_job_add_async_data(int server, struct json* response)
 {

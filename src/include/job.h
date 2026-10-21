@@ -110,6 +110,15 @@ int
 pgmoneta_job_finish(int server, struct json* payload);
 
 /**
+ * @brief Fails the active job of a process that exited without finishing it,
+ *        e.g. killed by a signal
+ *
+ * @param pid The process
+ */
+void
+pgmoneta_job_owner_exited(pid_t pid);
+
+/**
  * @brief Adds asynchronous job data to the response for a given server
  * 
  * @param server The server index
