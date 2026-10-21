@@ -28,7 +28,9 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
 #include <art.h>
+#include <compression.h>
 #include <extraction.h>
 #include <files.h>
 #include <logging.h>
@@ -39,6 +41,7 @@
 /* system */
 #include <assert.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -59,7 +62,9 @@ static int restore_excluded_files_execute(char*, struct art*);
 static int restore_excluded_files_teardown(char*, struct art*);
 
 static char* get_user_password(char* username);
-static int create_standby_signal(char* basedir);
+static int create_signal(char* basedir, char* name);
+static int copy_history_files(char* from, char* to);
+static void write_recovery_targets(FILE* tfile, char* position);
 
 struct workflow*
 pgmoneta_create_restore(void)
@@ -369,7 +374,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
    char* position = NULL;
    bool primary = true;
    bool is_recovery_info = false;
-   char tokens[256];
+   bool copy_wal = false;
    char buffer[256];
    char line[1024];
    char* f = NULL;
@@ -377,8 +382,6 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
    char* t = NULL;
    FILE* tfile = NULL;
    char* path = NULL;
-   bool mode = false;
-   char* ptr = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -407,6 +410,10 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
    {
       primary = (bool)pgmoneta_art_search(nodes, NODE_PRIMARY);
    }
+   if (pgmoneta_art_contains_key(nodes, NODE_COPY_WAL))
+   {
+      copy_wal = (bool)pgmoneta_art_search(nodes, NODE_COPY_WAL);
+   }
 
    pgmoneta_log_debug("Recovery (execute): %s/%s", config->common.servers[server].name, label);
 
@@ -423,6 +430,12 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
          f = pgmoneta_append(f, "/");
       }
       f = pgmoneta_append(f, "postgresql.conf");
+
+      /* an incremental restore holds postgresql.conf back as .tmp until the workflow is done */
+      if (!pgmoneta_exists(f))
+      {
+         f = pgmoneta_append(f, ".tmp");
+      }
 
       t = pgmoneta_append(t, f);
       t = pgmoneta_append(t, ".tmp");
@@ -465,9 +478,6 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
 
       if (position != NULL)
       {
-         memset(&tokens[0], 0, sizeof(tokens));
-         memcpy(&tokens[0], position, strlen(position));
-
          memset(&line[0], 0, sizeof(line));
          pgmoneta_snprintf(&line[0], sizeof(line), "#\n");
          fputs(&line[0], tfile);
@@ -490,115 +500,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_snprintf(&line[0], sizeof(line), "primary_slot_name = \'%s\'\n", config->common.servers[server].wal_slot);
          fputs(&line[0], tfile);
 
-         ptr = strtok(&tokens[0], ",");
-
-         while (ptr != NULL)
-         {
-            char key[256];
-            char value[256];
-            char* equal = NULL;
-
-            memset(&key[0], 0, sizeof(key));
-            memset(&value[0], 0, sizeof(value));
-
-            equal = strchr(ptr, '=');
-
-            if (equal == NULL)
-            {
-               memcpy(&key[0], ptr, strlen(ptr));
-            }
-            else
-            {
-               memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
-               memcpy(&value[0], equal + 1, strlen(equal) - 1);
-            }
-
-            if (pgmoneta_compare_string(&key[0], "current") || pgmoneta_compare_string(&key[0], "immediate"))
-            {
-               if (!mode)
-               {
-                  memset(&line[0], 0, sizeof(line));
-                  pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target = \'immediate\'\n");
-                  fputs(&line[0], tfile);
-
-                  mode = true;
-               }
-            }
-            else if (pgmoneta_compare_string(&key[0], "name"))
-            {
-               if (!mode)
-               {
-                  memset(&line[0], 0, sizeof(line));
-                  pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_name = \'%s\'\n", strlen(value) > 0 ? &value[0] : "");
-                  fputs(&line[0], tfile);
-
-                  mode = true;
-               }
-            }
-            else if (pgmoneta_compare_string(&key[0], "xid"))
-            {
-               if (!mode)
-               {
-                  memset(&line[0], 0, sizeof(line));
-                  pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_xid = \'%s\'\n", strlen(value) > 0 ? &value[0] : "");
-                  fputs(&line[0], tfile);
-
-                  mode = true;
-               }
-            }
-            else if (pgmoneta_compare_string(&key[0], "lsn"))
-            {
-               if (!mode)
-               {
-                  memset(&line[0], 0, sizeof(line));
-                  pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_lsn = \'%s\'\n", strlen(value) > 0 ? &value[0] : "");
-                  fputs(&line[0], tfile);
-
-                  mode = true;
-               }
-            }
-            else if (pgmoneta_compare_string(&key[0], "time"))
-            {
-               if (!mode)
-               {
-                  memset(&line[0], 0, sizeof(line));
-                  pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_time = \'%s\'\n", strlen(value) > 0 ? &value[0] : "");
-                  fputs(&line[0], tfile);
-
-                  mode = true;
-               }
-            }
-            else if (pgmoneta_compare_string(&key[0], "primary") || pgmoneta_compare_string(&key[0], "replica"))
-            {
-               /* Ok */
-            }
-            else if (pgmoneta_compare_string(&key[0], "inclusive"))
-            {
-               memset(&line[0], 0, sizeof(line));
-               pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_inclusive = %s\n", strlen(value) > 0 ? &value[0] : "on");
-               fputs(&line[0], tfile);
-            }
-            else if (pgmoneta_compare_string(&key[0], "timeline"))
-            {
-               memset(&line[0], 0, sizeof(line));
-               pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_timeline = \'%s\'\n", strlen(value) > 0 ? &value[0] : "latest");
-               fputs(&line[0], tfile);
-            }
-            else if (pgmoneta_compare_string(&key[0], "action"))
-            {
-               memset(&line[0], 0, sizeof(line));
-               pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_action = \'%s\'\n", strlen(value) > 0 ? &value[0] : "pause");
-               fputs(&line[0], tfile);
-            }
-            else
-            {
-               memset(&line[0], 0, sizeof(line));
-               pgmoneta_snprintf(&line[0], sizeof(line), "%s = \'%s\'\n", &key[0], strlen(value) > 0 ? &value[0] : "");
-               fputs(&line[0], tfile);
-            }
-
-            ptr = strtok(NULL, ",");
-         }
+         write_recovery_targets(tfile, position);
       }
 
       if (ffile != NULL)
@@ -625,7 +527,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
          goto error;
       }
 
-      if (create_standby_signal(base))
+      if (create_signal(base, "standby.signal"))
       {
          goto error;
       }
@@ -642,9 +544,9 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
       t = pgmoneta_append(t, f);
       t = pgmoneta_append(t, ".tmp");
 
-      if (pgmoneta_exists(f))
+      if (pgmoneta_exists(f) || copy_wal)
       {
-         if (pgmoneta_fopen_secure(f, "r", &ffile))
+         if (pgmoneta_exists(f) && pgmoneta_fopen_secure(f, "r", &ffile))
          {
             pgmoneta_log_error("Could not open %s", f);
             goto error;
@@ -655,9 +557,11 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
             goto error;
          }
 
-         while ((fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
+         while (ffile != NULL && (fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
          {
-            if (pgmoneta_starts_with(&buffer[0], "primary_conninfo"))
+            if (pgmoneta_starts_with(&buffer[0], "primary_conninfo") ||
+                (copy_wal && (pgmoneta_starts_with(&buffer[0], "recovery_target") ||
+                              pgmoneta_starts_with(&buffer[0], "restore_command"))))
             {
                memset(&line[0], 0, sizeof(line));
                pgmoneta_snprintf(&line[0], sizeof(line), "#%s", &buffer[0]);
@@ -667,6 +571,14 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
             {
                fputs(&buffer[0], tfile);
             }
+         }
+
+         if (copy_wal)
+         {
+            fputs("#\n# Generated by pgmoneta\n#\n", tfile);
+            /* archive recovery requires a restore_command; when it fails PostgreSQL reads the segment from pg_wal */
+            fputs("restore_command = 'false'\n", tfile);
+            write_recovery_targets(tfile, position);
          }
 
          if (ffile != NULL)
@@ -692,6 +604,11 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
          {
             goto error;
          }
+      }
+
+      if (copy_wal && create_signal(base, "recovery.signal"))
+      {
+         goto error;
       }
 
       path = pgmoneta_append(path, base);
@@ -798,6 +715,39 @@ copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
 
    if (pgmoneta_copy_wal_files(server, waldir, waltarget, &backup->wal[0], workers))
    {
+      goto error;
+   }
+
+   /* recovery_target_timeline needs the .history files to follow a later timeline */
+   if (copy_history_files(waldir, waltarget))
+   {
+      goto error;
+   }
+
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+   {
+      pgmoneta_workers_transfer_failures(workers, nodes);
+      goto error;
+   }
+
+   /* PostgreSQL reads plain segments from pg_wal: the copies keep the WAL archive's .aes and compression suffixes */
+   if (pgmoneta_decrypt_directory(server, waltarget, workers, NULL))
+   {
+      pgmoneta_log_error("Could not decrypt the WAL in %s", waltarget);
+      goto error;
+   }
+
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+   {
+      pgmoneta_workers_transfer_failures(workers, nodes);
+      goto error;
+   }
+
+   if (pgmoneta_decompress_directory(server, waltarget, COMPRESSION_NONE, workers, NULL))
+   {
+      pgmoneta_log_error("Could not decompress the WAL in %s", waltarget);
       goto error;
    }
 
@@ -1035,7 +985,7 @@ get_user_password(char* username)
 }
 
 static int
-create_standby_signal(char* basedir)
+create_signal(char* basedir, char* name)
 {
    char* f = NULL;
    int fd = 0;
@@ -1045,7 +995,7 @@ create_standby_signal(char* basedir)
    {
       f = pgmoneta_append(f, "/");
    }
-   f = pgmoneta_append(f, "standby.signal");
+   f = pgmoneta_append(f, name);
 
    if ((fd = creat(f, 0600)) < 0)
    {
@@ -1057,4 +1007,195 @@ create_standby_signal(char* basedir)
    close(fd);
    free(f);
    return 0;
+}
+
+static void
+write_recovery_targets(FILE* tfile, char* position)
+{
+   char tokens[256];
+   char line[1024];
+   bool mode = false;
+   char* ptr = NULL;
+
+   memset(&tokens[0], 0, sizeof(tokens));
+   memcpy(&tokens[0], position, strlen(position));
+
+   ptr = strtok(&tokens[0], ",");
+
+   while (ptr != NULL)
+   {
+      char key[256];
+      char value[256];
+      char* equal = NULL;
+
+      memset(&key[0], 0, sizeof(key));
+      memset(&value[0], 0, sizeof(value));
+
+      equal = strchr(ptr, '=');
+
+      if (equal == NULL)
+      {
+         memcpy(&key[0], ptr, strlen(ptr));
+      }
+      else
+      {
+         memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
+         memcpy(&value[0], equal + 1, strlen(equal) - 1);
+      }
+
+      if (pgmoneta_compare_string(&key[0], "current") || pgmoneta_compare_string(&key[0], "immediate"))
+      {
+         if (!mode)
+         {
+            memset(&line[0], 0, sizeof(line));
+            pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target = \'immediate\'\n");
+            fputs(&line[0], tfile);
+
+            mode = true;
+         }
+      }
+      else if (pgmoneta_compare_string(&key[0], "name"))
+      {
+         if (!mode)
+         {
+            memset(&line[0], 0, sizeof(line));
+            pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_name = \'%s\'\n", strlen(value) > 0 ? &value[0] : "");
+            fputs(&line[0], tfile);
+
+            mode = true;
+         }
+      }
+      else if (pgmoneta_compare_string(&key[0], "xid"))
+      {
+         if (!mode)
+         {
+            memset(&line[0], 0, sizeof(line));
+            pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_xid = \'%s\'\n", strlen(value) > 0 ? &value[0] : "");
+            fputs(&line[0], tfile);
+
+            mode = true;
+         }
+      }
+      else if (pgmoneta_compare_string(&key[0], "lsn"))
+      {
+         if (!mode)
+         {
+            memset(&line[0], 0, sizeof(line));
+            pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_lsn = \'%s\'\n", strlen(value) > 0 ? &value[0] : "");
+            fputs(&line[0], tfile);
+
+            mode = true;
+         }
+      }
+      else if (pgmoneta_compare_string(&key[0], "time"))
+      {
+         if (!mode)
+         {
+            memset(&line[0], 0, sizeof(line));
+            pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_time = \'%s\'\n", strlen(value) > 0 ? &value[0] : "");
+            fputs(&line[0], tfile);
+
+            mode = true;
+         }
+      }
+      else if (pgmoneta_compare_string(&key[0], "primary") || pgmoneta_compare_string(&key[0], "replica"))
+      {
+         /* Ok */
+      }
+      else if (pgmoneta_compare_string(&key[0], "inclusive"))
+      {
+         memset(&line[0], 0, sizeof(line));
+         pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_inclusive = %s\n", strlen(value) > 0 ? &value[0] : "on");
+         fputs(&line[0], tfile);
+      }
+      else if (pgmoneta_compare_string(&key[0], "timeline"))
+      {
+         memset(&line[0], 0, sizeof(line));
+         pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_timeline = \'%s\'\n", strlen(value) > 0 ? &value[0] : "latest");
+         fputs(&line[0], tfile);
+      }
+      else if (pgmoneta_compare_string(&key[0], "action"))
+      {
+         memset(&line[0], 0, sizeof(line));
+         pgmoneta_snprintf(&line[0], sizeof(line), "recovery_target_action = \'%s\'\n", strlen(value) > 0 ? &value[0] : "pause");
+         fputs(&line[0], tfile);
+      }
+      else
+      {
+         memset(&line[0], 0, sizeof(line));
+         pgmoneta_snprintf(&line[0], sizeof(line), "%s = \'%s\'\n", &key[0], strlen(value) > 0 ? &value[0] : "");
+         fputs(&line[0], tfile);
+      }
+
+      ptr = strtok(NULL, ",");
+   }
+}
+
+static int
+copy_history_files(char* from, char* to)
+{
+   struct deque* files = NULL;
+   struct deque_iterator* it = NULL;
+   char* ff = NULL;
+   char* tf = NULL;
+
+   if (pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, from, false, &files))
+   {
+      pgmoneta_log_error("Could not list %s", from);
+      goto error;
+   }
+
+   if (pgmoneta_deque_iterator_create(files, &it))
+   {
+      goto error;
+   }
+
+   while (pgmoneta_deque_iterator_next(it))
+   {
+      char* name = (char*)it->value->data;
+
+      if (strstr(name, ".history") == NULL)
+      {
+         continue;
+      }
+
+      ff = pgmoneta_append(NULL, from);
+      if (!pgmoneta_ends_with(ff, "/"))
+      {
+         ff = pgmoneta_append(ff, "/");
+      }
+      ff = pgmoneta_append(ff, name);
+
+      tf = pgmoneta_append(NULL, to);
+      if (!pgmoneta_ends_with(tf, "/"))
+      {
+         tf = pgmoneta_append(tf, "/");
+      }
+      tf = pgmoneta_append(tf, name);
+
+      if (pgmoneta_copy_file(ff, tf, NULL))
+      {
+         pgmoneta_log_error("Could not copy %s to %s", ff, tf);
+         goto error;
+      }
+
+      free(ff);
+      ff = NULL;
+      free(tf);
+      tf = NULL;
+   }
+
+   pgmoneta_deque_iterator_destroy(it);
+   pgmoneta_deque_destroy(files);
+
+   return 0;
+
+error:
+
+   free(ff);
+   free(tf);
+   pgmoneta_deque_iterator_destroy(it);
+   pgmoneta_deque_destroy(files);
+
+   return 1;
 }
