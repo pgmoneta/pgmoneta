@@ -199,6 +199,7 @@ restore_execute(char* name __attribute__((unused)), struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_DATA));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
@@ -208,7 +209,7 @@ restore_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Restore (execute): %s/%s", config->common.servers[server].name, label);
 
-   from = pgmoneta_get_server_backup_identifier_data(server, label);
+   from = pgmoneta_append(from, (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA));
    to = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
 
    pgmoneta_delete_directory(to);

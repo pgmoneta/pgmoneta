@@ -70,8 +70,10 @@ workers
   Use 0 to disable. Maximum is CPU count. Default is 0
 
 workspace
-  The directory for the workspace that incremental backup can use for its work.
-  Default is /tmp/pgmoneta-workspace/
+  The directory for the workspace that incremental backup can use for its work,
+  and where object storage restores are staged, so it needs room for the
+  downloaded backup.
+  Default is $TMPDIR/pgmoneta-workspace-<uid>/ ($TMPDIR defaults to /tmp)
 
 storage_engine
   The storage engine type (local, ssh, s3, azure, gcs). Default is local
@@ -303,8 +305,10 @@ wal_shipping
   The WAL shipping directory
 
 workspace
-  The directory for the workspace that incremental backup can use for its work.
-  Default is /tmp/pgmoneta-workspace/
+  The directory for the workspace that incremental backup can use for its work,
+  and where object storage restores are staged, so it needs room for the
+  downloaded backup.
+  Default is the global workspace
 
 hot_standby
   Hot standby directory. Single directory or comma separated directories up to 8 (e.g., /path/to/hot/standby1,/path/to/hot/standby2)

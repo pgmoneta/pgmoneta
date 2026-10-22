@@ -210,13 +210,13 @@ pgmoneta-cli restore primary newest timeline=2 /tmp
 
 Restaura un backup directamente desde S3 al directorio de destino indicado
 
-Este subcomando prepara un backup desde S3 de forma local y luego ejecuta el flujo de restauración estándar. El proceso es el siguiente:
+Este subcomando prepara un backup completo desde S3 en un directorio temporal del workspace y luego ejecuta el flujo de restauración estándar. El directorio local de backups no se modifica y los backups incrementales se rechazan. El proceso es el siguiente:
 
 * Descarga `backup.sha512`, `backup.info`, y `backup.manifest` desde S3
 * Verifica la integridad de `backup.info` mediante el checksum SHA512
 * Descarga todos los archivos de datos listados en el manifiesto, aplicando las extensiones correctas de compresión y cifrado
 * Restaura el backup preparado en el directorio de destino solicitado mediante el flujo de restauración estándar
-* Elimina la copia local temporal tras una restauración exitosa
+* Elimina el directorio temporal al terminar la restauración
 
 Comando
 

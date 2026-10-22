@@ -542,6 +542,50 @@ cleanup:
 }
 
 /*
+ * s3 restore stages the download in the workspace, so the local catalog entry
+ * of the same label is left untouched and no staging directory remains.
+ */
+MCTF_INTEGRATION_TEST(test_s3_restore_keeps_local_catalog)
+{
+   char info[MAX_PATH];
+   char cmd[2 * MAX_PATH];
+   char* before = NULL;
+   char* after = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   pgmoneta_snprintf(info, sizeof(info), "%s/backup/primary/backup/%s/backup.info",
+                     mctf_se_run_dir(), shared_label);
+
+   MCTF_ASSERT(mctf_sh(&before, "stat -c %%i '%s' && sha512sum '%s'", info, info) == 0, cleanup,
+               "could not read the local backup.info");
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "s3 restore primary %s %s", shared_label, TEST_RESTORE_DIR);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "s3 restore failed");
+
+   MCTF_ASSERT(mctf_sh(&after, "stat -c %%i '%s' && sha512sum '%s'", info, info) == 0, cleanup,
+               "the local backup.info is gone after s3 restore");
+   MCTF_ASSERT(strcmp(before, after) == 0, cleanup, "s3 restore replaced the local backup.info");
+
+   MCTF_ASSERT(mctf_sh(NULL, "test ! -e %s/backup/primary/backup/%s/data",
+                       mctf_se_run_dir(), shared_label) == 0,
+               cleanup, "s3 restore wrote data into the local catalog");
+
+   MCTF_ASSERT(mctf_sh(NULL, "! ls -A %s/workspace | grep -q '^\\.tmp_primary_'", mctf_se_run_dir()) == 0,
+               cleanup, "s3 restore left its staging directory in the workspace");
+
+cleanup:
+   free(before);
+   free(after);
+   MCTF_FINISH();
+}
+
+/*
  * Verify that a backup label has no objects in S3.
  * Checks that the listing succeeds and contains no S3 objects.
  */
@@ -706,6 +750,9 @@ MCTF_INTEGRATION_TEST(test_s3_commands_report_failure_for_invalid_label)
       free(output);
       output = NULL;
    }
+
+   MCTF_ASSERT(mctf_sh(NULL, "! ls -A %s/workspace | grep -q '^\\.tmp_primary_'", mctf_se_run_dir()) == 0,
+               cleanup, "failed s3 restore left its staging directory in the workspace");
 
 cleanup:
    free(output);

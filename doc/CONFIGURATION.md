@@ -33,7 +33,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | compression | zstd | String | No | The compression type (none, gzip, client-gzip, server-gzip, zstd, client-zstd, server-zstd, lz4, client-lz4, server-lz4, bzip2, client-bzip2) |
 | compression_level | 3 | Int | No | The compression level |
 | workers | 0 | Int | No | The number of workers that each process can use for its work. Use 0 to disable. Maximum is CPU count |
-| workspace | /tmp/pgmoneta-workspace/ | String | No | The directory for the workspace that incremental backup can use for its work. Can interpolate environment variables (e.g., `$HOME`) |
+| workspace | `$TMPDIR/pgmoneta-workspace-<uid>/` | String | No | The directory for the workspace that incremental backup can use for its work, and where where object storage restores are staged, so it needs room for the downloaded backup. `$TMPDIR` defaults to `/tmp`. Can interpolate environment variables (e.g., `$HOME`) |
 | storage_engine | local | String | No | The storage engine type (local, ssh, s3, azure) |
 | encryption | none | String | No | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes \| aes-256 \| aes-256-gcm`: AES GCM (Galois/Counter Mode) mode with 256 bit key length (Recommended)<br/> `aes-192 \| aes-192-gcm`: AES GCM mode with 192 bit key length<br/> `aes-128 \| aes-128-gcm`: AES GCM mode with 128 bit key length |
 | create_slot | no | Bool | No | Create a replication slot for all server. Valid values are: yes, no |
@@ -99,7 +99,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | follow | | String | No | Failover to this server if follow server fails |
 | retention | | Array | No | The retention for the server in days, weeks, months, years |
 | wal_shipping | | String | No | The WAL shipping directory |
-| workspace | /tmp/pgmoneta-workspace/ | String | No | The directory for the workspace that incremental backup can use for its work. Can interpolate environment variables (e.g., `$HOME`) |
+| workspace | | String | No | The directory for the workspace that incremental backup can use for its work, and where object storage restores are staged. Can interpolate environment variables (e.g., `$HOME`). Overrides global setting. |
 | s3_storage_class | | String | No | The S3 storage class. Overrides global setting. |
 | s3_port   | | Int | No | The port number for the S3 endpoint. Overrides global setting. |
 | s3_use_tls | | Bool | No | Use TLS for S3 connections. Overrides global setting. |

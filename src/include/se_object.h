@@ -94,6 +94,22 @@ pgmoneta_object_download_files(const struct object_storage_ops* ops, char* root,
 int
 pgmoneta_object_restore_directories(const struct object_storage_ops* ops, char* local_root);
 
+/**
+ * Download a full backup into local_root and publish its metadata there
+ *
+ * Incremental backups are refused, since their parent chain is not downloaded.
+ * On failure local_root may hold partial files; the caller removes it.
+ *
+ * @param ops The backend operations
+ * @param root The remote base path of the backup
+ * @param server The server index
+ * @param label The backup label
+ * @param local_root The local staging directory for the backup
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_object_download(const struct object_storage_ops* ops, char* root, int server, char* label, char* local_root);
+
 #ifdef __cplusplus
 }
 #endif

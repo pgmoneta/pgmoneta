@@ -31,6 +31,7 @@
 #include <deque.h>
 #include <files.h>
 #include <http.h>
+#include <info.h>
 #include <logging.h>
 #include <manifest.h>
 #include <progress.h>
@@ -620,6 +621,110 @@ error:
 
    pgmoneta_deque_iterator_destroy(iter);
    pgmoneta_deque_destroy(dirs);
+
+   return 1;
+}
+
+int
+pgmoneta_object_download(const struct object_storage_ops* ops, char* root, int server, char* label, char* local_root)
+{
+   char* info_tmp = NULL;
+   char* info_final = NULL;
+   char* manifest_tmp = NULL;
+   char* manifest_final = NULL;
+   char* sha512_tmp = NULL;
+   char* sha512_final = NULL;
+   struct backup* backup = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   pgmoneta_log_debug("%s restore: %s/%s", ops->name, config->common.servers[server].name, label);
+
+   if (pgmoneta_mkdir(local_root))
+   {
+      pgmoneta_log_error("%s restore: could not create %s", ops->name, local_root);
+      goto error;
+   }
+
+   info_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info.tmp");
+   info_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
+   manifest_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest.tmp");
+   manifest_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
+   sha512_tmp = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512.tmp");
+   sha512_final = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.sha512");
+
+   if (pgmoneta_object_bootstrap(ops, root, server, local_root))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_load_info_file(info_tmp, &backup))
+   {
+      pgmoneta_log_error("%s restore: failed to load staging backup.info from %s", ops->name, info_tmp);
+      goto error;
+   }
+
+   if (backup->type == TYPE_INCREMENTAL)
+   {
+      pgmoneta_log_error("%s restore: %s/%s is an incremental backup, which can not be restored from object storage",
+                         ops->name, config->common.servers[server].name, label);
+      goto error;
+   }
+
+   pgmoneta_log_debug("%s restore: compression=%d encryption=%d", ops->name, backup->compression, backup->encryption);
+
+   if (pgmoneta_object_download_files(ops, root, local_root, server, backup->compression, backup->encryption))
+   {
+      goto error;
+   }
+
+   /* directory rows are excluded from the file list, so recreate them here */
+   if (pgmoneta_object_restore_directories(ops, local_root))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_move_file(manifest_tmp, manifest_final))
+   {
+      pgmoneta_log_error("%s restore: could not rename %s to %s", ops->name, manifest_tmp, manifest_final);
+      goto error;
+   }
+
+   if (pgmoneta_move_file(sha512_tmp, sha512_final))
+   {
+      pgmoneta_log_error("%s restore: could not rename %s to %s", ops->name, sha512_tmp, sha512_final);
+      goto error;
+   }
+
+   /* Publish last: backup.info makes this look like a complete backup */
+   if (pgmoneta_move_file(info_tmp, info_final))
+   {
+      pgmoneta_log_error("%s restore: could not rename %s to %s", ops->name, info_tmp, info_final);
+      goto error;
+   }
+
+   pgmoneta_log_info("%s restore: %s/%s staged", ops->name, config->common.servers[server].name, label);
+
+   free(backup);
+   free(info_tmp);
+   free(info_final);
+   free(manifest_tmp);
+   free(manifest_final);
+   free(sha512_tmp);
+   free(sha512_final);
+
+   return 0;
+
+error:
+
+   free(backup);
+   free(info_tmp);
+   free(info_final);
+   free(manifest_tmp);
+   free(manifest_final);
+   free(sha512_tmp);
+   free(sha512_final);
 
    return 1;
 }

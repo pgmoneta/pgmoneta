@@ -104,7 +104,7 @@ Ejemplo:
 pgmoneta-cli s3 restore primary 20260316000957 /tmp
 ```
 
-Este comando prepara los archivos de backup desde S3, verifica la integridad de `backup.info` mediante SHA512, restaura el backup en el directorio de destino solicitado y elimina la copia local temporal tras una restauración exitosa.
+Este comando prepara los archivos de backup desde S3 en un directorio temporal del workspace, verifica la integridad de `backup.info` mediante SHA512, restaura el backup en el directorio de destino solicitado y luego elimina el directorio temporal. Solo se pueden restaurar backups completos de esta forma.
 ```
 pgmoneta-cli restore primary 20260316000957 current /tmp
 ```

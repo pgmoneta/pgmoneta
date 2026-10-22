@@ -121,13 +121,14 @@ struct workflow*
 pgmoneta_storage_create_remote(void);
 
 /**
- * Stage a backup from the remote storage engine into local storage
+ * Stage a backup from the remote storage engine into a temporary directory in the workspace
  * @param server The server index
  * @param label The backup label
+ * @param root The staging root holding <label>/, set even on failure; the caller deletes and frees it
  * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_storage_remote_download(int server, char* label);
+pgmoneta_storage_remote_download(int server, char* label, char** root);
 
 /**
  * Open WAL shipping file in remote ssh server
