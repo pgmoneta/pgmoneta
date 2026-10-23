@@ -327,7 +327,7 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
             if (time_info->tm_year == backup_time_info.tm_year &&
                 time_info->tm_yday == backup_time_info.tm_yday)
             {
-               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->common.servers[server].name, backups[j]->label);
+               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->common.servers[server].name, backups[k]->label);
                keep[k--] = true;
                break;
             }
@@ -377,7 +377,7 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
                 cur_year == backup_time_info.tm_year &&
                 backup_time_info.tm_mday == 1)
             {
-               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->common.servers[server].name, backups[j]->label);
+               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->common.servers[server].name, backups[k]->label);
                keep[k--] = true;
                break;
             }
@@ -413,7 +413,7 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
             // find the latest backup on the first day of that year
             if (cur_year == backup_time_info.tm_year && backup_time_info.tm_yday == 0)
             {
-               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->common.servers[server].name, backups[j]->label);
+               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->common.servers[server].name, backups[k]->label);
                keep[k--] = true;
                break;
             }
