@@ -309,7 +309,7 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
       for (int j = 0; j < retention_weeks; j++)
       {
          // push the time a week back
-         tmp_time = tmp_time - (j * 7 * 24 * 60 * 60);
+         tmp_time = t - (j * 7 * 24 * 60 * 60);
          time_info = localtime(&tmp_time);
          // tm_wday starts with Sunday, wind tmp_time to the nearest Monday
          tmp_time = tmp_time - ((time_info->tm_wday + 6) % 7) * 24 * 60 * 60;
