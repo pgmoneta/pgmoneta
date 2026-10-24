@@ -73,11 +73,7 @@ typedef int64_t timestamp_tz;
 #define WAL_MAGIC_V16             0xD113 /**< PostgreSQL 16 WAL magic number */
 #define WAL_MAGIC_V17             0xD116 /**< PostgreSQL 17 WAL magic number */
 #define WAL_MAGIC_V18             0xD118 /**< PostgreSQL 18 WAL magic number */
-
-#define PG19_TARGET_BETA3         1
-#define PG19_TARGET               PG19_TARGET_BETA3
-#define WAL_MAGIC_V19             0xD121 /**< PostgreSQL 19 beta3 WAL magic number */
-
+#define WAL_MAGIC_V19             0xD122 /**< PostgreSQL 19 WAL magic number */
 #define InvalidOid                ((oid)0)
 #define FLEXIBLE_ARRAY_MEMBER     /* empty */
 #define INVALID_REP_ORIGIN_ID     0

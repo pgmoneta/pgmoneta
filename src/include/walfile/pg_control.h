@@ -149,6 +149,41 @@ struct check_point_v17
 };
 
 /**
+ * @struct check_point_v19
+ * @brief PostgreSQL 19 checkpoint record.
+ *
+ * PostgreSQL 19 adds logical_decoding_enabled and widens next_multi_offset to
+ * 64 bits.
+ */
+struct check_point_v19
+{
+   xlog_rec_ptr redo;
+   timeline_id this_timeline_id;
+   timeline_id prev_timeline_id;
+   bool full_page_writes;
+   int wal_level;
+   bool logical_decoding_enabled;
+   struct full_transaction_id next_xid;
+   oid next_oid;
+   multi_xact_id next_multi;
+   uint64_t next_multi_offset;
+   transaction_id oldest_xid;
+   oid oldest_xid_db;
+   multi_xact_id oldest_multi;
+   oid oldest_multi_db;
+   pg_time_t time;
+   transaction_id oldest_commit_ts_xid;
+   transaction_id newest_commit_ts_xid;
+   transaction_id oldest_active_xid;
+};
+
+/** PostgreSQL 19 CHECKPOINT_REDO record payload. */
+struct xl_checkpoint_redo_v19
+{
+   int wal_level;
+};
+
+/**
  * @struct check_point
  * @brief Wrapper structure to handle different versions of checkpoint records.
  *
@@ -165,6 +200,7 @@ struct check_point
    {
       struct check_point_v13 v13; /**< Version 13 data */
       struct check_point_v17 v17; /**< Version 17 data */
+      struct check_point_v19 v19; /**< Version 19 data */
    } data;                        /**< Union holding version-specific checkpoint data */
 };
 
@@ -194,6 +230,9 @@ check_point_parse_v13(struct check_point* wrapper, void* rec);
 void
 check_point_parse_v17(struct check_point* wrapper, void* rec);
 
+void
+check_point_parse_v19(struct check_point* wrapper, void* rec);
+
 /**
  * @brief Formats a version 16 checkpoint record.
  *
@@ -213,6 +252,9 @@ check_point_format_v13(struct check_point* wrapper, char* buf);
  */
 char*
 check_point_format_v17(struct check_point* wrapper, char* buf);
+
+char*
+check_point_format_v19(struct check_point* wrapper, char* buf);
 
 /*
  * System status indicator.  Note this is stored in pg_control.
@@ -506,6 +548,49 @@ struct control_file_data_v18
    pg_crc32c crc; /**< CRC checksum for control file integrity. */
 };
 
+/** PostgreSQL 19 ControlFileData (PG_CONTROL_VERSION 1905). */
+struct control_file_data_v19
+{
+   uint64_t system_identifier;
+   uint32_t pg_control_version;
+   uint32_t catalog_version_no;
+   db_state state;
+   pg_time_t time;
+   xlog_rec_ptr checkpoint;
+   struct check_point_v19 checkpoint_copy;
+   xlog_rec_ptr unlogged_lsn;
+   xlog_rec_ptr min_recovery_point;
+   timeline_id min_recovery_point_tli;
+   xlog_rec_ptr backup_start_point;
+   xlog_rec_ptr backup_end_point;
+   bool backup_end_required;
+   int wal_level;
+   bool wal_log_hints;
+   int max_connections;
+   int max_worker_processes;
+   int max_wal_senders;
+   int max_prepared_xacts;
+   int max_locks_per_xact;
+   bool track_commit_timestamp;
+   uint32_t max_align;
+   double float_format;
+   uint32_t blcksz;
+   uint32_t relseg_size;
+   uint32_t slru_pages_per_segment;
+   uint32_t xlog_blcksz;
+   uint32_t xlog_seg_size;
+   uint32_t name_data_len;
+   uint32_t index_max_keys;
+   uint32_t toast_max_chunk_size;
+   uint32_t loblksize;
+   bool float8_by_val;
+   uint32_t data_checksum_version_init;
+   uint32_t data_checksum_version;
+   bool default_char_signedness;
+   char mock_authentication_nonce[MOCK_AUTH_NONCE_LEN];
+   pg_crc32c crc;
+};
+
 enum control_file_version {
    CONTROL_FILE_V13,
    CONTROL_FILE_V14,
@@ -513,6 +598,7 @@ enum control_file_version {
    CONTROL_FILE_V16,
    CONTROL_FILE_V17,
    CONTROL_FILE_V18,
+   CONTROL_FILE_V19,
 };
 
 /**
@@ -534,6 +620,7 @@ struct control_file_data
       struct control_file_data_v13 v16; /**< Version 16 data */
       struct control_file_data_v17 v17; /**< Version 17 data */
       struct control_file_data_v18 v18; /**< Version 18 data */
+      struct control_file_data_v19 v19; /**< Version 19 data */
    } data;                              /**< Version-specific control file data */
 };
 
