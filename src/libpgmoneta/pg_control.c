@@ -133,6 +133,7 @@ get_controlfile_by_exact_path(int pg_version, const char* control_file_path, str
    // | 13-16              | 1300               |
    // | 17                 | 1700               |
    // | 18                 | 1800               |
+   // | 19                 | 1905               |
    switch (pg_control_version)
    {
       case 1300:
@@ -177,6 +178,13 @@ get_controlfile_by_exact_path(int pg_version, const char* control_file_path, str
          memcpy(&cntldata->data.v18, controlfile_buf, sizeof(struct control_file_data_v18));
          crc_ptr = &cntldata->data.v18.crc;
          crc_offset = offsetof(struct control_file_data_v18, crc);
+         break;
+
+      case 1905:
+         cntldata->version = CONTROL_FILE_V19;
+         memcpy(&cntldata->data.v19, controlfile_buf, sizeof(struct control_file_data_v19));
+         crc_ptr = &cntldata->data.v19.crc;
+         crc_offset = offsetof(struct control_file_data_v19, crc);
          break;
 
       default:
@@ -247,6 +255,11 @@ pgmoneta_control_data_page_layout(struct control_file_data* controldata,
             b = controldata->data.v18.blcksz;
             r = controldata->data.v18.relseg_size;
             c = controldata->data.v18.data_checksum_version;
+            break;
+         case CONTROL_FILE_V19:
+            b = controldata->data.v19.blcksz;
+            r = controldata->data.v19.relseg_size;
+            c = controldata->data.v19.data_checksum_version;
             break;
          default:
             /* 13 through 16 share a layout */

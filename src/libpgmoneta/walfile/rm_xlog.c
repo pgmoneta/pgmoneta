@@ -85,7 +85,12 @@ create_check_point(void)
 {
    struct check_point* wrapper = (struct check_point*)malloc(sizeof(struct check_point));
 
-   if (server_config->version >= 17)
+   if (server_config->version >= 19)
+   {
+      wrapper->parse = check_point_parse_v19;
+      wrapper->format = check_point_format_v19;
+   }
+   else if (server_config->version >= 17)
    {
       wrapper->parse = check_point_parse_v17;
       wrapper->format = check_point_format_v17;
@@ -201,6 +206,57 @@ error:
    return NULL;
 }
 
+char*
+check_point_format_v19(struct check_point* wrapper, char* buf)
+{
+   struct check_point_v19 checkpoint = wrapper->data.v19;
+   char* oldest_xid_db = NULL;
+   char* oldest_multi_db = NULL;
+
+   if (pgmoneta_get_database_name(checkpoint.oldest_xid_db, &oldest_xid_db))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_database_name(checkpoint.oldest_multi_db, &oldest_multi_db))
+   {
+      goto error;
+   }
+
+   buf = pgmoneta_format_and_append(buf, "redo %X/%X; "
+                                         "tli %u; prev tli %u; fpw %s; wal_level %s; logical decoding %s; xid %u:%u; oid %u; multi %u; offset %llu; "
+                                         "oldest xid %u in DB %s; oldest multi %u in DB %s; "
+                                         "oldest/newest commit timestamp xid: %u/%u; "
+                                         "oldest running xid %u",
+                                    LSN_FORMAT_ARGS(checkpoint.redo),
+                                    checkpoint.this_timeline_id,
+                                    checkpoint.prev_timeline_id,
+                                    checkpoint.full_page_writes ? "true" : "false",
+                                    get_wal_level_string(checkpoint.wal_level),
+                                    checkpoint.logical_decoding_enabled ? "true" : "false",
+                                    EPOCH_FROM_FULL_TRANSACTION_ID(checkpoint.next_xid),
+                                    XID_FROM_FULL_TRANSACTION_ID(checkpoint.next_xid),
+                                    checkpoint.next_oid,
+                                    checkpoint.next_multi,
+                                    (unsigned long long)checkpoint.next_multi_offset,
+                                    checkpoint.oldest_xid,
+                                    oldest_xid_db,
+                                    checkpoint.oldest_multi,
+                                    oldest_multi_db,
+                                    checkpoint.oldest_commit_ts_xid,
+                                    checkpoint.newest_commit_ts_xid,
+                                    checkpoint.oldest_active_xid);
+
+   free(oldest_xid_db);
+   free(oldest_multi_db);
+   return buf;
+
+error:
+   free(oldest_xid_db);
+   free(oldest_multi_db);
+   return NULL;
+}
+
 void
 check_point_parse_v13(struct check_point* wrapper, void* rec)
 {
@@ -240,6 +296,12 @@ void
 check_point_parse_v17(struct check_point* wrapper, void* rec)
 {
    wrapper->data.v17 = *((struct check_point_v17*)rec);
+}
+
+void
+check_point_parse_v19(struct check_point* wrapper, void* rec)
+{
+   wrapper->data.v19 = *((struct check_point_v19*)rec);
 }
 
 void
@@ -315,6 +377,14 @@ pgmoneta_wal_xlog_desc(char* buf, struct decoded_xlog_record* record)
       struct xl_restore_point* xlrec = (struct xl_restore_point*)rec;
 
       buf = pgmoneta_format_and_append(buf, xlrec->rp_name);
+   }
+   else if (info == XLOG_CHECKPOINT_REDO)
+   {
+      struct xl_checkpoint_redo_v19 xlrec;
+
+      memcpy(&xlrec, rec, sizeof(xlrec));
+      buf = pgmoneta_format_and_append(buf, "wal_level %s",
+                                       get_wal_level_string(xlrec.wal_level));
    }
    else if (info == XLOG_FPI || info == XLOG_FPI_FOR_HINT || info == XLOG_ASSIGN_LSN)
    {

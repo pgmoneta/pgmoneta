@@ -29,6 +29,7 @@
 #include <pgmoneta.h>
 #include <mctf.h>
 #include <walfile/pg_control.h>
+#include <walfile/rm_xlog.h>
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -37,10 +38,9 @@
 /*
  * control_file_data is a union tagged by version, and the accessor picks the
  * member matching the version. Note what this test can and cannot show: as the
- * structures stand, these three fields sit at the same offset in every variant
- * (see test_pg_control_layouts_still_coincide), so reading the wrong member
- * would still give the right answer today. This pins the values the accessor
- * returns; the test below is the one that notices if that stops being true.
+ * structures stand, these three fields sit at the same offset through v18.
+ * PostgreSQL 19 moves them with its larger checkpoint copy, so the accessor
+ * must select the matching union member.
  */
 MCTF_TEST(test_pg_control_page_layout_per_version)
 {
@@ -92,6 +92,18 @@ MCTF_TEST(test_pg_control_page_layout_per_version)
    MCTF_ASSERT_INT_EQ(relseg_size, 131072, cleanup, "wrong segment size for v18");
    MCTF_ASSERT_INT_EQ(checksum_version, 1, cleanup, "wrong checksum version for v18");
 
+   memset(&cd, 0, sizeof(cd));
+   cd.version = CONTROL_FILE_V19;
+   cd.data.v19.blcksz = 32768;
+   cd.data.v19.relseg_size = 32768;
+   cd.data.v19.data_checksum_version = 1;
+
+   pgmoneta_control_data_page_layout(&cd, &blcksz, &relseg_size, &checksum_version);
+
+   MCTF_ASSERT_INT_EQ(blcksz, 32768, cleanup, "wrong block size for v19");
+   MCTF_ASSERT_INT_EQ(relseg_size, 32768, cleanup, "wrong segment size for v19");
+   MCTF_ASSERT_INT_EQ(checksum_version, 1, cleanup, "wrong checksum version for v19");
+
 cleanup:
    MCTF_FINISH();
 }
@@ -139,11 +151,9 @@ cleanup:
 
 /*
  * The accessor dispatches on version because the union has a member per
- * version, but today every variant puts these three fields in the same place,
- * which is why a wrong member still reads correctly. That is worth knowing
- * rather than assuming: if a future version moves them, the dispatch stops
- * being cosmetic and starts being what keeps verify from reading a block size
- * out of the wrong field, so this fails to say so.
+ * version. Versions 13 through 18 happen to put the geometry fields in the
+ * same place. PostgreSQL 19's enlarged checkpoint copy moves them, so this
+ * test ensures the version dispatch is materially required for beta4.
  */
 MCTF_TEST(test_pg_control_layouts_still_coincide)
 {
@@ -168,6 +178,49 @@ MCTF_TEST(test_pg_control_layouts_still_coincide)
                       offsetof(struct control_file_data_v18, data_checksum_version), cleanup,
                       "data_checksum_version moved between v13 and v18");
 
+   MCTF_ASSERT(offsetof(struct control_file_data_v13, blcksz) !=
+                  offsetof(struct control_file_data_v19, blcksz),
+               cleanup,
+               "blcksz should move in the v19 beta4 layout");
+   MCTF_ASSERT(offsetof(struct control_file_data_v13, data_checksum_version) !=
+                  offsetof(struct control_file_data_v19, data_checksum_version),
+               cleanup,
+               "data_checksum_version should move in the v19 beta4 layout");
+
 cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pg19_beta4_wal_layout)
+{
+   MCTF_ASSERT_INT_EQ(WAL_MAGIC_V19, 0xD122, cleanup,
+                      "PostgreSQL 19 beta4 WAL magic is incorrect");
+   MCTF_ASSERT_INT_EQ(sizeof(struct check_point_v19), 96, cleanup,
+                      "PostgreSQL 19 beta4 checkpoint layout has the wrong size");
+   MCTF_ASSERT_INT_EQ(offsetof(struct control_file_data_v19, crc), 308, cleanup,
+                      "PostgreSQL 19 beta4 pg_control CRC offset is incorrect");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pg19_beta4_checkpoint_redo_description)
+{
+   struct decoded_xlog_record record;
+   struct xl_checkpoint_redo_v19 redo = {.wal_level = WAL_LEVEL_REPLICA};
+   char* description = NULL;
+
+   memset(&record, 0, sizeof(record));
+   record.header.xl_info = XLOG_CHECKPOINT_REDO;
+   record.main_data = (char*)&redo;
+   record.main_data_len = sizeof(redo);
+
+   description = pgmoneta_wal_xlog_desc(NULL, &record);
+   MCTF_ASSERT(description != NULL, cleanup, "PostgreSQL 19 beta4 checkpoint redo was not described");
+   MCTF_ASSERT(strstr(description, "wal_level replica") != NULL, cleanup,
+               "PostgreSQL 19 beta4 checkpoint redo has the wrong payload or opcode");
+
+cleanup:
+   free(description);
    MCTF_FINISH();
 }

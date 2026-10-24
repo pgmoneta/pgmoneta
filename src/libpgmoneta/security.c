@@ -81,7 +81,6 @@
 #define NUMBER_OF_SECURITY_MESSAGES 5
 #define SECURITY_BUFFER_SIZE        16384 /* Must hold a PasswordMessage carrying a MAX_PASSWORD_LENGTH credential (cloud IAM tokens) */
 
-static signed char has_security;
 static ssize_t security_lengths[NUMBER_OF_SECURITY_MESSAGES];
 static char security_messages[NUMBER_OF_SECURITY_MESSAGES][SECURITY_BUFFER_SIZE];
 
@@ -1278,8 +1277,6 @@ server_trust(void)
 {
    pgmoneta_log_trace("server_trust");
 
-   has_security = SECURITY_TRUST;
-
    return AUTH_SUCCESS;
 }
 
@@ -1338,8 +1335,6 @@ server_password(char* username, char* password, SSL* ssl, int server_fd)
 
       security_lengths[auth_index] = auth_msg->length;
       memcpy(&security_messages[auth_index], auth_msg->data, auth_msg->length);
-
-      has_security = SECURITY_PASSWORD;
    }
    else
    {
@@ -1574,8 +1569,6 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    {
       goto bad_password;
    }
-
-   has_security = SECURITY_SCRAM256;
 
    free(salt);
    free(err);
