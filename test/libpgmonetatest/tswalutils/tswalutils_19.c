@@ -52,7 +52,7 @@
 #include <sys/types.h>
 
 /* PostgreSQL 19 specific values */
-#define RANDOM_MAGIC_19 0xD121 /* Official PostgreSQL 19 WAL magic number */
+#define RANDOM_MAGIC_19 0xD122 /* Official PostgreSQL 19 WAL magic number */
 #define RANDOM_INFO_19  0x0007 /* XLP_ALL_FLAGS for PG19 (no BKP_REMOVABLE) */
 
 static struct decoded_xlog_record*
@@ -202,8 +202,7 @@ pgmoneta_test_generate_check_point_shutdown_v19(void)
    struct walfile* wf = NULL;
    struct decoded_xlog_record* rec = NULL;
 
-   /* PostgreSQL 19 uses the same checkpoint structure as v17 */
-   struct check_point_v17 cp;
+   struct check_point_v19 cp;
    memset(&cp, 0, sizeof(cp));
 
    cp.redo = RANDOM_REDO;
@@ -211,6 +210,7 @@ pgmoneta_test_generate_check_point_shutdown_v19(void)
    cp.prev_timeline_id = RANDOM_PREV_TLI;
    cp.full_page_writes = RANDOM_FULL_PAGE_WRITES;
    cp.wal_level = RANDOM_WAL_LEVEL;
+   cp.logical_decoding_enabled = false;
    cp.next_xid.value = RANDOM_NEXT_XID;
    cp.next_oid = RANDOM_NEXT_OID;
    cp.next_multi = RANDOM_NEXT_MULTI;
@@ -264,14 +264,14 @@ pgmoneta_test_generate_mixed_heap_wal_v19(void)
    struct decoded_xlog_record* rec_ins = NULL;
    struct decoded_xlog_record* rec_del = NULL;
 
-   /* PostgreSQL 19 uses the same checkpoint structure as v17 */
-   struct check_point_v17 cp;
+   struct check_point_v19 cp;
    memset(&cp, 0, sizeof(cp));
    cp.redo = RANDOM_REDO;
    cp.this_timeline_id = RANDOM_THIS_TLI;
    cp.prev_timeline_id = RANDOM_PREV_TLI;
    cp.full_page_writes = RANDOM_FULL_PAGE_WRITES;
    cp.wal_level = RANDOM_WAL_LEVEL;
+   cp.logical_decoding_enabled = false;
    cp.next_xid.value = RANDOM_NEXT_XID;
    cp.next_oid = RANDOM_NEXT_OID;
    cp.next_multi = RANDOM_NEXT_MULTI;
