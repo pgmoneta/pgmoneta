@@ -592,7 +592,7 @@ pgmoneta-cli s3 <action> <arguments>
 Subcomando
 
 - `ls` : Listar todos los archivos en s3
-- `delete` : Eliminar todos los archivos bajo un prefijo remoto en s3
+- `delete` : Eliminar la copia en S3 de un backup
 - `restore` : Restaurar un backup directamente desde S3 al directorio de destino indicado
 
 Ejemplo
@@ -627,6 +627,22 @@ Ejemplos
 
 ``` sh
 pgmoneta-cli s3 restore primary 20260316000957 /tmp
+```
+
+### s3 delete
+
+Elimina la copia en S3 de un backup.
+
+- Con `storage_engine = local, s3` solo se elimina la copia en S3; el backup local queda intacto
+- Con `storage_engine = s3` también se eliminan los metadatos locales restantes, para que `list` quede limpio
+- Rechaza eliminar un backup que tenga un hijo incremental vivo (usa el `delete` normal para eliminaciones con cadena); la comprobación aplica cuando el motor local está habilitado
+- Rechaza etiquetas desconocidas, backups retenidos y catálogos ilegibles
+- Si la eliminación falla a medias, repetir `s3 delete` la termina
+
+Ejemplos
+
+``` sh
+pgmoneta-cli s3 delete primary 20260316000957
 ```
 
 ## clear

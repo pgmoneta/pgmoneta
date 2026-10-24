@@ -249,6 +249,42 @@ cleanup:
 }
 
 /*
+ * Direct S3 delete removes all objects under the requested backup prefix.
+ */
+MCTF_INTEGRATION_TEST(test_s3_delete_action_removes_objects)
+{
+   char label[256] = {0};
+   char cmd[512];
+   char* listing = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(mctf_se_backup("primary") == 0, cleanup, "backup to S3 failed");
+   MCTF_ASSERT(newest_backup_label(label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not resolve backup label");
+
+   /*
+    * Use the new "s3 delete" management action directly.
+    */
+   snprintf(cmd, sizeof(cmd), "s3 delete primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "s3 delete failed");
+
+   /*
+    * Verify that the objects under the deleted prefix are gone.
+    */
+   MCTF_ASSERT(assert_no_s3_objects("primary", label, &listing) == MCTF_OK, cleanup,
+               "S3 objects remain after s3 delete, or s3 ls did not report success");
+
+cleanup:
+   free(listing);
+   MCTF_FINISH();
+}
+
+/*
  * After delete, no S3 objects must remain for that backup label — the
  * remote store must be swept, not just the local catalog entry.
  */
@@ -286,6 +322,151 @@ MCTF_INTEGRATION_TEST(test_s3_delete_removes_objects)
 cleanup:
    free(listing);
    free(backup_list);
+   MCTF_FINISH();
+}
+
+/*
+ * Without the local storage engine there is no chain the local catalog
+ * could protect (live incrementals require local data), so the leaf guard
+ * is skipped: s3 delete succeeds even with a child entry staged in the
+ * catalog, sweeps the S3 objects, and still drops the stale local metadata
+ * per exclusive-S3 semantics. The staged entry is removed in cleanup.
+ */
+MCTF_INTEGRATION_TEST(test_s3_delete_s3_only_ignores_catalog_child)
+{
+   char parent[256] = {0};
+   char child[260] = {0};
+   char cmd[512];
+   char path[MAX_PATH];
+   char* listing = NULL;
+   char* backups = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   /* full backup -> parent */
+   MCTF_ASSERT(mctf_se_backup("primary") == 0, cleanup, "full backup to S3 failed");
+   MCTF_ASSERT(newest_backup_label(parent, sizeof(parent)) == MCTF_OK, cleanup,
+               "could not resolve parent label");
+
+   /* prove the S3 copy exists before deleting (no false-positive sweep) */
+   MCTF_ASSERT(mctf_se_s3_ls("primary", parent, &listing) == 0, cleanup, "s3 ls failed");
+   MCTF_ASSERT_PTR_NONNULL(listing, cleanup, "empty s3 ls response");
+   MCTF_ASSERT(strstr(listing, "S3Key") != NULL, cleanup, "no S3 objects after backup");
+   free(listing);
+   listing = NULL;
+
+   /* stage a child entry into the local catalog (same shape as a live
+    * incremental child: LABEL/PARENT/STATUS=1 plus backup.sha512) */
+   snprintf(child, sizeof(child), "%s9", parent);
+   snprintf(path, sizeof(path), "%s/backup/primary/backup/%s", mctf_se_run_dir(), child);
+   MCTF_ASSERT(mctf_sh(NULL, "mkdir -p %s", path) == 0, cleanup,
+               "could not stage child directory");
+   MCTF_ASSERT(mctf_sh(NULL, "printf 'LABEL=%s\\nPARENT=%s\\nSTATUS=1\\n' > %s/backup.info",
+                       child, parent, path) == 0,
+               cleanup,
+               "could not stage child backup.info");
+   MCTF_ASSERT(mctf_sh(NULL, "cp %s/backup/primary/backup/%s/backup.sha512 %s/backup.sha512",
+                       mctf_se_run_dir(), parent, path) == 0,
+               cleanup,
+               "could not stage child backup.sha512");
+
+   /* guard skipped without local engine: deletion succeeds */
+   snprintf(cmd, sizeof(cmd), "s3 delete primary %s", parent);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "s3 delete failed");
+
+   /* S3 objects gone */
+   MCTF_ASSERT(assert_no_s3_objects("primary", parent, &listing) == MCTF_OK, cleanup,
+               "S3 objects remain after s3 delete, or s3 ls did not report success");
+   free(listing);
+   listing = NULL;
+
+   /* drop the staged child entry before catalog assertions: its label
+    * contains the parent label as a substring, which would false-positive
+    * the delisting check below */
+   snprintf(path, sizeof(path), "%s/backup/primary/backup/%s", mctf_se_run_dir(), child);
+   MCTF_ASSERT(mctf_sh(NULL, "rm -rf %s", path) == 0, cleanup,
+               "could not remove staged child entry");
+   child[0] = '\0';
+
+   /* stale local metadata of the deleted backup gone (exclusive S3) */
+   snprintf(path, sizeof(path), "%s/backup/primary/backup/%s", mctf_se_run_dir(), parent);
+   MCTF_ASSERT(mctf_sh(NULL, "test ! -d %s", path) == 0, cleanup,
+               "local metadata remains after s3-only s3 delete");
+
+   /* catalog no longer lists the deleted label */
+   MCTF_ASSERT(mctf_se_list_backup("primary", &backups) == 0, cleanup, "list-backup failed");
+   MCTF_ASSERT_PTR_NONNULL(backups, cleanup, "empty list-backup response");
+   MCTF_ASSERT(strstr(backups, parent) == NULL, cleanup,
+               "deleted backup still listed after s3-only s3 delete");
+
+cleanup:
+   /* remove the staged child entry; never leak it into other tests */
+   if (child[0] != '\0')
+   {
+      snprintf(path, sizeof(path), "%s/backup/primary/backup/%s", mctf_se_run_dir(), child);
+      mctf_sh(NULL, "rm -rf %s", path);
+   }
+   free(listing);
+   free(backups);
+   MCTF_FINISH();
+}
+
+/*
+ * Exclusive-S3 mode (this module runs with storage_engine = s3): a leaf
+ * s3 delete must sweep the S3 objects AND drop the leftover local metadata,
+ * otherwise 'list' keeps showing the deleted backup and 'verify' fails on
+ * the missing data.
+ */
+MCTF_INTEGRATION_TEST(test_s3_delete_cleans_s3_only_metadata)
+{
+   char label[256] = {0};
+   char cmd[512];
+   char path[MAX_PATH];
+   char* listing = NULL;
+   char* backups = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(mctf_se_backup("primary") == 0, cleanup, "backup to S3 failed");
+   MCTF_ASSERT(newest_backup_label(label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not resolve backup label");
+
+   /* prove the S3 copy exists before deleting (no false-positive sweep) */
+   MCTF_ASSERT(mctf_se_s3_ls("primary", label, &listing) == 0, cleanup, "s3 ls failed");
+   MCTF_ASSERT_PTR_NONNULL(listing, cleanup, "empty s3 ls response");
+   MCTF_ASSERT(strstr(listing, "S3Key") != NULL, cleanup, "no S3 objects after backup");
+   free(listing);
+   listing = NULL;
+
+   snprintf(cmd, sizeof(cmd), "s3 delete primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "s3 delete failed");
+
+   /* S3 objects gone */
+   MCTF_ASSERT(assert_no_s3_objects("primary", label, &listing) == MCTF_OK, cleanup,
+               "S3 objects remain after s3 delete, or s3 ls did not report success");
+
+   /* local metadata gone */
+   snprintf(path, sizeof(path), "%s/backup/primary/backup/%s", mctf_se_run_dir(), label);
+   MCTF_ASSERT(mctf_sh(NULL, "test ! -d %s", path) == 0, cleanup,
+               "local metadata remains after s3-only s3 delete");
+
+   /* catalog no longer lists the label */
+   MCTF_ASSERT(mctf_se_list_backup("primary", &backups) == 0, cleanup, "list-backup failed");
+   MCTF_ASSERT_PTR_NONNULL(backups, cleanup, "empty list-backup response");
+   MCTF_ASSERT(strstr(backups, label) == NULL, cleanup,
+               "deleted backup still listed after s3-only s3 delete");
+
+cleanup:
+   free(listing);
+   free(backups);
    MCTF_FINISH();
 }
 
@@ -661,7 +842,7 @@ cleanup:
  */
 MCTF_INTEGRATION_TEST(test_s3_commands_report_failure_for_invalid_label)
 {
-   const char* commands[] = {"restore", "delete", "retain"};
+   const char* commands[] = {"restore", "delete", "retain", "s3 delete"};
    const int command_count = sizeof(commands) / sizeof(commands[0]);
    char invalid_label[256];
    char cmd[2 * MAX_PATH];
@@ -702,6 +883,11 @@ MCTF_INTEGRATION_TEST(test_s3_commands_report_failure_for_invalid_label)
          MCTF_ASSERT(strstr(output, "Error: 505") != NULL, cleanup,
                      "%s returned an unexpected error code", commands[i]);
       }
+      else if (strcmp(commands[i], "s3 delete") == 0)
+      {
+         MCTF_ASSERT(strstr(output, "Error: 3406") != NULL, cleanup,
+                     "%s returned an unexpected error code", commands[i]);
+      }
 
       free(output);
       output = NULL;
@@ -713,8 +899,53 @@ cleanup:
 }
 
 /*
- * retain and expunge must actually flip the Keep flag on the backup, not
- * just return success while leaving the metadata unchanged.
+ * A partial label must never match by prefix: s3 delete requires an exact
+ * catalog match, otherwise "2026" would wipe every 2026* backup. Uses the
+ * first 6 chars of a real label and proves the real backup is untouched.
+ */
+MCTF_INTEGRATION_TEST(test_s3_delete_refuses_partial_label)
+{
+   char partial[256] = {0};
+   char cmd[2 * MAX_PATH];
+   char* output = NULL;
+   char* listing = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   pgmoneta_snprintf(partial, sizeof(partial), "%.6s", shared_label);
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "s3 delete primary %s", partial);
+   mctf_se_cli(cmd, &output);
+
+   MCTF_ASSERT_PTR_NONNULL(output, cleanup, "no output from s3 delete command");
+   MCTF_ASSERT(strstr(output, "Status: false") != NULL, cleanup,
+               "s3 delete did not report failure for a partial label");
+   MCTF_ASSERT(strstr(output, "Error: 3406") != NULL, cleanup,
+               "s3 delete of a partial label returned an unexpected error code");
+   free(output);
+   output = NULL;
+
+   /* the real backup behind the prefix must be untouched */
+   MCTF_ASSERT(mctf_se_s3_ls("primary", shared_label, &listing) == 0, cleanup, "s3 ls failed");
+   MCTF_ASSERT_PTR_NONNULL(listing, cleanup, "empty s3 ls response");
+   MCTF_ASSERT(strstr(listing, "S3Key") != NULL, cleanup,
+               "S3 objects were deleted by a partial-label delete");
+
+cleanup:
+   free(output);
+   free(listing);
+   MCTF_FINISH();
+}
+
+/*
+ * Retaining a backup must set the keep flag, and expunging it must clear
+ * the flag again: s3 delete refuses retained backups, so the toggle has
+ * to be observable through info.
  */
 MCTF_INTEGRATION_TEST(test_s3_retain_then_expunge_toggles_keep)
 {
