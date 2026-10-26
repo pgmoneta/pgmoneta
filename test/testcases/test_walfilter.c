@@ -41,6 +41,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <sys/stat.h>
 
 #define WALFILTER_TEST_SUBDIR "/walfilter"
@@ -340,3 +341,150 @@ cleanup:
    pgmoneta_test_teardown();
    MCTF_FINISH();
 }
+
+static bool
+directory_has_file(const char* dir)
+{
+   DIR* d = opendir(dir);
+   struct dirent* entry = NULL;
+   bool found = false;
+
+   if (d == NULL)
+   {
+      return false;
+   }
+
+   while (!found && (entry = readdir(d)) != NULL)
+   {
+      found = entry->d_name[0] != '.';
+   }
+
+   closedir(d);
+   return found;
+}
+
+/**
+ * Run walfilter on a WAL file with a filtered DELETE followed by the given
+ * record, using a DELETE rule or an XID 200 rule.
+ *
+ * @param later The record after the DELETE
+ * @param by_xid Filter by XID 200 instead of by operation
+ * @param exit_code The walfilter exit code
+ * @param written Whether filtered WAL was written to the target directory
+ * @return 0 if walfilter could be run, otherwise 1
+ */
+static int
+run_conflict_case(enum walfilter_later_record later, bool by_xid, int* exit_code, bool* written)
+{
+   char base_dir[MAX_PATH];
+   char source_dir[MAX_PATH];
+   char target_dir[MAX_PATH];
+   char wal_path[MAX_PATH];
+   char yaml_path[MAX_PATH];
+   char* output = NULL;
+   struct walfile* wf = NULL;
+   const char* operations[] = {"DELETE"};
+   const int xids[] = {200};
+   int ret = 1;
+
+   *exit_code = -1;
+   *written = false;
+
+   pgmoneta_snprintf(base_dir, sizeof(base_dir), "%s%s", TEST_BASE_DIR, WALFILTER_TEST_SUBDIR);
+   pgmoneta_snprintf(source_dir, sizeof(source_dir), "%s/source_conflict", base_dir);
+   pgmoneta_snprintf(target_dir, sizeof(target_dir), "%s/target_conflict", base_dir);
+   pgmoneta_snprintf(wal_path, sizeof(wal_path), "%s%s", source_dir, RANDOM_WALFILE_NAME);
+   pgmoneta_snprintf(yaml_path, sizeof(yaml_path), "%s/conflict.yaml", base_dir);
+
+   if (pgmoneta_exists(target_dir))
+   {
+      pgmoneta_delete_directory(target_dir);
+   }
+
+   if (ensure_directory(base_dir) || ensure_directory(source_dir))
+   {
+      goto cleanup;
+   }
+
+   wf = pgmoneta_test_generate_walfilter_conflict_wal_v17(later);
+   if (wf == NULL || pgmoneta_write_walfile(wf, -1, wal_path))
+   {
+      goto cleanup;
+   }
+
+   if (write_yaml_config(yaml_path, source_dir, target_dir,
+                         by_xid ? NULL : operations, by_xid ? 0 : 1,
+                         by_xid ? xids : NULL, by_xid ? 1 : 0))
+   {
+      goto cleanup;
+   }
+
+   if (pgmoneta_walfilter_cli(yaml_path, NULL, &output, exit_code))
+   {
+      goto cleanup;
+   }
+
+   *written = directory_has_file(target_dir);
+   ret = 0;
+
+cleanup:
+   free(output);
+   if (wf != NULL)
+   {
+      pgmoneta_destroy_walfile(wf);
+   }
+   if (pgmoneta_exists(target_dir))
+   {
+      pgmoneta_delete_directory(target_dir);
+   }
+   if (pgmoneta_exists(yaml_path))
+   {
+      unlink(yaml_path);
+   }
+   if (pgmoneta_exists(source_dir))
+   {
+      pgmoneta_delete_directory(source_dir);
+   }
+   return ret;
+}
+
+#define CONFLICT_TEST(name, later, by_xid, expect_fail)                                      \
+   MCTF_TEST(name)                                                                           \
+   {                                                                                         \
+      int exit_code = -1;                                                                    \
+      bool written = false;                                                                  \
+                                                                                             \
+      pgmoneta_test_setup();                                                                 \
+      MCTF_ASSERT_INT_EQ(run_conflict_case(later, by_xid, &exit_code, &written), 0, cleanup, \
+                         "Failed to run walfilter");                                         \
+      if (expect_fail)                                                                       \
+      {                                                                                      \
+         MCTF_ASSERT(exit_code != 0, cleanup, "walfilter should refuse to filter");          \
+         MCTF_ASSERT(!written, cleanup, "walfilter should not write filtered WAL");          \
+      }                                                                                      \
+      else                                                                                   \
+      {                                                                                      \
+         MCTF_ASSERT_INT_EQ(exit_code, 0, cleanup, "walfilter should succeed");              \
+         MCTF_ASSERT(written, cleanup, "walfilter should write filtered WAL");               \
+      }                                                                                      \
+                                                                                             \
+cleanup:                                                                                     \
+      pgmoneta_test_teardown();                                                              \
+      MCTF_FINISH();                                                                         \
+   }
+
+/* A later prune of the deleted tuple would remove it again during replay */
+CONFLICT_TEST(test_walfilter_delete_then_prune_fails, WALFILTER_LATER_PRUNE_SAME, false, true)
+/* A prune of another tuple on the same block is harmless */
+CONFLICT_TEST(test_walfilter_delete_then_prune_other_passes, WALFILTER_LATER_PRUNE_OTHER, false, false)
+/* A later full-page image of the block can carry the delete and its hint bits */
+CONFLICT_TEST(test_walfilter_delete_then_image_fails, WALFILTER_LATER_IMAGE, false, true)
+/* A B-tree DELETE whose conflict horizon covers the deleting XID removed index entries for its tuples */
+CONFLICT_TEST(test_walfilter_delete_then_btree_delete_fails, WALFILTER_LATER_BTREE_NEWER, false, true)
+/* A B-tree DELETE with an older conflict horizon is unrelated */
+CONFLICT_TEST(test_walfilter_delete_then_older_btree_delete_passes, WALFILTER_LATER_BTREE_OLDER, false, false)
+/* Nothing touches the deleted tuple later */
+CONFLICT_TEST(test_walfilter_delete_without_conflict_passes, WALFILTER_LATER_NONE, false, false)
+/* Filtering by XID has the same problem */
+CONFLICT_TEST(test_walfilter_xid_then_prune_fails, WALFILTER_LATER_PRUNE_SAME, true, true)
+CONFLICT_TEST(test_walfilter_xid_without_conflict_passes, WALFILTER_LATER_NONE, true, false)

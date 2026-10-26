@@ -42,6 +42,7 @@
 #include <utils.h>
 #include <walfile.h>
 #include <walfile/pg_control.h>
+#include <walfile/rm_btree.h>
 #include <walfile/rm_heap.h>
 #include <walfile/rmgr.h>
 #include <walfile/wal_reader.h>
@@ -58,11 +59,40 @@
 
 #define OPERATION_DELETE "DELETE"
 
+/**
+ * @struct filtered_tuple
+ * A heap tuple that a filtered record made dead. If a later record prunes
+ * it, or restores its page from a full-page image, replay brings the
+ * filtered change back even though the filtered record itself is a NOOP.
+ */
+struct filtered_tuple
+{
+   struct rel_file_locator rlocator; /**< Relation of the tuple */
+   enum fork_number forknum;         /**< Fork of the tuple */
+   block_number blkno;               /**< Block of the tuple */
+   offset_number offnum;             /**< Offset of the tuple */
+   transaction_id xmax;              /**< XID that made the tuple dead */
+   xlog_rec_ptr lsn;                 /**< LSN of the filtered record */
+};
+
+/**
+ * @struct filtered_tuples
+ * The tuples made dead by all filtered records
+ */
+struct filtered_tuples
+{
+   struct filtered_tuple* items; /**< The tuples */
+   int count;                    /**< Number of tuples */
+   int capacity;                 /**< Allocated number of tuples */
+};
+
 int pgmoneta_init_crc32c(uint32_t* crc);
 int pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc);
 int pgmoneta_finalize_crc32c(uint32_t* crc);
 static int pgmoneta_recalculate_record_crc(struct decoded_xlog_record* record, uint16_t magic);
 static char* walfilter_wal_output_name(struct walfile* wf);
+static int track_filtered_record(struct filtered_tuples* tracked, struct decoded_xlog_record* rec);
+static int check_filter_conflicts(struct filtered_tuples* tracked, int file_count, struct walfile** walfiles);
 
 static void
 usage(void)
@@ -251,15 +281,448 @@ walfilter_wal_output_name(struct walfile* wf)
    return pgmoneta_wal_file_name(wf->long_phd->std.xlp_tli, segno, wf->long_phd->xlp_seg_size);
 }
 
+/* First normal XID; 0-2 are invalid, bootstrap and frozen */
+#define FIRST_NORMAL_XID 3
+
+/* A tracked block whose tuple offset doesn't matter, only the block */
+#define WHOLE_BLOCK 0
+
+static bool
+xid_follows_or_equals(transaction_id a, transaction_id b)
+{
+   if (a < FIRST_NORMAL_XID || b < FIRST_NORMAL_XID)
+   {
+      return a >= b;
+   }
+
+   return (int32_t)(a - b) >= 0;
+}
+
+static int
+add_filtered_tuple(struct filtered_tuples* tracked, struct decoded_bkp_block* blk,
+                   offset_number offnum, transaction_id xmax, xlog_rec_ptr lsn)
+{
+   struct filtered_tuple* t = NULL;
+
+   if (tracked->count == tracked->capacity)
+   {
+      int capacity = tracked->capacity == 0 ? 64 : tracked->capacity * 2;
+      struct filtered_tuple* items = realloc(tracked->items, capacity * sizeof(struct filtered_tuple));
+
+      if (items == NULL)
+      {
+         return 1;
+      }
+
+      tracked->items = items;
+      tracked->capacity = capacity;
+   }
+
+   t = &tracked->items[tracked->count++];
+   t->rlocator = blk->rlocator;
+   t->forknum = blk->forknum;
+   t->blkno = blk->blkno;
+   t->offnum = offnum;
+   t->xmax = xmax;
+   t->lsn = lsn;
+
+   return 0;
+}
+
+/**
+ * Remember what a heap record that is about to be filtered out changed:
+ * the tuple a DELETE or UPDATE made dead, and every heap block the record
+ * touched. Must be called before the record is turned into a NOOP.
+ *
+ * @param tracked The tracked tuples
+ * @param rec The record
+ * @return 0 on success, otherwise 1
+ */
+static int
+track_filtered_record(struct filtered_tuples* tracked, struct decoded_xlog_record* rec)
+{
+   uint8_t info = (rec->header.xl_info & ~XLR_INFO_MASK) & XLOG_HEAP_OPMASK;
+   int dead_block = -1;
+   offset_number dead_offnum = WHOLE_BLOCK;
+   transaction_id dead_xmax = 0;
+
+   if (rec->header.xl_rmid != RM_HEAP_ID && rec->header.xl_rmid != RM_HEAP2_ID)
+   {
+      return 0;
+   }
+
+   if (rec->header.xl_rmid == RM_HEAP_ID && rec->main_data != NULL)
+   {
+      if (info == XLOG_HEAP_DELETE && rec->main_data_len >= sizeof(struct xl_heap_delete))
+      {
+         struct xl_heap_delete del;
+
+         memcpy(&del, rec->main_data, sizeof(del));
+         dead_block = 0;
+         dead_offnum = del.offnum;
+         dead_xmax = del.xmax;
+      }
+      else if ((info == XLOG_HEAP_UPDATE || info == XLOG_HEAP_HOT_UPDATE) &&
+               rec->main_data_len >= offsetof(struct xl_heap_update, new_xmax))
+      {
+         struct xl_heap_update upd;
+
+         memset(&upd, 0, sizeof(upd));
+         memcpy(&upd, rec->main_data, MIN(rec->main_data_len, sizeof(upd)));
+         /* Like heap_xlog_update(): the old tuple is in block 1 if there is one */
+         dead_block = XLogRecHasBlockRef(rec, 1) ? 1 : 0;
+         dead_offnum = upd.old_offnum;
+         dead_xmax = upd.old_xmax;
+      }
+   }
+
+   for (int i = 0; i <= rec->max_block_id; i++)
+   {
+      if (!XLogRecHasBlockRef(rec, i))
+      {
+         continue;
+      }
+
+      if (add_filtered_tuple(tracked, &rec->blocks[i],
+                             i == dead_block ? dead_offnum : WHOLE_BLOCK,
+                             i == dead_block ? dead_xmax : 0,
+                             rec->lsn))
+      {
+         return 1;
+      }
+   }
+
+   return 0;
+}
+
+static int
+filtered_tuple_cmp(const void* a, const void* b)
+{
+   const struct filtered_tuple* x = a;
+   const struct filtered_tuple* y = b;
+
+#define CMP_FIELD(f)               \
+   if (x->f != y->f)               \
+   {                               \
+      return x->f < y->f ? -1 : 1; \
+   }
+   CMP_FIELD(rlocator.spcOid);
+   CMP_FIELD(rlocator.dbOid);
+   CMP_FIELD(rlocator.relNumber);
+   CMP_FIELD(forknum);
+   CMP_FIELD(blkno);
+   CMP_FIELD(offnum);
+#undef CMP_FIELD
+   return 0;
+}
+
+static bool
+same_block(struct filtered_tuple* t, struct decoded_bkp_block* blk)
+{
+   return t->rlocator.spcOid == blk->rlocator.spcOid &&
+          t->rlocator.dbOid == blk->rlocator.dbOid &&
+          t->rlocator.relNumber == blk->rlocator.relNumber &&
+          t->forknum == blk->forknum &&
+          t->blkno == blk->blkno;
+}
+
+/**
+ * Find the first tracked tuple on a block (tracked must be sorted)
+ */
+static int
+find_block(struct filtered_tuples* tracked, struct decoded_bkp_block* blk)
+{
+   struct filtered_tuple key;
+   int lo = 0;
+   int hi = tracked->count;
+
+   memset(&key, 0, sizeof(key));
+   key.rlocator = blk->rlocator;
+   key.forknum = blk->forknum;
+   key.blkno = blk->blkno;
+   key.offnum = 0;
+
+   while (lo < hi)
+   {
+      int mid = lo + (hi - lo) / 2;
+
+      if (filtered_tuple_cmp(&tracked->items[mid], &key) < 0)
+      {
+         lo = mid + 1;
+      }
+      else
+      {
+         hi = mid;
+      }
+   }
+
+   if (lo < tracked->count && same_block(&tracked->items[lo], blk))
+   {
+      return lo;
+   }
+
+   return -1;
+}
+
+static void
+report_conflict(struct filtered_tuple* t, struct decoded_xlog_record* rec, char* what)
+{
+   pgmoneta_log_error("Cannot filter the record at %X/%X: the record at %X/%X (%s) changes "
+                      "the same data in relation %u/%u/%u block %u%s",
+                      LSN_FORMAT_ARGS(t->lsn), LSN_FORMAT_ARGS(rec->lsn), what,
+                      t->rlocator.spcOid, t->rlocator.dbOid, t->rlocator.relNumber, t->blkno,
+                      t->offnum != WHOLE_BLOCK ? "" : " (whole block)");
+}
+
+/**
+ * Is offset offnum on block blk a tuple that a filtered record before lsn made dead?
+ */
+static struct filtered_tuple*
+find_dead_tuple(struct filtered_tuples* tracked, struct decoded_bkp_block* blk,
+                offset_number offnum, xlog_rec_ptr lsn)
+{
+   int i = find_block(tracked, blk);
+
+   if (i < 0)
+   {
+      return NULL;
+   }
+
+   for (; i < tracked->count && same_block(&tracked->items[i], blk); i++)
+   {
+      if (tracked->items[i].offnum == offnum && tracked->items[i].lsn < lsn)
+      {
+         return &tracked->items[i];
+      }
+   }
+
+   return NULL;
+}
+
+/**
+ * Check the offsets a Heap2 PRUNE or VACUUM record removes against the
+ * tuples made dead by filtered records
+ */
+static struct filtered_tuple*
+prune_conflict(struct filtered_tuples* tracked, struct decoded_xlog_record* rec, uint32_t magic)
+{
+   uint8_t info = (rec->header.xl_info & ~XLR_INFO_MASK) & XLOG_HEAP_OPMASK;
+   struct decoded_bkp_block* blk = NULL;
+   offset_number* redirected = NULL;
+   offset_number* nowdead = NULL;
+   offset_number* nowunused = NULL;
+   int nredirected = 0;
+   int ndead = 0;
+   int nunused = 0;
+   struct filtered_tuple* t = NULL;
+
+   if (rec->main_data == NULL || !XLogRecHasBlockData(rec, 0))
+   {
+      return NULL;
+   }
+
+   blk = &rec->blocks[0];
+
+   if (magic >= WAL_MAGIC_V17)
+   {
+      uint16_t flags;
+      int nplans;
+      struct xlhp_freeze_plan* plans;
+      offset_number* frz_offsets;
+
+      if (info != XLOG_HEAP2_PRUNE_ON_ACCESS && info != XLOG_HEAP2_PRUNE_VACUUM_SCAN &&
+          info != XLOG_HEAP2_PRUNE_VACUUM_CLEANUP)
+      {
+         return NULL;
+      }
+
+      if (magic >= WAL_MAGIC_V19)
+      {
+         flags = ((struct xl_heap_prune_v19*)rec->main_data)->flags;
+      }
+      else
+      {
+         flags = ((struct xl_heap_prune_v17*)rec->main_data)->flags;
+      }
+
+      heap_xlog_deserialize_prune_and_freeze(blk->data, flags, &nplans, &plans, &frz_offsets,
+                                             &nredirected, &redirected, &ndead, &nowdead,
+                                             &nunused, &nowunused);
+   }
+   else if (info == XLOG_HEAP2_PRUNE)
+   {
+      struct xl_heap_prune_v16* xlrec = (struct xl_heap_prune_v16*)rec->main_data;
+
+      nredirected = xlrec->nredirected;
+      ndead = xlrec->ndead;
+      redirected = (offset_number*)blk->data;
+      nowdead = redirected + (nredirected * 2);
+      nowunused = nowdead + ndead;
+      nunused = (int)(blk->data_len / sizeof(offset_number)) - (nredirected * 2) - ndead;
+   }
+   else if (info == XLOG_HEAP2_VACUUM)
+   {
+      nunused = ((struct xl_heap_vacuum*)rec->main_data)->nunused;
+      nowunused = (offset_number*)blk->data;
+   }
+   else
+   {
+      return NULL;
+   }
+
+   /* For a redirect, the first offset of each pair is the one whose tuple goes away */
+   for (int i = 0; i < nredirected && t == NULL; i++)
+   {
+      t = find_dead_tuple(tracked, blk, redirected[i * 2], rec->lsn);
+   }
+   for (int i = 0; i < ndead && t == NULL; i++)
+   {
+      t = find_dead_tuple(tracked, blk, nowdead[i], rec->lsn);
+   }
+   for (int i = 0; i < nunused && t == NULL; i++)
+   {
+      t = find_dead_tuple(tracked, blk, nowunused[i], rec->lsn);
+   }
+
+   return t;
+}
+
+/**
+ * Fail if a record that is kept would undo the effect of filtering:
+ * - a Heap2 PRUNE or VACUUM record that removes a tuple a filtered record
+ *   made dead,
+ * - a full-page image of a heap block a filtered record changed (the image
+ *   can carry the filtered change and hint bits that make it visible), or
+ * - a B-tree DELETE whose conflict horizon is at or after an XID that made
+ *   a tracked tuple dead, in the same database (heap_index_delete_tuples()
+ *   advances the horizon from the deleting XID of each removed entry's tuple).
+ *
+ * @param tracked The tuples changed by filtered records
+ * @param file_count The number of WAL files
+ * @param walfiles The WAL files
+ * @return 0 if there is no conflict, otherwise 1
+ */
+static int
+check_filter_conflicts(struct filtered_tuples* tracked, int file_count, struct walfile** walfiles)
+{
+   int conflicts = 0;
+
+   if (tracked->count == 0)
+   {
+      return 0;
+   }
+
+   qsort(tracked->items, tracked->count, sizeof(struct filtered_tuple), filtered_tuple_cmp);
+
+   for (int i = 0; i < file_count; i++)
+   {
+      struct walfile* wf = walfiles[i];
+      struct deque_iterator* iter = NULL;
+
+      if (wf == NULL || wf->records == NULL)
+      {
+         continue;
+      }
+
+      if (pgmoneta_deque_iterator_create(wf->records, &iter))
+      {
+         return 1;
+      }
+
+      while (pgmoneta_deque_iterator_next(iter))
+      {
+         struct decoded_xlog_record* rec = (struct decoded_xlog_record*)iter->value->data;
+         uint8_t info = rec->header.xl_info & ~XLR_INFO_MASK;
+         struct filtered_tuple* t = NULL;
+
+         /* Filtered records are NOOPs now; NOOP redo applies none of their images */
+         if (rec->header.xl_rmid == RM_XLOG_ID && info == XLOG_NOOP)
+         {
+            continue;
+         }
+
+         for (int b = 0; b <= rec->max_block_id && t == NULL; b++)
+         {
+            int j;
+
+            if (!XLogRecHasBlockRef(rec, b) || !XLogRecHasBlockImage(rec, b) || !rec->blocks[b].apply_image)
+            {
+               continue;
+            }
+
+            j = find_block(tracked, &rec->blocks[b]);
+            if (j >= 0 && tracked->items[j].lsn < rec->lsn)
+            {
+               t = &tracked->items[j];
+               report_conflict(t, rec, "full-page image");
+            }
+         }
+
+         if (t == NULL && rec->header.xl_rmid == RM_HEAP2_ID)
+         {
+            t = prune_conflict(tracked, rec, wf->magic_number);
+            if (t != NULL)
+            {
+               report_conflict(t, rec, "prune/vacuum");
+            }
+         }
+
+         if (t == NULL && rec->header.xl_rmid == RM_BTREE_ID && info == XLOG_BTREE_DELETE &&
+             rec->main_data != NULL && rec->main_data_len >= sizeof(transaction_id) &&
+             XLogRecHasBlockRef(rec, 0))
+         {
+            transaction_id horizon;
+
+            /* The first field of xl_btree_delete in every version */
+            memcpy(&horizon, rec->main_data, sizeof(horizon));
+
+            for (int k = 0; k < tracked->count && horizon >= FIRST_NORMAL_XID; k++)
+            {
+               struct filtered_tuple* c = &tracked->items[k];
+
+               if (c->offnum != WHOLE_BLOCK && c->lsn < rec->lsn &&
+                   c->rlocator.dbOid == rec->blocks[0].rlocator.dbOid &&
+                   xid_follows_or_equals(horizon, c->xmax))
+               {
+                  t = c;
+                  pgmoneta_log_error("Cannot filter the record at %X/%X: the B-tree DELETE at %X/%X in "
+                                     "index %u/%u/%u has conflict horizon %u, at or after the filtered XID %u",
+                                     LSN_FORMAT_ARGS(t->lsn), LSN_FORMAT_ARGS(rec->lsn),
+                                     rec->blocks[0].rlocator.spcOid, rec->blocks[0].rlocator.dbOid,
+                                     rec->blocks[0].rlocator.relNumber, horizon, t->xmax);
+                  break;
+               }
+            }
+         }
+
+         if (t != NULL)
+         {
+            conflicts++;
+         }
+      }
+
+      pgmoneta_deque_iterator_destroy(iter);
+   }
+
+   if (conflicts > 0)
+   {
+      pgmoneta_log_error("%d later record(s) would undo the filtering; no filtered WAL was written", conflicts);
+      return 1;
+   }
+
+   return 0;
+}
+
 /**
  * Filter out DELETE operations from WAL files
  *
  * @param file_count Pointer to the number of WAL files
  * @param walfiles Pointer to the array of WAL file pointers
+ * @param tracked The tuples changed by filtered records
  * @return 0 on success, non-zero on failure
  */
 int
-pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles)
+pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles, struct filtered_tuples* tracked)
 {
 #define XID_IS_DELETED(xid) \
    ({ int found = 0; \
@@ -378,6 +841,13 @@ pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles)
 
          if (match)
          {
+            if (track_filtered_record(tracked, rec))
+            {
+               pgmoneta_deque_iterator_destroy(rec_iter);
+               free(delete_xids);
+               return 1;
+            }
+
             /* Change to NOOP (RM_XLOG, XLOG_NOOP) */
             rec->header.xl_info = XLOG_NOOP;
             rec->header.xl_rmid = RM_XLOG_ID;
@@ -413,10 +883,11 @@ pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles)
  * @param walfiles Pointer to the array of WAL file pointers
  * @param xids Array of XIDs to filter out
  * @param xid_count Number of XIDs in the array
+ * @param tracked The tuples changed by filtered records
  * @return 0 on success, non-zero on failure
  */
 int
-pgmoneta_filter_xids(int* file_count, struct walfile*** walfiles, int* xids, int xid_count)
+pgmoneta_filter_xids(int* file_count, struct walfile*** walfiles, int* xids, int xid_count, struct filtered_tuples* tracked)
 {
 #define XID_IS_FILTERED(xid) \
    ({ int found = 0; \
@@ -462,6 +933,11 @@ pgmoneta_filter_xids(int* file_count, struct walfile*** walfiles, int* xids, int
 
          if (match)
          {
+            if (track_filtered_record(tracked, rec))
+            {
+               goto error;
+            }
+
             /* Change to NOOP (RM_XLOG, XLOG_NOOP) */
             rec->header.xl_info = XLOG_NOOP;
             rec->header.xl_rmid = RM_XLOG_ID;
@@ -513,6 +989,7 @@ main(int argc, char* argv[])
    char* wal_path = NULL;
    struct walfile** walfiles = NULL;
    int walfile_count = 0;
+   struct filtered_tuples tracked = {0};
    char* target_pg_wal_dir = NULL;
    char secure_temp_dir[MAX_PATH];
    int secure_temp_dir_created = 0;
@@ -898,7 +1375,7 @@ main(int argc, char* argv[])
       {
          if (pgmoneta_compare_string(yaml_config.operations[i], OPERATION_DELETE))
          {
-            if (pgmoneta_filter_operation_delete(&walfile_count, &walfiles))
+            if (pgmoneta_filter_operation_delete(&walfile_count, &walfiles, &tracked))
             {
                pgmoneta_log_error("Failed to apply filter on operation %s", yaml_config.operations[i]);
                goto error;
@@ -909,11 +1386,16 @@ main(int argc, char* argv[])
 
    if (yaml_config.xid_count > 0)
    {
-      if (pgmoneta_filter_xids(&walfile_count, &walfiles, yaml_config.xids, yaml_config.xid_count))
+      if (pgmoneta_filter_xids(&walfile_count, &walfiles, yaml_config.xids, yaml_config.xid_count, &tracked))
       {
          pgmoneta_log_error("Failed to apply filter on XIDs");
          goto error;
       }
+   }
+
+   if (check_filter_conflicts(&tracked, walfile_count, walfiles))
+   {
+      goto error;
    }
 
    pgmoneta_process_walfiles(walfile_count, walfiles);
@@ -994,6 +1476,7 @@ cleanup:
       walfiles = NULL;
    }
 
+   free(tracked.items);
    free(target_pg_wal_dir);
    target_pg_wal_dir = NULL;
    free(tmp_wal);
