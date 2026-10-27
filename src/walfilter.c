@@ -660,7 +660,7 @@ check_filter_conflicts(struct filtered_tuples* tracked, int file_count, struct w
 
          if (t == NULL && rec->header.xl_rmid == RM_HEAP2_ID)
          {
-            t = prune_conflict(tracked, rec, wf->magic_number);
+            t = prune_conflict(tracked, rec, wf->long_phd != NULL ? wf->long_phd->std.xlp_magic : 0);
             if (t != NULL)
             {
                report_conflict(t, rec, "prune/vacuum");
