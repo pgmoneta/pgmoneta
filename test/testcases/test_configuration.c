@@ -106,6 +106,10 @@ MCTF_TEST_NEGATIVE(test_configuration_reject_invalid_time)
    MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, "abc", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
                "conf set abc should fail");
 
+   // authentication_timeout must be at least 1 second
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_AUTHENTICATION_TIMEOUT, "0", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set authentication_timeout 0 should fail");
+
 cleanup:
    pgmoneta_test_teardown();
    MCTF_FINISH();
@@ -115,6 +119,8 @@ MCTF_TEST(test_configuration_get_returns_set_values)
 {
    pgmoneta_test_setup();
 
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_AUTHENTICATION_TIMEOUT, "17s", 0) == 0, cleanup,
+               "conf set authentication_timeout 17s failed");
    MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, "45s", 0) == 0, cleanup,
                "conf set blocking_timeout 45s failed");
    MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, "2m", 0) == 0, cleanup,
@@ -122,6 +128,8 @@ MCTF_TEST(test_configuration_get_returns_set_values)
    MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, "30s", 0) == 0, cleanup,
                "conf set log_rotation_age 30s failed");
 
+   MCTF_ASSERT(pgmoneta_tsclient_conf_get(CONFIGURATION_ARGUMENT_AUTHENTICATION_TIMEOUT, 0) == 0, cleanup,
+               "conf get authentication_timeout failed");
    MCTF_ASSERT(pgmoneta_tsclient_conf_get(CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, 0) == 0, cleanup,
                "conf get blocking_timeout failed");
    MCTF_ASSERT(pgmoneta_tsclient_conf_get(CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, 0) == 0, cleanup,
@@ -282,6 +290,17 @@ MCTF_TEST(test_configuration_json_put_time_value)
 
    MCTF_ASSERT_INT_EQ((int)pgmoneta_json_get(nested, "value"), 30, cleanup, "seconds: value should be 30");
    MCTF_ASSERT_STR_EQ((char*)pgmoneta_json_get(nested, "string_value"), "30s", cleanup, "seconds: string_value should be '30s'");
+
+   pgmoneta_json_put_time_value(res, "authentication_timeout", PGMONETA_TIME_SEC(17), FORMAT_TIME_S);
+
+   nested = (struct json*)pgmoneta_json_get(res, "authentication_timeout");
+   MCTF_ASSERT_PTR_NONNULL(nested, cleanup, "authentication: nested object should exist");
+
+   MCTF_ASSERT(pgmoneta_json_contains_key(nested, "value"), cleanup, "authentication: should contain 'value' key");
+   MCTF_ASSERT(pgmoneta_json_contains_key(nested, "string_value"), cleanup, "authentication: should contain 'string_value' key");
+
+   MCTF_ASSERT_INT_EQ((int)pgmoneta_json_get(nested, "value"), 17, cleanup, "authentication: value should be 17");
+   MCTF_ASSERT_STR_EQ((char*)pgmoneta_json_get(nested, "string_value"), "17s", cleanup, "authentication: string_value should be '17s'");
 
    // Minutes
    pgmoneta_json_put_time_value(res, "blocking_timeout", PGMONETA_TIME_MIN(5), FORMAT_TIME_MIN);

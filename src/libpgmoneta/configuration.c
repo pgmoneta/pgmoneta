@@ -927,6 +927,26 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (pgmoneta_compare_string(key, "authentication_timeout"))
+               {
+                  if (pgmoneta_compare_string(section, "pgmoneta"))
+                  {
+                     if (as_seconds(value, &config->authentication_timeout, PGMONETA_TIME_SEC(5)))
+                     {
+                        unknown = true;
+                     }
+
+                     if (pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S) < 1)
+                     {
+                        config->authentication_timeout = PGMONETA_TIME_SEC(5);
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (pgmoneta_compare_string(key, "blocking_timeout"))
                {
                   if (pgmoneta_compare_string(section, "pgmoneta"))
@@ -3936,6 +3956,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put_size_value(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_SIZE, config->common.log_rotation_size);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LINE_PREFIX, (uintptr_t)config->common.log_line_prefix, ValueString);
    pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_LOG_MODE, config->common.log_mode, to_log_mode);
+   pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_AUTHENTICATION_TIMEOUT, config->authentication_timeout, FORMAT_TIME_S);
    pgmoneta_json_put_time_value(res, CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, config->blocking_timeout, FORMAT_TIME_S);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS, (uintptr_t)config->tls, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->tls_cert_file, ValueString);
@@ -4765,6 +4786,18 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
       else if (pgmoneta_compare_string(key, "verification"))
       {
          if (as_seconds(value, &config->verification, PGMONETA_TIME_DISABLED))
+         {
+            unknown = true;
+         }
+      }
+      else if (pgmoneta_compare_string(key, "authentication_timeout"))
+      {
+         if (as_seconds(value, &config->authentication_timeout, PGMONETA_TIME_SEC(5)))
+         {
+            unknown = true;
+         }
+
+         if (pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S) < 1)
          {
             unknown = true;
          }
