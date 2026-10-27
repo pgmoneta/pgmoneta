@@ -47,7 +47,7 @@ remote_azure                8514ms        4889ms  1.74x faster
 | option | |
 |---|---|
 | `-c <case>` | run a single case |
-| `-i <n>` | measured iterations, default 5 |
+| `-i <n>` | measured iterations, 1 to 100, default 5 |
 | `-s <n>` | seed a pgbench dataset of scale `<n>`, default 0 (none) |
 
 `bench.sh list` shows the registered cases; `bench.sh clean` removes the build and runtime state.
