@@ -5632,6 +5632,12 @@ as_retention(char* str, int* days, int* weeks, int* months, int* years)
       token = next;
    }
 
+   // the format is days, weeks, months, years, so a fifth field, even an empty one, is an error
+   if (token != NULL)
+   {
+      goto error;
+   }
+
    for (int i = 0; i < 4; i++)
    {
       *fields[i] = values[i];

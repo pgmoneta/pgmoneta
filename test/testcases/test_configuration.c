@@ -153,6 +153,9 @@ MCTF_TEST(test_configuration_retention_parse)
       {"zero", {7, -1, 3, 1}},
       {"negative", {-1, -1, -1, -1}},
       {"non_numeric", {-1, -1, -1, -1}},
+      {"extra_field", {-1, -1, -1, -1}},
+      {"extra_field_whitespace", {-1, -1, -1, -1}},
+      {"trailing_comma", {-1, -1, -1, -1}},
    };
    int number_of_expected = sizeof(expected) / sizeof(expected[0]);
 
@@ -239,6 +242,14 @@ MCTF_TEST_NEGATIVE(test_configuration_retention_reject)
    // Non-numeric
    MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, abc, 3, 1", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
                "conf set retention 7, abc, 3, 1 should fail");
+
+   // More than four fields
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 4, 3, 1, 9", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set retention 7, 4, 3, 1, 9 should fail");
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7 , 4 , 3 , 1 , 9 ", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set retention 7 , 4 , 3 , 1 , 9 should fail");
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 4, 3, 1,", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set retention 7, 4, 3, 1, should fail");
 
 cleanup:
    pgmoneta_test_teardown();
