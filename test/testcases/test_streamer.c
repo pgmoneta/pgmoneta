@@ -122,7 +122,8 @@ MCTF_TEST(test_streamer)
             /* restore */
             MCTF_ASSERT(!pgmoneta_vfile_create_local(backup_dest, "r", &reader), cleanup);
             MCTF_ASSERT(!pgmoneta_vfile_create_local(restore_dest, "wb", &writer), cleanup);
-            MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_RESTORE, encryption, compression, &restore_streamer), cleanup);
+            /* restore with another AES mode, the stream header carries the one that was used */
+            MCTF_ASSERT(!pgmoneta_streamer_create(STREAMER_MODE_RESTORE, j == 0 ? ENCRYPTION_NONE : encryption_methods[j % 3 + 1], compression, &restore_streamer), cleanup);
             pgmoneta_streamer_add_destination(restore_streamer, writer);
 
             do

@@ -1229,19 +1229,48 @@ encrypt_file(char* from, char* to, int enc)
    unsigned char* inbuf = NULL;
    unsigned char* outbuf = NULL;
    long remaining = 0;
+   int mode = ENCRYPTION_NONE;
+   unsigned char format_byte = 0;
 
    config = (struct main_configuration*)shmem;
 
-   if (config->common.encryption == ENCRYPTION_NONE)
+   if (enc == 1)
    {
-      pgmoneta_log_error("encrypt_file: encryption is not configured (encryption = none)");
-      goto error;
+      if (config->common.encryption == ENCRYPTION_NONE)
+      {
+         pgmoneta_log_error("encrypt_file: encryption is not configured (encryption = none)");
+         goto error;
+      }
+
+      mode = config->common.encryption;
+   }
+   else
+   {
+      /* The mode comes from the file, not from the configuration */
+      in = fopen(from, "rb");
+      if (in == NULL)
+      {
+         pgmoneta_log_error("fopen: Could not open %s", from);
+         goto error;
+      }
+
+      if (fread(&format_byte, 1, 1, in) != 1)
+      {
+         pgmoneta_log_error("fread: failed to read the format byte from %s", from);
+         goto error;
+      }
+
+      if (pgmoneta_encryption_mode_from_format(format_byte, &mode))
+      {
+         pgmoneta_log_error("encrypt_file: %s was not encrypted in a supported format", from);
+         goto error;
+      }
    }
 
-   cipher_fp = get_cipher(config->common.encryption);
+   cipher_fp = get_cipher(mode);
    if (cipher_fp == NULL)
    {
-      pgmoneta_log_error("encrypt_file: unsupported encryption mode: %d", config->common.encryption);
+      pgmoneta_log_error("encrypt_file: unsupported encryption mode: %d", mode);
       goto error;
    }
    cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
@@ -1281,7 +1310,7 @@ encrypt_file(char* from, char* to, int enc)
          goto error;
       }
 
-      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, config->common.encryption) != 0)
+      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, mode) != 0)
       {
          pgmoneta_log_error("derive_key_iv: Failed to derive key");
          goto error;
@@ -1295,13 +1324,6 @@ encrypt_file(char* from, char* to, int enc)
    }
    else
    {
-      in = fopen(from, "rb");
-      if (in == NULL)
-      {
-         pgmoneta_log_error("fopen: Could not open %s", from);
-         goto error;
-      }
-
       if (fread(salt, 1, PBKDF2_SALT_LENGTH, in) != PBKDF2_SALT_LENGTH)
       {
          pgmoneta_log_error("fread: failed to read salt from %s", from);
@@ -1315,7 +1337,7 @@ encrypt_file(char* from, char* to, int enc)
       }
 
       long file_size;
-      long header_size = PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH;
+      long header_size = ENCRYPTION_HEADER_LENGTH;
 
       if (fseek(in, 0L, SEEK_END) != 0)
       {
@@ -1349,14 +1371,14 @@ encrypt_file(char* from, char* to, int enc)
          pgmoneta_log_error("fread: failed to read GCM tag from %s", from);
          goto error;
       }
-      /* Seek back to data start (after salt + IV) */
+      /* Seek back to data start (after the format byte, salt and IV) */
       if (fseek(in, header_size, SEEK_SET) != 0)
       {
          pgmoneta_log_error("fseek: failed to return to data in %s", from);
          goto error;
       }
 
-      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, config->common.encryption) != 0)
+      if (derive_key_iv(master_key, master_key_length, salt, key, NULL, mode) != 0)
       {
          pgmoneta_log_error("derive_key_iv: Failed to derive key");
          goto error;
@@ -1396,7 +1418,13 @@ encrypt_file(char* from, char* to, int enc)
 
    if (enc == 1)
    {
-      /* Prepend salt and IV to the output file */
+      /* Prepend the format byte, salt and IV to the output file */
+      format_byte = pgmoneta_encryption_format_byte(mode);
+      if (fwrite(&format_byte, 1, 1, out) != 1)
+      {
+         pgmoneta_log_error("fwrite: failed to write the format byte");
+         goto error;
+      }
       if (fwrite(salt, 1, PBKDF2_SALT_LENGTH, out) != PBKDF2_SALT_LENGTH)
       {
          pgmoneta_log_error("fwrite: failed to write salt");
@@ -2030,13 +2058,31 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
       }
       else
       {
-         size_t header_len = PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH;
+         size_t header_len = ENCRYPTION_HEADER_LENGTH;
+         int mode = ENCRYPTION_NONE;
 
          if (in_size < header_len)
          {
-            pgmoneta_log_error("Unable to load Salt+IV header");
+            pgmoneta_log_error("Unable to load the encryption header");
             goto error;
          }
+
+         /* The mode comes from the stream, not from the configuration */
+         if (pgmoneta_encryption_mode_from_format(*(unsigned char*)in_buf, &mode))
+         {
+            goto error;
+         }
+
+         if (mode != this->mode)
+         {
+            this->cipher_fp = get_cipher(mode);
+            this->cipher_block_size = EVP_CIPHER_block_size(this->cipher_fp());
+            this->mode = mode;
+            this->key_derived = false;
+         }
+
+         in_buf = (unsigned char*)in_buf + 1;
+         in_size -= 1;
 
          /* Only re-derive the key if we haven't already, or if the stream salt changed somehow */
          if (!this->key_derived || memcmp(this->salt, in_buf, PBKDF2_SALT_LENGTH) != 0)
@@ -2098,11 +2144,11 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
 
    if (write_header)
    {
-      if (required > SIZE_MAX - (PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH))
+      if (required > SIZE_MAX - ENCRYPTION_HEADER_LENGTH)
       {
          goto error;
       }
-      required += PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH;
+      required += ENCRYPTION_HEADER_LENGTH;
    }
 
    if (ensure_capacity(&this->out_buf, &this->out_capacity, required))
@@ -2113,9 +2159,10 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
 
    if (write_header)
    {
-      memcpy(this->out_buf, this->salt, PBKDF2_SALT_LENGTH);
-      memcpy(this->out_buf + PBKDF2_SALT_LENGTH, this->iv, (size_t)AES_GCM_IV_LENGTH);
-      offset += PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH;
+      this->out_buf[0] = pgmoneta_encryption_format_byte(this->mode);
+      memcpy(this->out_buf + 1, this->salt, PBKDF2_SALT_LENGTH);
+      memcpy(this->out_buf + 1 + PBKDF2_SALT_LENGTH, this->iv, (size_t)AES_GCM_IV_LENGTH);
+      offset += ENCRYPTION_HEADER_LENGTH;
    }
 
    if (enc)
@@ -2378,6 +2425,29 @@ pgmoneta_is_encrypted(char* file_path)
    }
 
    return false;
+}
+
+unsigned char
+pgmoneta_encryption_format_byte(int mode)
+{
+   return (unsigned char)((ENCRYPTION_FORMAT_VERSION << 4) | (mode & 0x0F));
+}
+
+int
+pgmoneta_encryption_mode_from_format(unsigned char format_byte, int* mode)
+{
+   int version = format_byte >> 4;
+   int m = format_byte & 0x0F;
+
+   if (version != ENCRYPTION_FORMAT_VERSION || get_cipher(m) == NULL)
+   {
+      pgmoneta_log_error("Unsupported encryption format: 0x%02x", format_byte);
+      return 1;
+   }
+
+   *mode = m;
+
+   return 0;
 }
 
 static int
