@@ -88,8 +88,8 @@ bitmask_to_compression(uint32_t file_type)
 
 /**
  * Determine the encryption type for a file from its bitmask.
- * The .aes suffix doesn't distinguish AES variants, so we fall back to
- * the config's encryption type when the file is encrypted.
+ * The .aes suffix doesn't distinguish AES variants; the decryptor takes
+ * the actual mode from the format byte in the file header.
  */
 static int
 bitmask_to_encryption(uint32_t file_type)

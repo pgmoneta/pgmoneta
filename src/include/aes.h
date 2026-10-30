@@ -38,6 +38,12 @@ extern "C" {
 #define GCM_TAG_LENGTH     16
 #define AES_GCM_IV_LENGTH  12
 
+/* An encrypted file or stream starts with a format byte: the format version
+ * in the high 4 bits and the ENCRYPTION_* mode in the low 4 bits, followed
+ * by the salt and the IV. The GCM tag is at the end. */
+#define ENCRYPTION_FORMAT_VERSION 1
+#define ENCRYPTION_HEADER_LENGTH  (1 + PBKDF2_SALT_LENGTH + AES_GCM_IV_LENGTH)
+
 #include <pgmoneta.h>
 #include <json.h>
 #include <workers.h>
@@ -240,6 +246,23 @@ pgmoneta_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsign
  */
 bool
 pgmoneta_is_encrypted(char* file_path);
+
+/**
+ * Get the format byte that starts a file or stream encrypted with a mode
+ * @param mode The encryption mode (ENCRYPTION_AES_*)
+ * @return The format byte
+ */
+unsigned char
+pgmoneta_encryption_format_byte(int mode);
+
+/**
+ * Get the encryption mode from the format byte of an encrypted file or stream
+ * @param format_byte The format byte
+ * @param mode [out] The encryption mode (ENCRYPTION_AES_*)
+ * @return 0 upon success, otherwise 1 when the byte isn't a supported format
+ */
+int
+pgmoneta_encryption_mode_from_format(unsigned char format_byte, int* mode);
 
 #define AES_CBC_SALTED_MAGIC      "Salted__"
 #define AES_CBC_SALTED_MAGIC_SIZE 8

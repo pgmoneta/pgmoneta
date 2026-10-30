@@ -38,14 +38,21 @@ pgmoneta-cli encrypt <file>
 
 ### Implementación técnica
 
-#### Formato de archivo (desde 0.21.0)
+#### Formato de archivo (desde 0.22.0)
 
-Cada archivo cifrado comienza con un encabezado unificado de 28 bytes:
+Cada archivo cifrado comienza con un encabezado unificado de 29 bytes:
 
 | Desplazamiento | Longitud | Descripción |
 |----------------|----------|-------------|
-| 0              | 16       | Salt utilizado para la derivación de claves PBKDF2 |
-| 16             | 12       | Campo del Vector de Inicialización (IV) |
+| 0              | 1        | Byte de formato: versión del formato (4 bits altos) y modo de cifrado (4 bits bajos) |
+| 1              | 16       | Salt utilizado para la derivación de claves PBKDF2 |
+| 17             | 12       | Campo del Vector de Inicialización (IV) |
+
+Los valores del modo de cifrado son `1` para AES-256-GCM, `2` para AES-192-GCM y `3` para AES-128-GCM.
+La versión actual del formato es `1`, por lo que un archivo AES-256-GCM comienza con `0x11`.
+
+El descifrado toma el modo del byte de formato, no de la opción `encryption`,
+por lo que los archivos WAL y los respaldos siguen siendo legibles después de cambiar `encryption`.
 
 Se genera un IV aleatorio único de 12 bytes para cada operación de cifrado y se almacena directamente después del salt. La **Etiqueta de Autenticación (16 bytes)** se añade al **final del archivo** (después del texto cifrado).
 
