@@ -1042,3 +1042,121 @@ cleanup:
    remove(output);
    MCTF_FINISH();
 }
+
+/**
+ * Test: the format byte holds the mode, and decryption uses it instead of the configuration.
+ */
+MCTF_TEST(test_aes_file_format_byte)
+{
+   struct test_encryption_env env;
+   struct main_configuration* config = NULL;
+   int modes[] = {ENCRYPTION_AES_256_GCM, ENCRYPTION_AES_192_GCM, ENCRYPTION_AES_128_GCM};
+   char* plaintext = "The mode of an encrypted file comes from its header";
+   char from[MAX_PATH] = {0};
+   char encrypted[MAX_PATH] = {0};
+   char decrypted[MAX_PATH] = {0};
+   char content[128] = {0};
+   unsigned char format_byte = 0;
+   FILE* f = NULL;
+
+   MCTF_ASSERT(pgmoneta_test_setup_encryption_env(&env) == 0, cleanup, "Failed to setup mock environment");
+   config = (struct main_configuration*)shmem;
+
+   pgmoneta_snprintf(from, MAX_PATH, "%s/format.txt", env.test_home);
+   pgmoneta_snprintf(encrypted, MAX_PATH, "%s/format.txt.aes", env.test_home);
+   pgmoneta_snprintf(decrypted, MAX_PATH, "%s/format.out", env.test_home);
+
+   for (int i = 0; i < 3; i++)
+   {
+      config->common.encryption = modes[i];
+      MCTF_ASSERT_INT_EQ(write_test_file(from, plaintext, strlen(plaintext)), 0, cleanup, "could not write %s", from);
+      MCTF_ASSERT_INT_EQ(pgmoneta_encrypt_file(from, encrypted, NULL), 0, cleanup, "encryption failed for mode %d", modes[i]);
+
+      f = fopen(encrypted, "rb");
+      MCTF_ASSERT_PTR_NONNULL(f, cleanup, "Failed to open encrypted file");
+      MCTF_ASSERT(fread(&format_byte, 1, 1, f) == 1, cleanup, "Failed to read format byte");
+      fclose(f);
+      f = NULL;
+      MCTF_ASSERT_INT_EQ(format_byte, (ENCRYPTION_FORMAT_VERSION << 4) | modes[i], cleanup, "wrong format byte for mode %d", modes[i]);
+      MCTF_ASSERT_INT_EQ(pgmoneta_get_file_size(encrypted), ENCRYPTION_HEADER_LENGTH + strlen(plaintext) + GCM_TAG_LENGTH, cleanup, "wrong encrypted size");
+
+      /* the configuration changed since the file was written */
+      config->common.encryption = (i == 0) ? ENCRYPTION_NONE : modes[(i + 1) % 3];
+      MCTF_ASSERT_INT_EQ(pgmoneta_decrypt_file(encrypted, decrypted, NULL), 0, cleanup, "decryption failed for mode %d", modes[i]);
+
+      memset(content, 0, sizeof(content));
+      f = fopen(decrypted, "rb");
+      MCTF_ASSERT_PTR_NONNULL(f, cleanup, "Failed to open decrypted file");
+      MCTF_ASSERT(fread(content, 1, sizeof(content) - 1, f) == strlen(plaintext), cleanup, "wrong decrypted size");
+      fclose(f);
+      f = NULL;
+      MCTF_ASSERT_STR_EQ(content, plaintext, cleanup, "decrypted content mismatch for mode %d", modes[i]);
+      remove(decrypted);
+   }
+
+cleanup:
+   if (f)
+   {
+      fclose(f);
+   }
+   remove(from);
+   remove(encrypted);
+   remove(decrypted);
+   pgmoneta_test_teardown_encryption_env(&env);
+   MCTF_FINISH();
+}
+
+/**
+ * Test: an unknown format byte or a truncated header is rejected.
+ */
+MCTF_TEST_NEGATIVE(test_aes_file_bad_header)
+{
+   struct test_encryption_env env;
+   char* plaintext = "A file with a bad header";
+   char from[MAX_PATH] = {0};
+   char encrypted[MAX_PATH] = {0};
+   char decrypted[MAX_PATH] = {0};
+   unsigned char bad[] = {0x00, (ENCRYPTION_FORMAT_VERSION << 4) | 0x0F, ((ENCRYPTION_FORMAT_VERSION + 1) << 4) | ENCRYPTION_AES_256_GCM};
+   unsigned char header[ENCRYPTION_HEADER_LENGTH] = {0};
+   FILE* f = NULL;
+
+   MCTF_ASSERT(pgmoneta_test_setup_encryption_env(&env) == 0, cleanup, "Failed to setup mock environment");
+
+   pgmoneta_snprintf(from, MAX_PATH, "%s/bad.txt", env.test_home);
+   pgmoneta_snprintf(encrypted, MAX_PATH, "%s/bad.txt.aes", env.test_home);
+   pgmoneta_snprintf(decrypted, MAX_PATH, "%s/bad.out", env.test_home);
+
+   for (int i = 0; i < 3; i++)
+   {
+      MCTF_ASSERT_INT_EQ(write_test_file(from, plaintext, strlen(plaintext)), 0, cleanup, "could not write %s", from);
+      MCTF_ASSERT_INT_EQ(pgmoneta_encrypt_file(from, encrypted, NULL), 0, cleanup, "encryption failed");
+
+      f = fopen(encrypted, "r+b");
+      MCTF_ASSERT_PTR_NONNULL(f, cleanup, "Failed to open encrypted file");
+      MCTF_ASSERT(fwrite(&bad[i], 1, 1, f) == 1, cleanup, "Failed to write format byte");
+      fclose(f);
+      f = NULL;
+
+      MCTF_ASSERT(pgmoneta_decrypt_file(encrypted, decrypted, NULL) != 0, cleanup, "format byte 0x%02x was accepted", bad[i]);
+      MCTF_ASSERT(pgmoneta_exists(encrypted), cleanup, "the encrypted file was deleted");
+      MCTF_ASSERT(!pgmoneta_exists(decrypted), cleanup, "an output was written");
+      remove(encrypted);
+   }
+
+   /* a valid format byte, but the file ends inside the header */
+   header[0] = pgmoneta_encryption_format_byte(ENCRYPTION_AES_256_GCM);
+   MCTF_ASSERT_INT_EQ(write_test_file(encrypted, (char*)header, ENCRYPTION_HEADER_LENGTH - 1), 0, cleanup, "could not write %s", encrypted);
+   MCTF_ASSERT(pgmoneta_decrypt_file(encrypted, decrypted, NULL) != 0, cleanup, "a truncated header was accepted");
+   MCTF_ASSERT(!pgmoneta_exists(decrypted), cleanup, "an output was written");
+
+cleanup:
+   if (f)
+   {
+      fclose(f);
+   }
+   remove(from);
+   remove(encrypted);
+   remove(decrypted);
+   pgmoneta_test_teardown_encryption_env(&env);
+   MCTF_FINISH();
+}

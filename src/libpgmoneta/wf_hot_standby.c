@@ -297,22 +297,20 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             goto cleanup;
          }
 
-         if (config->common.encryption != ENCRYPTION_NONE)
+         /* Decrypt any .aes file, the backup may have been taken with another encryption setting */
+         if (pgmoneta_decrypt_directory(-1, destination, workers, NULL))
          {
-            if (pgmoneta_decrypt_directory(-1, destination, workers, NULL))
+            error = true;
+            goto cleanup;
+         }
+         if (workers != NULL)
+         {
+            pgmoneta_workers_wait(workers);
+            if (!pgmoneta_workers_outcome_ok(workers))
             {
+               pgmoneta_workers_transfer_failures(workers, nodes);
                error = true;
                goto cleanup;
-            }
-            if (workers != NULL)
-            {
-               pgmoneta_workers_wait(workers);
-               if (!pgmoneta_workers_outcome_ok(workers))
-               {
-                  pgmoneta_workers_transfer_failures(workers, nodes);
-                  error = true;
-                  goto cleanup;
-               }
             }
          }
 

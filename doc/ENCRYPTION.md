@@ -32,14 +32,21 @@ pgmoneta-cli encrypt <file>
 
 ## Technical Implementation
 
-### File Format (Since 0.21.0)
+### File Format (Since 0.22.0)
 
-Each encrypted file starts with a 28-byte header:
+Each encrypted file starts with a 29-byte header:
 
 | Offset | Length | Description |
 |--------|--------|-------------|
-| 0      | 16     | Salt used for PBKDF2 key derivation |
-| 16     | 12     | Initialization Vector (IV) field |
+| 0      | 1      | Format byte: format version (high 4 bits) and encryption mode (low 4 bits) |
+| 1      | 16     | Salt used for PBKDF2 key derivation |
+| 17     | 12     | Initialization Vector (IV) field |
+
+The encryption mode values are `1` for AES-256-GCM, `2` for AES-192-GCM and `3` for AES-128-GCM.
+The current format version is `1`, so an AES-256-GCM file starts with `0x11`.
+
+Decryption takes the mode from the format byte, not from the `encryption` setting,
+so WAL files and backups stay readable after `encryption` is changed.
 
 **Note on AES-GCM**:
 *   A unique, random 12-byte IV is generated for every encryption operation and stored directly after the salt.

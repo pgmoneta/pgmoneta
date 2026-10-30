@@ -2,6 +2,21 @@
 
 ## From 0.21.x to 0.22.x
 
+### Encryption Format Byte
+
+Each encrypted file now starts with a format byte that holds the format
+version and the encryption mode, followed by the salt and the IV (29-byte header).
+Decryption takes the mode from this byte instead of the `encryption` setting,
+so WAL files and backups stay readable after `encryption` is changed.
+
+This is a **breaking change**. Encrypted backups and WAL files created with
+0.21.x cannot be decrypted by this version.
+
+**Action required:**
+
+1. Restore or decrypt any encrypted backups and WAL files you need with 0.21.x before upgrading.
+2. Take a new full backup after the upgrade.
+
 ### MD5 Authentication Removal
 
 Legacy MD5 authentication has been completely removed from pgmoneta for improved security. This is a **breaking change** for any deployment still relying on MD5.
