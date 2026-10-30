@@ -102,6 +102,28 @@ struct walfile*
 pgmoneta_test_generate_mixed_heap_wal_v17(void);
 
 /**
+ * The record that follows the filtered DELETE in
+ * pgmoneta_test_generate_walfilter_conflict_wal_v17()
+ */
+enum walfilter_later_record {
+   WALFILTER_LATER_NONE,        /**< HEAP INSERT on another block */
+   WALFILTER_LATER_PRUNE_SAME,  /**< Heap2 PRUNE that removes the deleted tuple */
+   WALFILTER_LATER_PRUNE_OTHER, /**< Heap2 PRUNE of another tuple on the same block */
+   WALFILTER_LATER_IMAGE,       /**< HEAP INSERT with a full-page image of the block */
+   WALFILTER_LATER_BTREE_NEWER, /**< B-tree DELETE with conflict horizon = the deleting XID */
+   WALFILTER_LATER_BTREE_OLDER, /**< B-tree DELETE with an older conflict horizon */
+};
+
+/**
+ * Generate a WAL file with CHECKPOINT_SHUTDOWN, a HEAP DELETE by XID 200 of
+ * offset 3 on block 7 of relation 1663/5/16384, and one later record.
+ * @param later The later record
+ * @return The generated walfile, or NULL on failure
+ */
+struct walfile*
+pgmoneta_test_generate_walfilter_conflict_wal_v17(enum walfilter_later_record later);
+
+/**
  * Generate a PostgreSQL 19 WAL file with CHECKPOINT_SHUTDOWN record.
  * Uses the official PostgreSQL 19 WAL magic number (0xD121) and XLP flags.
  * @return The generated walfile, or NULL on failure
