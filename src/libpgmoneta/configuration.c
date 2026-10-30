@@ -5050,8 +5050,8 @@ extract_key_value(char* str, char** key, char** value)
    char* equal = NULL;
    char* end = NULL;
    char* ptr = NULL;
-   char left[MISC_LENGTH];
-   char right[MISC_LENGTH];
+   char left[LINE_LENGTH];
+   char right[LINE_LENGTH];
    bool start_left = false;
    bool start_right = false;
    int idx = 0;
@@ -5088,8 +5088,11 @@ extract_key_value(char* str, char** key, char** value)
 
             if (start_left)
             {
-               left[idx] = c;
-               idx++;
+               if (idx < (int)sizeof(left) - 1)
+               {
+                  left[idx] = c;
+                  idx++;
+               }
             }
          }
          else
@@ -5121,8 +5124,11 @@ extract_key_value(char* str, char** key, char** value)
             {
                if (c != '#')
                {
-                  right[idx] = c;
-                  idx++;
+                  if (idx < (int)sizeof(right) - 1)
+                  {
+                     right[idx] = c;
+                     idx++;
+                  }
                }
                else
                {

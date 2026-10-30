@@ -31,11 +31,13 @@
 #include <json.h>
 #include <management.h>
 #include <mctf.h>
+#include <shmem.h>
 #include <tsclient.h>
 #include <tscommon.h>
 #include <utils.h>
 
 #include <stdlib.h>
+#include <unistd.h>
 
 MCTF_TEST(test_configuration_accept_time)
 {
@@ -318,5 +320,72 @@ MCTF_TEST(test_configuration_json_put_size_value)
 
 cleanup:
    pgmoneta_json_destroy(res);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_configuration_read_bounds_long_key_and_value)
+{
+   /* A key or value longer than MISC_LENGTH used to overrun left[]/right[] */
+   FILE* file = NULL;
+   char path[] = "/tmp/pgmoneta_test_long_value_XXXXXX";
+   int fd = -1;
+   void* shmem = NULL;
+   struct main_configuration* config = NULL;
+   char long_value[MISC_LENGTH + 80];
+   char long_key[MISC_LENGTH + 80];
+
+   memset(long_value, 'a', sizeof(long_value) - 1);
+   long_value[sizeof(long_value) - 1] = '\0';
+
+   memset(long_key, 'k', sizeof(long_key) - 1);
+   long_key[sizeof(long_key) - 1] = '\0';
+
+   fd = mkstemp(path);
+   MCTF_ASSERT(fd != -1, cleanup, "mkstemp failed for the scratch config file");
+
+   file = fdopen(fd, "w");
+   MCTF_ASSERT_PTR_NONNULL(file, cleanup, "fdopen failed for the scratch config file");
+
+   fprintf(file, "[pgmoneta]\n");
+   fprintf(file, "host = %s\n", long_value);
+   fprintf(file, "%s = 1\n", long_key);
+   fprintf(file, "metrics = 5001\n");
+   fprintf(file, "base_dir = /tmp/pgmoneta\n");
+   fprintf(file, "s3_base_dir = /%s\n", long_value);
+   fprintf(file, "\n");
+   fprintf(file, "[primary]\n");
+   fprintf(file, "host = localhost\n");
+   fprintf(file, "port = 5432\n");
+   fclose(file);
+   file = NULL;
+
+   MCTF_ASSERT(pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem) == 0,
+               cleanup, "failed to create shared memory for the test configuration");
+   MCTF_ASSERT_PTR_NONNULL(shmem, cleanup, "shared memory pointer is NULL");
+
+   pgmoneta_init_main_configuration(shmem);
+   config = (struct main_configuration*)shmem;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_main_configuration(shmem, path), 0,
+                      cleanup, "pgmoneta_read_main_configuration should parse a config with an over-long key/value without failing");
+
+   MCTF_ASSERT(strlen(config->host) < MISC_LENGTH, cleanup,
+               "host must be truncated to fit within MISC_LENGTH, not left unset or overrun");
+   MCTF_ASSERT(strlen(config->host) > 0, cleanup,
+               "host should still hold the truncated value, not be empty");
+
+   MCTF_ASSERT(strlen(config->s3.base_dir) > MISC_LENGTH, cleanup,
+               "s3_base_dir must not be truncated at MISC_LENGTH");
+
+cleanup:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   if (shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+   }
+   unlink(path);
    MCTF_FINISH();
 }
