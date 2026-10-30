@@ -91,6 +91,7 @@ static unsigned int as_update_process_title(char* str, unsigned int default_poli
 static int as_logging_rotation_size(char* str, int* size);
 static int as_seconds(char* str, pgmoneta_time_t* time, pgmoneta_time_t default_age);
 static int as_bytes(char* str, int* bytes, int default_bytes);
+static int as_retention_value(char* str, int* value);
 static int as_retention(char* str, int* days, int* weeks, int* months, int* years);
 static int as_create_slot(char* str, int* create_slot);
 static char* get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year);
@@ -5551,10 +5552,58 @@ as_compression(char* str)
 }
 
 static int
+as_retention_value(char* str, int* value)
+{
+   size_t len = 0;
+
+   while (*str != '\0' && isspace((unsigned char)*str))
+   {
+      str++;
+   }
+
+   len = strlen(str);
+   while (len > 0 && isspace((unsigned char)str[len - 1]))
+   {
+      str[len - 1] = '\0';
+      len--;
+   }
+
+   // an empty value or a placeholder leaves the field unset
+   if (*str == '\0' || pgmoneta_compare_string(str, "X") || pgmoneta_compare_string(str, "x") || pgmoneta_compare_string(str, "-"))
+   {
+      *value = -1;
+      return 0;
+   }
+
+   if (as_int(str, value) || *value < 0)
+   {
+      return 1;
+   }
+
+   if (*value == 0)
+   {
+      *value = -1;
+   }
+
+   return 0;
+}
+
+static int
 as_retention(char* str, int* days, int* weeks, int* months, int* years)
 {
+   int* fields[] = {days, weeks, months, years};
+   int values[] = {-1, -1, -1, -1};
+   char* copied_str = NULL;
+   char* token = NULL;
+   char* next = NULL;
+
+   if (*str == '\0')
+   {
+      goto error;
+   }
+
    // make a deep copy because the parsing break the input string
-   char* copied_str = (char*)malloc(strlen(str) + 1);
+   copied_str = (char*)malloc(strlen(str) + 1);
 
    if (copied_str == NULL)
    {
@@ -5564,181 +5613,36 @@ as_retention(char* str, int* days, int* weeks, int* months, int* years)
    memset(copied_str, 0, strlen(str) + 1);
    memcpy(copied_str, str, strlen(str));
 
-   char* token = strtok(copied_str, ",");
-   if (token == NULL)
+   // split on each comma so an empty field keeps its position
+   token = copied_str;
+   for (int i = 0; i < 4 && token != NULL; i++)
+   {
+      next = strchr(token, ',');
+      if (next != NULL)
+      {
+         *next = '\0';
+         next++;
+      }
+
+      if (as_retention_value(token, &values[i]))
+      {
+         goto error;
+      }
+
+      token = next;
+   }
+
+   // the format is days, weeks, months, years, so a fifth field, even an empty one, is an error
+   if (token != NULL)
    {
       goto error;
    }
-   while (*token != '\0' && isspace((unsigned char)*token))
+
+   for (int i = 0; i < 4; i++)
    {
-      token++;
+      *fields[i] = values[i];
    }
-   if (*token == '\0')
-   {
-      // allowing spaces or empty values
-      *days = -1;
-   }
-   else
-   {
-      // remove trailing spaces
-      size_t len = strlen(token);
-      while (len > 0 && isspace(token[len - 1]))
-      {
-         token[len - 1] = '\0';
-         len--;
-      }
-      if (as_int(token, days))
-      {
-         if (pgmoneta_compare_string(token, "X") || pgmoneta_compare_string(token, "x") || pgmoneta_compare_string(token, "-"))
-         {
-            *days = -1;
-         }
-         else
-         {
-            goto error;
-         }
-      }
-      if (*days < 0)
-      {
-         goto error;
-      }
-      if (*days == 0)
-      {
-         *days = -1;
-      }
-   }
-   token = strtok(NULL, ",");
-   if (token == NULL)
-   {
-      // input stops on days
-      free(copied_str);
-      return 0;
-   }
-   while (*token != '\0' && isspace((unsigned char)*token))
-   {
-      token++;
-   }
-   if (*token == '\0')
-   {
-      *weeks = -1;
-   }
-   else
-   {
-      // remove trailing spaces
-      size_t len = strlen(token);
-      while (len > 0 && isspace(token[len - 1]))
-      {
-         token[len - 1] = '\0';
-         len--;
-      }
-      if (as_int(token, weeks))
-      {
-         if (pgmoneta_compare_string(token, "X") || pgmoneta_compare_string(token, "x") || pgmoneta_compare_string(token, "-"))
-         {
-            *weeks = -1;
-         }
-         else
-         {
-            goto error;
-         }
-      }
-      if (*weeks < 0)
-      {
-         goto error;
-      }
-      if (*weeks == 0)
-      {
-         *weeks = -1;
-      }
-   }
-   token = strtok(NULL, ",");
-   if (token == NULL)
-   {
-      // input stops on weeks
-      free(copied_str);
-      return 0;
-   }
-   while (*token != '\0' && isspace((unsigned char)*token))
-   {
-      token++;
-   }
-   if (*token == '\0')
-   {
-      *weeks = -1;
-   }
-   else
-   {
-      // remove trailing spaces
-      size_t len = strlen(token);
-      while (len > 0 && isspace(token[len - 1]))
-      {
-         token[len - 1] = '\0';
-         len--;
-      }
-      if (as_int(token, months))
-      {
-         if (pgmoneta_compare_string(token, "X") || pgmoneta_compare_string(token, "x") || pgmoneta_compare_string(token, "-"))
-         {
-            *months = -1;
-         }
-         else
-         {
-            goto error;
-         }
-      }
-      if (*months < 0)
-      {
-         goto error;
-      }
-      if (*months == 0)
-      {
-         *months = -1;
-      }
-   }
-   token = strtok(NULL, ",");
-   if (token == NULL)
-   {
-      // input stops on months
-      free(copied_str);
-      return 0;
-   }
-   while (*token != '\0' && isspace((unsigned char)*token))
-   {
-      token++;
-   }
-   if (*token == '\0')
-   {
-      *years = -1;
-   }
-   else
-   {
-      // remove trailing spaces
-      size_t len = strlen(token);
-      while (len > 0 && isspace(token[len - 1]))
-      {
-         token[len - 1] = '\0';
-         len--;
-      }
-      if (as_int(token, years))
-      {
-         if (pgmoneta_compare_string(token, "X") || pgmoneta_compare_string(token, "x") || pgmoneta_compare_string(token, "-"))
-         {
-            *years = -1;
-         }
-         else
-         {
-            goto error;
-         }
-      }
-      if (*years < 0)
-      {
-         goto error;
-      }
-      if (*years == 0)
-      {
-         *years = -1;
-      }
-   }
+
    free(copied_str);
    return 0;
 error:

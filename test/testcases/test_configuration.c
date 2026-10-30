@@ -31,6 +31,7 @@
 #include <json.h>
 #include <management.h>
 #include <mctf.h>
+#include <shmem.h>
 #include <tsclient.h>
 #include <tscommon.h>
 #include <utils.h>
@@ -128,6 +129,127 @@ MCTF_TEST(test_configuration_get_returns_set_values)
                "conf get metrics_cache_max_age failed");
    MCTF_ASSERT(pgmoneta_tsclient_conf_get(CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, 0) == 0, cleanup,
                "conf get log_rotation_age failed");
+
+cleanup:
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_configuration_retention_parse)
+{
+   struct main_configuration* config = NULL;
+   bool shmem_allocated = false;
+   struct
+   {
+      char* name;
+      int retention[4]; /* days, weeks, months, years; -1 is unset */
+   } expected[] = {
+      {"valid", {7, 4, 3, 1}},
+      {"blank_months", {7, 4, -1, 1}},
+      {"blank_weeks", {7, -1, 3, 1}},
+      {"blank_years", {7, 4, 3, -1}},
+      {"placeholders", {7, -1, -1, 1}},
+      {"empty_field", {7, 4, -1, 1}},
+      {"zero", {7, -1, 3, 1}},
+      {"negative", {-1, -1, -1, -1}},
+      {"non_numeric", {-1, -1, -1, -1}},
+      {"extra_field", {-1, -1, -1, -1}},
+      {"extra_field_whitespace", {-1, -1, -1, -1}},
+      {"trailing_comma", {-1, -1, -1, -1}},
+   };
+   int number_of_expected = sizeof(expected) / sizeof(expected[0]);
+
+   if (shmem == NULL)
+   {
+      MCTF_ASSERT_INT_EQ(pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem), 0,
+                         cleanup, "failed to create shared memory");
+      shmem_allocated = true;
+   }
+
+   pgmoneta_test_config_save();
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_load_conf(TEST_CONF_DIR "/retention/01.conf"), 0,
+                      cleanup, "failed to read retention/01.conf");
+
+   config = (struct main_configuration*)shmem;
+
+   // The documented default
+   MCTF_ASSERT_INT_EQ(config->retention_days, 7, cleanup, "global: days should be 7");
+   MCTF_ASSERT_INT_EQ(config->retention_weeks, -1, cleanup, "global: weeks should be unset");
+   MCTF_ASSERT_INT_EQ(config->retention_months, -1, cleanup, "global: months should be unset");
+   MCTF_ASSERT_INT_EQ(config->retention_years, -1, cleanup, "global: years should be unset");
+
+   MCTF_ASSERT_INT_EQ(config->common.number_of_servers, number_of_expected,
+                      cleanup, "expected %d servers, got %d", number_of_expected, config->common.number_of_servers);
+
+   for (int i = 0; i < number_of_expected; i++)
+   {
+      struct server* srv = &config->common.servers[i];
+
+      MCTF_ASSERT_STR_EQ(srv->name, expected[i].name, cleanup, "server %d should be %s", i, expected[i].name);
+      MCTF_ASSERT_INT_EQ(srv->retention_days, expected[i].retention[0],
+                         cleanup, "%s: days %d, expected %d", srv->name, srv->retention_days, expected[i].retention[0]);
+      MCTF_ASSERT_INT_EQ(srv->retention_weeks, expected[i].retention[1],
+                         cleanup, "%s: weeks %d, expected %d", srv->name, srv->retention_weeks, expected[i].retention[1]);
+      MCTF_ASSERT_INT_EQ(srv->retention_months, expected[i].retention[2],
+                         cleanup, "%s: months %d, expected %d", srv->name, srv->retention_months, expected[i].retention[2]);
+      MCTF_ASSERT_INT_EQ(srv->retention_years, expected[i].retention[3],
+                         cleanup, "%s: years %d, expected %d", srv->name, srv->retention_years, expected[i].retention[3]);
+   }
+
+cleanup:
+   pgmoneta_test_config_restore();
+   if (shmem_allocated)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+      shmem = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_configuration_retention_accept)
+{
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 4, 3, 1", 0) == 0, cleanup,
+               "conf set retention 7, 4, 3, 1 failed");
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 4, , 1", 0) == 0, cleanup,
+               "conf set retention 7, 4, , 1 failed");
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7,4,,1", 0) == 0, cleanup,
+               "conf set retention 7,4,,1 failed");
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 4, X, 1", 0) == 0, cleanup,
+               "conf set retention 7, 4, X, 1 failed");
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 0, 3, 1", 0) == 0, cleanup,
+               "conf set retention 7, 0, 3, 1 failed");
+
+   // The documented default, last so the server ends up with the same retention as the test configuration
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, - , - , -", 0) == 0, cleanup,
+               "conf set retention 7, - , - , - failed");
+
+cleanup:
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_configuration_retention_reject)
+{
+   pgmoneta_test_setup();
+
+   // Negative value
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 4, -3, 1", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set retention 7, 4, -3, 1 should fail");
+
+   // Non-numeric
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, abc, 3, 1", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set retention 7, abc, 3, 1 should fail");
+
+   // More than four fields
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 4, 3, 1, 9", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set retention 7, 4, 3, 1, 9 should fail");
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7 , 4 , 3 , 1 , 9 ", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set retention 7 , 4 , 3 , 1 , 9 should fail");
+   MCTF_ASSERT(pgmoneta_tsclient_conf_set(CONFIGURATION_ARGUMENT_RETENTION, "7, 4, 3, 1,", MANAGEMENT_ERROR_CONF_SET_ERROR) == 0, cleanup,
+               "conf set retention 7, 4, 3, 1, should fail");
 
 cleanup:
    pgmoneta_test_teardown();
