@@ -80,9 +80,9 @@
 #define VM_XLOG_CATALOG_REL 0x04
 
 /* PG19 CheckPoint wire layout (mirrors struct check_point_v19 in
- * migration_engine.c). Real PG19 CheckPoint carries nextOid between nextXid
+ * walfile/pg_control.h). Real PG19 CheckPoint carries nextOid between nextXid
  * and nextMulti, exactly like PG18's - the field order below is the true
- * on-disk layout (checked against REL_19_BETA3 pg_control.h). */
+ * on-disk layout (checked against REL_19_STABLE pg_control.h). */
 struct walbridge_checkpoint_v19
 {
    xlog_rec_ptr redo;
@@ -103,7 +103,6 @@ struct walbridge_checkpoint_v19
    transaction_id oldest_commit_ts_xid;
    transaction_id newest_commit_ts_xid;
    transaction_id oldest_active_xid;
-   uint32_t data_checksum_state;
 };
 
 static bool test_shmem_allocated = false;
@@ -456,7 +455,6 @@ MCTF_TEST(test_walbridge_migration_checkpoint)
    MCTF_ASSERT_INT_EQ(v19.oldest_commit_ts_xid, v17.oldest_commit_ts_xid, cleanup, "oldest_commit_ts_xid not preserved");
    MCTF_ASSERT_INT_EQ(v19.newest_commit_ts_xid, v17.newest_commit_ts_xid, cleanup, "newest_commit_ts_xid not preserved");
    MCTF_ASSERT_INT_EQ(v19.oldest_active_xid, v17.oldest_active_xid, cleanup, "oldest_active_xid not preserved");
-   MCTF_ASSERT_INT_EQ((int)v19.data_checksum_state, 1, cleanup, "beta3 checksum state must be on when requested");
 
 cleanup:
    destroy_decoded_record(rec);
