@@ -52,6 +52,7 @@ extern int s3_upload(int server, char* label, int compression, int encryption);
 extern int s3_cleanup(int server, char* label);
 extern int s3_download(int server, char* label, int compression, int encryption);
 extern int azure_upload(int server, char* label, int compression, int encryption);
+extern int azure_cleanup(int server, char* label);
 extern int azure_download(int server, char* label, int compression, int encryption);
 extern int gcs_upload(int server, char* label, int compression, int encryption);
 extern int gcs_download(int server, char* label, int compression, int encryption);
@@ -76,7 +77,7 @@ static const struct storage_engine engines[] = {
     s3_upload, s3_cleanup, s3_download},
    {"Azure", STORAGE_ENGINE_AZURE,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
-    azure_upload, NULL, azure_download},
+    azure_upload, azure_cleanup, azure_download},
    {"GCS", STORAGE_ENGINE_GCS,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
     gcs_upload, NULL, gcs_download},
