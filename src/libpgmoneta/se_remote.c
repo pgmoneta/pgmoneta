@@ -46,10 +46,10 @@
 #include <stdlib.h>
 #include <time.h>
 
-/* Per-backend upload/cleanup entry points defined in their respective se_*.c */
+/* Per-backend upload/cleanup entry points defined in their respective se_*.c
+ * (pgmoneta_s3_cleanup lives in storage.h). */
 extern int ssh_upload(int server, char* label, int compression, int encryption);
 extern int s3_upload(int server, char* label, int compression, int encryption);
-extern int s3_cleanup(int server, char* label);
 extern int s3_download(int server, char* label, int compression, int encryption);
 extern int azure_upload(int server, char* label, int compression, int encryption);
 extern int azure_download(int server, char* label, int compression, int encryption);
@@ -73,7 +73,7 @@ static const struct storage_engine engines[] = {
     ssh_upload, NULL, NULL},
    {"S3", STORAGE_ENGINE_S3,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_BATCH_DELETE | STORAGE_CAP_MULTIPART | STORAGE_CAP_PARALLEL_SAFE,
-    s3_upload, s3_cleanup, s3_download},
+    s3_upload, pgmoneta_s3_cleanup, s3_download},
    {"Azure", STORAGE_ENGINE_AZURE,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
     azure_upload, NULL, azure_download},
