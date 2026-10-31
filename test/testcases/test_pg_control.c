@@ -197,6 +197,8 @@ MCTF_TEST(test_pg19_beta4_wal_layout)
                       "PostgreSQL 19 beta4 WAL magic is incorrect");
    MCTF_ASSERT_INT_EQ(sizeof(struct check_point_v19), 96, cleanup,
                       "PostgreSQL 19 beta4 checkpoint layout has the wrong size");
+   MCTF_ASSERT_INT_EQ(offsetof(struct check_point_v19, data_checksum_state), 92, cleanup,
+                      "PostgreSQL 19 beta4 checkpoint checksum-state offset is incorrect");
    MCTF_ASSERT_INT_EQ(offsetof(struct control_file_data_v19, crc), 308, cleanup,
                       "PostgreSQL 19 beta4 pg_control CRC offset is incorrect");
 

@@ -60,7 +60,7 @@
 #define CHECKPOINT_V18_SIZE 88
 #define CHECKPOINT_V19_SIZE 96
 
-/* PG18 data checksum state (stored in PostgreSQL's pg_control, not in WAL) */
+/* PG19 RM_XLOG2 checksum-state values */
 #define PG_DATA_CHECKSUM_OFF 0
 #define PG_DATA_CHECKSUM_ON  1
 
@@ -71,32 +71,9 @@
 
 #define INFO(x)                     ((x)->header.xl_info & ~XLR_INFO_MASK)
 
-struct check_point_v19
-{
-   xlog_rec_ptr redo;
-   timeline_id this_timeline_id;
-   timeline_id prev_timeline_id;
-   bool full_page_writes;
-   int wal_level;
-   bool logical_decoding_enabled;
-   struct full_transaction_id next_xid;
-   oid next_oid;
-   multi_xact_id next_multi;
-   uint64_t next_multi_offset;
-   transaction_id oldest_xid;
-   oid oldest_xid_db;
-   multi_xact_id oldest_multi;
-   oid oldest_multi_db;
-   pg_time_t time;
-   transaction_id oldest_commit_ts_xid;
-   transaction_id newest_commit_ts_xid;
-   transaction_id oldest_active_xid;
-   uint32_t data_checksum_state;
-};
-
 /* Lock the wire sizes at compile time so a field edit cannot silently fall out
  * of sync with the real PostgreSQL layouts (REL_18_STABLE = 88 bytes,
- * REL_19_BETA3 = 96 bytes). */
+ * REL_19_BETA4 = 96 bytes). */
 typedef char static_assert_v17_checkpoint_size[(sizeof(struct check_point_v17) == CHECKPOINT_V18_SIZE) ? 1 : -1];
 typedef char static_assert_v19_checkpoint_size[(sizeof(struct check_point_v19) == CHECKPOINT_V19_SIZE) ? 1 : -1];
 
@@ -340,7 +317,6 @@ translate_checkpoint(struct decoded_xlog_record* record, bool data_checksums)
    v19.newest_commit_ts_xid = v17.newest_commit_ts_xid;
    v19.oldest_active_xid = v17.oldest_active_xid;
    v19.data_checksum_state = data_checksums ? PG_DATA_CHECKSUM_ON : PG_DATA_CHECKSUM_OFF;
-
    new_data = malloc(CHECKPOINT_V19_SIZE);
    if (!new_data)
    {

@@ -152,8 +152,8 @@ struct check_point_v17
  * @struct check_point_v19
  * @brief PostgreSQL 19 checkpoint record.
  *
- * PostgreSQL 19 adds logical_decoding_enabled and widens next_multi_offset to
- * 64 bits.
+ * PostgreSQL 19 adds logical_decoding_enabled, widens next_multi_offset to
+ * 64 bits, and records the current data checksum state.
  */
 struct check_point_v19
 {
@@ -175,6 +175,7 @@ struct check_point_v19
    transaction_id oldest_commit_ts_xid;
    transaction_id newest_commit_ts_xid;
    transaction_id oldest_active_xid;
+   uint32_t data_checksum_state;
 };
 
 /** PostgreSQL 19 CHECKPOINT_REDO record payload. */
