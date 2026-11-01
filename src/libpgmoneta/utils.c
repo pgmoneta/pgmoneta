@@ -5192,7 +5192,7 @@ pgmoneta_escape_string(char* str)
    len = strlen(str);
    for (int i = 0; i < len; i++)
    {
-      if (str[i] == '\"' || str[i] == '\'' || str[i] == '\\' || str[i] == '\n' || str[i] == '\t' || str[i] == '\r')
+      if (str[i] == '\"' || str[i] == '\\' || str[i] == '\n' || str[i] == '\t' || str[i] == '\r')
       {
          translated_len++;
       }
@@ -5205,7 +5205,6 @@ pgmoneta_escape_string(char* str)
       switch (str[i])
       {
          case '\\':
-         case '\'':
          case '\"':
             translated_ec_string[idx] = '\\';
             idx++;
