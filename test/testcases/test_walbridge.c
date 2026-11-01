@@ -1691,6 +1691,67 @@ cleanup:
    rmdir(base);
    MCTF_FINISH();
 }
+/* A record whose data lengths add up to more than the record holds must be
+ * rejected, as PostgreSQL does, instead of being copied past the end of the
+ * record. */
+MCTF_TEST(test_walbridge_reader_rejects_bad_data_length)
+{
+   char base[PATH_MAX];
+   char seg[PATH_MAX];
+   char* buf = NULL;
+   FILE* fd = NULL;
+   struct walfile* wf = NULL;
+   uint64_t sysid = 0x0102030405060708ULL;
+   uint32_t seg_size = 32768;
+   uint32_t blcksz = 8192;
+   uint32_t claimed_len = 4096;
+   int count = 0;
+
+   pgmoneta_snprintf(base, sizeof(base), "%s", "/tmp/walbridge_test_bad_data_length");
+   pgmoneta_mkdir(base);
+   pgmoneta_snprintf(seg, sizeof(seg), "%s/%s", base, "000000010000000000000001");
+
+   unlink(seg);
+
+   buf = calloc(1, seg_size);
+   MCTF_ASSERT_PTR_NONNULL(buf, cleanup, "alloc buf failed");
+
+   write_long_header_craft(buf, XLP_LONG_HEADER, 32768, 0, sysid, seg_size, blcksz);
+   write_page_header_craft(buf, 8192, WAL_MAGIC_V18, 0, 40960, 0);
+   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, 0, 49152, 0);
+   write_page_header_craft(buf, 24576, WAL_MAGIC_V18, 0, 57344, 0);
+
+   /* [DataLong][u32 len] claims 4096 bytes of main data, but the record
+    * carries only 16 */
+   write_record_header_craft(buf, 40, SIZE_OF_XLOG_RECORD + 5 + 16);
+   ((uint8_t*)buf)[40 + SIZE_OF_XLOG_RECORD] = (uint8_t)XLR_BLOCK_ID_DATA_LONG;
+   memcpy(buf + 40 + SIZE_OF_XLOG_RECORD + 1, &claimed_len, sizeof(uint32_t));
+   memset(buf + 40 + SIZE_OF_XLOG_RECORD + 5, 0x41, 16);
+
+   fd = fopen(seg, "wb");
+   MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open seg failed");
+   MCTF_ASSERT_INT_EQ(fwrite(buf, 1, seg_size, fd), (int)seg_size, cleanup, "write seg failed");
+   fclose(fd);
+   fd = NULL;
+
+   MCTF_ASSERT(parse_craft_segment(seg, &wf, &count) != 0, cleanup,
+               "a record with more data than it holds must be rejected");
+
+cleanup:
+   if (fd)
+   {
+      fclose(fd);
+   }
+   free(buf);
+   if (wf)
+   {
+      pgmoneta_destroy_walfile(wf);
+   }
+   unlink(seg);
+   rmdir(base);
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_walbridge_reader_multi_page_segment_continuations)
 {
    const uint32_t seg_size = 1024 * 1024; /* PostgreSQL-valid WAL segment size */

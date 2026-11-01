@@ -1062,7 +1062,10 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
          goto err;
       }
    }
-   assert(remaining == datatotal);
+   if (remaining != datatotal)
+   {
+      goto shortdata_err;
+   }
 
    for (block_id = 0; block_id <= decoded->max_block_id; block_id++)
    {
