@@ -440,7 +440,7 @@ xact_desc_commit_v14(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_
       buf = pgmoneta_format_and_append(buf, "%u: ", parsed.twophase_xid);
    }
 
-   buf = pgmoneta_format_and_append(buf, pgmoneta_wal_timestamptz_to_str(xlrec->xact_time));
+   buf = pgmoneta_format_and_append(buf, "%s", pgmoneta_wal_timestamptz_to_str(xlrec->xact_time));
 
    buf = xact_desc_relations(buf, "rels", parsed.nrels, parsed.xnodes);
    buf = xact_desc_subxacts(buf, parsed.nsubxacts, parsed.subxacts);
@@ -476,7 +476,7 @@ xact_desc_commit_v15(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_
       buf = pgmoneta_format_and_append(buf, "%u: ", parsed.twophase_xid);
    }
 
-   buf = pgmoneta_format_and_append(buf, pgmoneta_wal_timestamptz_to_str(xlrec->xact_time));
+   buf = pgmoneta_format_and_append(buf, "%s", pgmoneta_wal_timestamptz_to_str(xlrec->xact_time));
 
    buf = xact_desc_relations(buf, "rels", parsed.nrels, parsed.xnodes);
    buf = xact_desc_subxacts(buf, parsed.nsubxacts, parsed.subxacts);
@@ -513,7 +513,7 @@ xact_desc_abort_v14(char* buf, uint8_t info, struct xl_xact_abort* xlrec)
       buf = pgmoneta_format_and_append(buf, "%u: ", parsed.twophase_xid);
    }
 
-   buf = pgmoneta_format_and_append(buf, pgmoneta_wal_timestamptz_to_str(xlrec->xact_time));
+   buf = pgmoneta_format_and_append(buf, "%s", pgmoneta_wal_timestamptz_to_str(xlrec->xact_time));
 
    buf = xact_desc_relations(buf, "rels", parsed.nrels, parsed.xnodes);
    buf = xact_desc_subxacts(buf, parsed.nsubxacts, parsed.subxacts);
@@ -533,7 +533,7 @@ xact_desc_abort_v15(char* buf, uint8_t info, struct xl_xact_abort* xlrec)
       buf = pgmoneta_format_and_append(buf, "%u: ", parsed.twophase_xid);
    }
 
-   buf = pgmoneta_format_and_append(buf, pgmoneta_wal_timestamptz_to_str(xlrec->xact_time));
+   buf = pgmoneta_format_and_append(buf, "%s", pgmoneta_wal_timestamptz_to_str(xlrec->xact_time));
 
    buf = xact_desc_relations(buf, "rels", parsed.nrels, parsed.xnodes);
    buf = xact_desc_subxacts(buf, parsed.nsubxacts, parsed.subxacts);
@@ -549,7 +549,7 @@ xact_desc_prepare_v14(char* buf, uint8_t info, struct xl_xact_prepare_v14* xlrec
    parse_prepare_record_v14(info, xlrec, &parsed);
 
    buf = pgmoneta_format_and_append(buf, "gid %s: ", parsed.twophase_gid);
-   buf = pgmoneta_format_and_append(buf, pgmoneta_wal_timestamptz_to_str(parsed.xact_time));
+   buf = pgmoneta_format_and_append(buf, "%s", pgmoneta_wal_timestamptz_to_str(parsed.xact_time));
 
    buf = xact_desc_relations(buf, "rels(commit)", parsed.nrels, parsed.xnodes);
    buf = xact_desc_relations(buf, "rels(abort)", parsed.nabortrels,
@@ -568,7 +568,7 @@ xact_desc_prepare_v15(char* buf, uint8_t info, struct xl_xact_prepare_v15* xlrec
    parse_prepare_record_v15(info, xlrec, &parsed);
 
    buf = pgmoneta_format_and_append(buf, "gid %s: ", parsed.twophase_gid);
-   buf = pgmoneta_format_and_append(buf, pgmoneta_wal_timestamptz_to_str(parsed.xact_time));
+   buf = pgmoneta_format_and_append(buf, "%s", pgmoneta_wal_timestamptz_to_str(parsed.xact_time));
 
    buf = xact_desc_relations(buf, "rels(commit)", parsed.nrels, parsed.xnodes);
    buf = xact_desc_relations(buf, "rels(abort)", parsed.nabortrels,

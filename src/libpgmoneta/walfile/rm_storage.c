@@ -42,7 +42,7 @@ pgmoneta_wal_storage_desc(char* buf, struct decoded_xlog_record* record)
       struct xl_smgr_create* xlrec = (struct xl_smgr_create*)rec;
       char* path = RELPATHPERM(xlrec->rnode, xlrec->forkNum);
 
-      buf = pgmoneta_format_and_append(buf, path);
+      buf = pgmoneta_format_and_append(buf, "%s", path);
       free(path);
    }
    else if (info == XLOG_SMGR_TRUNCATE)

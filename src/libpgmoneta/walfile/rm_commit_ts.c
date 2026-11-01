@@ -76,7 +76,7 @@ xl_commit_ts_truncate_format_v16(struct xl_commit_ts_truncate* wrapper, char* bu
 char*
 xl_commit_ts_truncate_format_v17(struct xl_commit_ts_truncate* wrapper, char* buf)
 {
-   return pgmoneta_format_and_append(buf, "pageno %d, oldest_xid %u",
+   return pgmoneta_format_and_append(buf, "pageno %" PRId64 ", oldest_xid %u",
                                      wrapper->data.v17.pageno, wrapper->data.v17.oldestXid);
 }
 

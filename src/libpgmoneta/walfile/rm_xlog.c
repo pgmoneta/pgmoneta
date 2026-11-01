@@ -376,7 +376,7 @@ pgmoneta_wal_xlog_desc(char* buf, struct decoded_xlog_record* record)
    {
       struct xl_restore_point* xlrec = (struct xl_restore_point*)rec;
 
-      buf = pgmoneta_format_and_append(buf, xlrec->rp_name);
+      buf = pgmoneta_format_and_append(buf, "%s", xlrec->rp_name);
    }
    else if (info == XLOG_CHECKPOINT_REDO)
    {

@@ -1342,7 +1342,7 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
          if (forknum != MAIN_FORKNUM)
          {
             buf = pgmoneta_format_and_append(buf,
-                                             ", blkref #%d: rel %u/%u/%u fork %d blk %u",
+                                             ", blkref #%d: rel %s/%s/%s fork %d blk %u",
                                              block_id,
                                              spcname, dbname, relname,
                                              forknum,
@@ -1351,7 +1351,7 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
          else
          {
             buf = pgmoneta_format_and_append(buf,
-                                             ", blkref #%d: rel %u/%u/%u blk %u",
+                                             ", blkref #%d: rel %s/%s/%s blk %u",
                                              block_id,
                                              spcname, dbname, relname,
                                              blk);
