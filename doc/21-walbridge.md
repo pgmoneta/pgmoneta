@@ -19,8 +19,8 @@ only when serving a downstream physical replication client.
 
 ## Requirements
 
-- PostgreSQL **18** primary and PostgreSQL **19 beta3** client tools.
-- **Data checksums are always supported.** The primary may be initialized with data checksums enabled or disabled; the migration engine recomputes the block/page checksums of full-page images and propagates the data-checksum state, so no `--no-data-checksums` is needed. Record CRCs are always recomputed.
+- PostgreSQL **18** primary and PostgreSQL **19** client tools (beta4 or later).
+- **Data checksums are always supported.** The primary may be initialized with data checksums enabled or disabled; the migration engine recomputes the block/page checksums of full-page images, so no `--no-data-checksums` is needed. Record CRCs are always recomputed.
 - The upstream `wal_slot` must be created on the PostgreSQL 18 primary before `pgmoneta-walbridge` starts. The reference downstream client is PostgreSQL 19 `pg_receivewal`; it speaks the bridge's independent downstream LSN space. The sender currently implements one durable downstream retention watermark, not PostgreSQL slot catalog management.
 - Both links of the chain use **SCRAM-SHA-256**: the upstream connection from the receiver to the PostgreSQL 18 primary, and the downstream connection from the PostgreSQL 19 client to the sender. Credentials on both links come from the per-server `user` and `pgmoneta_users.conf`.
 - The raw upstream WAL archive is `<base_dir>/<server-section>/wal/`. The LSN

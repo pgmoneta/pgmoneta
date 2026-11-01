@@ -27,13 +27,13 @@ For installation, configuration and usage see **21-walbridge.md**.
 3. **Sender**: on `START_REPLICATION`, resolves the requested downstream LSN with the persisted map, reads the relevant raw WAL records, translates them, encodes PostgreSQL 19 WAL, and sends contiguous `XLogData`. It records and flushes new LSN-map entries before publishing the associated stream bytes.
 
 4. **Migration engine**: translates 18.x records to 19.x. Notable translations:
-   - `XLOG_CHECKPOINT_ONLINE` / `XLOG_CHECKPOINT_SHUTDOWN` carry the CheckPoint record, grown from 88 bytes to 96: `logicalDecodingEnabled` is inserted and `MultiXactOffset` is widened 32 → 64 bit, with the checksum state placed in the tail padding. PostgreSQL's CheckPoint **does** carry `nextOid` (after `nextXid`, before the multi/oldest fields) on both sides, and it is preserved field-for-field by the translator. `XLOG_NEXTOID` records pass through untouched.
-   - `XLOG_CHECKPOINT_REDO`: 4-byte `{wal_level}` payload becomes 8-byte `{wal_level, data_checksum_version}`. Data checksums are always supported, so the downstream checkpoint advertises data checksums enabled.
+   - `XLOG_CHECKPOINT_ONLINE` / `XLOG_CHECKPOINT_SHUTDOWN` carry the CheckPoint record, grown from 88 bytes to 96: `logicalDecodingEnabled` is inserted and `MultiXactOffset` is widened 32 → 64 bit; the last 4 bytes are padding. PostgreSQL's CheckPoint **does** carry `nextOid` (after `nextXid`, before the multi/oldest fields) on both sides, and it is preserved field-for-field by the translator. `XLOG_NEXTOID` records pass through untouched.
+   - `XLOG_CHECKPOINT_REDO`: the 4-byte `{wal_level}` payload is the same in 18.x and 19.x and passes through unchanged.
    - `XLOG_HEAP2_PRUNE_VACUUM_CLEANUP`: 8-byte `{oldest_xid, new_relfilenumber, flags, nredirected, ndead}` layout becomes the 19.x 16-byte `{oldest_xid, new_relfilenumber, flags, nredirected, ndead, 0, 0, 0}` layout.
    - `XLOG_HEAP2_VISIBLE`, `XLOG_MULTIXACT_CREATE_ID`, `XLOG_MULTIXACT_TRUNCATE_ID` and `XLOG_GIST_ASSIGN_LSN` are handled so that the downstream chaining (`xl_prev`) and record CRCs stay correct.
    - Every translated record gets a recomputed CRC-32C (Castagnoli) since the payload changed.
 
-5. **Downstream stream layout**: records are laid out at 8-byte aligned positions starting at LSN 40 (after the 40-byte long page header with 19.x magic `0xD121`), chained via `xl_prev`, padded with `MAXALIGN`, and finished with a segment switch + tail pad. Exactly like PostgreSQL, a record that does not fit in the remaining page space continues across the page boundary (partial header or data, then a continuation page carrying `XLP_FIRST_IS_CONTRECORD` and `xlp_rem_len`), so no zero gap is ever left between records. The downstream LSNs are entirely independent of the upstream LSNs.
+5. **Downstream stream layout**: records are laid out at 8-byte aligned positions starting at LSN 40 (after the 40-byte long page header with 19.x magic `0xD122`), chained via `xl_prev`, padded with `MAXALIGN`, and finished with a segment switch + tail pad. Exactly like PostgreSQL, a record that does not fit in the remaining page space continues across the page boundary (partial header or data, then a continuation page carrying `XLP_FIRST_IS_CONTRECORD` and `xlp_rem_len`), so no zero gap is ever left between records. The downstream LSNs are entirely independent of the upstream LSNs.
 
 6. **LSN map and retention**: the map stores `upstream_lsn downstream_lsn` pairs. On a standby status update, the sender maps durable downstream flush feedback backwards and atomically persists it in `<wal dir>/walbridge.lsnmap.feedback`. The receiver retains the raw segment containing that upstream LSN and prunes only older raw segments. `READ_REPLICATION_SLOT` reports the retained downstream floor.
 
@@ -120,7 +120,7 @@ PostgreSQL creates a new WAL segment pre-extended to its full size and zero-fill
 
 ## PG18/PG19 WAL compatibility matrix
 
-Verified against the PostgreSQL 18 and PostgreSQL 19 beta3 headers:
+Verified against the PostgreSQL 18 and PostgreSQL 19 (REL_19_STABLE) headers:
 
 | Concern | PG17 | PG18 | PG19 |
 | :------ | :--- | :--- | :--- |
@@ -129,13 +129,13 @@ Verified against the PostgreSQL 18 and PostgreSQL 19 beta3 headers:
 | Block IDs (`DATA_SHORT 255`, `DATA_LONG 254`, `ORIGIN 253`, `TOPLEVEL_XID 252`) | identical | identical | identical |
 | `xl_heap_prune` | `{reason, flags}` (`XLHP_*`) | `{reason, flags}` (`XLHP_*`) | `{uint16 flags}` (`XLHP_*`) |
 | `xlp_info` flags (`XLP_ALL_FLAGS`) | 0x0001\|0x0002\|0x0004\|0x0008 = 0x000F (BKP_REMOVABLE 0x0004, OVERWRITE_CONTRECORD 0x0008) | identical to 17 (0x000F) | 0x0001\|0x0002\|0x0004 = 0x0007 (BKP_REMOVABLE removed; OVERWRITE_CONTRECORD re-used 0x0004) |
-| WAL magic | 0xD116 | 0xD118 | 0xD121 (PostgreSQL 19 beta3) |
+| WAL magic | 0xD116 | 0xD118 | 0xD122 (PostgreSQL 19 beta4 and later) |
 
 Consequences enforced in pgmoneta:
 
 - The block-header format is identical between 18 and 19, so raw 18.x blocks decode with the same constants; no flag remap is needed for `fork_flags`.
 - The page-header flag `XLP_FIRST_IS_OVERWRITE_CONTRECORD` moved from 0x0008 (17/18) to 0x0004 (19), and `XLP_BKP_REMOVABLE` (0x0004 in 17/18) was removed in 19. `pgmoneta_wal_store_remap_page_flags` maps the 18.x overwrite-contrecord bit 0x0008 → 0x0004 and drops 18.x BKP_REMOVABLE. The reader accepts the 18.x flags; the store never emits them (it builds fresh page headers).
-- The only PG19 target is beta3: it uses magic `0xD121`, carries CheckPoint checksum state, and writes the eight-byte `{int wal_level, uint32 data_checksum_version}` `xl_checkpoint_redo` payload.
+- The PG19 target is beta4 and later (REL_19_STABLE): magic `0xD122`, no checksum state in CheckPoint, and the same four-byte `{int wal_level}` `xl_checkpoint_redo` payload as PG18 (beta3 had `dataChecksumState` and an eight-byte redo payload).
 - `XLH_PRUNE_NO_LOGICAL` does **not** appear in PostgreSQL 17/18/19 prune records. It is a PG15-era flag (`no_untouched_dead_items`) removed in PG17 when the `{reason, flags}` prune format was introduced; nothing in the 18→19 bridge has to handle it.
 - The heap2 prune redo payload differs only in width: 17/18 use `{reason, flags}` and 19 uses a 16-bit `flags`; `pgmoneta_wal_heap2_desc` dispatches on `server_config->version >= 19` to the v19 layout and uses the shared deserializer for the block-0 sub-records (`xlhp_freeze_plans`, redirected/dead/now-unused arrays, `frz_offsets`), whose stored order matches PostgreSQL exactly.
 
@@ -149,7 +149,7 @@ cmake --build build --target pgmoneta-test
 build/test/pgmoneta-test -m walbridge
 ```
 
-The supported live validation uses a PostgreSQL 18 primary and PostgreSQL 19 beta3 `pg_receivewal`/`pg_waldump`; it is documented in `21-walbridge.md`. It validates a received archive, not PostgreSQL 19 recovery from a PostgreSQL 18 data directory.
+The supported live validation uses a PostgreSQL 18 primary and PostgreSQL 19 `pg_receivewal`/`pg_waldump`; it is documented in `21-walbridge.md`. It validates a received archive, not PostgreSQL 19 recovery from a PostgreSQL 18 data directory.
 
 ### Reader check (downstream/store)
 

@@ -60,10 +60,6 @@
 #define CHECKPOINT_V18_SIZE 88
 #define CHECKPOINT_V19_SIZE 96
 
-/* PG18 data checksum state (stored in PostgreSQL's pg_control, not in WAL) */
-#define PG_DATA_CHECKSUM_OFF 0
-#define PG_DATA_CHECKSUM_ON  1
-
 /* PG18 multixact record sizes */
 #define MULTIXACT_CREATE_HDR_V18    12
 #define MULTIXACT_TRUNCATE_SIZE_V18 20
@@ -334,10 +330,9 @@ translate_checkpoint(struct decoded_xlog_record* record, bool data_checksums __a
 }
 
 static int
-translate_checkpoint_redo(struct decoded_xlog_record* record, bool data_checksums)
+translate_checkpoint_redo(struct decoded_xlog_record* record, bool data_checksums __attribute__((unused)))
 {
    int wal_level;
-   char* new_data = NULL;
 
    if (record->main_data_len < sizeof(int))
    {
@@ -355,25 +350,8 @@ translate_checkpoint_redo(struct decoded_xlog_record* record, bool data_checksum
       return -1;
    }
 
-   {
-      uint32_t data_checksum_version = data_checksums ? PG_DATA_CHECKSUM_ON : PG_DATA_CHECKSUM_OFF;
-
-      new_data = malloc(2 * sizeof(int));
-      if (!new_data)
-      {
-         pgmoneta_log_error("migration_engine: out of memory translating checkpoint redo record");
-         return -1;
-      }
-
-      memcpy(new_data, &wal_level, sizeof(int));
-      memcpy(new_data + sizeof(int), &data_checksum_version, sizeof(uint32_t));
-
-      free(record->main_data);
-      record->main_data = new_data;
-      record->main_data_len = 2 * sizeof(int);
-   }
-
-   return PGMONETA_MIGRATION_MODIFIED;
+   /* PostgreSQL 19 keeps the 4-byte {wal_level} payload of PostgreSQL 18 */
+   return PGMONETA_MIGRATION_KEEP;
 }
 
 static int

@@ -806,11 +806,11 @@ MCTF_TEST(test_walbridge_store_roundtrip)
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_write_record(store, rec1), 0, cleanup, "write rec1 failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_sync_partial_page(store), 0, cleanup, "sync rec1 failed");
 
-   /* PostgreSQL 19 beta3 checkpoint redo includes the checksum version. */
+   /* PostgreSQL 19 keeps the 4-byte {wal_level} checkpoint redo payload */
    rec2 = create_decoded_record(RM_XLOG_ID, XLOG_CHECKPOINT_REDO, 0x20000000, &wal_level, sizeof(wal_level));
    MCTF_ASSERT_PTR_NONNULL(rec2, cleanup, "create rec2 failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec2, WAL_MAGIC_V18, WAL_MAGIC_V19, map, true), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate rec2 failed");
-   MCTF_ASSERT_INT_EQ((int)rec2->main_data_len, (int)(2 * sizeof(int)), cleanup, "beta3 checkpoint redo must include checksum version");
+   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec2, WAL_MAGIC_V18, WAL_MAGIC_V19, map, true), PGMONETA_MIGRATION_KEEP, cleanup, "translate rec2 failed");
+   MCTF_ASSERT_INT_EQ((int)rec2->main_data_len, (int)sizeof(int), cleanup, "checkpoint redo must stay {wal_level}");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_write_record(store, rec2), 0, cleanup, "write rec2 failed");
 
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_flush(store), 0, cleanup, "flush failed");
@@ -861,12 +861,7 @@ MCTF_TEST(test_walbridge_store_roundtrip)
       {
          MCTF_ASSERT_INT_EQ(rec->lsn, down2, cleanup, "parsed rec2 lsn mismatch");
          MCTF_ASSERT_INT_EQ(rec->header.xl_prev, down1, cleanup, "second record must chain to first");
-         MCTF_ASSERT_INT_EQ(rec->main_data_len, 8, cleanup, "checkpoint redo main data must be 8 bytes");
-         {
-            uint32_t cksum_version = 0;
-            memcpy(&cksum_version, rec->main_data + 4, sizeof(uint32_t));
-            MCTF_ASSERT_INT_EQ((int)cksum_version, 1, cleanup, "checkpoint redo checksum version must be on");
-         }
+         MCTF_ASSERT_INT_EQ(rec->main_data_len, 4, cleanup, "checkpoint redo main data must be 4 bytes");
       }
    }
    pgmoneta_deque_iterator_destroy(iter);
@@ -2205,7 +2200,7 @@ MCTF_TEST(test_walbridge_encoder_matches_store)
    MCTF_ASSERT_PTR_NONNULL(rec4, cleanup, "create rec4 failed");
 
    MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec2, WAL_MAGIC_V18, WAL_MAGIC_V19, map, false), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate rec2 failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec3, WAL_MAGIC_V18, WAL_MAGIC_V19, map, true), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate rec3 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec3, WAL_MAGIC_V18, WAL_MAGIC_V19, map, true), PGMONETA_MIGRATION_KEEP, cleanup, "translate rec3 failed");
 
    /* feed the identical sequence to the store and the encoder */
    {
@@ -3930,11 +3925,11 @@ MCTF_TEST(test_walbridge_sender_phase_a)
 
    MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(P1, WAL_MAGIC_V18, WAL_MAGIC_V19, map, false), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate P1 failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_write_record(store, P1), 0, cleanup, "write P1 failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(P2, WAL_MAGIC_V18, WAL_MAGIC_V19, map, false), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate P2 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(P2, WAL_MAGIC_V18, WAL_MAGIC_V19, map, false), PGMONETA_MIGRATION_KEEP, cleanup, "translate P2 failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_write_record(store, P2), 0, cleanup, "write P2 failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(P3, WAL_MAGIC_V18, WAL_MAGIC_V19, map, false), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate P3 failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_write_record(store, P3), 0, cleanup, "write P3 failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(P4, WAL_MAGIC_V18, WAL_MAGIC_V19, map, false), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate P4 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(P4, WAL_MAGIC_V18, WAL_MAGIC_V19, map, false), PGMONETA_MIGRATION_KEEP, cleanup, "translate P4 failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_write_record(store, P4), 0, cleanup, "write P4 failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_flush(store), 0, cleanup, "store flush failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 0x20000000, &down2), 0, cleanup, "map down P2 failed");
@@ -4434,7 +4429,7 @@ wb_lt_setup(struct wb_live_tail* t, const char* base, int port)
    upraw = NULL;
 
    if (pgmoneta_migration_engine_translate(L1, WAL_MAGIC_V18, WAL_MAGIC_V19, NULL, false) != PGMONETA_MIGRATION_MODIFIED ||
-       pgmoneta_migration_engine_translate(L2, WAL_MAGIC_V18, WAL_MAGIC_V19, NULL, false) != PGMONETA_MIGRATION_MODIFIED ||
+       pgmoneta_migration_engine_translate(L2, WAL_MAGIC_V18, WAL_MAGIC_V19, NULL, false) != PGMONETA_MIGRATION_KEEP ||
        pgmoneta_migration_engine_translate(L3, WAL_MAGIC_V18, WAL_MAGIC_V19, NULL, false) != PGMONETA_MIGRATION_MODIFIED ||
        pgmoneta_wal_encoder_write_record(refenc, L1, NULL) ||
        pgmoneta_wal_encoder_write_record(refenc, L2, NULL) ||
@@ -4628,7 +4623,7 @@ wb_lt_setup(struct wb_live_tail* t, const char* base, int port)
    if (pgmoneta_wal_encoder_resume(refenc, t->floor_down, (uint64_t)seg_size) ||
        pgmoneta_migration_engine_translate(L1, WAL_MAGIC_V18, WAL_MAGIC_V19, t->map, false) != PGMONETA_MIGRATION_MODIFIED ||
        pgmoneta_wal_encoder_write_record(refenc, L1, NULL) ||
-       pgmoneta_migration_engine_translate(L2, WAL_MAGIC_V18, WAL_MAGIC_V19, t->map, false) != PGMONETA_MIGRATION_MODIFIED ||
+       pgmoneta_migration_engine_translate(L2, WAL_MAGIC_V18, WAL_MAGIC_V19, t->map, false) != PGMONETA_MIGRATION_KEEP ||
        pgmoneta_wal_encoder_write_record(refenc, L2, NULL) ||
        pgmoneta_migration_engine_translate(L3, WAL_MAGIC_V18, WAL_MAGIC_V19, t->map, false) != PGMONETA_MIGRATION_MODIFIED ||
        pgmoneta_wal_encoder_write_record(refenc, L3, NULL))
