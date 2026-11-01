@@ -156,7 +156,7 @@ pgmoneta_wal_standby_desc(char* buf, struct decoded_xlog_record* record)
             goto error;
          }
 
-         buf = pgmoneta_format_and_append(buf, "xid %u db %s rel %u ",
+         buf = pgmoneta_format_and_append(buf, "xid %u db %s rel %s ",
                                           xlrec->locks[i].xid, dbname,
                                           relname);
 

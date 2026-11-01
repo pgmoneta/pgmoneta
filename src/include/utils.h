@@ -1357,7 +1357,7 @@ pgmoneta_get_file_size(char* file_path);
  * @return The resulting string
  */
 char*
-pgmoneta_format_and_append(char* buf, char* format, ...);
+pgmoneta_format_and_append(char* buf, char* format, ...) __attribute__((format(printf, 2, 3)));
 
 /**
  * Wrapper for the atoi() function, which provides NULL input check
