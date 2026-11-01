@@ -241,6 +241,68 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_json_escape_round_trip)
+{
+   struct json* obj = NULL;
+   struct json* parsed = NULL;
+   struct json* cloned = NULL;
+   char* str = NULL;
+   char* value = NULL;
+   struct
+   {
+      char* key;
+      char* value;
+      char* serialized;
+   } cases[] = {
+      {"k", "plain text", "{\"k\":\"plain text\"}"},
+      {"k", "don't delete", "{\"k\":\"don't delete\"}"},
+      {"k", "it's \"quoted\"", "{\"k\":\"it's \\\"quoted\\\"\"}"},
+      {"k", "a\\\"b\\'c\\", "{\"k\":\"a\\\\\\\"b\\\\'c\\\\\"}"},
+      {"it's", "v", "{\"it's\":\"v\"}"},
+      {"k", "\" \\ \n \t \r", "{\"k\":\"\\\" \\\\ \\n \\t \\r\"}"},
+      {"k", "caf\xc3\xa9 \xe6\x97\xa5\xe6\x9c\xac \xf0\x9f\x98\x80", "{\"k\":\"caf\xc3\xa9 \xe6\x97\xa5\xe6\x9c\xac \xf0\x9f\x98\x80\"}"},
+   };
+
+   pgmoneta_test_setup();
+
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+   {
+      pgmoneta_json_create(&obj);
+      pgmoneta_json_put(obj, cases[i].key, (uintptr_t)cases[i].value, ValueString);
+
+      str = pgmoneta_json_to_string(obj, FORMAT_JSON_COMPACT, NULL, 0);
+      MCTF_ASSERT_PTR_NONNULL(str, cleanup, "case %zu: to_string failed", i);
+      MCTF_ASSERT_STR_EQ(str, cases[i].serialized, cleanup, "case %zu: serialized as %s", i, str);
+
+      MCTF_ASSERT(!pgmoneta_json_parse_string(str, &parsed), cleanup, "case %zu: parse failed for %s", i, str);
+      value = (char*)pgmoneta_json_get(parsed, cases[i].key);
+      MCTF_ASSERT_PTR_NONNULL(value, cleanup, "case %zu: key missing after parse", i);
+      MCTF_ASSERT_STR_EQ(value, cases[i].value, cleanup, "case %zu: value changed by parse", i);
+
+      MCTF_ASSERT(!pgmoneta_json_clone(obj, &cloned), cleanup, "case %zu: clone failed", i);
+      value = (char*)pgmoneta_json_get(cloned, cases[i].key);
+      MCTF_ASSERT_PTR_NONNULL(value, cleanup, "case %zu: key missing after clone", i);
+      MCTF_ASSERT_STR_EQ(value, cases[i].value, cleanup, "case %zu: value changed by clone", i);
+
+      free(str);
+      str = NULL;
+      pgmoneta_json_destroy(obj);
+      obj = NULL;
+      pgmoneta_json_destroy(parsed);
+      parsed = NULL;
+      pgmoneta_json_destroy(cloned);
+      cloned = NULL;
+   }
+
+cleanup:
+   free(str);
+   pgmoneta_json_destroy(obj);
+   pgmoneta_json_destroy(parsed);
+   pgmoneta_json_destroy(cloned);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_json_remove)
 {
    struct json* obj = NULL;
