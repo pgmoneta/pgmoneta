@@ -637,12 +637,26 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       MALLOC(buffer, data_length);
 
       // Read record data, possibly across page boundaries
-      if (data_length + ftell(file) >= end_of_page)
       {
          size_t bytes_read = 0;
          size_t total_bytes_read = 0;
          uint32_t remaining_data_length = data_length;
-         bytes_read = fread(buffer, 1, end_of_page - ftell(file), file);
+
+         /* The start of a record continued from the previous segment */
+         if (partial_record->data_buffer_bytes_read != 0)
+         {
+            if (partial_record->data_buffer_bytes_read <= data_length)
+            {
+               memcpy(buffer, partial_record->data_buffer, partial_record->data_buffer_bytes_read);
+               total_bytes_read = partial_record->data_buffer_bytes_read;
+               remaining_data_length -= partial_record->data_buffer_bytes_read;
+            }
+            free(partial_record->data_buffer);
+            partial_record->data_buffer = NULL;
+            partial_record->data_buffer_bytes_read = 0;
+         }
+
+         bytes_read = fread(buffer + total_bytes_read, 1, MIN(remaining_data_length, end_of_page - ftell(file)), file);
          total_bytes_read += bytes_read;
          remaining_data_length -= bytes_read;
          while (remaining_data_length != 0)
@@ -676,52 +690,6 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
             total_bytes_read += bytes_read;
          }
          assert(total_bytes_read == data_length);
-      }
-      else
-      {
-         if (partial_record->data_buffer_bytes_read != 0)
-         {
-            if (partial_record->data_buffer_bytes_read > data_length)
-            {
-               /*
-                * Stale partial data from a previously parsed (torn) segment
-                * tail: the current record is not its continuation, so the
-                * saved bytes cannot belong to this record and would overflow
-                * the (smaller) data buffer. Discard them and read fresh.
-                */
-               free(partial_record->data_buffer);
-               partial_record->data_buffer = NULL;
-               partial_record->data_buffer_bytes_read = 0;
-
-               bytes_read = fread(buffer, 1, data_length, file);
-               if (bytes_read != data_length)
-               {
-                  pgmoneta_log_error("Error: Actual bytes read do not match the expected length");
-                  goto error;
-               }
-            }
-            else
-            {
-               /* Copy partial data from previous file */
-               memcpy(buffer, partial_record->data_buffer, partial_record->data_buffer_bytes_read);
-               free(partial_record->data_buffer);
-               partial_record->data_buffer = NULL;
-
-               uint32_t bytes_needed = data_length - partial_record->data_buffer_bytes_read;
-               bytes_read = fread(buffer + partial_record->data_buffer_bytes_read, 1, bytes_needed, file);
-
-               partial_record->data_buffer_bytes_read = 0;
-            }
-         }
-         else
-         {
-            bytes_read = fread(buffer, 1, data_length, file);
-            if (bytes_read != data_length)
-            {
-               pgmoneta_log_error("Error: Actual bytes read do not match the expected length");
-               goto error;
-            }
-         }
       }
 
       /*

@@ -1543,6 +1543,159 @@ write_multi_page_continuation_craft(char* buf, uint32_t blcksz, xlog_rec_ptr bas
  * longer than one WAL page must advance through every continuation-page
  * header before reading the following record.  The old next_record override
  * landed in the first continuation page and silently skipped the segment. */
+
+MCTF_TEST(test_walbridge_reader_cross_segment_long)
+{
+   char base[PATH_MAX];
+   char seg_a[PATH_MAX];
+   char seg_b[PATH_MAX];
+   char* buf = NULL;
+   FILE* fd = NULL;
+   struct walfile* wf = NULL;
+   struct deque_iterator* iter = NULL;
+   uint64_t sysid = 0x0102030405060708ULL;
+   uint32_t seg_size = 32768;
+   uint32_t blcksz = 8192;
+   uint32_t payload_len = 9000;
+   uint32_t data_len = 5 + payload_len;
+   uint8_t* expect = NULL;
+   int count = 0;
+   int found_recon = 0;
+   int found_next = 0;
+   uint32_t i = 0;
+
+   pgmoneta_snprintf(base, sizeof(base), "%s", "/tmp/walbridge_test_crossseg_long");
+   pgmoneta_mkdir(base);
+   pgmoneta_snprintf(seg_a, sizeof(seg_a), "%s/%s", base, "000000010000000000000001");
+   pgmoneta_snprintf(seg_b, sizeof(seg_b), "%s/%s", base, "000000010000000000000002");
+
+   unlink(seg_a);
+   unlink(seg_b);
+
+   expect = malloc(payload_len);
+   MCTF_ASSERT_PTR_NONNULL(expect, cleanup, "alloc expect failed");
+   for (i = 0; i < payload_len; i++)
+   {
+      expect[i] = (uint8_t)(i * 7);
+   }
+
+   /* ---------------- segment A (logSegNo 1, base LSN 32768) ----------- */
+   buf = calloc(1, seg_size);
+   MCTF_ASSERT_PTR_NONNULL(buf, cleanup, "alloc buf failed");
+
+   write_long_header_craft(buf, XLP_LONG_HEADER, 32768, 0, sysid, seg_size, blcksz);
+   write_page_header_craft(buf, 8192, WAL_MAGIC_V18, 0, 40960, 0);
+   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, 0, 49152, 0);
+   write_page_header_craft(buf, 24576, WAL_MAGIC_V18, 0, 57344, 0);
+
+   write_filler_craft(buf, 40, 8128, 0x41);
+   write_filler_craft(buf, 8216, 8168, 0x42);
+   write_filler_craft(buf, 16432, 8120, 0x43);
+   write_filler_craft(buf, 24600, 8080, 0x44);
+
+   /* boundary record: header at LSN 32704, a 9005-byte body of which only the
+    * first 40 bytes ([DataLong][u32 len][35 payload bytes]) fit in A */
+   write_record_header_craft(buf, 32704, SIZE_OF_XLOG_RECORD + data_len);
+   ((uint8_t*)buf)[32704 + SIZE_OF_XLOG_RECORD] = (uint8_t)XLR_BLOCK_ID_DATA_LONG;
+   memcpy(buf + 32704 + SIZE_OF_XLOG_RECORD + 1, &payload_len, sizeof(uint32_t));
+   memcpy(buf + 32704 + SIZE_OF_XLOG_RECORD + 5, expect, 35);
+
+   fd = fopen(seg_a, "wb");
+   MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open seg_a failed");
+   MCTF_ASSERT_INT_EQ(fwrite(buf, 1, seg_size, fd), (int)seg_size, cleanup, "write seg_a failed");
+   fclose(fd);
+   fd = NULL;
+   free(buf);
+   buf = NULL;
+
+   /* ---------------- segment B (logSegNo 2, base LSN 65536) ----------- */
+   /* the remaining 8965 body bytes span page 0 (8152 bytes after the long
+    * header) and page 1 (813 bytes after its short header) */
+   buf = calloc(1, seg_size);
+   MCTF_ASSERT_PTR_NONNULL(buf, cleanup, "alloc buf failed");
+
+   write_long_header_craft(buf, XLP_LONG_HEADER | XLP_FIRST_IS_CONTRECORD, 65536, data_len - 40,
+                           sysid, seg_size, blcksz);
+   write_page_header_craft(buf, 8192, WAL_MAGIC_V18, XLP_FIRST_IS_CONTRECORD, 73728, data_len - 40 - 8152);
+   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, 0, 81920, 0);
+   write_page_header_craft(buf, 24576, WAL_MAGIC_V18, 0, 90112, 0);
+
+   memcpy(buf + 40, expect + 35, 8152);
+   memcpy(buf + 8192 + 24, expect + 35 + 8152, payload_len - 35 - 8152);
+
+   /* the next record starts at MAXALIGN(9029) = 9032 and fills page 1 */
+   write_filler_craft(buf, 9032, 16384 - 9032 - SIZE_OF_XLOG_RECORD, 0x51);
+
+   fd = fopen(seg_b, "wb");
+   MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open seg_b failed");
+   MCTF_ASSERT_INT_EQ(fwrite(buf, 1, seg_size, fd), (int)seg_size, cleanup, "write seg_b failed");
+   fclose(fd);
+   fd = NULL;
+   free(buf);
+   buf = NULL;
+
+   /* ---- parse A: 4 complete fillers + the saved start of the record ---- */
+   MCTF_ASSERT_INT_EQ(parse_craft_segment(seg_a, &wf, &count), 0, cleanup, "could not parse seg_a");
+   MCTF_ASSERT_INT_EQ(count, 4, cleanup, "seg_a must yield 4 complete records");
+   MCTF_ASSERT_INT_EQ((int)partial_record->data_buffer_bytes_read, 40,
+                      cleanup, "partial must have saved 40 body bytes from seg_a");
+   if (wf)
+   {
+      pgmoneta_destroy_walfile(wf);
+      wf = NULL;
+   }
+
+   /* ---- parse B: reassemble the record across two pages of B ---------- */
+   MCTF_ASSERT_INT_EQ(parse_craft_segment(seg_b, &wf, &count), 0, cleanup, "could not parse seg_b");
+   MCTF_ASSERT_INT_EQ(count, 2, cleanup, "seg_b must yield the reassembled record and the filler after it");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_deque_iterator_create(wf->records, &iter), 0, cleanup, "iterator create failed");
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      struct decoded_xlog_record* rec = (struct decoded_xlog_record*)iter->value->data;
+      if (!rec || rec->partial)
+      {
+         continue;
+      }
+      if (rec->lsn == 32704 + 32768)
+      {
+         MCTF_ASSERT_INT_EQ((int)rec->main_data_len, (int)payload_len, cleanup, "reassembled main data len mismatch");
+         MCTF_ASSERT_PTR_NONNULL(rec->main_data, cleanup, "reassembled main data must be present");
+         MCTF_ASSERT_INT_EQ(memcmp(rec->main_data, expect, payload_len), 0, cleanup,
+                            "reassembled main data must be the A tail followed by both pages of B");
+         found_recon = 1;
+      }
+      else if (rec->lsn == 65536 + 9032)
+      {
+         found_next = 1;
+      }
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
+
+   MCTF_ASSERT_INT_EQ(found_recon, 1, cleanup, "reassembled cross-segment record was not decoded");
+   MCTF_ASSERT_INT_EQ(found_next, 1, cleanup, "the record after the continuation was not decoded");
+
+cleanup:
+   if (fd)
+   {
+      fclose(fd);
+   }
+   free(buf);
+   free(expect);
+   if (iter)
+   {
+      pgmoneta_deque_iterator_destroy(iter);
+   }
+   if (wf)
+   {
+      pgmoneta_destroy_walfile(wf);
+   }
+   unlink(seg_a);
+   unlink(seg_b);
+   rmdir(base);
+   MCTF_FINISH();
+}
 MCTF_TEST(test_walbridge_reader_multi_page_segment_continuations)
 {
    const uint32_t seg_size = 1024 * 1024; /* PostgreSQL-valid WAL segment size */
