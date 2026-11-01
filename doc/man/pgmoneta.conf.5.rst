@@ -54,6 +54,7 @@ metrics_cache_max_size
   ``metrics`` are disabled. Its value, however, is taken into account only if ``metrics_cache_max_age`` is set
   to a non-zero value. Supports suffixes: ``B`` (bytes), the default if omitted, ``K`` or ``KB`` (kilobytes),
   ``M`` or ``MB`` (megabytes), ``G`` or ``GB`` (gigabytes).
+  The largest accepted value is 2147483647 bytes, so ``2G`` and above are rejected.
   Default is 256k
 
 management
@@ -196,6 +197,7 @@ log_rotation_age
 log_rotation_size
   The size of the log file that will trigger a log rotation. Supports suffixes: B (bytes), the default if omitted,
   K or KB (kilobytes), M or MB (megabytes), G or GB (gigabytes). A value of 0 (with or without suffix) disables.
+  The largest accepted value is 2147483647 bytes, so 2G and above are rejected.
   Default is 0
 
 log_line_prefix

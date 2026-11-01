@@ -35,7 +35,10 @@
 #include <tscommon.h>
 #include <utils.h>
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 MCTF_TEST(test_configuration_accept_time)
 {
@@ -318,5 +321,207 @@ MCTF_TEST(test_configuration_json_put_size_value)
 
 cleanup:
    pgmoneta_json_destroy(res);
+   MCTF_FINISH();
+}
+
+/**
+ * Read a configuration that sets log_rotation_size and metrics_cache_max_size
+ * to the same value, and count the "Unknown:" warnings the reader prints for
+ * a rejected value.
+ */
+static int
+read_byte_size(char* value, int* log_rotation_size, int* metrics_cache_max_size, int* warnings)
+{
+   char conf_path[] = "/tmp/pgmoneta_test_byte_size_XXXXXX";
+   char err_path[] = "/tmp/pgmoneta_test_byte_size_err_XXXXXX";
+   char line[MISC_LENGTH * 4];
+   struct main_configuration* config = NULL;
+   FILE* f = NULL;
+   int conf_fd = -1;
+   int err_fd = -1;
+   int saved_stderr = -1;
+   int ret = 1;
+
+   *warnings = 0;
+
+   conf_fd = mkstemp(conf_path);
+   err_fd = mkstemp(err_path);
+   if (conf_fd == -1 || err_fd == -1)
+   {
+      goto done;
+   }
+
+   f = fdopen(conf_fd, "w");
+   if (f == NULL)
+   {
+      goto done;
+   }
+   conf_fd = -1;
+   fprintf(f, "[pgmoneta]\nhost = localhost\nbase_dir = /tmp\n"
+              "log_rotation_size = %s\nmetrics_cache_max_size = %s\n\n"
+              "[primary]\nhost = localhost\nport = 5432\nuser = repl\n",
+           value, value);
+   fclose(f);
+   f = NULL;
+
+   fflush(stderr);
+   saved_stderr = dup(STDERR_FILENO);
+   if (saved_stderr == -1 || dup2(err_fd, STDERR_FILENO) == -1)
+   {
+      goto done;
+   }
+   ret = pgmoneta_test_load_conf(conf_path);
+   fflush(stderr);
+   dup2(saved_stderr, STDERR_FILENO);
+
+   config = (struct main_configuration*)shmem;
+   *log_rotation_size = config->common.log_rotation_size;
+   *metrics_cache_max_size = config->metrics_cache_max_size;
+
+   f = fopen(err_path, "r");
+   while (f != NULL && fgets(line, sizeof(line), f) != NULL)
+   {
+      if (strstr(line, "Unknown:") != NULL)
+      {
+         (*warnings)++;
+      }
+   }
+
+done:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   if (saved_stderr != -1)
+   {
+      close(saved_stderr);
+   }
+   if (conf_fd != -1)
+   {
+      close(conf_fd);
+   }
+   if (err_fd != -1)
+   {
+      close(err_fd);
+   }
+   unlink(conf_path);
+   unlink(err_path);
+
+   return ret;
+}
+
+MCTF_TEST(test_configuration_byte_size_accept)
+{
+   struct
+   {
+      char* value;
+      int bytes;
+   } cases[] = {
+      {"0", 0},
+      {"0B", 0},
+      {"1", 1},
+      {"1B", 1},
+      {"1b", 1},
+      {"1K", 1024},
+      {"1k", 1024},
+      {"1KB", 1024},
+      {"1kb", 1024},
+      {"256k", 262144},
+      {"1M", 1048576},
+      {"1MB", 1048576},
+      {"1mb", 1048576},
+      {"1G", 1073741824},
+      {"1GB", 1073741824},
+      {"1gb", 1073741824},
+      {"010K", 10240},
+      {"2047M", 2146435072},
+      {"2097151K", 2147482624},
+      {"2147483647", 2147483647},
+      {"2147483647B", 2147483647},
+   };
+   int log_rotation_size = -1;
+   int metrics_cache_max_size = -1;
+   int warnings = -1;
+
+   pgmoneta_test_config_save();
+
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+   {
+      MCTF_ASSERT_INT_EQ(read_byte_size(cases[i].value, &log_rotation_size, &metrics_cache_max_size, &warnings), 0,
+                         cleanup, "'%s': failed to read the configuration", cases[i].value);
+      MCTF_ASSERT_INT_EQ(log_rotation_size, cases[i].bytes, cleanup,
+                         "'%s': log_rotation_size is %d, expected %d", cases[i].value, log_rotation_size, cases[i].bytes);
+      MCTF_ASSERT_INT_EQ(metrics_cache_max_size, cases[i].bytes, cleanup,
+                         "'%s': metrics_cache_max_size is %d, expected %d", cases[i].value, metrics_cache_max_size, cases[i].bytes);
+      MCTF_ASSERT_INT_EQ(warnings, 0, cleanup, "'%s': accepted value should not be reported", cases[i].value);
+   }
+
+cleanup:
+   pgmoneta_test_config_restore();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_configuration_byte_size_reject)
+{
+   char* cases[] = {
+      // unknown or malformed suffixes
+      "1T",
+      "2T",
+      "5X",
+      "1Z",
+      "1Q",
+      "1XYZ",
+      "1TG",
+      "1K2",
+      "1BB",
+      "1KBB",
+      "1KBX",
+      "1MBX",
+      "1GBX",
+      "10GBX",
+      "1.5G",
+      "1 K",
+      "0x10",
+      // no digits, or a sign
+      "K",
+      "B",
+      "KB",
+      "-1",
+      "-1K",
+      "+1K",
+      // larger than an int
+      "2048M",
+      "2G",
+      "3G",
+      "4G",
+      "5G",
+      "2097152K",
+      "2147483648",
+      "2147483648B",
+      "4294967295B",
+      "4294967296B",
+      "4294967297B",
+      "9223372036854775807",
+      "99999999999999999999999999999999",
+   };
+   int log_rotation_size = -1;
+   int metrics_cache_max_size = -1;
+   int warnings = -1;
+
+   pgmoneta_test_config_save();
+
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+   {
+      MCTF_ASSERT_INT_EQ(read_byte_size(cases[i], &log_rotation_size, &metrics_cache_max_size, &warnings), 0,
+                         cleanup, "'%s': failed to read the configuration", cases[i]);
+      MCTF_ASSERT_INT_EQ(warnings, 2, cleanup, "'%s': both keys should be reported, got %d warnings", cases[i], warnings);
+      MCTF_ASSERT_INT_EQ(log_rotation_size, 0, cleanup,
+                         "'%s': log_rotation_size should keep its default, got %d", cases[i], log_rotation_size);
+      MCTF_ASSERT_INT_EQ(metrics_cache_max_size, 0, cleanup,
+                         "'%s': metrics_cache_max_size should keep its default, got %d", cases[i], metrics_cache_max_size);
+   }
+
+cleanup:
+   pgmoneta_test_config_restore();
    MCTF_FINISH();
 }
