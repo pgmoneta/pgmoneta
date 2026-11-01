@@ -74,7 +74,7 @@ xl_clog_truncate_parse_v17(struct xl_clog_truncate* wrapper, char* rec)
 char*
 xl_clog_truncate_format_v16(struct xl_clog_truncate* wrapper, char* buf)
 {
-   return pgmoneta_format_and_append(buf, "page %ld; oldestXact %u",
+   return pgmoneta_format_and_append(buf, "page %" PRId64 "; oldestXact %u",
                                      wrapper->data.v16.pageno,
                                      wrapper->data.v16.oldestXact);
 }
