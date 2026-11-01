@@ -32,6 +32,7 @@
 #include <configuration.h>
 #include <deque.h>
 #include <walfile/pg_control.h>
+#include <walfile/rm_btree.h>
 #include <walfile/rm_heap.h>
 #include <walfile/rmgr.h>
 #include <utils.h>
@@ -226,7 +227,7 @@ pgmoneta_test_generate_check_point_shutdown_v17(void)
    }
 
    rec = create_record(RM_XLOG_ID, XLOG_CHECKPOINT_SHUTDOWN, 0,
-                        &cp, sizeof(cp));
+                       &cp, sizeof(cp));
    if (rec == NULL)
    {
       goto error;
@@ -298,7 +299,7 @@ pgmoneta_test_generate_mixed_heap_wal_v17(void)
    }
 
    rec_cp = create_record(RM_XLOG_ID, XLOG_CHECKPOINT_SHUTDOWN, 0,
-                           &cp, sizeof(cp));
+                          &cp, sizeof(cp));
    if (rec_cp == NULL)
    {
       goto error;
@@ -311,7 +312,7 @@ pgmoneta_test_generate_mixed_heap_wal_v17(void)
    rec_cp = NULL;
 
    rec_ins = create_record(RM_HEAP_ID, XLOG_HEAP_INSERT, 100,
-                            &ins, sizeof(ins));
+                           &ins, sizeof(ins));
    if (rec_ins == NULL)
    {
       goto error;
@@ -324,7 +325,7 @@ pgmoneta_test_generate_mixed_heap_wal_v17(void)
    rec_ins = NULL;
 
    rec_del = create_record(RM_HEAP_ID, XLOG_HEAP_DELETE, 200,
-                            &del, sizeof(del));
+                           &del, sizeof(del));
    if (rec_del == NULL)
    {
       goto error;
@@ -354,6 +355,196 @@ error:
       free(rec_cp->main_data);
       free(rec_cp);
    }
+   pgmoneta_destroy_walfile(wf);
+   return NULL;
+}
+
+static int
+add_block(struct decoded_xlog_record* rec, int block_id, rel_file_number rel, block_number blkno,
+          void* data, uint16_t data_len, bool image)
+{
+   struct decoded_bkp_block* blk = &rec->blocks[block_id];
+
+   blk->in_use = true;
+   blk->rlocator.spcOid = 1663;
+   blk->rlocator.dbOid = 5;
+   blk->rlocator.relNumber = rel;
+   blk->forknum = MAIN_FORKNUM;
+   blk->blkno = blkno;
+   blk->flags = MAIN_FORKNUM;
+
+   if (data_len > 0)
+   {
+      blk->data = malloc(data_len);
+      if (blk->data == NULL)
+      {
+         return 1;
+      }
+      memcpy(blk->data, data, data_len);
+      blk->data_len = data_len;
+      blk->has_data = true;
+      blk->flags |= BKPBLOCK_HAS_DATA;
+   }
+
+   if (image)
+   {
+      blk->bkp_image = calloc(1, RANDOM_XLOG_BLCKSZ);
+      if (blk->bkp_image == NULL)
+      {
+         return 1;
+      }
+      blk->bimg_len = RANDOM_XLOG_BLCKSZ;
+      blk->hole_offset = 0;
+      blk->bimg_info = 0x02; /* BKPIMAGE_APPLY from PostgreSQL 15 on */
+      blk->has_image = true;
+      blk->apply_image = true;
+      blk->flags |= BKPBLOCK_HAS_IMAGE;
+   }
+
+   if (block_id > rec->max_block_id)
+   {
+      rec->max_block_id = block_id;
+   }
+
+   return 0;
+}
+
+/* create_record() sizes a record without block references; take the real size from the encoder */
+static int
+fix_total_length(struct decoded_xlog_record* rec)
+{
+   struct xlog_record header;
+   char* encoded = pgmoneta_wal_encode_xlog_record(rec, RANDOM_MAGIC, NULL);
+
+   if (encoded == NULL)
+   {
+      return 1;
+   }
+
+   memcpy(&header, encoded, sizeof(header));
+   rec->header.xl_tot_len = header.xl_tot_len;
+   rec->size = header.xl_tot_len;
+   free(encoded);
+
+   return 0;
+}
+
+static void
+free_record(struct decoded_xlog_record* rec)
+{
+   if (rec == NULL)
+   {
+      return;
+   }
+
+   for (int i = 0; i <= rec->max_block_id; i++)
+   {
+      free(rec->blocks[i].data);
+      free(rec->blocks[i].bkp_image);
+   }
+   free(rec->main_data);
+   free(rec);
+}
+
+struct walfile*
+pgmoneta_test_generate_walfilter_conflict_wal_v17(enum walfilter_later_record later)
+{
+   struct walfile* wf = NULL;
+   struct decoded_xlog_record* rec = NULL;
+   struct check_point_v17 cp;
+   struct xl_heap_delete del;
+   struct xl_heap_insert ins;
+   struct xl_heap_prune_v17 prune;
+   struct xl_btree_delete_v16 bdel;
+   char prune_data[sizeof(uint16_t) + sizeof(offset_number)];
+   uint16_t ntargets = 1;
+   offset_number pruned = later == WALFILTER_LATER_PRUNE_SAME ? 3 : 4;
+
+   memset(&cp, 0, sizeof(cp));
+   cp.redo = RANDOM_REDO;
+   cp.this_timeline_id = RANDOM_THIS_TLI;
+   cp.prev_timeline_id = RANDOM_PREV_TLI;
+   cp.full_page_writes = RANDOM_FULL_PAGE_WRITES;
+   cp.wal_level = RANDOM_WAL_LEVEL;
+   cp.next_xid.value = RANDOM_NEXT_XID;
+   cp.next_oid = RANDOM_NEXT_OID;
+   cp.time = RANDOM_TIME;
+
+   wf = create_walfile_shell();
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
+   rec = create_record(RM_XLOG_ID, XLOG_CHECKPOINT_SHUTDOWN, 0, &cp, sizeof(cp));
+   if (rec == NULL || pgmoneta_deque_add(wf->records, NULL, (uintptr_t)rec, ValueRef))
+   {
+      goto error;
+   }
+
+   /* The DELETE that a DELETE or XID 200 rule filters out */
+   memset(&del, 0, sizeof(del));
+   del.xmax = 200;
+   del.offnum = 3;
+   rec = create_record(RM_HEAP_ID, XLOG_HEAP_DELETE, 200, &del, sizeof(del));
+   if (rec == NULL || add_block(rec, 0, 16384, 7, NULL, 0, false) || fix_total_length(rec) ||
+       pgmoneta_deque_add(wf->records, NULL, (uintptr_t)rec, ValueRef))
+   {
+      goto error;
+   }
+
+   memset(&ins, 0, sizeof(ins));
+   ins.offnum = 1;
+
+   switch (later)
+   {
+      case WALFILTER_LATER_NONE:
+         rec = create_record(RM_HEAP_ID, XLOG_HEAP_INSERT, 300, &ins, sizeof(ins));
+         if (rec == NULL || add_block(rec, 0, 16384, 8, NULL, 0, false))
+         {
+            goto error;
+         }
+         break;
+      case WALFILTER_LATER_IMAGE:
+         rec = create_record(RM_HEAP_ID, XLOG_HEAP_INSERT, 300, &ins, sizeof(ins));
+         if (rec == NULL || add_block(rec, 0, 16384, 7, NULL, 0, true))
+         {
+            goto error;
+         }
+         break;
+      case WALFILTER_LATER_PRUNE_SAME:
+      case WALFILTER_LATER_PRUNE_OTHER:
+         memset(&prune, 0, sizeof(prune));
+         prune.flags = XLHP_HAS_DEAD_ITEMS;
+         memcpy(prune_data, &ntargets, sizeof(ntargets));
+         memcpy(prune_data + sizeof(ntargets), &pruned, sizeof(pruned));
+         rec = create_record(RM_HEAP2_ID, XLOG_HEAP2_PRUNE_ON_ACCESS, 0, &prune, sizeof(prune));
+         if (rec == NULL || add_block(rec, 0, 16384, 7, prune_data, sizeof(prune_data), false))
+         {
+            goto error;
+         }
+         break;
+      case WALFILTER_LATER_BTREE_NEWER:
+      case WALFILTER_LATER_BTREE_OLDER:
+         memset(&bdel, 0, sizeof(bdel));
+         bdel.snapshot_conflict_horizon = later == WALFILTER_LATER_BTREE_NEWER ? 200 : 150;
+         rec = create_record(RM_BTREE_ID, XLOG_BTREE_DELETE, 300, &bdel, sizeof(bdel));
+         if (rec == NULL || add_block(rec, 0, 16390, 1, NULL, 0, false))
+         {
+            goto error;
+         }
+         break;
+   }
+
+   if (fix_total_length(rec) || pgmoneta_deque_add(wf->records, NULL, (uintptr_t)rec, ValueRef))
+   {
+      goto error;
+   }
+
+   return wf;
+
+error:
+   free_record(rec);
    pgmoneta_destroy_walfile(wf);
    return NULL;
 }

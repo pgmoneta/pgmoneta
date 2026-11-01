@@ -323,8 +323,21 @@ rules:                             # Optional: filtering rules
    - Filters out records matching specified operations (e.g., DELETE)
    - Filters out records with specified transaction IDs (XIDs)
    - Converts filtered records to NOOP operations
-4. **Recalculate CRCs**: Updates checksums for modified records
-5. **Write Output**: Saves filtered WAL files to the target directory
+4. **Check for Conflicts**: Fails without writing anything if a later record would undo the filtering (see [Limitations](#limitations))
+5. **Recalculate CRCs**: Updates checksums for modified records
+6. **Write Output**: Saves filtered WAL files to the target directory
+
+### Limitations
+
+Filtering WAL is not a logical undo. A filtered record becomes a NOOP, but records that PostgreSQL wrote later can still carry its effect, and replaying them would bring the filtered change back. `pgmoneta-walfilter` refuses to write any output when it finds such a record, and logs the LSN of the filtered record and of the later one:
+
+- a heap prune or vacuum record that removes a tuple a filtered record deleted or updated
+- a full-page image of a heap block that a filtered record changed, since the image can contain the change and hint bits that make it visible
+- a B-tree DELETE whose conflict horizon is at or after an XID that deleted a filtered tuple, since it removed index entries for that tuple
+
+Full-page images of index pages, which can carry entries that index scans marked dead, and index types other than B-tree are not checked yet.
+
+In practice, DELETE and XID filtering only work when the affected pages were not read, pruned, vacuumed, or written again after a checkpoint, before the end of the WAL being filtered. Give `source_dir` only the WAL from the start of the backup you will restore: older WAL is never replayed, but its records are checked too and can cause a refusal.
 
 ### Examples
 
