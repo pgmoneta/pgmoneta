@@ -6043,6 +6043,9 @@ error:
  * The default is expressed always as bytes.
  * Uppercase letters work too.
  * If no suffix is specified, the value is expressed as bytes.
+ * A 'b' may follow k, m or g (e.g., "2MB").
+ * The result must fit in an int, so the largest accepted size
+ * is 2147483647 bytes; larger values are rejected.
  *
  * @param str the string to parse (e.g., "2M")
  * @param bytes the value to set as result of the parsing stage
@@ -6053,11 +6056,9 @@ error:
 static int
 as_bytes(char* str, int* bytes, int default_bytes)
 {
-   int multiplier = 1;
-   int index;
-   char value[MISC_LENGTH];
-   bool multiplier_set = false;
-   int i_value = default_bytes;
+   char* end = NULL;
+   long long value;
+   long long multiplier = 1;
 
    if (is_empty_string(str))
    {
@@ -6065,76 +6066,58 @@ as_bytes(char* str, int* bytes, int default_bytes)
       return 0;
    }
 
-   index = 0;
-   for (size_t i = 0; i < strlen(str); i++)
+   // a leading digit rules out signs and whitespace,
+   // which strtoll() would otherwise accept
+   if (!isdigit((unsigned char)str[0]))
    {
-      if (isdigit(str[i]))
-      {
-         value[index++] = str[i];
-      }
-      else if (isalpha(str[i]) && multiplier_set)
-      {
-         // allow a 'B' suffix on a multiplier
-         // like for instance 'MB', but don't allow it
-         // for bytes themselves ('BB')
-         if (multiplier == 1 || (str[i] != 'b' && str[i] != 'B'))
-         {
-            // another non-digit char not allowed
-            goto error;
-         }
-      }
-      else if (isalpha(str[i]) && !multiplier_set)
-      {
-         if (str[i] == 'M' || str[i] == 'm')
-         {
-            multiplier = 1024 * 1024;
-            multiplier_set = true;
-         }
-         else if (str[i] == 'G' || str[i] == 'g')
-         {
-            multiplier = 1024 * 1024 * 1024;
-            multiplier_set = true;
-         }
-         else if (str[i] == 'K' || str[i] == 'k')
-         {
-            multiplier = 1024;
-            multiplier_set = true;
-         }
-         else if (str[i] == 'B' || str[i] == 'b')
-         {
-            multiplier = 1;
-            multiplier_set = true;
-         }
-      }
-      else
-      {
-         // do not allow alien chars
-         goto error;
-      }
+      goto error;
    }
 
-   value[index] = '\0';
-   if (!as_int(value, &i_value))
+   errno = 0;
+   value = strtoll(str, &end, 10);
+   if (errno == ERANGE)
    {
-      // sanity check: the value
-      // must be a positive number!
-      if (i_value >= 0)
-      {
-         *bytes = i_value * multiplier;
-      }
-      else
-      {
-         goto error;
-      }
-
-      return 0;
+      goto error;
    }
-   else
+
+   switch (*end)
    {
+      case 'K':
+      case 'k':
+         multiplier = 1024LL;
+         end++;
+         break;
+      case 'M':
+      case 'm':
+         multiplier = 1024LL * 1024;
+         end++;
+         break;
+      case 'G':
+      case 'g':
+         multiplier = 1024LL * 1024 * 1024;
+         end++;
+         break;
+      default:
+         break;
+   }
+
+   if (*end == 'B' || *end == 'b')
+   {
+      end++;
+   }
+
+   if (*end != '\0' || value > INT_MAX / multiplier)
+   {
+      goto error;
+   }
+
+   *bytes = (int)(value * multiplier);
+   return 0;
+
 error:
-      *bytes = default_bytes;
-      return 1;
-   }
+   errno = 0;
+   *bytes = default_bytes;
+   return 1;
 }
 
 static int
