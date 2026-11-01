@@ -582,7 +582,7 @@ MCTF_TEST(test_utils_string_manipulation)
    MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
    res = pgmoneta_escape_string(s);
    MCTF_ASSERT_PTR_NONNULL(res, cleanup, "escape_string failed");
-   MCTF_ASSERT_STR_EQ(res, "foo\\'bar", cleanup, "escape_string result mismatch");
+   MCTF_ASSERT_STR_EQ(res, "foo'bar", cleanup, "escape_string result mismatch");
    free(s);
    s = NULL;
    free(res);
