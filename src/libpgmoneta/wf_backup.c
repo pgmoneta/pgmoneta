@@ -142,7 +142,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
 
-   pgmoneta_log_debug("Basebackup (execute): %s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Basebackup (execute): %s/%s", config->common.servers[server].name, label);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);

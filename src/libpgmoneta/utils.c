@@ -2650,7 +2650,7 @@ pgmoneta_list_directory(char* directory)
             }
             else
             {
-               pgmoneta_log_debug(current);
+               pgmoneta_log_debug("%s", current);
             }
          }
 
@@ -5703,7 +5703,7 @@ pgmoneta_backtrace(void)
 
    if (s != NULL)
    {
-      pgmoneta_log_debug(s);
+      pgmoneta_log_debug("%s", s);
    }
 
    free(s);
