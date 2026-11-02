@@ -1735,7 +1735,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_GET_NOFORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Conf Get: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_GET_NOFORK);
+         pgmoneta_log_error("Conf Get: No fork (%d)", MANAGEMENT_ERROR_CONF_GET_NOFORK);
          goto error;
       }
       else if (pid == 0)
@@ -1758,7 +1758,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_SET_NOFORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Conf Set: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_SET_NOFORK);
+         pgmoneta_log_error("Conf Set: No fork (%d)", MANAGEMENT_ERROR_CONF_SET_NOFORK);
          goto error;
       }
       else if (pid == 0)
@@ -1781,7 +1781,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_NOFORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Status: No fork %s (%d)", server, MANAGEMENT_ERROR_STATUS_NOFORK);
+         pgmoneta_log_error("Status: No fork (%d)", MANAGEMENT_ERROR_STATUS_NOFORK);
          goto error;
       }
       else if (pid == 0)
@@ -1802,7 +1802,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Details: No fork %s (%d)", server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK);
+         pgmoneta_log_error("Details: No fork (%d)", MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK);
          goto error;
       }
       else if (pid == 0)
@@ -1905,7 +1905,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECRYPT_NOFORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Decrypt: No fork %s (%d)", server, MANAGEMENT_ERROR_DECRYPT_NOFORK);
+         pgmoneta_log_error("Decrypt: No fork (%d)", MANAGEMENT_ERROR_DECRYPT_NOFORK);
          goto error;
       }
       else if (pid == 0)
@@ -1926,7 +1926,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ENCRYPT_NOFORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Encrypt: No fork %s (%d)", server, MANAGEMENT_ERROR_ENCRYPT_NOFORK);
+         pgmoneta_log_error("Encrypt: No fork (%d)", MANAGEMENT_ERROR_ENCRYPT_NOFORK);
          goto error;
       }
       else if (pid == 0)
@@ -1947,7 +1947,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Decompress: No fork %s (%d)", server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
+         pgmoneta_log_error("Decompress: No fork (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
          goto error;
       }
       else if (pid == 0)
@@ -1989,7 +1989,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_COMPRESS_NOFORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Compress: No fork %s (%d)", server, MANAGEMENT_ERROR_COMPRESS_NOFORK);
+         pgmoneta_log_error("Compress: No fork (%d)", MANAGEMENT_ERROR_COMPRESS_NOFORK);
          goto error;
       }
       else if (pid == 0)

@@ -97,7 +97,7 @@ pgmoneta_log_is_enabled(int level);
  * @return 0 upon success, otherwise 1
  */
 void
-pgmoneta_log_line(int level, char* file, int line, char* fmt, ...);
+pgmoneta_log_line(int level, char* file, int line, char* fmt, ...) __attribute__((format(printf, 4, 5)));
 
 /**
  * Log a memory segment

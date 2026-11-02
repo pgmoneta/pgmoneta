@@ -944,7 +944,7 @@ job_error:
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Delete: %s/%s (Elapsed: %s)", config->common.servers[srv].name,
-                     (uintptr_t)pgmoneta_art_search(nodes, NODE_LABEL), elapsed);
+                     (char*)pgmoneta_art_search(nodes, NODE_LABEL), elapsed);
 
    free(elapsed);
 

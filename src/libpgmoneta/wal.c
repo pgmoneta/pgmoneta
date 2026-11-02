@@ -403,7 +403,7 @@ pgmoneta_wal(int srv, char** argv)
                   {
                      if (xlogoff != 0)
                      {
-                        pgmoneta_log_error("Received WAL record of offset %d with no file open", xlogoff);
+                        pgmoneta_log_error("Received WAL record of offset %zu with no file open", xlogoff);
                         goto error;
                      }
                      // new wal file
@@ -435,7 +435,7 @@ pgmoneta_wal(int srv, char** argv)
                   }
                   else if (curr_xlogoff != xlogoff)
                   {
-                     pgmoneta_log_error("Received WAL record offset %08x, expected %08x", xlogoff, curr_xlogoff);
+                     pgmoneta_log_error("Received WAL record offset %08zx, expected %08zx", xlogoff, curr_xlogoff);
                      goto error;
                   }
                   bytes_left = msg->length - hdrlen;
@@ -455,7 +455,7 @@ pgmoneta_wal(int srv, char** argv)
                      }
                      if (bytes_to_write != fwrite(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_file))
                      {
-                        pgmoneta_log_error("Could not write %d bytes to WAL file %s", bytes_to_write, filename);
+                        pgmoneta_log_error("Could not write %zu bytes to WAL file %s", bytes_to_write, filename);
                         goto error;
                      }
                      if (fflush(wal_file) != 0)
