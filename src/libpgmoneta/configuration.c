@@ -203,7 +203,7 @@ pgmoneta_init_main_configuration(void* shm)
    config->common.non_blocking = true;
    config->backlog = 16;
    config->hugepage = HUGEPAGE_TRY;
-   config->direct_io = DIRECT_IO_OFF;
+   config->common.direct_io = DIRECT_IO_OFF;
 
    config->update_process_title = UPDATE_PROCESS_TITLE_VERBOSE;
 
@@ -1201,7 +1201,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (pgmoneta_compare_string(section, "pgmoneta"))
                   {
-                     config->direct_io = as_direct_io(value);
+                     config->common.direct_io = as_direct_io(value);
                   }
                   else
                   {
@@ -3968,7 +3968,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NON_BLOCKING, (uintptr_t)config->common.non_blocking, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKLOG, (uintptr_t)config->backlog, ValueInt64);
    pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_HUGEPAGE, config->hugepage, to_hugepage);
-   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_DIRECT_IO, config->direct_io, to_direct_io);
+   pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_DIRECT_IO, config->common.direct_io, to_direct_io);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PIDFILE, (uintptr_t)config->pidfile, ValueString);
    pgmoneta_json_put_enum_value(res, CONFIGURATION_ARGUMENT_UPDATE_PROCESS_TITLE, config->update_process_title, to_update_process_title);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)config->common.configuration_path, ValueString);
