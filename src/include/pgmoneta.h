@@ -457,7 +457,8 @@ struct common_configuration
    char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
    atomic_schar log_lock;             /**< The logging lock */
 
-   int encryption; /**< The AES encryption mode for file operations */
+   int encryption;          /**< The AES encryption mode for file operations */
+   unsigned char direct_io; /**< Direct I/O support (off, auto, on) for file operations */
 
    struct server servers[NUMBER_OF_SERVERS]; /**< The servers */
    struct user users[NUMBER_OF_USERS];       /**< The users */
@@ -555,7 +556,6 @@ struct main_configuration
    char libev[MISC_LENGTH]; /**< Name of libev mode */
    int backlog;             /**< The backlog for listen */
    unsigned char hugepage;  /**< Huge page support */
-   unsigned char direct_io; /**< Direct I/O support (off, auto, on) */
 
    int max_rate; /**< Maximum backup rate in bytes per second. */
 

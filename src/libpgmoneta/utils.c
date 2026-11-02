@@ -2738,6 +2738,7 @@ do_copy_file(struct worker_common* wc)
 static int
 copy_file(struct worker_input* fi)
 {
+   struct common_configuration* common = (struct common_configuration*)shmem;
    struct main_configuration* config = (struct main_configuration*)shmem;
    char* from = NULL;
    int fd_from = -1;
@@ -2764,11 +2765,12 @@ copy_file(struct worker_input* fi)
       from = pgmoneta_append(from, fi->from);
    }
 
-   if (config != NULL && config->direct_io != DIRECT_IO_OFF && config->storage_engine == STORAGE_ENGINE_LOCAL)
+   /* walinfo and walfilter only have the common configuration, where direct_io is off */
+   if (common != NULL && common->direct_io != DIRECT_IO_OFF && config->storage_engine == STORAGE_ENGINE_LOCAL)
    {
 #if defined(__linux__)
       /* In auto mode, pre-check O_DIRECT support to avoid unnecessary attempts */
-      if (config->direct_io == DIRECT_IO_AUTO)
+      if (common->direct_io == DIRECT_IO_AUTO)
       {
          char* from_copy = NULL;
          if (!pgmoneta_copy_string(from, &from_copy))
@@ -2840,7 +2842,7 @@ copy_file(struct worker_input* fi)
 #if defined(__linux__)
    if (fd_from < 0)
    {
-      if (errno == EINVAL && use_direct_io && config != NULL && config->direct_io == DIRECT_IO_AUTO)
+      if (errno == EINVAL && use_direct_io && common != NULL && common->direct_io == DIRECT_IO_AUTO)
       {
          pgmoneta_log_debug("O_DIRECT open failed for %s (EINVAL), falling back to buffered I/O", from);
          use_direct_io = false;
@@ -2875,7 +2877,7 @@ copy_file(struct worker_input* fi)
    fd_to = open(to, flags_to, permissions);
 
 #if defined(__linux__)
-   if (fd_to < 0 && errno == EINVAL && use_direct_io && config != NULL && config->direct_io == DIRECT_IO_AUTO)
+   if (fd_to < 0 && errno == EINVAL && use_direct_io && common != NULL && common->direct_io == DIRECT_IO_AUTO)
    {
       /* Fallback for fd_to */
       pgmoneta_log_debug("O_DIRECT open failed for %s (EINVAL), falling back to buffered I/O", to);
@@ -2928,7 +2930,7 @@ copy_file(struct worker_input* fi)
 #if defined(__linux__)
             /* If write fails with EINVAL and we're using O_DIRECT in auto mode,
              * it might be due to alignment. Try fallback. */
-            if (errno == EINVAL && use_direct_io && config != NULL && config->direct_io == DIRECT_IO_AUTO)
+            if (errno == EINVAL && use_direct_io && common != NULL && common->direct_io == DIRECT_IO_AUTO)
             {
                pgmoneta_log_debug("O_DIRECT write failed for %s (EINVAL), falling back to buffered I/O", to);
                close(fd_to);
