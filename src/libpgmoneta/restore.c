@@ -2202,14 +2202,14 @@ read_block(struct rfile* rf, off_t offset, uint32_t blocksz, uint8_t* buffer)
    uint32_t nread = 0;
    if (fseek(rf->fp, offset, SEEK_SET))
    {
-      pgmoneta_log_error("unable to locate file pointer to offset %llu in file %s", offset, rf->filepath);
+      pgmoneta_log_error("unable to locate file pointer to offset %lld in file %s", (long long)offset, rf->filepath);
       goto error;
    }
 
    nread = fread(buffer, 1, blocksz, rf->fp);
    if (nread != blocksz)
    {
-      pgmoneta_log_error("unable to read block at offset %llu from file %s", offset, rf->filepath);
+      pgmoneta_log_error("unable to read block at offset %lld from file %s", (long long)offset, rf->filepath);
       goto error;
    }
 
@@ -2658,9 +2658,9 @@ restore_backup_full(struct art* nodes)
 
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
    {
-      pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(target_root), target_root);
-      pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(target_root), target_root);
-      pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(target_root), target_root);
+      pgmoneta_log_trace("Restore: Used space is %lu for %s", pgmoneta_directory_size(target_root), target_root);
+      pgmoneta_log_trace("Restore: Free space is %lu for %s", pgmoneta_free_space(target_root), target_root);
+      pgmoneta_log_trace("Restore: Total space is %lu for %s", pgmoneta_total_space(target_root), target_root);
    }
 
    free_space = pgmoneta_free_space(target_root);

@@ -620,7 +620,7 @@ pgmoneta_sha512_verification(char** argv)
                if (entry == NULL)
                {
                   pgmoneta_log_error("Verification: %s / %s: formatting error at line %d",
-                                     config->common.servers[server].name, sha512_path, sha512_path,
+                                     config->common.servers[server].name, sha512_path,
                                      line);
                   err = 1;
                   success = false;

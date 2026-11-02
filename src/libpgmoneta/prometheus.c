@@ -1258,10 +1258,10 @@ retry_cache_locking:
       if (is_metrics_cache_configured() && is_metrics_cache_valid())
       {
          // serve the message directly out of the cache
-         pgmoneta_log_debug("Serving metrics out of cache (%d/%d bytes valid until %lld)",
+         pgmoneta_log_debug("Serving metrics out of cache (%zu/%zu bytes valid until %lld)",
                             strlen(cache->data),
                             cache->size,
-                            cache->valid_until);
+                            (long long)cache->valid_until);
 
          msg.kind = 0;
          msg.length = strlen(cache->data);
@@ -4810,7 +4810,7 @@ metrics_cache_append(char* data)
    if (origin_length + append_length >= cache->size)
    {
       // cannot append new data, so invalidate cache
-      pgmoneta_log_debug("Cannot append %d bytes to the Prometheus cache because it will overflow the size of %d bytes (currently at %d bytes). HINT: try adjusting `metrics_cache_max_size`",
+      pgmoneta_log_debug("Cannot append %zu bytes to the Prometheus cache because it will overflow the size of %zu bytes (currently at %zu bytes). HINT: try adjusting `metrics_cache_max_size`",
                          append_length,
                          cache->size,
                          origin_length);

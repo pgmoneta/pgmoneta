@@ -310,7 +310,7 @@ pgmoneta_log_error_response_message(struct message* msg)
 
       if (field_type != 'M' && field_type != 'C')
       {
-         pgmoneta_log_debug("Error response field type: %c=%s", field_type, msg->data + offset);
+         pgmoneta_log_debug("Error response field type: %c=%s", field_type, (char*)msg->data + offset);
       }
 
       offset += (strlen(msg->data + offset) + 1);
@@ -354,7 +354,7 @@ pgmoneta_log_notice_response_message(struct message* msg)
 
       if (field_type != 'M' && field_type != 'C')
       {
-         pgmoneta_log_debug("Notice response field type: %c=%s", field_type, msg->data + offset);
+         pgmoneta_log_debug("Notice response field type: %c=%s", field_type, (char*)msg->data + offset);
       }
 
       offset += (strlen(msg->data + offset) + 1);

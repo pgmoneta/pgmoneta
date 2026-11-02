@@ -200,7 +200,7 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
    {
       config->common.servers[srv].segment_size = segsz;
    }
-   pgmoneta_log_debug("%s/segment_size %d", config->common.servers[srv].name, config->common.servers[srv].segment_size);
+   pgmoneta_log_debug("%s/segment_size %zu", config->common.servers[srv].name, config->common.servers[srv].segment_size);
 
    if (get_block_size(ssl, socket, &blocksz))
    {
@@ -212,7 +212,7 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
    {
       config->common.servers[srv].block_size = blocksz;
    }
-   pgmoneta_log_debug("%s/block_size %d", config->common.servers[srv].name, config->common.servers[srv].block_size);
+   pgmoneta_log_debug("%s/block_size %zu", config->common.servers[srv].name, config->common.servers[srv].block_size);
 
    config->common.servers[srv].relseg_size = config->common.servers[srv].segment_size / config->common.servers[srv].block_size;
 

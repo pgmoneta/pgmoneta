@@ -282,7 +282,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
 
-   pgmoneta_log_debug("Incremental backup (execute): %s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Incremental backup (execute): %s/%s", config->common.servers[server].name, label);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -827,7 +827,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
 
-   pgmoneta_log_debug("Incremental backup (execute): %s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Incremental backup (execute): %s/%s", config->common.servers[server].name, label);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);

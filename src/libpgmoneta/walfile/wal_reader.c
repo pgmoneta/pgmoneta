@@ -48,6 +48,7 @@
 
 /* system */
 #include <assert.h>
+#include <inttypes.h>
 #include <libgen.h>
 #include <stdint.h>
 #include <string.h>
@@ -280,7 +281,7 @@ pgmoneta_validate_wal_filename(char* path, char** base_filename, xlog_seg_no* se
       return 1;
    }
 
-   pgmoneta_log_trace("Valid WAL file name: %s (timeline: %u, segment: %lu)",
+   pgmoneta_log_trace("Valid WAL file name: %s (timeline: %u, segment: %" PRIu64 ")",
                       wal_filename, test_tli, test_logSegNo);
 
    if (segno != NULL)
@@ -3058,11 +3059,11 @@ add_xid_and_subxacts_to_map(transaction_id main_xid, transaction_id* subxacts, i
       }
       else
       {
-         pgmoneta_log_trace("Added subXID %u -> timestamp %ld to map", subxacts[i], timestamp);
+         pgmoneta_log_trace("Added subXID %u -> timestamp %" PRId64 " to map", subxacts[i], timestamp);
       }
    }
 
-   pgmoneta_log_trace("Added XID %u -> timestamp %ld to map with %d subxacts", main_xid, timestamp, nsubxacts);
+   pgmoneta_log_trace("Added XID %u -> timestamp %" PRId64 " to map with %d subxacts", main_xid, timestamp, nsubxacts);
    return 0;
 }
 
@@ -3124,7 +3125,7 @@ pgmoneta_process_xid_timestamp(struct decoded_xlog_record* record, struct xid_ti
          pgmoneta_log_error("Failed to add XID %u to timestamp map", xid);
          return 1;
       }
-      pgmoneta_log_trace("Added XID %u -> timestamp %ld to map (prepared transaction)", xid, record->xact_timestamp);
+      pgmoneta_log_trace("Added XID %u -> timestamp %" PRId64 " to map (prepared transaction)", xid, record->xact_timestamp);
    }
 
    return 0;

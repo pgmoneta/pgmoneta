@@ -160,7 +160,7 @@ pgmoneta_wal_summary_save(int srv, uint64_t s_lsn, uint64_t e_lsn, block_ref_tab
 
    if (pgmoneta_brt_write(brt, tmp_file))
    {
-      pgmoneta_log_error("pgmoneta_summarize_wal: unable to generate summary for [%d, %d)", s_lsn, e_lsn);
+      pgmoneta_log_error("pgmoneta_summarize_wal: unable to generate summary for [%X/%X, %X/%X)", LSN_FORMAT_ARGS(s_lsn), LSN_FORMAT_ARGS(e_lsn));
       goto error;
    }
 

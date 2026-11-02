@@ -247,7 +247,7 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
    rc = sftp_init(sftp);
    if (rc != SSH_OK)
    {
-      pgmoneta_log_error("Error: %s", sftp_get_error(sftp));
+      pgmoneta_log_error("Error: %d", sftp_get_error(sftp));
       goto error;
    }
 

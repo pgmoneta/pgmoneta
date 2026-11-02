@@ -153,6 +153,8 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
+   label = pgmoneta_append(label, backup->label);
+
    real_directory = pgmoneta_append(real_directory, directory);
    if (!pgmoneta_ends_with(real_directory, "/"))
    {
