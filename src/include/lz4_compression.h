@@ -109,6 +109,14 @@ pgmoneta_lz4d_string(unsigned char* compressed_buffer, size_t compressed_size, c
 int
 pgmoneta_lz4_compressor_create(struct compressor** compressor);
 
+/**
+ * Create a decompressor for the LZ4 frame format, which PostgreSQL uses for server-lz4 archives
+ * @param compressor [out] The decompressor
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_lz4_frame_decompressor_create(struct compressor** compressor);
+
 #ifdef __cplusplus
 }
 #endif

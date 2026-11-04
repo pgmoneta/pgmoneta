@@ -33,6 +33,7 @@
 #include <extraction.h>
 #include <logging.h>
 #include <lz4.h>
+#include <lz4frame.h>
 #include <lz4_compression.h>
 #include <management.h>
 #include <utils.h>
@@ -57,6 +58,10 @@ static int lz4_compressor_compress(struct compressor* compressor, void* out_buf,
 static int lz4_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
 static void lz4_compressor_close(struct compressor* compressor);
 
+static int lz4_frame_decompressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static int lz4_frame_decompressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static void lz4_frame_decompressor_close(struct compressor* compressor);
+
 enum lz4_compressor_state {
    LZ4_NEED_DATA,
    LZ4_FLUSH,
@@ -80,6 +85,13 @@ struct lz4_compressor
    int in_buf_idx;
    int out_buf_idx;
    enum lz4_compressor_state state;
+};
+
+struct lz4_frame_decompressor
+{
+   struct compressor super;
+   LZ4F_dctx* dctx;
+   bool frame_complete;
 };
 
 void
@@ -868,4 +880,119 @@ lz4_compressor_close(struct compressor* compressor)
    struct lz4_compressor* this = (struct lz4_compressor*)compressor;
    LZ4_freeStream(this->compress_strm);
    LZ4_freeStreamDecode(this->decompress_strm);
+}
+
+int
+pgmoneta_lz4_frame_decompressor_create(struct compressor** compressor)
+{
+   struct lz4_frame_decompressor* fdecompressor = NULL;
+
+   fdecompressor = malloc(sizeof(struct lz4_frame_decompressor));
+   if (fdecompressor == NULL)
+   {
+      pgmoneta_log_error("lz4 frame decompressor: allocation failed");
+      goto error;
+   }
+   memset(fdecompressor, 0, sizeof(struct lz4_frame_decompressor));
+
+   if (LZ4F_isError(LZ4F_createDecompressionContext(&fdecompressor->dctx, LZ4F_VERSION)))
+   {
+      pgmoneta_log_error("lz4 frame decompressor: failed to create the decompression context");
+      goto error;
+   }
+
+   fdecompressor->super.close = lz4_frame_decompressor_close;
+   fdecompressor->super.compress = lz4_frame_decompressor_compress;
+   fdecompressor->super.decompress = lz4_frame_decompressor_decompress;
+   *compressor = (struct compressor*)fdecompressor;
+   return 0;
+
+error:
+   free(fdecompressor);
+   return 1;
+}
+
+static int
+lz4_frame_decompressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   (void)compressor;
+   (void)out_buf;
+   (void)out_capacity;
+
+   pgmoneta_log_error("lz4 frame decompressor: compression is not supported");
+
+   *out_size = 0;
+   *finished = true;
+
+   return 1;
+}
+
+static int
+lz4_frame_decompressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct lz4_frame_decompressor* this = (struct lz4_frame_decompressor*)compressor;
+   char none = 0;
+   char* src = &none;
+   size_t src_size = 0;
+   size_t dst_size = out_capacity;
+   size_t hint = 0;
+   bool done = false;
+
+   if (this == NULL || (this->super.in_buf == NULL && this->super.in_size > 0))
+   {
+      goto error;
+   }
+
+   if (this->super.in_buf != NULL)
+   {
+      src = (char*)this->super.in_buf + this->super.in_pos;
+      src_size = this->super.in_size - this->super.in_pos;
+   }
+
+   hint = LZ4F_decompress(this->dctx, out_buf, &dst_size, src, &src_size, NULL);
+   if (LZ4F_isError(hint))
+   {
+      pgmoneta_log_error("lz4 frame decompressor: %s", LZ4F_getErrorName(hint));
+      goto error;
+   }
+
+   this->super.in_pos += src_size;
+
+   /* without input LZ4F_decompress() asks for the next frame header even after a complete frame */
+   if (src_size > 0)
+   {
+      this->frame_complete = hint == 0;
+   }
+
+   done = this->super.in_pos == this->super.in_size && dst_size < out_capacity;
+
+   if (done && this->super.last_chunk && !this->frame_complete)
+   {
+      pgmoneta_log_error("lz4 frame decompressor: the input ends inside a frame");
+      goto error;
+   }
+
+   *out_size = dst_size;
+   *finished = done;
+
+   return 0;
+
+error:
+   *out_size = 0;
+   *finished = true;
+
+   return 1;
+}
+
+static void
+lz4_frame_decompressor_close(struct compressor* compressor)
+{
+   struct lz4_frame_decompressor* this = (struct lz4_frame_decompressor*)compressor;
+
+   if (this == NULL)
+   {
+      return;
+   }
+
+   LZ4F_freeDecompressionContext(this->dctx);
 }
