@@ -2655,7 +2655,7 @@ s3_upload(int server, char* label, int compression, int encryption)
 }
 
 int
-s3_cleanup(int server, char* label)
+pgmoneta_s3_cleanup(int server, char* label)
 {
    char* s3_root = NULL;
    int rc;

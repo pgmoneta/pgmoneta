@@ -126,6 +126,22 @@ int
 mctf_se_up(int backend);
 
 /**
+ * Bring up a backend like mctf_se_up(), but write @p storage_engine
+ * verbatim into the managed pgmoneta.conf instead of the driver's default
+ * (e.g. "local, s3" on the Garage backend to test mixed local+remote
+ * semantics), using @p name for the run directory so concurrent modules
+ * stay isolated. The backend's own config keys are still emitted.
+ *
+ * @param backend The backend to start
+ * @param storage_engine The storage_engine value, e.g. "local, s3"
+ * @param name The run-directory tag, e.g. "garage-local-s3" (may be NULL
+ *             to use the driver's default name)
+ * @return MCTF_OK, MCTF_SKIPPED, or MCTF_FAIL (as mctf_se_up)
+ */
+int
+mctf_se_up_with_engine(int backend, const char* storage_engine, const char* name);
+
+/**
  * Bring up all backends and one pgmoneta instance with every storage engine.
  * @return MCTF_OK, MCTF_SKIPPED, or MCTF_FAIL (as mctf_se_up)
  */
