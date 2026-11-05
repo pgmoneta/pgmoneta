@@ -27,7 +27,10 @@
  */
 
 /* pgmoneta */
+#include <extraction.h>
+#include <files.h>
 #include <fcntl.h>
+#include <info.h>
 #include <logging.h>
 #include <security.h>
 #include <utils.h>
@@ -231,6 +234,120 @@ error:
       fclose(fd);
    }
    return 1;
+}
+
+
+int
+pgmoneta_read_backup_page_layout(int server, char* label,
+                                 uint32_t* blcksz, uint32_t* relseg_size)
+{
+   struct backup* backup = NULL;
+   struct backup* root_backup = NULL;
+   struct backup* control_backup = NULL;
+   struct control_file_data* controldata = NULL;
+   char* backup_dir = NULL;
+   char* control_file = NULL;
+   char* control_relative_path = NULL;
+   char* suffix = NULL;
+   uint32_t block_size = 0;
+   uint32_t segment_size = 0;
+   bool crc_ok = false;
+   int result = 1;
+
+   if (label == NULL || blcksz == NULL || relseg_size == NULL)
+   {
+      goto done;
+   }
+
+   *blcksz = 0;
+   *relseg_size = 0;
+
+   backup_dir = pgmoneta_get_server_backup(server);
+   if (backup_dir == NULL ||
+       pgmoneta_load_info(backup_dir, label, &backup) ||
+       backup == NULL ||
+       backup->major_version <= 0)
+   {
+      goto done;
+   }
+
+   if (backup->type == TYPE_FULL)
+   {
+      control_backup = backup;
+   }
+   else
+   {
+      if (pgmoneta_get_backup_root(server, backup, &root_backup) ||
+          root_backup == NULL)
+      {
+         goto done;
+      }
+
+      control_backup = root_backup;
+   }
+
+   control_relative_path = pgmoneta_append(control_relative_path, "global/pg_control");
+   if (control_relative_path == NULL ||
+       pgmoneta_extraction_get_suffix(control_backup->compression,
+                                      control_backup->encryption, &suffix))
+   {
+      goto done;
+   }
+
+   if (suffix != NULL)
+   {
+      control_relative_path = pgmoneta_append(control_relative_path, suffix);
+      free(suffix);
+      suffix = NULL;
+   }
+
+   if (control_relative_path == NULL ||
+       pgmoneta_extract_backup_file(server, control_backup->label,
+                                    control_relative_path, NULL, &control_file))
+   {
+      goto done;
+   }
+
+   if (get_controlfile_by_exact_path(control_backup->major_version,
+                                     control_file, &controldata, &crc_ok) ||
+       controldata == NULL ||
+       !crc_ok)
+   {
+      pgmoneta_log_error("Unable to read a valid pg_control for backup %s",
+                         control_backup->label);
+      goto done;
+   }
+
+   pgmoneta_control_data_page_layout(controldata, &block_size,
+                                     &segment_size, NULL);
+
+   if (block_size == 0 || segment_size == 0)
+   {
+      pgmoneta_log_error("Invalid database page layout in backup %s",
+                         control_backup->label);
+      goto done;
+   }
+
+   *blcksz = block_size;
+   *relseg_size = segment_size;
+   result = 0;
+
+done:
+   free(suffix);
+   free(control_relative_path);
+   free(controldata);
+
+   if (control_file != NULL)
+   {
+      pgmoneta_delete_file(control_file, NULL);
+      free(control_file);
+   }
+
+   free(root_backup);
+   free(backup);
+   free(backup_dir);
+
+   return result;
 }
 
 void

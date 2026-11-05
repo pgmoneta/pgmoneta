@@ -45,7 +45,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define WAL_STORE_PAGE_SIZE 8192
 
 struct wal_store
 {
@@ -159,7 +158,7 @@ page_checksum_comp(uint32_t checksum, uint32_t value)
 }
 
 static uint32_t
-page_checksum_block(const char* page)
+page_checksum_block(const char* page, uint32_t page_size)
 {
    uint32_t sums[PAGE_CHECKSUM_SUMS];
    uint32_t result = 0;
@@ -167,7 +166,7 @@ page_checksum_block(const char* page)
 
    memcpy(sums, page_checksum_base_offsets, sizeof(page_checksum_base_offsets));
 
-   for (i = 0; i < (uint32_t)(WAL_STORE_PAGE_SIZE / (sizeof(uint32_t) * PAGE_CHECKSUM_SUMS)); i++)
+   for (i = 0; i < (uint32_t)(page_size / (sizeof(uint32_t) * PAGE_CHECKSUM_SUMS)); i++)
       for (j = 0; j < PAGE_CHECKSUM_SUMS; j++)
       {
          uint32_t word;
@@ -186,7 +185,7 @@ page_checksum_block(const char* page)
 }
 
 static uint16_t
-wal_store_page_checksum(char* page, uint32_t blkno)
+wal_store_page_checksum(char* page, uint32_t page_size, uint32_t blkno)
 {
    uint16_t save;
    uint32_t checksum;
@@ -194,7 +193,7 @@ wal_store_page_checksum(char* page, uint32_t blkno)
    save = *((uint16_t*)(page + 8));
    *((uint16_t*)(page + 8)) = 0;
 
-   checksum = page_checksum_block(page);
+   checksum = page_checksum_block(page, page_size);
    checksum ^= blkno;
 
    *((uint16_t*)(page + 8)) = save;
@@ -218,7 +217,22 @@ wal_store_recompute_page_checksum(struct decoded_bkp_block* block)
       return;
    }
 
-   checksum = wal_store_page_checksum(block->bkp_image, (uint32_t)block->blkno);
+   /*
+    * A full-page image without a hole or compression must have a valid
+    * PostgreSQL database page size. Its size is independent of WAL BLCKSZ.
+    */
+   if (!block->bkp_image ||
+       block->bimg_len < 1024 ||
+       block->bimg_len > 32 * 1024 ||
+       (block->bimg_len & (block->bimg_len - 1)) != 0 ||
+       block->bimg_len % (sizeof(uint32_t) * PAGE_CHECKSUM_SUMS) != 0)
+   {
+      return;
+   }
+
+   checksum = wal_store_page_checksum(block->bkp_image,
+                                      block->bimg_len,
+                                      (uint32_t)block->blkno);
    *((uint16_t*)(block->bkp_image + 8)) = checksum;
 }
 
@@ -311,7 +325,7 @@ wal_store_init_page(struct wal_store* store, bool contrecord, uint32_t rem_len)
    struct xlog_page_header_data* phd;
    struct xlog_long_page_header_data* long_phd;
 
-   memset(store->page, 0, WAL_STORE_PAGE_SIZE);
+   memset(store->page, 0, store->xlog_blksz);
 
    if (long_header)
    {
@@ -366,14 +380,14 @@ wal_store_flush_page(struct wal_store* store)
 
    offset = (off_t)(store->page_lsn % (uint64_t)store->wal_seg_size);
 
-   if (pwrite(store->fd, store->page, WAL_STORE_PAGE_SIZE, offset) != WAL_STORE_PAGE_SIZE)
+   if (pwrite(store->fd, store->page, store->xlog_blksz, offset) != store->xlog_blksz)
    {
       pgmoneta_log_error("wal_store: could not write page at %llu: %m",
                          (unsigned long long)offset);
       return 1;
    }
 
-   store->page_lsn += WAL_STORE_PAGE_SIZE;
+   store->page_lsn += store->xlog_blksz;
 
    return 0;
 }
@@ -411,9 +425,9 @@ pgmoneta_wal_store_sync_partial_page(struct wal_store* store)
 static int
 wal_store_pad_and_flush_page(struct wal_store* store)
 {
-   if (store->page_fill < WAL_STORE_PAGE_SIZE)
+   if (store->page_fill < store->xlog_blksz)
    {
-      memset(store->page + store->page_fill, 0, WAL_STORE_PAGE_SIZE - store->page_fill);
+      memset(store->page + store->page_fill, 0, store->xlog_blksz - store->page_fill);
    }
    return wal_store_flush_page(store);
 }
@@ -422,7 +436,7 @@ static int
 wal_store_pad_segment_tail(struct wal_store* store)
 {
    uint64_t seg_off;
-   char zeros[WAL_STORE_PAGE_SIZE];
+   char* zeros = NULL;
 
    /* if the write cursor is already at (or past) the end of the current
     * segment there is nothing left to pad; flushing any further would wrap
@@ -434,17 +448,26 @@ wal_store_pad_segment_tail(struct wal_store* store)
    }
 
    seg_off = store->page_lsn % (uint64_t)store->wal_seg_size;
-   memset(zeros, 0, sizeof(zeros));
+
+   zeros = calloc(1, store->xlog_blksz);
+   if (!zeros)
+   {
+      pgmoneta_log_error("wal_store: could not allocate segment padding buffer");
+      return 1;
+   }
 
    while (seg_off < (uint64_t)store->wal_seg_size)
    {
-      if (pwrite(store->fd, zeros, WAL_STORE_PAGE_SIZE, (off_t)seg_off) != WAL_STORE_PAGE_SIZE)
+      if (pwrite(store->fd, zeros, store->xlog_blksz, (off_t)seg_off) != store->xlog_blksz)
       {
+         free(zeros);
          pgmoneta_log_error("wal_store: could not pad segment: %m");
          return 1;
       }
-      seg_off += WAL_STORE_PAGE_SIZE;
+      seg_off += store->xlog_blksz;
    }
+
+   free(zeros);
 
    store->page_lsn = (store->page_lsn / (uint64_t)store->wal_seg_size + 1) * (uint64_t)store->wal_seg_size;
 
@@ -542,7 +565,7 @@ wal_store_place(struct wal_store* store, const char* buf, uint32_t len)
 
    while (off < len)
    {
-      uint32_t remaining = WAL_STORE_PAGE_SIZE - store->page_fill;
+      uint32_t remaining = store->xlog_blksz - store->page_fill;
       uint32_t copy;
 
       if (remaining == 0)
@@ -636,7 +659,7 @@ wal_store_end_segment(struct wal_store* store)
       return 0;
    }
 
-   if (store->page_fill == WAL_STORE_PAGE_SIZE)
+   if (store->page_fill == store->xlog_blksz)
    {
       if (wal_store_flush_page(store))
       {
@@ -706,6 +729,18 @@ pgmoneta_wal_store_create(const char* downstream_dir, struct lsn_map* map, uint6
    }
    *store = NULL;
 
+   if (wal_seg_size == 0 ||
+       (wal_seg_size & (wal_seg_size - 1)) != 0 ||
+       xlog_blksz < SIZE_OF_XLOG_LONG_PHD ||
+       (xlog_blksz & (xlog_blksz - 1)) != 0 ||
+       wal_seg_size < xlog_blksz ||
+       wal_seg_size % xlog_blksz != 0)
+   {
+      pgmoneta_log_error("wal_store: invalid WAL segment size %u or page size %u",
+                         wal_seg_size, xlog_blksz);
+      goto error;
+   }
+
    s = calloc(1, sizeof(struct wal_store));
    if (s == NULL)
    {
@@ -724,7 +759,7 @@ pgmoneta_wal_store_create(const char* downstream_dir, struct lsn_map* map, uint6
    s->next_lsn = 0;
    s->fd = -1;
 
-   s->page = malloc(WAL_STORE_PAGE_SIZE);
+   s->page = malloc(s->xlog_blksz);
    if (s->page == NULL)
    {
       pgmoneta_log_error("wal_store: out of memory");
@@ -788,7 +823,8 @@ pgmoneta_wal_store_resume(struct wal_store* store, uint64_t xl_prev, uint64_t ne
    }
    store->fd = -1;
 
-   segno = (next_lsn - 1) / (uint64_t)store->wal_seg_size;
+   /* Resume in the segment containing next_lsn. */
+   segno = next_lsn / (uint64_t)store->wal_seg_size;
    store->segno = segno;
 
    if (wal_store_open_segment_ex(store, false))
@@ -803,19 +839,19 @@ pgmoneta_wal_store_resume(struct wal_store* store, uint64_t xl_prev, uint64_t ne
     * boundary the previous page was already flushed in full, so start a fresh
     * empty page at next_lsn (keeping a full in-memory page from the previous
     * page would make its address fall before the current segment). */
-   if (next_lsn % WAL_STORE_PAGE_SIZE == 0)
+   if (next_lsn % store->xlog_blksz == 0)
    {
       page_lsn = next_lsn;
       page_fill = 0;
    }
    else
    {
-      page_lsn = next_lsn & ~(uint64_t)(WAL_STORE_PAGE_SIZE - 1);
+      page_lsn = next_lsn - (next_lsn % (uint64_t)store->xlog_blksz);
       page_fill = (uint32_t)(next_lsn - page_lsn);
    }
    store->page_lsn = page_lsn;
 
-   memset(store->page, 0, WAL_STORE_PAGE_SIZE);
+   memset(store->page, 0, store->xlog_blksz);
    if (page_fill == 0)
    {
       /* resume landed exactly on a page boundary: there is no partial page to
@@ -912,7 +948,7 @@ pgmoneta_wal_store_write_record(struct wal_store* store, struct decoded_xlog_rec
 
    record_lsn = store->page_lsn + store->page_fill;
 
-   if (store->page_fill == WAL_STORE_PAGE_SIZE)
+   if (store->page_fill == store->xlog_blksz)
    {
       if (store->page_lsn >= (store->segno + 1) * (uint64_t)store->wal_seg_size)
       {
@@ -998,7 +1034,7 @@ pgmoneta_wal_store_flush(struct wal_store* store)
     * was fully padded and fsynced when it was closed. */
    if (store->page_fill > 0 && store->page_lsn < (store->segno + 1) * (uint64_t)store->wal_seg_size)
    {
-      if (store->page_fill == WAL_STORE_PAGE_SIZE)
+      if (store->page_fill == store->xlog_blksz)
       {
          /* a complete page: write it out and move to a fresh page */
          if (wal_store_flush_page(store))
@@ -1014,8 +1050,8 @@ pgmoneta_wal_store_flush(struct wal_store* store)
           * keep the in-memory page (and its LSN) in place so the next record
           * continues on the same page instead of skipping to the next one. */
          off_t offset = (off_t)(store->page_lsn % (uint64_t)store->wal_seg_size);
-         memset(store->page + store->page_fill, 0, WAL_STORE_PAGE_SIZE - store->page_fill);
-         if (pwrite(store->fd, store->page, WAL_STORE_PAGE_SIZE, offset) != WAL_STORE_PAGE_SIZE)
+         memset(store->page + store->page_fill, 0, store->xlog_blksz - store->page_fill);
+         if (pwrite(store->fd, store->page, store->xlog_blksz, offset) != store->xlog_blksz)
          {
             pgmoneta_log_error("wal_store: could not write padded page at %llu: %m",
                                (unsigned long long)offset);

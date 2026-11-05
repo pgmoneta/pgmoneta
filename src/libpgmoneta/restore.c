@@ -41,6 +41,7 @@
 #include <utils.h>
 #include <value.h>
 #include <workers.h>
+#include <walfile/pg_control.h>
 #include <workflow.h>
 
 /* system */
@@ -66,6 +67,8 @@ struct build_backup_file_input
 {
    struct worker_common common;
    int server;
+   uint32_t block_size;
+   uint32_t relseg_size;
    char label[MISC_LENGTH];
    char output_dir[MAX_PATH];
    char relative_dir[MAX_PATH];
@@ -114,6 +117,8 @@ static int combine_backups_recursive(uint32_t tsoid,
                                      struct deque* prior_labels,
                                      struct art* backups,
                                      struct json* files,
+                                     uint32_t block_size,
+                                     uint32_t relseg_size,
                                      bool incremental,
                                      bool exclude,
                                      struct workers* workers);
@@ -142,6 +147,8 @@ reconstruct_backup_file(int server,
                         struct art* backups,
                         bool incremental,
                         struct json* files,
+                        uint32_t block_size,
+                        uint32_t relseg_size,
                         struct deque* failures);
 
 static void
@@ -157,6 +164,8 @@ create_reconstruct_backup_file_input(int server,
                                      struct art* backups,
                                      bool incremental,
                                      struct json* files,
+                                     uint32_t block_size,
+                                     uint32_t relseg_size,
                                      struct workers* workers,
                                      struct build_backup_file_input** wi);
 
@@ -944,6 +953,8 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
    struct deque_iterator* iter = NULL;
    struct json* files = NULL;
    struct main_configuration* config;
+   uint32_t block_size = 0;
+   uint32_t relseg_size = 0;
 
    if (manifest == NULL || prior_labels == NULL || base == NULL || input_dir == NULL || output_dir == NULL)
    {
@@ -965,6 +976,12 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
    }
 
    config = (struct main_configuration*)shmem;
+
+   if (pgmoneta_read_backup_page_layout(server, label, &block_size, &relseg_size))
+   {
+      pgmoneta_log_error("Unable to read database page layout for backup %s", label);
+      goto error;
+   }
 
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
@@ -1017,7 +1034,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
    create_workspace_directories(server, prior_labels, NULL);
 
    // round 1 for base data directory
-   if (combine_backups_recursive(0, server, label, input_dir, output_dir, NULL, prior_labels, backups, files, incremental, !combine_as_is, workers))
+   if (combine_backups_recursive(0, server, label, input_dir, output_dir, NULL, prior_labels, backups, files, block_size, relseg_size, incremental, !combine_as_is, workers))
    {
       goto error;
    }
@@ -1073,7 +1090,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
          goto error;
       }
 
-      if (combine_backups_recursive(tsoid, server, label, itblspc_dir, full_tablespace_path, NULL, prior_labels, backups, files, incremental, !combine_as_is, workers))
+      if (combine_backups_recursive(tsoid, server, label, itblspc_dir, full_tablespace_path, NULL, prior_labels, backups, files, block_size, relseg_size, incremental, !combine_as_is, workers))
       {
          goto error;
       }
@@ -1599,6 +1616,8 @@ combine_backups_recursive(uint32_t tsoid,
                           struct deque* prior_labels,
                           struct art* backups,
                           struct json* files,
+                          uint32_t block_size,
+                          uint32_t relseg_size,
                           bool incremental,
                           bool exclude,
                           struct workers* workers)
@@ -1707,7 +1726,7 @@ combine_backups_recursive(uint32_t tsoid,
          create_workspace_directory(server, label, new_relative_prefix);
          create_workspace_directories(server, prior_labels, new_relative_prefix);
 
-         if (combine_backups_recursive(tsoid, server, label, input_dir, output_dir, new_relative_dir, prior_labels, backups, files, incremental, exclude, workers))
+         if (combine_backups_recursive(tsoid, server, label, input_dir, output_dir, new_relative_dir, prior_labels, backups, files, block_size, relseg_size, incremental, exclude, workers))
          {
             goto error;
          }
@@ -1753,6 +1772,8 @@ combine_backups_recursive(uint32_t tsoid,
                                                     backups,
                                                     incremental,
                                                     files,
+                                                    block_size,
+                                                    relseg_size,
                                                     workers,
                                                     &wi);
                pgmoneta_workers_add(workers, do_reconstruct_backup_file, (struct worker_common*)wi);
@@ -1774,6 +1795,8 @@ combine_backups_recursive(uint32_t tsoid,
                                         backups,
                                         incremental,
                                         files,
+                                        block_size,
+                                        relseg_size,
                                         workers != NULL ? workers->outcome : NULL))
             {
                pgmoneta_log_error("unable to reconstruct file %s%s", relative_prefix, entry->d_name + INCREMENTAL_PREFIX_LENGTH);
@@ -1832,6 +1855,8 @@ reconstruct_backup_file(int server,
                         struct art* backups,
                         bool incremental,
                         struct json* files,
+                        uint32_t block_size,
+                        uint32_t relseg_size,
                         struct deque* failures)
 {
    struct deque* sources = NULL;             // bookkeeping of each incr/full backup rfile, so that we can free them conveniently
@@ -1842,7 +1867,6 @@ reconstruct_backup_file(int server,
    uint32_t block_length = 0;                // total number of blocks in the reconstructed file
    bool full_copy_possible = true;           // whether we could just copy over directly instead of block by block
    uint32_t b = 0;                           // temp variable for block numbers
-   struct main_configuration* config;
    size_t blocksz = 0;
    char incr_file_name[MAX_PATH];
    char ofullpath[MAX_PATH_CONCAT];
@@ -1858,14 +1882,13 @@ reconstruct_backup_file(int server,
    bool full_file_found = false;
    bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
-   config = (struct main_configuration*)shmem;
 
    // since we are working with backup archives, these path will have compression and encryption suffix
    // ofullpath and manifest_path shouldn't have the decryption or decompression suffixes
    memset(ofullpath, 0, MAX_PATH_CONCAT);
    memset(manifest_path, 0, MAX_PATH_CONCAT);
 
-   blocksz = config->common.servers[server].block_size;
+   blocksz = block_size;
 
    pgmoneta_deque_create(false, &sources);
 
@@ -1878,7 +1901,7 @@ reconstruct_backup_file(int server,
    pgmoneta_snprintf(incr_file_name, MAX_PATH, "%s%s", INCREMENTAL_PREFIX, base_file_name);
    // handle the latest file specially, it is the only file that can only be incremental
    bck = (struct backup*)pgmoneta_art_search(backups, label);
-   if (pgmoneta_incremental_rfile_initialize(server, label, relative_dir, incr_file_name, bck->encryption, bck->compression, failures, &latest_source))
+   if (pgmoneta_incremental_rfile_initialize(server, label, relative_dir, incr_file_name, bck->encryption, bck->compression, block_size, relseg_size, failures, &latest_source))
    {
       goto error;
    }
@@ -1939,7 +1962,7 @@ reconstruct_backup_file(int server,
       // 4. final incr name (with compression/encryption suffix, and incremental prefix)
       if (pgmoneta_rfile_create(server, prior_label, relative_dir, base_file_name, bck->encryption, bck->compression, NULL, &rf))
       {
-         if (pgmoneta_incremental_rfile_initialize(server, prior_label, relative_dir, incr_file_name, bck->encryption, bck->compression, NULL, &rf))
+         if (pgmoneta_incremental_rfile_initialize(server, prior_label, relative_dir, incr_file_name, bck->encryption, bck->compression, block_size, relseg_size, NULL, &rf))
          {
             pgmoneta_log_error("reconstruct: unable to find file %s%s in prior backup %s", relative_dir, base_file_name, prior_label);
             pgmoneta_record_failure(failures, "reconstruct: %s%s missing from prior backup %s", relative_dir, base_file_name, prior_label);
@@ -3197,6 +3220,8 @@ do_reconstruct_backup_file(struct worker_common* wc)
                                input->backups,
                                input->incremental,
                                input->files,
+                               input->block_size,
+                               input->relseg_size,
                                failures))
    {
       goto error;
@@ -3250,6 +3275,8 @@ create_reconstruct_backup_file_input(int server,
                                      struct art* backups,
                                      bool incremental,
                                      struct json* files,
+                                     uint32_t block_size,
+                                     uint32_t relseg_size,
                                      struct workers* workers,
                                      struct build_backup_file_input** wi)
 {
@@ -3258,6 +3285,8 @@ create_reconstruct_backup_file_input(int server,
    memset(input, 0, sizeof(struct build_backup_file_input));
    input->common.workers = workers;
    input->server = server;
+   input->block_size = block_size;
+   input->relseg_size = relseg_size;
    memcpy(input->label, label, strlen(label));
    memcpy(input->output_dir, output_dir, strlen(output_dir));
    memcpy(input->relative_dir, relative_dir, strlen(relative_dir));

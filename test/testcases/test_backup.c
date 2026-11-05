@@ -34,6 +34,7 @@
 #include <tscommon.h>
 #include <mctf.h>
 #include <utils.h>
+#include <walfile/pg_control.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,6 +58,10 @@ MCTF_TEST(test_pgmoneta_backup_incremental_basic)
    struct json* b0 = NULL;
    struct json* b1 = NULL;
    struct json* b2 = NULL;
+   uint32_t block_size = 0;
+   uint32_t relseg_size = 0;
+   uint32_t expected_block_size = 0;
+   uint32_t expected_relseg_size = 0;
 
    pgmoneta_test_setup();
 
@@ -74,6 +79,29 @@ MCTF_TEST(test_pgmoneta_backup_incremental_basic)
    MCTF_ASSERT_PTR_NONNULL(b0, cleanup, "backup 0 null");
    MCTF_ASSERT_PTR_NONNULL(b1, cleanup, "backup 1 null");
    MCTF_ASSERT_PTR_NONNULL(b2, cleanup, "backup 2 null");
+
+   MCTF_ASSERT(pgmoneta_read_backup_page_layout(PRIMARY_SERVER,
+                                                pgmoneta_tsclient_get_backup_label(b0),
+                                                &block_size, &relseg_size) == 0 &&
+               block_size > 0 && relseg_size > 0,
+              cleanup, "failed to read full backup page layout");
+
+   expected_block_size = block_size;
+   expected_relseg_size = relseg_size;
+
+   MCTF_ASSERT(pgmoneta_read_backup_page_layout(PRIMARY_SERVER,
+                                                pgmoneta_tsclient_get_backup_label(b1),
+                                                &block_size, &relseg_size) == 0 &&
+               block_size == expected_block_size &&
+               relseg_size == expected_relseg_size,
+              cleanup, "first incremental backup page layout mismatch");
+
+   MCTF_ASSERT(pgmoneta_read_backup_page_layout(PRIMARY_SERVER,
+                                                pgmoneta_tsclient_get_backup_label(b2),
+                                                &block_size, &relseg_size) == 0 &&
+               block_size == expected_block_size &&
+               relseg_size == expected_relseg_size,
+              cleanup, "second incremental backup page layout mismatch");
 
    MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b0), "FULL", cleanup, "backup 0 type mismatch");
    MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b1), "INCREMENTAL", cleanup, "backup 1 type mismatch");
