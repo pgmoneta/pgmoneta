@@ -42,7 +42,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define WAL_ENCODER_PAGE_SIZE 8192
 
 struct wal_encoder
 {
@@ -111,6 +110,18 @@ pgmoneta_wal_encoder_create(uint64_t sysid, uint32_t wal_seg_size, uint32_t xlog
    }
    *encoder = NULL;
 
+   if (wal_seg_size == 0 ||
+       (wal_seg_size & (wal_seg_size - 1)) != 0 ||
+       xlog_blksz < SIZE_OF_XLOG_LONG_PHD ||
+       (xlog_blksz & (xlog_blksz - 1)) != 0 ||
+       wal_seg_size < xlog_blksz ||
+       wal_seg_size % xlog_blksz != 0)
+   {
+      pgmoneta_log_error("wal_encode: invalid WAL segment size %u or page size %u",
+                         wal_seg_size, xlog_blksz);
+      goto error;
+   }
+
    e = calloc(1, sizeof(struct wal_encoder));
    if (e == NULL)
    {
@@ -127,7 +138,7 @@ pgmoneta_wal_encoder_create(uint64_t sysid, uint32_t wal_seg_size, uint32_t xlog
    e->next_lsn = 0;
    e->checksums = checksums;
 
-   e->page = malloc(WAL_ENCODER_PAGE_SIZE);
+   e->page = malloc(e->xlog_blksz);
    if (e->page == NULL)
    {
       pgmoneta_log_error("wal_encode: out of memory");
@@ -182,19 +193,19 @@ pgmoneta_wal_encoder_resume(struct wal_encoder* encoder, uint64_t xl_prev, uint6
    /* reconstruct the page state so the next record is placed exactly at
     * next_lsn. The prefix bytes [page_lsn,next_lsn) are already in the peer's
     * possession, so byte emission starts at page_fill (page_emitted). */
-   if (next_lsn % WAL_ENCODER_PAGE_SIZE == 0)
+   if (next_lsn % encoder->xlog_blksz == 0)
    {
       page_lsn = next_lsn;
       page_fill = 0;
    }
    else
    {
-      page_lsn = next_lsn & ~(uint64_t)(WAL_ENCODER_PAGE_SIZE - 1);
+      page_lsn = next_lsn - (next_lsn % (uint64_t)encoder->xlog_blksz);
       page_fill = (uint32_t)(next_lsn - page_lsn);
    }
    encoder->page_lsn = page_lsn;
 
-   memset(encoder->page, 0, WAL_ENCODER_PAGE_SIZE);
+   memset(encoder->page, 0, encoder->xlog_blksz);
    if (page_fill == 0)
    {
       /* resume landed exactly on a page boundary: nothing of the page is in
@@ -226,7 +237,7 @@ wal_encoder_init_page(struct wal_encoder* encoder, bool contrecord, uint32_t rem
    struct xlog_page_header_data* phd;
    struct xlog_long_page_header_data* long_phd;
 
-   memset(encoder->page, 0, WAL_ENCODER_PAGE_SIZE);
+   memset(encoder->page, 0, encoder->xlog_blksz);
 
    if (long_header)
    {
@@ -276,17 +287,17 @@ wal_encoder_flush_page(struct wal_encoder* encoder)
       return 1;
    }
 
-   if (encoder->page_emitted < WAL_ENCODER_PAGE_SIZE)
+   if (encoder->page_emitted < encoder->xlog_blksz)
    {
       if (wal_encoder_emit_append(encoder,
                                   encoder->page + encoder->page_emitted,
-                                  WAL_ENCODER_PAGE_SIZE - encoder->page_emitted))
+                                  encoder->xlog_blksz - encoder->page_emitted))
       {
          return 1;
       }
    }
 
-   encoder->page_lsn += WAL_ENCODER_PAGE_SIZE;
+   encoder->page_lsn += encoder->xlog_blksz;
    encoder->page_emitted = 0;
 
    return 0;
@@ -295,9 +306,9 @@ wal_encoder_flush_page(struct wal_encoder* encoder)
 static int
 wal_encoder_pad_and_flush_page(struct wal_encoder* encoder)
 {
-   if (encoder->page_fill < WAL_ENCODER_PAGE_SIZE)
+   if (encoder->page_fill < encoder->xlog_blksz)
    {
-      memset(encoder->page + encoder->page_fill, 0, WAL_ENCODER_PAGE_SIZE - encoder->page_fill);
+      memset(encoder->page + encoder->page_fill, 0, encoder->xlog_blksz - encoder->page_fill);
    }
    return wal_encoder_flush_page(encoder);
 }
@@ -306,7 +317,7 @@ static int
 wal_encoder_pad_segment_tail(struct wal_encoder* encoder)
 {
    uint64_t seg_off;
-   char zeros[WAL_ENCODER_PAGE_SIZE];
+   char* zeros = NULL;
 
    if (encoder->page_lsn >= (encoder->segno + 1) * (uint64_t)encoder->wal_seg_size)
    {
@@ -315,16 +326,25 @@ wal_encoder_pad_segment_tail(struct wal_encoder* encoder)
    }
 
    seg_off = encoder->page_lsn % (uint64_t)encoder->wal_seg_size;
-   memset(zeros, 0, sizeof(zeros));
+
+   zeros = calloc(1, encoder->xlog_blksz);
+   if (!zeros)
+   {
+      pgmoneta_log_error("wal_encode: could not allocate segment padding buffer");
+      return 1;
+   }
 
    while (seg_off < (uint64_t)encoder->wal_seg_size)
    {
-      if (wal_encoder_emit_append(encoder, zeros, WAL_ENCODER_PAGE_SIZE))
+      if (wal_encoder_emit_append(encoder, zeros, encoder->xlog_blksz))
       {
+         free(zeros);
          return 1;
       }
-      seg_off += WAL_ENCODER_PAGE_SIZE;
+      seg_off += encoder->xlog_blksz;
    }
+
+   free(zeros);
 
    encoder->page_lsn = (uint64_t)encoder->segno * (uint64_t)encoder->wal_seg_size + encoder->wal_seg_size;
    encoder->page_emitted = 0;
@@ -340,7 +360,7 @@ wal_encoder_place(struct wal_encoder* encoder, const char* buf, uint32_t len)
 
    while (off < len)
    {
-      uint32_t remaining = WAL_ENCODER_PAGE_SIZE - encoder->page_fill;
+      uint32_t remaining = encoder->xlog_blksz - encoder->page_fill;
       uint32_t copy;
 
       if (remaining == 0)
@@ -406,7 +426,7 @@ wal_encoder_end_segment(struct wal_encoder* encoder)
       return 0;
    }
 
-   if (encoder->page_fill == WAL_ENCODER_PAGE_SIZE)
+   if (encoder->page_fill == encoder->xlog_blksz)
    {
       if (wal_encoder_flush_page(encoder))
       {
@@ -484,7 +504,7 @@ pgmoneta_wal_encoder_write_record(struct wal_encoder* encoder, struct decoded_xl
    total_len = ((struct xlog_record*)buf)->xl_tot_len;
    rlsn = encoder->page_lsn + encoder->page_fill;
 
-   if (encoder->page_fill == WAL_ENCODER_PAGE_SIZE)
+   if (encoder->page_fill == encoder->xlog_blksz)
    {
       if (wal_encoder_flush_page(encoder))
       {

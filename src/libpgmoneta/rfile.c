@@ -163,19 +163,16 @@ pgmoneta_rfile_destroy(struct rfile* rf)
 }
 
 int
-pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct deque* failures, struct rfile** rfile)
+pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, uint32_t block_size, uint32_t relseg_size, struct deque* failures, struct rfile** rfile)
 {
    uint32_t magic = 0;
    uint32_t nread = 0;
    struct rfile* rf = NULL;
-   struct main_configuration* config;
-   size_t relsegsz = 0;
-   size_t blocksz = 0;
-
-   config = (struct main_configuration*)shmem;
-
-   relsegsz = config->common.servers[server].relseg_size;
-   blocksz = config->common.servers[server].block_size;
+   if (block_size == 0 || relseg_size == 0)
+   {
+      pgmoneta_log_error("rfile initialize: invalid database page layout for backup %s", label);
+      goto error;
+   }
 
    if (pgmoneta_rfile_create(server, label, relative_dir, base_file_name, encryption, compression, failures, &rf))
    {
@@ -205,7 +202,7 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
       pgmoneta_record_failure(failures, "rfile_initialize: corrupt header in %s/%s (label %s) - cannot read block count", relative_dir, base_file_name, label);
       goto error;
    }
-   if (rf->num_blocks > relsegsz)
+   if (rf->num_blocks > relseg_size)
    {
       pgmoneta_log_error("rfile initialize: file has %d blocks which is more than server's segment size", rf->num_blocks);
       pgmoneta_record_failure(failures, "rfile_initialize: block count %u > segment size in %s/%s (label %s)", rf->num_blocks, relative_dir, base_file_name, label);
@@ -219,7 +216,7 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
       pgmoneta_record_failure(failures, "rfile_initialize: corrupt header in %s/%s (label %s) - cannot read truncation length", relative_dir, base_file_name, label);
       goto error;
    }
-   if (rf->truncation_block_length > relsegsz)
+   if (rf->truncation_block_length > relseg_size)
    {
       pgmoneta_log_error("rfile initialize: file has truncation block length of %d which is more than server's segment size", rf->truncation_block_length);
       pgmoneta_record_failure(failures, "rfile_initialize: truncation length %u > segment size in %s/%s (label %s)", rf->truncation_block_length, relative_dir, base_file_name, label);
@@ -247,9 +244,9 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
    }
 
    rf->header_length = sizeof(uint32_t) * (1 + 1 + 1 + rf->num_blocks);
-   if (rf->num_blocks > 0 && rf->header_length % blocksz != 0)
+   if (rf->num_blocks > 0 && rf->header_length % block_size != 0)
    {
-      rf->header_length += (blocksz - (rf->header_length % blocksz));
+      rf->header_length += (block_size - (rf->header_length % block_size));
    }
 
    *rfile = rf;

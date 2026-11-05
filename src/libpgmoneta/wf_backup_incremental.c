@@ -1044,7 +1044,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
 
    pgmoneta_log_debug("Incremental Backup: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   if (pgmoneta_backup_size(server, label, &size, &biggest_file_size))
+   if (pgmoneta_backup_size(server, label, incremental_label, &size, &biggest_file_size))
    {
       pgmoneta_log_error("Incremental Backup: Could not get incremental size for %s", config->common.servers[server].name);
       goto error;

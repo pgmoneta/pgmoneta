@@ -36,6 +36,7 @@
 #include <rfile.h>
 #include <security.h>
 #include <utils.h>
+#include <walfile/pg_control.h>
 
 /* system */
 #include <assert.h>
@@ -1526,11 +1527,13 @@ error:
 }
 
 int
-pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* biggest_file_size)
+pgmoneta_backup_size(int server, char* label, char* layout_label, unsigned long* size, uint64_t* biggest_file_size)
 {
    struct json* manifest_read = NULL;
    struct json* files = NULL;
    struct main_configuration* config = NULL;
+   uint32_t block_size = 0;
+   uint32_t relseg_size = 0;
    struct json_iterator* iter = NULL;
    char* manifest_path = NULL;
    unsigned long sz = 0;
@@ -1539,6 +1542,12 @@ pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* big
    char* bare_file_name = NULL;
 
    config = (struct main_configuration*)shmem;
+
+   if (pgmoneta_read_backup_page_layout(server, layout_label, &block_size, &relseg_size))
+   {
+      pgmoneta_log_error("Unable to read database page layout for backup %s", label);
+      goto error;
+   }
 
    // read and traverse the manifest of the incremental backup
    manifest_path = pgmoneta_get_server_backup_identifier_data(server, label);
@@ -1577,7 +1586,7 @@ pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* big
             goto error;
          }
 
-         if (pgmoneta_incremental_rfile_initialize(server, label, relative_path, bare_file_name, config->common.encryption, config->compression_type, NULL, &rf))
+         if (pgmoneta_incremental_rfile_initialize(server, label, relative_path, bare_file_name, config->common.encryption, config->compression_type, block_size, relseg_size, NULL, &rf))
          {
             pgmoneta_log_error("Unable to create rfile %s", bare_file_name);
             goto error;
@@ -1594,9 +1603,10 @@ pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* big
          if (block_length == 0)
          {
             pgmoneta_log_error("Unable to find block length for %s", bare_file_name);
+            pgmoneta_rfile_destroy(rf);
             goto error;
          }
-         file_size = block_length * config->common.servers[server].block_size;
+         file_size = (uint64_t)block_length * block_size;
          pgmoneta_rfile_destroy(rf);
          free(relative_path);
          free(bare_file_name);

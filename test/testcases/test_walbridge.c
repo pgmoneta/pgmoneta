@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <pagechecksum.h>
 #include <deque.h>
 #include <logging.h>
 #include <shmem.h>
@@ -45,6 +46,7 @@
 #include <walbridge/lsn_map.h>
 #include <walbridge/migration_engine.h>
 #include <walbridge/wal_store.h>
+#include <walbridge/walbridge_utils.h>
 #include <walbridge/wal_receiver.h>
 #include <walbridge/wal_encode.h>
 #include <mctf.h>
@@ -177,6 +179,32 @@ destroy_decoded_record(struct decoded_xlog_record* rec)
    }
    free(rec->main_data);
    free(rec);
+}
+
+
+MCTF_TEST(test_walbridge_parse_wal_segment_size)
+{
+   int size = 0;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("16MB", &size), 0, cleanup, "16MB should parse");
+   MCTF_ASSERT_INT_EQ(size, 16 * 1024 * 1024, cleanup, "16MB conversion is incorrect");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("1GB", &size), 0, cleanup, "1GB should parse");
+   MCTF_ASSERT_INT_EQ(size, 1024 * 1024 * 1024, cleanup, "1GB conversion is incorrect");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("16 MB", &size), 0, cleanup, "16 MB should parse");
+   MCTF_ASSERT_INT_EQ(size, 16 * 1024 * 1024, cleanup, "16 MB conversion is incorrect");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size(NULL, &size), 1, cleanup, "NULL input should fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("", &size), 1, cleanup, "empty input should fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("0MB", &size), 1, cleanup, "zero size should fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("-1MB", &size), 1, cleanup, "negative size should fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("16KB", &size), 1, cleanup, "invalid unit should fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("16MBjunk", &size), 1, cleanup, "trailing junk should fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_walbridge_parse_wal_segment_size("2GB", &size), 1, cleanup, "overflowing size should fail");
+
+cleanup:
+   MCTF_FINISH();
 }
 
 MCTF_TEST(test_walbridge_lsn_map_at_or_before)
@@ -1131,6 +1159,104 @@ cleanup:
    unlink(map_path);
    rmdir(downstream_dir);
    rmdir(base);
+   MCTF_FINISH();
+}
+
+
+MCTF_TEST(test_walbridge_checksum_recompute_16k_database_page)
+{
+   struct lsn_map* map = NULL;
+   struct wal_store* store = NULL;
+   struct decoded_xlog_record* rec = NULL;
+   char base[PATH_MAX];
+   char map_path[PATH_MAX];
+   char downstream_dir[PATH_MAX];
+   uint8_t* page = NULL;
+   uint8_t bod[1] = {0};
+   uint16_t expected = 0;
+   uint16_t actual = 0;
+   const uint32_t page_size = 16 * 1024;
+   const uint32_t blockno = 42;
+
+   pgmoneta_snprintf(base, sizeof(base), "%s",
+                     "/tmp/walbridge_test_checksum_16k");
+   pgmoneta_mkdir(base);
+   pgmoneta_snprintf(map_path, sizeof(map_path), "%s/lsn.map", base);
+   pgmoneta_snprintf(downstream_dir, sizeof(downstream_dir), "%s/wal", base);
+
+   unlink(map_path);
+   pgmoneta_mkdir(downstream_dir);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(map_path, &map),
+                      0, cleanup, "lsn map creation failed");
+
+   /* WAL pages remain 8 KB; only the database page is 16 KB. */
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_create(
+                         downstream_dir, map, 999,
+                         DEFAULT_WAL_SEGZ_BYTES, 8192, 1, &store),
+                      0, cleanup, "wal store creation failed");
+
+   pgmoneta_wal_store_set_checksums(store, true);
+
+   page = calloc(1, page_size);
+   MCTF_ASSERT_PTR_NONNULL(page, cleanup, "page allocation failed");
+
+   /* Use deterministic, non-zero page contents. */
+   for (uint32_t i = 0; i < page_size; i++)
+   {
+      page[i] = (uint8_t)((i * 31U + 7U) & 0xffU);
+   }
+
+   /* The checksum field must be zero before computing the reference. */
+   memset(page + 8, 0, sizeof(uint16_t));
+
+   expected = pgmoneta_page_checksum(page, page_size, blockno);
+   MCTF_ASSERT(expected != 0, cleanup, "reference checksum must be non-zero");
+
+   rec = create_decoded_record(
+      RM_HEAP_ID, XLOG_HEAP_INSERT, 0x10000000, bod, sizeof(bod));
+   MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "record creation failed");
+
+   rec->max_block_id = 0;
+   rec->blocks[0].in_use = true;
+   rec->blocks[0].apply_image = true;
+   rec->blocks[0].has_image = true;
+   rec->blocks[0].bimg_info = 0;
+   rec->blocks[0].blkno = blockno;
+   rec->blocks[0].bkp_image = (char*)page;
+   rec->blocks[0].bimg_len = (uint16_t)page_size;
+
+   pgmoneta_wal_store_recompute_page_checksums(store, rec);
+
+   actual = pgmoneta_page_stored_checksum(page);
+
+   MCTF_ASSERT_INT_EQ(actual, expected, cleanup,
+                      "16 KB image checksum differs from reference");
+
+   /* Recomputing must remain idempotent. */
+   pgmoneta_wal_store_recompute_page_checksums(store, rec);
+   MCTF_ASSERT_INT_EQ(pgmoneta_page_stored_checksum(page), expected,
+                      cleanup, "16 KB checksum recompute is not idempotent");
+
+cleanup:
+   if (rec)
+   {
+      rec->blocks[0].bkp_image = NULL;
+      destroy_decoded_record(rec);
+   }
+
+   free(page);
+
+   if (store)
+   {
+      pgmoneta_wal_store_destroy(store);
+   }
+
+   pgmoneta_lsn_map_destroy(map);
+   unlink(map_path);
+   rmdir(downstream_dir);
+   rmdir(base);
+
    MCTF_FINISH();
 }
 
@@ -2116,6 +2242,149 @@ cleanup:
    MCTF_FINISH();
 }
 
+/* A WAL file with a zero block size must be rejected before
+ * attempting to traverse subsequent page headers. */
+MCTF_TEST_NEGATIVE(test_walbridge_reader_rejects_zero_block_size)
+{
+   char base[PATH_MAX];
+   char seg[PATH_MAX];
+   char* buf = NULL;
+   FILE* fd = NULL;
+   struct walfile* wf = NULL;
+   uint64_t sysid = 0x0102030405060708ULL;
+   uint32_t seg_size = 32768;
+   int count = 0;
+
+   pgmoneta_snprintf(base, sizeof(base), "%s",
+                     "/tmp/walbridge_test_zero_block_size");
+   pgmoneta_mkdir(base);
+
+   pgmoneta_snprintf(seg, sizeof(seg), "%s/%s", base,
+                     "000000010000000000000001");
+
+   unlink(seg);
+
+   buf = calloc(1, seg_size);
+   MCTF_ASSERT_PTR_NONNULL(buf, cleanup, "alloc buf failed");
+
+   /* Valid WAL magic and segment size, but an invalid zero block size. */
+   write_long_header_craft(buf, XLP_LONG_HEADER, 32768, 0,
+                           sysid, seg_size, 0);
+
+   fd = fopen(seg, "wb");
+   MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open seg failed");
+
+   MCTF_ASSERT_INT_EQ(fwrite(buf, 1, seg_size, fd),
+                      (int)seg_size, cleanup, "write seg failed");
+
+   fclose(fd);
+   fd = NULL;
+
+   MCTF_ASSERT(parse_craft_segment(seg, &wf, &count) != 0,
+               cleanup,
+               "WAL with zero block size must be rejected");
+
+cleanup:
+   if (fd)
+   {
+      fclose(fd);
+   }
+
+   free(buf);
+
+   if (wf)
+   {
+      pgmoneta_destroy_walfile(wf);
+   }
+
+   unlink(seg);
+   rmdir(base);
+
+   MCTF_FINISH();
+}
+
+/* Return 1 when the WAL reader rejects the supplied long-header sizes. */
+static int
+reader_rejects_invalid_wal_header(const char* base, uint32_t seg_size,
+                                  uint32_t blcksz)
+{
+   char dir[PATH_MAX];
+   char seg[PATH_MAX];
+   char* buf = NULL;
+   FILE* fd = NULL;
+   struct walfile* wf = NULL;
+   uint32_t file_size = 32768;
+   uint64_t sysid = 0x0102030405060708ULL;
+   int count = 0;
+   int rejected = 0;
+
+   pgmoneta_snprintf(dir, sizeof(dir), "%s", base);
+   pgmoneta_mkdir(dir);
+   pgmoneta_snprintf(seg, sizeof(seg), "%s/000000010000000000000001", dir);
+   unlink(seg);
+
+   buf = calloc(1, file_size);
+   if (buf == NULL)
+      goto cleanup;
+
+   write_long_header_craft(buf, XLP_LONG_HEADER, 32768, 0,
+                           sysid, seg_size, blcksz);
+
+   fd = fopen(seg, "wb");
+   if (fd == NULL)
+      goto cleanup;
+
+   if (fwrite(buf, 1, file_size, fd) != file_size)
+      goto cleanup;
+
+   fclose(fd);
+   fd = NULL;
+
+   rejected = parse_craft_segment(seg, &wf, &count) != 0;
+
+cleanup:
+   if (fd)
+      fclose(fd);
+   free(buf);
+   if (wf)
+      pgmoneta_destroy_walfile(wf);
+   unlink(seg);
+   rmdir(dir);
+
+   return rejected;
+}
+
+MCTF_TEST_NEGATIVE(test_walbridge_reader_rejects_non_power_of_two_block_size)
+{
+   MCTF_ASSERT(reader_rejects_invalid_wal_header(
+                  "/tmp/walbridge_test_non_power_block", 32768, 6000),
+               cleanup, "WAL with non-power-of-two block size must be rejected");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_walbridge_reader_rejects_invalid_segment_size)
+{
+   MCTF_ASSERT(reader_rejects_invalid_wal_header(
+                  "/tmp/walbridge_test_invalid_segment", 30000, 8192),
+               cleanup, "WAL with invalid segment size must be rejected");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_walbridge_reader_rejects_non_power_of_two_segment_size)
+{
+   MCTF_ASSERT(reader_rejects_invalid_wal_header(
+                  "/tmp/walbridge_test_non_power_segment",
+                  24 * 1024 * 1024, 8192),
+               cleanup, "WAL with non-power-of-two segment size must be rejected");
+
+cleanup:
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_walbridge_reader_multi_page_segment_continuations)
 {
    const uint32_t seg_size = 1024 * 1024; /* PostgreSQL-valid WAL segment size */
@@ -2621,6 +2890,92 @@ cleanup:
    MCTF_FINISH();
 }
 
+
+MCTF_TEST(test_walbridge_store_resume_at_segment_boundary)
+{
+   char base[512];
+   char map_path[512];
+   char downstream_dir[512];
+   char seg0_path[512];
+   char seg0_partial[512];
+   char seg1_partial[512];
+   const uint32_t wal_seg_size = 1024 * 1024;
+   const char sentinel[] = "published-segment";
+   char actual[sizeof(sentinel)] = {0};
+   struct lsn_map* map = NULL;
+   struct wal_store* store = NULL;
+   struct decoded_xlog_record* rec = NULL;
+   struct stat st;
+   FILE* f = NULL;
+   uint8_t data[2] = {0x01, 0x07};
+
+   pgmoneta_snprintf(base, sizeof(base), "%s", "/tmp/walbridge_test_resume_boundary");
+   pgmoneta_snprintf(map_path, sizeof(map_path), "%s/lsn.map", base);
+   pgmoneta_snprintf(downstream_dir, sizeof(downstream_dir), "%s/wal", base);
+   pgmoneta_snprintf(seg0_path, sizeof(seg0_path), "%s/000000010000000000000000", downstream_dir);
+   pgmoneta_snprintf(seg0_partial, sizeof(seg0_partial), "%s.partial", seg0_path);
+   pgmoneta_snprintf(seg1_partial, sizeof(seg1_partial), "%s/000000010000000000000001.partial", downstream_dir);
+
+   pgmoneta_mkdir(base);
+   pgmoneta_mkdir(downstream_dir);
+   unlink(map_path);
+   unlink(seg0_path);
+   unlink(seg0_partial);
+   unlink(seg1_partial);
+
+   f = fopen(seg0_path, "wb");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not create previous segment");
+   MCTF_ASSERT_INT_EQ((int)fwrite(sentinel, 1, sizeof(sentinel), f),
+                      (int)sizeof(sentinel), cleanup, "could not write sentinel");
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(map_path, &map), 0, cleanup, "map create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_create(downstream_dir, map, 123456789,
+                                                wal_seg_size, 8192, 1, &store),
+                      0, cleanup, "store create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_resume(store, 0, wal_seg_size),
+                      0, cleanup, "boundary resume failed");
+
+   rec = create_decoded_record(RM_HEAP2_ID, XLOG_HEAP2_PRUNE_VACUUM_CLEANUP,
+                               0x30000000, data, sizeof(data));
+   MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "record creation failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec, WAL_MAGIC_V18,
+                                                          WAL_MAGIC_V19, map, false),
+                      PGMONETA_MIGRATION_MODIFIED, cleanup, "record translation failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_write_record(store, rec),
+                      0, cleanup, "record write after resume failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_flush(store), 0, cleanup, "store flush failed");
+
+   f = fopen(seg0_path, "rb");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "previous segment disappeared");
+   MCTF_ASSERT_INT_EQ((int)fread(actual, 1, sizeof(actual), f),
+                      (int)sizeof(actual), cleanup, "previous segment was truncated");
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT_INT_EQ(memcmp(actual, sentinel, sizeof(sentinel)),
+                      0, cleanup, "previous published segment was overwritten");
+   MCTF_ASSERT_INT_EQ(stat(seg1_partial, &st), 0, cleanup, "next segment was not opened");
+   MCTF_ASSERT(st.st_size >= 8192, cleanup, "next segment does not contain a WAL page");
+
+cleanup:
+   if (f)
+   {
+      fclose(f);
+   }
+   destroy_decoded_record(rec);
+   pgmoneta_wal_store_destroy(store);
+   pgmoneta_lsn_map_destroy(map);
+   unlink(seg1_partial);
+   unlink(seg0_partial);
+   unlink(seg0_path);
+   unlink(map_path);
+   rmdir(downstream_dir);
+   rmdir(base);
+   MCTF_FINISH();
+}
+
 /* Build a full-page-image record large enough to force page crossing and
  * (with many copies) downstream segment rotation. */
 static struct decoded_xlog_record*
@@ -2844,6 +3199,140 @@ cleanup:
 /* An encoder resumed at a mid-stream downstream LSN must emit exactly the
  * tail of an encoder that streamed the whole prefix: reconnect at D must look
  * identical to a client that never disconnected. */
+MCTF_TEST(test_walbridge_encoder_matches_store_16k)
+{
+   struct lsn_map* map = NULL;
+   struct wal_store* store = NULL;
+   struct wal_encoder* enc = NULL;
+   struct decoded_xlog_record* rec1 = NULL;
+   struct decoded_xlog_record* rec2 = NULL;
+   struct decoded_xlog_record* rec3 = NULL;
+   struct decoded_xlog_record* rec4 = NULL;
+   char base[PATH_MAX];
+   char map_path[PATH_MAX];
+   char downstream_dir[PATH_MAX];
+   char seg_path[PATH_MAX] = "";
+   char* store_bytes = NULL;
+   char* tail = NULL;
+   char* chunk = NULL;
+   size_t store_len = 0;
+   size_t stream_len = 0;
+   size_t spare = 0;
+   uint8_t prune[2] = {0x01, 0x07};
+   int wal_level = 2;
+   const uint32_t wal_seg_size = 1024 * 1024;
+
+   pgmoneta_snprintf(base, sizeof(base), "%s", "/tmp/walbridge_test_encstore_16k");
+   pgmoneta_mkdir(base);
+   pgmoneta_snprintf(map_path, sizeof(map_path), "%s/lsn.map", base);
+   pgmoneta_snprintf(downstream_dir, sizeof(downstream_dir), "%s/wal", base);
+   unlink(map_path);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(map_path, &map), 0, cleanup, "lsn_map_create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_create(downstream_dir, map, 123456789, wal_seg_size, 16384, 1, &store), 0, cleanup, "store create failed");
+   pgmoneta_wal_store_set_checksums(store, true);
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_create(123456789, wal_seg_size, 16384, 1, true, &enc), 0, cleanup, "encoder create failed");
+
+   /* ~33KB record: crosses 16KB WAL page boundaries within the same segment */
+   rec1 = create_fpi_record(0x10000000, 33000);
+   rec2 = create_decoded_record(RM_HEAP2_ID, XLOG_HEAP2_PRUNE_VACUUM_CLEANUP, 0x20000000, prune, sizeof(prune));
+   rec3 = create_decoded_record(RM_XLOG_ID, XLOG_CHECKPOINT_REDO, 0x30000000, &wal_level, sizeof(wal_level));
+   rec4 = create_fpi_record(0x40000000, 33000);
+   MCTF_ASSERT_PTR_NONNULL(rec1, cleanup, "create rec1 failed");
+   MCTF_ASSERT_PTR_NONNULL(rec2, cleanup, "create rec2 failed");
+   MCTF_ASSERT_PTR_NONNULL(rec3, cleanup, "create rec3 failed");
+   MCTF_ASSERT_PTR_NONNULL(rec4, cleanup, "create rec4 failed");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec2, WAL_MAGIC_V18, WAL_MAGIC_V19, map, false), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate rec2 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec3, WAL_MAGIC_V18, WAL_MAGIC_V19, map, true), PGMONETA_MIGRATION_KEEP, cleanup, "translate rec3 failed");
+
+   /* feed the identical sequence to the store and the encoder */
+   {
+      struct decoded_xlog_record* recs[] = {rec1, rec2, rec3, rec4};
+      for (int i = 0; i < 4; i++)
+      {
+         MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_write_record(store, recs[i]), 0, cleanup, "store write failed");
+         MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_sync_partial_page(store), 0, cleanup, "store sync failed");
+         MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_write_record(enc, recs[i], NULL), 0, cleanup, "encoder write failed");
+         MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_take(enc, &chunk, &spare), 0, cleanup, "encoder take failed");
+         if (chunk)
+         {
+            MCTF_ASSERT_INT_EQ(concat_bytes(&tail, &stream_len, chunk, spare), 0, cleanup, "append stream failed");
+            free(chunk);
+            chunk = NULL;
+         }
+      }
+   }
+   pgmoneta_wal_store_flush(store);
+
+   MCTF_ASSERT(stream_len > 0, cleanup, "stream must not be empty");
+
+   /* encoder stream length must equal the store's byte cursor (next_lsn) */
+   MCTF_ASSERT_INT_EQ((int)stream_len, (int)pgmoneta_wal_encoder_next_lsn(enc), cleanup, "stream length must match encoder next_lsn");
+
+   /* compare against the store's materialized segment 0 bytes */
+   pgmoneta_snprintf(seg_path, sizeof(seg_path), "%s/000000010000000000000000.partial", downstream_dir);
+   store_bytes = read_file_bytes(seg_path, &store_len);
+   MCTF_ASSERT_PTR_NONNULL(store_bytes, cleanup, "could not read store segment");
+   MCTF_ASSERT(store_len >= stream_len, cleanup, "store segment must cover the stream");
+   MCTF_ASSERT_INT_EQ(memcmp(store_bytes, tail, stream_len), 0, cleanup, "encoder bytes must match store bytes");
+
+   /* The long header must advertise the configured 16 KB WAL page size. */
+   MCTF_ASSERT(stream_len > 16384 + SIZE_OF_XLOG_SHORT_PHD,
+              cleanup, "stream must include the second WAL page header");
+
+   {
+      struct xlog_long_page_header_data* long_phd =
+         (struct xlog_long_page_header_data*)tail;
+      struct xlog_page_header_data* second_page =
+         (struct xlog_page_header_data*)(tail + 16384);
+
+      MCTF_ASSERT_INT_EQ((int)long_phd->xlp_seg_size, (int)wal_seg_size,
+                         cleanup, "long header must advertise 1 MB WAL segments");
+
+      MCTF_ASSERT_INT_EQ((int)long_phd->xlp_xlog_blcksz, 16384,
+                         cleanup, "long header must advertise 16 KB WAL pages");
+
+      MCTF_ASSERT_INT_EQ((int)second_page->xlp_magic, (int)WAL_MAGIC_V19,
+                         cleanup, "second page must have valid WAL magic");
+
+      MCTF_ASSERT_INT_EQ((int)second_page->xlp_pageaddr, 16384,
+                         cleanup, "second page must start at offset 16384");
+   }
+
+cleanup:
+   if (chunk)
+   {
+      free(chunk);
+   }
+   free(tail);
+   free(store_bytes);
+   destroy_decoded_record(rec1);
+   destroy_decoded_record(rec2);
+   destroy_decoded_record(rec3);
+   destroy_decoded_record(rec4);
+   if (enc)
+   {
+      pgmoneta_wal_encoder_destroy(enc);
+   }
+   if (store)
+   {
+      pgmoneta_wal_store_destroy(store);
+   }
+   pgmoneta_lsn_map_destroy(map);
+   unlink(map_path);
+   if (seg_path[0])
+   {
+      unlink(seg_path);
+   }
+   rmdir(downstream_dir);
+   rmdir(base);
+   MCTF_FINISH();
+}
+
+/* An encoder resumed at a mid-stream downstream LSN must emit exactly the
+ * tail of an encoder that streamed the whole prefix: reconnect at D must look
+ * identical to a client that never disconnected. */
 MCTF_TEST(test_walbridge_encoder_resume_identity)
 {
    struct lsn_map* map = NULL;
@@ -2966,7 +3455,7 @@ MCTF_TEST(test_walbridge_encoder_resume_at_boundary)
    struct wal_encoder* enc = NULL;
    struct decoded_xlog_record* rec = NULL;
    uint8_t prune[2] = {0x01, 0x07};
-   uint32_t seg_size = DEFAULT_WAL_SEGZ_BYTES;
+   uint32_t seg_size = 1024 * 1024;
    uint64_t sysid = 123456789ULL;
    char* chunk = NULL;
    size_t n = 0;
@@ -2976,8 +3465,8 @@ MCTF_TEST(test_walbridge_encoder_resume_at_boundary)
    MCTF_ASSERT_INT_EQ(pgmoneta_migration_engine_translate(rec, WAL_MAGIC_V18, WAL_MAGIC_V19, NULL, false), PGMONETA_MIGRATION_MODIFIED, cleanup, "translate failed");
 
    /* short header: resume on an intra-segment page boundary */
-   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_create(sysid, seg_size, 8192, 1, true, &enc), 0, cleanup, "encoder create failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_resume(enc, 0, 8192), 0, cleanup, "resume at page boundary failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_create(sysid, seg_size, 16384, 1, true, &enc), 0, cleanup, "encoder create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_resume(enc, 0, 16384), 0, cleanup, "resume at page boundary failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_write_record(enc, rec, NULL), 0, cleanup, "write after boundary resume failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_take(enc, &chunk, &n), 0, cleanup, "take after boundary resume failed");
    MCTF_ASSERT(chunk != NULL && n >= 20, cleanup, "emitted bytes must include the short page header");
@@ -2988,7 +3477,7 @@ MCTF_TEST(test_walbridge_encoder_resume_at_boundary)
       memcpy(&pageaddr, chunk + 8, 8);
       MCTF_ASSERT_INT_EQ((int)magic, (int)WAL_MAGIC_V19, cleanup, "short page magic must be V19");
       MCTF_ASSERT_INT_EQ((int)(uint8_t)chunk[2], 0, cleanup, "short page info must be clear");
-      MCTF_ASSERT_INT_EQ((int)pageaddr, (int)8192, cleanup, "short page pageaddr must be 8192");
+      MCTF_ASSERT_INT_EQ((int)pageaddr, (int)16384, cleanup, "short page pageaddr must be 16384");
    }
    free(chunk);
    chunk = NULL;
@@ -2996,7 +3485,7 @@ MCTF_TEST(test_walbridge_encoder_resume_at_boundary)
    enc = NULL;
 
    /* long header: resume exactly on a segment base */
-   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_create(sysid, seg_size, 8192, 1, true, &enc), 0, cleanup, "encoder create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_create(sysid, seg_size, 16384, 1, true, &enc), 0, cleanup, "encoder create failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_resume(enc, 0, seg_size), 0, cleanup, "resume at segment base failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_write_record(enc, rec, NULL), 0, cleanup, "write after segment resume failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_take(enc, &chunk, &n), 0, cleanup, "take after segment resume failed");
@@ -3012,6 +3501,10 @@ MCTF_TEST(test_walbridge_encoder_resume_at_boundary)
       MCTF_ASSERT_INT_EQ((int)(uint8_t)chunk[2], (int)XLP_LONG_HEADER, cleanup, "long page info must mark the long header");
       MCTF_ASSERT_INT_EQ((int)pageaddr, (int)seg_size, cleanup, "long page pageaddr must be the segment base");
       MCTF_ASSERT_INT_EQ((int)sysid_out, (int)sysid, cleanup, "long page sysid must round-trip");
+      MCTF_ASSERT_INT_EQ((int)((struct xlog_long_page_header_data*)chunk)->xlp_seg_size, (int)seg_size,
+                         cleanup, "long page must advertise the configured WAL segment size");
+      MCTF_ASSERT_INT_EQ((int)((struct xlog_long_page_header_data*)chunk)->xlp_xlog_blcksz, 16384,
+                         cleanup, "long page must advertise 16 KB WAL pages");
    }
 
 cleanup:
@@ -3382,9 +3875,9 @@ MCTF_TEST(test_walbridge_encoder_rotation_matches_store)
    unlink(map_path);
 
    MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(map_path, &map), 0, cleanup, "lsn_map_create failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_create(downstream_dir, map, 987654321, wal_size, 8192, 1, &store), 0, cleanup, "store create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_store_create(downstream_dir, map, 987654321, wal_size, 16384, 1, &store), 0, cleanup, "store create failed");
    pgmoneta_wal_store_set_checksums(store, false);
-   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_create(987654321, wal_size, 8192, 1, false, &enc), 0, cleanup, "encoder create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_wal_encoder_create(987654321, wal_size, 16384, 1, false, &enc), 0, cleanup, "encoder create failed");
 
    /* ~65.5KB records: 24 of them are ~1.5MB, forcing the store and the encoder
     * through the same downstream segment rotation point */
@@ -3405,7 +3898,17 @@ MCTF_TEST(test_walbridge_encoder_rotation_matches_store)
       }
    }
 
-   MCTF_ASSERT(stream_len > wal_size + 8192, cleanup, "stream must span the rotation point");
+   MCTF_ASSERT(stream_len > wal_size + 16384, cleanup, "stream must span the rotation point");
+   {
+      struct xlog_long_page_header_data* long_phd =
+         (struct xlog_long_page_header_data*)stream;
+
+      MCTF_ASSERT_INT_EQ((int)long_phd->xlp_seg_size, (int)wal_size,
+                         cleanup, "long header must advertise 1 MB WAL segments");
+      MCTF_ASSERT_INT_EQ((int)long_phd->xlp_xlog_blcksz, 16384,
+                         cleanup, "long header must advertise 16 KB WAL pages");
+   }
+
 
    /* the stream must equal segment 0 (padded) followed by segment 1 */
    pgmoneta_snprintf(seg0_path, sizeof(seg0_path), "%s/000000010000000000000000", downstream_dir);

@@ -635,6 +635,18 @@ int
 pgmoneta_read_control_data(int server, char* directory, struct control_file_data** controldata);
 
 /**
+ * Read the database page layout from the full backup associated with a backup.
+ * @param server The server
+ * @param label The backup label
+ * @param blcksz [out] The database block size
+ * @param relseg_size [out] The relation segment size in blocks
+ * @return 0 on success, 1 otherwise
+ */
+int
+pgmoneta_read_backup_page_layout(int server, char* label,
+                                 uint32_t* blcksz, uint32_t* relseg_size);
+
+/**
  * Get the page geometry of the cluster a control file came from
  *
  * The fields are in every version of the structure, but the structure is a

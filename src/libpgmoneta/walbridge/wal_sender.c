@@ -2282,12 +2282,18 @@ sender_stream(int fd, int srv, char* downstream_dir, char* map_path, uint64_t st
    char* wal_dir = NULL;
    uint64_t pos = start_lsn;
    uint64_t sent_lsn = 0;
-   uint32_t seg_size = DEFAULT_WAL_SEG_SIZE;
+   uint32_t seg_size = 0;
+   struct main_configuration* main_config = (struct main_configuration*)shmem;
    int64_t last_keepalive = 0;
    uint64_t last_map_offset = 0;
    bool done = false;
 
-   sender_get_stream_info(srv, NULL, NULL, &seg_size);
+   if (main_config == NULL || main_config->common.servers[srv].wal_size <= 0)
+   {
+      pgmoneta_log_error("wal_sender: invalid cached WAL segment size for server %d", srv);
+      return 1;
+   }
+   seg_size = (uint32_t)main_config->common.servers[srv].wal_size;
 
    if (pgmoneta_lsn_map_create(map_path, &map))
    {
