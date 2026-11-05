@@ -38,6 +38,7 @@
 #include <utils.h>
 #include <walfile.h>
 #include <walbridge/walbridge.h>
+#include <walbridge/walbridge_utils.h>
 #include <walbridge/migration_engine.h>
 #include <walbridge/wal_receiver.h>
 #include <walbridge/wal_sender.h>
@@ -53,6 +54,52 @@
 #include <unistd.h>
 
 extern bool enable_translation;
+int
+pgmoneta_walbridge_parse_wal_segment_size(const char* value, int* size)
+{
+   char* end = NULL;
+   long amount = 0;
+   long multiplier = 0;
+
+   if (value == NULL || size == NULL)
+   {
+      return 1;
+   }
+
+   errno = 0;
+   amount = strtol(value, &end, 10);
+
+   if (errno != 0 || end == value || amount <= 0)
+   {
+      return 1;
+   }
+
+   while (*end == ' ' || *end == '\t')
+   {
+      end++;
+   }
+
+   if (strcmp(end, "MB") == 0)
+   {
+      multiplier = 1024L * 1024L;
+   }
+   else if (strcmp(end, "GB") == 0)
+   {
+      multiplier = 1024L * 1024L * 1024L;
+   }
+   else
+   {
+      return 1;
+   }
+
+   if (amount > INT_MAX / multiplier)
+   {
+      return 1;
+   }
+
+   *size = (int)(amount * multiplier);
+   return 0;
+}
 
 static int
 walbridge_read_configuration(char* configuration_path, char* users_path);
@@ -88,12 +135,12 @@ error:
 
 /* Cache the primary's parameters (wal_level, data_checksums, wal_segment_size)
  * in shared memory so the receiver and sender answer handshake queries and
- * build the translated stream consistently. A failure is not fatal: the old
- * always-recompute behaviour is kept as the safe fallback.
+ * build the translated stream consistently. WAL segment-size discovery is required before the receiver can start.
  */
-static void
+static int
 walbridge_fetch_server_info(int srv)
 {
+   int wal_size = 0;
    struct main_configuration* config = (struct main_configuration*)shmem;
    SSL* ssl = NULL;
    int socket = -1;
@@ -111,9 +158,9 @@ walbridge_fetch_server_info(int srv)
    }
    if (usr == -1)
    {
-      pgmoneta_log_warn("walbridge: no matching user for server %s; keeping default parameters",
-                        config->common.servers[srv].name);
-      return;
+      pgmoneta_log_error("walbridge: no matching user for server %s",
+                         config->common.servers[srv].name);
+      return 1;
    }
 
    /* the message layer (used by the handshake below) needs its buffers */
@@ -123,9 +170,9 @@ walbridge_fetch_server_info(int srv)
                                     config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {
       pgmoneta_log_warn("walbridge: could not connect to %s to cache server parameters; "
-                        "keeping default parameters",
+                        "cannot retrieve primary server parameters",
                         config->common.servers[srv].name);
-      return;
+      return 1;
    }
 
    config->common.servers[srv].checksums = true;
@@ -157,20 +204,27 @@ walbridge_fetch_server_info(int srv)
 
    if (walbridge_run_show("wal_segment_size", value, sizeof(value), ssl, socket))
    {
-      pgmoneta_log_warn("walbridge: SHOW wal_segment_size failed; keeping default parameters");
+      pgmoneta_log_error("walbridge: unable to discover primary WAL segment size");
+      pgmoneta_close_ssl(ssl);
+      pgmoneta_disconnect(socket);
+      return 1;
    }
-   else
+
+   if (pgmoneta_walbridge_parse_wal_segment_size(value, &wal_size))
    {
-      int mb = atoi(value);
-      if (mb > 0)
-      {
-         config->common.servers[srv].wal_size = mb * 1024 * 1024;
-         pgmoneta_log_info("walbridge: primary wal_segment_size %dMB", mb);
-      }
+      pgmoneta_log_error("walbridge: invalid primary WAL segment size: %s", value);
+      pgmoneta_close_ssl(ssl);
+      pgmoneta_disconnect(socket);
+      return 1;
    }
+
+   config->common.servers[srv].wal_size = wal_size;
+   pgmoneta_log_info("walbridge: primary WAL segment size %d bytes", wal_size);
 
    pgmoneta_close_ssl(ssl);
    pgmoneta_disconnect(socket);
+
+   return 0;
 }
 
 int
@@ -191,7 +245,11 @@ pgmoneta_walbridge_start(char* configuration_path, char* users_path, char** argv
    pgmoneta_log_info("walbridge: starting PoC for server %d", srv);
 
    /* Cache the primary's parameters in shared memory for the receiver/sender */
-   walbridge_fetch_server_info(srv);
+   if (walbridge_fetch_server_info(srv))
+   {
+      pgmoneta_log_error("walbridge: cannot start without the primary WAL segment size");
+      goto error;
+   }
 
    /* Persist the LSN map alongside the raw WAL archive. */
    wal_dir = pgmoneta_get_server_wal(srv);

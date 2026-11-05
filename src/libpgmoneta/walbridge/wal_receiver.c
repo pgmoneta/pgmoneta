@@ -91,12 +91,13 @@ pgmoneta_walbridge_run_receiver(int srv, char** argv)
    pid_t pid;
    int child_status = 0;
 
-   pgmoneta_server_set_online(srv, true);
-
-   if (config->common.servers[srv].wal_size == 0)
+   if (config->common.servers[srv].wal_size <= 0)
    {
-      config->common.servers[srv].wal_size = DEFAULT_WAL_SEGZ_BYTES;
+      pgmoneta_log_error("walbridge: WAL segment size was not discovered");
+      return 1;
    }
+
+   pgmoneta_server_set_online(srv, true);
 
    pid = fork();
    if (pid == -1)

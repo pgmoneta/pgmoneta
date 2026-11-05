@@ -388,15 +388,28 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       goto error;
    }
 
-   /*
-    * The segment size on disk is authoritative and is recorded in the long
-    * page header; the file itself may be a partial (still-growing) segment,
-    * so its size cannot be used to derive the base LSN of the segment.
-    */
-   if (long_header->xlp_seg_size > 0)
+   if (long_header->xlp_xlog_blcksz < SIZE_OF_XLOG_LONG_PHD ||
+       (long_header->xlp_xlog_blcksz & (long_header->xlp_xlog_blcksz - 1)) != 0)
    {
-      wal_segz_bytes = long_header->xlp_seg_size;
+      pgmoneta_log_error("Invalid WAL block size (%u) in file %s",
+                         long_header->xlp_xlog_blcksz, path);
+      goto error;
    }
+
+   if (long_header->xlp_seg_size < long_header->xlp_xlog_blcksz ||
+       (long_header->xlp_seg_size & (long_header->xlp_seg_size - 1)) != 0 ||
+       long_header->xlp_seg_size % long_header->xlp_xlog_blcksz != 0)
+   {
+      pgmoneta_log_error("Invalid WAL segment size (%u) for block size (%u) in file %s",
+                         long_header->xlp_seg_size, long_header->xlp_xlog_blcksz, path);
+      goto error;
+   }
+
+   /*
+    * The segment size in the long page header is authoritative. The file
+    * itself may be a partial (still-growing) segment.
+    */
+   wal_segz_bytes = long_header->xlp_seg_size;
 
    pgmoneta_log_trace("Valid PostgreSQL WAL magic number: 0x%04X (PostgreSQL %d) in file %s",
                       long_header->std.xlp_magic, pg_version, path);

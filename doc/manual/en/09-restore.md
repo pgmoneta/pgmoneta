@@ -25,6 +25,11 @@ where
 
 [More information](https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET)
 
+During restore, pgmoneta uses the database page size and relation segment size
+recorded in the selected backup's `global/pg_control` file when reconstructing
+incremental backup files. This ensures that file reconstruction uses the
+layout of the backed-up PostgreSQL cluster.
+
 ## Automatic Backup Selection
 
 When specifying a recovery target (`lsn=X`, `time=X`, or `timeline=X`), pgmoneta can automatically
