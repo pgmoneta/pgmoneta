@@ -42,6 +42,12 @@ dnf install git gcc clang clang-analyzer clang-tools-extra cmake make libev libe
 
 in order to get the necessary dependencies.
 
+If you are using an Ubuntu/Debian based platform, you can use the following command:
+
+```
+sudo apt install -y git gcc clang clang-tools cmake make libev-dev libssl-dev libsystemd-dev zlib1g-dev libzstd-dev liblz4-dev libssh-dev python3-docutils libbz2-dev libarchive-dev libyaml-dev check pkg-config
+```
+
 ## Building the main branch
 
 To build the `main` branch:
