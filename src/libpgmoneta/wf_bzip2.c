@@ -209,7 +209,7 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
    pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
-   backup = (struct backup*)malloc(sizeof(struct backup));
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    backup->compression_bzip2_elapsed_time = compression_bzip2_elapsed_time;
    if (pgmoneta_save_info(server_backup, backup))
