@@ -50,11 +50,11 @@
 extern int ssh_upload(int server, char* label, int compression, int encryption);
 extern int s3_upload(int server, char* label, int compression, int encryption);
 extern int s3_cleanup(int server, char* label);
-extern int s3_download(int server, char* label, int compression, int encryption);
+extern int s3_download(int server, char* label, char* local_root);
 extern int azure_upload(int server, char* label, int compression, int encryption);
-extern int azure_download(int server, char* label, int compression, int encryption);
+extern int azure_download(int server, char* label, char* local_root);
 extern int gcs_upload(int server, char* label, int compression, int encryption);
-extern int gcs_download(int server, char* label, int compression, int encryption);
+extern int gcs_download(int server, char* label, char* local_root);
 
 /* The contract each remote backend must implement */
 struct storage_engine
@@ -64,7 +64,7 @@ struct storage_engine
    int capabilities;
    int (*upload)(int server, char* label, int compression, int encryption);
    int (*cleanup)(int server, char* label);
-   int (*download)(int server, char* label, int compression, int encryption);
+   int (*download)(int server, char* label, char* local_root);
 };
 
 static const struct storage_engine engines[] = {
@@ -150,9 +150,15 @@ pgmoneta_storage_create_remote(void)
 }
 
 int
-pgmoneta_storage_remote_download(int server, char* label)
+pgmoneta_storage_remote_download(int server, char* label, char** root)
 {
+   char staging[MAX_PATH];
+   char* ws = NULL;
+   char* local_root = NULL;
+   int rc;
    struct main_configuration* config = (struct main_configuration*)shmem;
+
+   *root = NULL;
 
    for (int i = 0; i < N_ENGINES; i++)
    {
@@ -161,10 +167,32 @@ pgmoneta_storage_remote_download(int server, char* label)
          continue;
       }
 
-      pgmoneta_log_debug("remote_download: staging %s/%s from %s",
-                         config->common.servers[server].name, label, engines[i].name);
+      ws = pgmoneta_get_server_workspace(server);
+      if (ws == NULL)
+      {
+         pgmoneta_log_error("remote_download: no workspace for %s", config->common.servers[server].name);
+         return 1;
+      }
 
-      return engines[i].download(server, label, 0, 0);
+      pgmoneta_snprintf(staging, sizeof(staging), "%s.tmp_%s_XXXXXX", ws, config->common.servers[server].name);
+      free(ws);
+
+      if (mkdtemp(staging) == NULL)
+      {
+         pgmoneta_log_error("remote_download: could not create staging directory %s", staging);
+         return 1;
+      }
+
+      *root = pgmoneta_append(pgmoneta_append(NULL, staging), "/");
+      local_root = pgmoneta_append(pgmoneta_append(pgmoneta_append(NULL, *root), label), "/");
+
+      pgmoneta_log_debug("remote_download: staging %s/%s from %s into %s",
+                         config->common.servers[server].name, label, engines[i].name, *root);
+
+      rc = engines[i].download(server, label, local_root);
+
+      free(local_root);
+      return rc;
    }
 
    pgmoneta_log_error("remote_download: no configured storage engine supports download for %s",

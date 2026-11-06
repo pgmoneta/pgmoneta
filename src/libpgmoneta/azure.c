@@ -58,7 +58,7 @@ pgmoneta_restore_azure_objects(int client_fd, int server, char* label, uint8_t c
    double total_seconds;
    char* directory = NULL;
    char* position = NULL;
-   char* local_data = NULL;
+   char* staging = NULL;
    struct art* nodes = NULL;
    struct backup* backup = NULL;
    struct json* req = NULL;
@@ -115,11 +115,17 @@ pgmoneta_restore_azure_objects(int client_fd, int server, char* label, uint8_t c
       goto error;
    }
 
-   if (pgmoneta_storage_remote_download(server, label))
+   if (pgmoneta_storage_remote_download(server, label, &staging))
    {
       ec = MANAGEMENT_ERROR_RESTORE_AZURE_DOWNLOAD;
       pgmoneta_log_error("Azure restore: failed to stage %s/%s",
                          config->common.servers[server].name, label);
+      goto error;
+   }
+
+   if (pgmoneta_art_insert(nodes, NODE_SERVER_BACKUP, (uintptr_t)staging, ValueString))
+   {
+      ec = MANAGEMENT_ERROR_RESTORE_AZURE_ERROR;
       goto error;
    }
 
@@ -153,8 +159,7 @@ pgmoneta_restore_azure_objects(int client_fd, int server, char* label, uint8_t c
       goto error;
    }
 
-   local_data = pgmoneta_get_server_backup_identifier_data(server, label);
-   pgmoneta_delete_directory(local_data);
+   pgmoneta_delete_directory(staging);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
@@ -177,7 +182,7 @@ pgmoneta_restore_azure_objects(int client_fd, int server, char* label, uint8_t c
    pgmoneta_json_destroy(payload);
    pgmoneta_art_destroy(nodes);
    free(elapsed);
-   free(local_data);
+   free(staging);
 
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
@@ -194,13 +199,13 @@ error:
    pgmoneta_art_destroy(nodes);
    free(elapsed);
 
-   if (local_data != NULL)
+   if (staging != NULL)
    {
-      pgmoneta_delete_directory(local_data);
+      pgmoneta_delete_directory(staging);
    }
 
    pgmoneta_disconnect(client_fd);
    pgmoneta_stop_logging();
-   free(local_data);
+   free(staging);
    exit(1);
 }

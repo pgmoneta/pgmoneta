@@ -71,7 +71,7 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
-| workspace | /tmp/pgmoneta-workspace/ | String | No | The directory for the workspace that incremental backup can use for its work |
+| workspace | `$TMPDIR/pgmoneta-workspace-<uid>/` | String | No | The directory for the workspace that incremental backup can use for its work, and where object storage restores are staged, so it needs room for the downloaded backup. `$TMPDIR` defaults to `/tmp` |
 
 **Storage**
 
