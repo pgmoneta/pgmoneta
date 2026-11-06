@@ -130,6 +130,33 @@ incremental backup child.
 
 Note: Support for incremental backups on PostgreSQL versions 14–16 is also provided, at preview level.
 
+## PostgreSQL page and segment sizes
+
+PostgreSQL allows the database page size, relation segment size, and WAL layout
+to be customized when building PostgreSQL or initializing a database cluster.
+The relevant options are:
+
+- `--with-blocksize=BLOCKSIZE`: Sets the database page size (`BLCKSZ`) in
+  kilobytes. The default is 8 KB.
+- `--with-segsize-blocks=SEGSIZE_BLOCKS`: Sets the number of blocks in each
+  relation segment (`RELSEG_SIZE`). This is a developer-only PostgreSQL build
+  option intended for testing segment-related code. When specified together
+  with `--with-segsize`, this option takes precedence.
+- `--with-wal-blocksize=BLOCKSIZE`: Sets the WAL page size (`XLOG_BLCKSZ`) in
+  kilobytes. The default is 8 KB.
+- `initdb --wal-segsize=SIZE`: Sets the WAL segment file size in megabytes.
+  The default is 16 MB. The value must be a power of 2 between 1 and 1024 MB
+  and can only be selected when initializing the database cluster.
+
+pgmoneta supports PostgreSQL installations and clusters using non-default
+values for these parameters. It obtains the database page size and relation
+segment size from the backup's `global/pg_control` file, the WAL page size
+from the WAL page header, and the WAL segment size from the PostgreSQL server.
+
+These detected values are used when calculating incremental backup file sizes,
+processing WAL pages and segments, and reconstructing files during restore.
+This avoids relying on hard-coded default page and segment sizes.
+
 ## Incremental backup for PostgreSQL 14-16
 
 ### Working

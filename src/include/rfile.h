@@ -92,12 +92,14 @@ pgmoneta_rfile_destroy(struct rfile* rf);
  * @param base_file_name The file name
  * @param encryption The encryption method
  * @param compression The compression method
+ * @param block_size The database block size in bytes
+ * @param relseg_size The relation segment size in blocks
  * @param failures The failure deque
  * @param rfile [out] The rfile
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct deque* failures, struct rfile** rfile);
+pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, uint32_t block_size, uint32_t relseg_size, struct deque* failures, struct rfile** rfile);
 
 #ifdef __cplusplus
 }

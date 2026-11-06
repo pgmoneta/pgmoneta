@@ -263,7 +263,7 @@ pgmoneta_save_info(char* directory, struct backup* backup);
  * @return 0 on success, 1 if otherwise
  */
 int
-pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* biggest_file_size);
+pgmoneta_backup_size(int server, char* label, char* layout_label, unsigned long* size, uint64_t* biggest_file_size);
 
 /**
  * Sort the backup array by its label
