@@ -2018,6 +2018,27 @@ pgmoneta_wal_record_summary(struct decoded_xlog_record* record, uint64_t start_l
             pgmoneta_log_fatal("Cannot set block_number:%d in block reference table", blocknum);
             goto error;
          }
+
+         /*
+          * A heap insert/update/delete can clear a page's all-visible bit in the
+          * visibility map without that VM page being registered as a block in the
+          * record: the clear is driven by a flag and applied during replay, so it is
+          * not seen in this loop. The summarizer would then miss it and an incremental
+          * restore would keep the stale all-visible VM page from the full backup, which
+          * makes index-only scans return dead tuples. Mark the corresponding VM block
+          * modified for every heap main-fork change so the incremental captures the
+          * current VM page. HEAPBLOCKS_PER_PAGE is (BLCKSZ - MAXALIGN(SizeOfPageHeaderData)) * 4,
+          * i.e. 32672 for the standard 8 KiB page.
+          */
+         if ((record->header.xl_rmid == RM_HEAP_ID || record->header.xl_rmid == RM_HEAP2_ID) &&
+             forknum == MAIN_FORKNUM)
+         {
+            if (pgmoneta_brt_mark_block_modified(brt, &rlocator, VISIBILITYMAP_FORKNUM, blocknum / 32672))
+            {
+               pgmoneta_log_fatal("Cannot set visibility map block for block_number:%d", blocknum);
+               goto error;
+            }
+         }
       }
    }
 
