@@ -5,7 +5,7 @@
 ### Fork pgmoneta into your GitHub account
 
 1. Go to [pgmoneta](https://github.com/pgmoneta/pgmoneta)
-2. Create a fork by cliking at fork button on the right top corner
+2. Create a fork by clicking at fork button on the right top corner
 3. A forked repository will be created in your account.
 
 ### Clone on your local machine
@@ -112,7 +112,7 @@ You can check the commit using:
 
 ## Push
 
-Nomally we just use
+Normally we just use
 
     git push origin branch_name
 
