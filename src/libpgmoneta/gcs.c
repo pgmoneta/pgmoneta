@@ -145,6 +145,13 @@ pgmoneta_restore_gcs_objects(int client_fd, int server, char* label, uint8_t com
       goto error;
    }
 
+   if (pgmoneta_art_insert(nodes, NODE_STAGED, true, ValueBool))
+   {
+      ec = MANAGEMENT_ERROR_RESTORE_GCS_ERROR;
+      pgmoneta_log_error("GCS restore: could not mark the backup as staged");
+      goto error;
+   }
+
    if (pgmoneta_restore_backup(nodes) != 0)
    {
       ec = MANAGEMENT_ERROR_RESTORE_GCS_ERROR;
