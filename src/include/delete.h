@@ -54,6 +54,30 @@ pgmoneta_delete(int srv, char* backup_id);
 int
 pgmoneta_delete_wal(int srv);
 
+/**
+ * Delete the backups of a server that did not finish, locally and on the
+ * remote storage engines. A marker stays until the remote cleanup of its
+ * backup succeeds, so the next call tries again.
+ * The caller holds the repository lock of the server, or nothing runs yet
+ * @param srv The server index
+ * @param startup Also delete the backup directories without backup.info,
+ *                which is only safe before anything runs, since a restore
+ *                from S3, Azure or GCS downloads one without the lock
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_incomplete_backups(int srv, bool startup);
+
+/**
+ * Delete the incomplete backup of a backup process that died,
+ * then release the repository lock
+ * @param argv The argv
+ * @param srv The server index
+ * @param pid The backup process that died
+ */
+void
+pgmoneta_delete_failed_backup(char** argv, int srv, pid_t pid);
+
 #ifdef __cplusplus
 }
 #endif

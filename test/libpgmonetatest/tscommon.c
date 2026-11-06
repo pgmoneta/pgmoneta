@@ -541,6 +541,27 @@ pgmoneta_test_exec_command(const char* command, char** output, int* exit_code)
    return 0;
 }
 
+pid_t
+pgmoneta_test_find_process(char* title)
+{
+   char* command = NULL;
+   char* output = NULL;
+   int exit_code = 0;
+   pid_t pid = 0;
+
+   command = pgmoneta_format_and_append(NULL, "pgrep -n -f '^pgmoneta: %s'", title);
+
+   if (command != NULL && !pgmoneta_test_exec_command(command, &output, &exit_code) && exit_code == 0)
+   {
+      pid = (pid_t)atoi(output);
+   }
+
+   free(output);
+   free(command);
+
+   return pid;
+}
+
 int
 pgmoneta_test_load_conf(char* conf_path)
 {

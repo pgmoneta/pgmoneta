@@ -130,6 +130,15 @@ int
 pgmoneta_storage_remote_download(int server, char* label);
 
 /**
+ * Remove a backup from the remote storage engines
+ * @param server The server index
+ * @param label The backup label
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_storage_remote_cleanup(int server, char* label);
+
+/**
  * Open WAL shipping file in remote ssh server
  * @param srv The server index
  * @param filename WAL file name

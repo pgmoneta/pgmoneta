@@ -91,6 +91,12 @@ pgmoneta-cli list-backup primary --sort desc
 
 for descending order (newest first).
 
+## Interrupted backups
+
+While a backup is being taken, a `<label>.incomplete` file sits next to its directory, and the backup is only listed once its `backup.info` file has been written.
+
+If the process taking the backup dies before the backup is complete (`kill -9`, out of memory killer), [**pgmoneta**][pgmoneta] deletes the backup right away, including what was already uploaded to S3, and logs a warning. If [**pgmoneta**][pgmoneta] itself goes down (crash, power loss), it deletes the backup the next time it starts, together with any backup directory that has no `backup.info`.
+
 ## Create an incremental backup
 
 We can take an incremental backup from the primary with the following command

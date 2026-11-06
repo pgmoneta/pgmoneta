@@ -1126,13 +1126,6 @@ error:
          pgmoneta_delete_file(cleanup, NULL);
       }
       free(cleanup);
-
-      cleanup = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.info");
-      if (pgmoneta_exists(cleanup))
-      {
-         pgmoneta_delete_file(cleanup, NULL);
-      }
-      free(cleanup);
    }
 
    free(azure_root);
