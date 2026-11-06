@@ -280,7 +280,7 @@ error:
 static int
 backup_stream_cb(struct streamer* this, bool last_chunk)
 {
-   char cbuf[BUFFER_SIZE];
+   char* cbuf = NULL;
    void* ebuf = NULL;
    size_t ebuf_size;
    size_t cbuf_size = 0;
@@ -294,10 +294,12 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
       goto error;
    }
 
+   cbuf = this->output;
+
    pgmoneta_compressor_prepare(this->compressor, this->buffer, this->size, last_chunk);
    while (!finished)
    {
-      if (this->compressor->compress(this->compressor, cbuf, sizeof(cbuf), &cbuf_size, &finished))
+      if (this->compressor->compress(this->compressor, cbuf, sizeof(this->output), &cbuf_size, &finished))
       {
          pgmoneta_log_error("Failed to compress data in streamer");
          goto error;
@@ -347,7 +349,7 @@ error:
 static int
 restore_stream_cb(struct streamer* this, bool last_chunk)
 {
-   char cbuf[BUFFER_SIZE];
+   char* cbuf = NULL;
    void* ebuf = NULL;
    size_t ebuf_size;
    size_t cbuf_size = 0;
@@ -361,6 +363,8 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
       goto error;
    }
 
+   cbuf = this->output;
+
    if (this->encryptor->decrypt(this->encryptor, this->buffer, this->size, last_chunk, &ebuf, &ebuf_size))
    {
       pgmoneta_log_error("Failed to decrypt data in streamer");
@@ -370,7 +374,7 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
    pgmoneta_compressor_prepare(this->compressor, ebuf, ebuf_size, last_chunk);
    while (!finished)
    {
-      if (this->compressor->decompress(this->compressor, cbuf, sizeof(cbuf), &cbuf_size, &finished))
+      if (this->compressor->decompress(this->compressor, cbuf, sizeof(this->output), &cbuf_size, &finished))
       {
          pgmoneta_log_error("Failed to decompress data in streamer");
          goto error;

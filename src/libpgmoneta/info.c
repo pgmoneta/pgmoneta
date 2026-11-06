@@ -1643,9 +1643,16 @@ split_file_path(char* path, char** relative_path, char** bare_file_name)
       goto error;
    }
 
-   rel_path = dirname(path_copy);
+   /* dirname() may return its own buffer (macOS), so keep a copy the caller can free */
+   rel_path = pgmoneta_append(rel_path, dirname(path_copy));
+   free(path_copy);
+   path_copy = NULL;
 
-   /* don't use path_copy from this point onwards */
+   if (rel_path == NULL)
+   {
+      goto error;
+   }
+
    relative_path_len = strlen(rel_path);
 
    /* path is only the filename (doesn't contain any '/') */
