@@ -78,6 +78,23 @@ void
 pgmoneta_wal(int srv, char** argv);
 
 /**
+ * Classify a WAL start-point ErrorResponse as a "not in history" error.
+ *
+ * Returns true if and only if the PostgreSQL ErrorResponse M-field text
+ * indicates that the requested WAL start point is not in the server's
+ * history (PostgreSQL walsender.c message:
+ * "requested starting point %X/%X on timeline %u is not in this server's
+ * history").  Returns false for NULL, empty string, or any other message.
+ *
+ * @note <stdbool.h> is available through the existing pgmoneta.h include.
+ *
+ * @param message The ErrorResponse M-field text (may be NULL)
+ * @return true if the message matches the history-start-point error; false otherwise
+ */
+bool
+pgmoneta_wal_is_history_start_error(const char* message);
+
+/**
  * Find and extract the history info from .history file of given server and timeline
  * @param srv The server index
  * @param tli The timeline

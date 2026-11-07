@@ -64,6 +64,12 @@ int mappings_size = 0;
 oid_mapping* oidMappings = NULL;
 bool enable_translation = false;
 
+enum wal_start_source {
+   WAL_START_ARCHIVE = 1,
+   WAL_START_SLOT = 2,
+   WAL_START_CURRENT = 3
+};
+
 static int wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket);
 static FILE* wal_open(char* root, char* filename, int segsize);
 static int wal_close(char* root, char* filename, bool partial, FILE* file);
@@ -77,6 +83,10 @@ static int wal_shipping_setup(int srv, char** wal_shipping);
 static void update_wal_lsn(int srv, size_t xlogptr);
 static void reap_wal_children(int sig);
 static void install_wal_sigchld_handler(void);
+static int wal_reconnect_and_identify(int srv, int usr, SSL** out_ssl, int* out_socket,
+                                      struct stream_buffer** out_buffer,
+                                      char** out_system_id, uint32_t* out_timeline,
+                                      char** out_xlogpos);
 
 void
 pgmoneta_wal(int srv, char** argv)
@@ -119,6 +129,10 @@ pgmoneta_wal(int srv, char** argv)
    struct workflow* head = NULL;
    struct workflow* current = NULL;
    struct art* nodes = NULL;
+   char* system_id = NULL;
+   enum wal_start_source start_source = 0;
+   bool retried = false;
+   bool restart_stream = false;
 
    config = (struct main_configuration*)shmem;
 
@@ -254,6 +268,17 @@ pgmoneta_wal(int srv, char** argv)
       goto error;
    }
 
+   if (pgmoneta_query_response_get_data(identify_system_response, 0) == NULL)
+   {
+      goto error;
+   }
+   system_id = (char*)malloc(strlen(pgmoneta_query_response_get_data(identify_system_response, 0)) + 1);
+   if (system_id == NULL)
+   {
+      goto error;
+   }
+   strcpy(system_id, pgmoneta_query_response_get_data(identify_system_response, 0));
+
    cur_timeline = pgmoneta_atoi(
       pgmoneta_query_response_get_data(identify_system_response, 1));
    if (cur_timeline < 1)
@@ -263,8 +288,15 @@ pgmoneta_wal(int srv, char** argv)
    }
    config->common.servers[srv].cur_timeline = cur_timeline;
 
-   wal_find_streaming_start(d, segsize, &timeline, &high32, &low32);
-   if (timeline == 0)
+   if (wal_find_streaming_start(d, segsize, &timeline, &high32, &low32))
+   {
+      goto error;
+   }
+   if (timeline != 0)
+   {
+      start_source = WAL_START_ARCHIVE;
+   }
+   else
    {
       read_replication = (config->common.servers[srv].version >= 15) ? 1 : 0;
 
@@ -278,11 +310,16 @@ pgmoneta_wal(int srv, char** argv)
          {
             read_replication = 0; // Fallback if not PostgreSQL 15+
          }
+         else
+         {
+            start_source = WAL_START_SLOT;
+         }
       }
 
       // use current xlogpos as last resort
       if (!read_replication)
       {
+         start_source = WAL_START_CURRENT;
          timeline = cur_timeline;
          xlogpos_size = strlen(pgmoneta_query_response_get_data(identify_system_response, 2)) + 1;
          xlogpos = (char*)malloc(xlogpos_size);
@@ -348,11 +385,92 @@ pgmoneta_wal(int srv, char** argv)
          type = msg->kind;
          if (type == 'E')
          {
+            if (start_source == WAL_START_ARCHIVE && !retried)
+            {
+               char* err_msg = NULL;
+               bool is_hist_err = false;
+
+               pgmoneta_extract_error_fields('M', msg, &err_msg);
+               is_hist_err = pgmoneta_wal_is_history_start_error(err_msg);
+               free(err_msg);
+
+               if (is_hist_err)
+               {
+                  char* fresh_sys_id = NULL;
+                  uint32_t fresh_timeline = 0;
+                  char* fresh_xlogpos = NULL;
+                  uint32_t old_high32 = high32;
+                  uint32_t old_low32 = low32;
+                  uint32_t old_timeline = timeline;
+
+                  retried = true;
+                  pgmoneta_log_error_response_message(msg);
+
+                  pgmoneta_free_message(start_replication_msg);
+                  start_replication_msg = NULL;
+                  if (msg != NULL)
+                  {
+                     msg->data = NULL;
+                  }
+                  pgmoneta_close_ssl(ssl);
+                  ssl = NULL;
+                  if (socket != -1)
+                  {
+                     pgmoneta_disconnect(socket);
+                     socket = -1;
+                  }
+                  pgmoneta_memory_stream_buffer_free(buffer);
+                  buffer = NULL;
+
+                  if (wal_reconnect_and_identify(srv, usr, &ssl, &socket, &buffer,
+                                                 &fresh_sys_id, &fresh_timeline, &fresh_xlogpos))
+                  {
+                     goto error;
+                  }
+
+                  if (strcmp(system_id, fresh_sys_id) != 0)
+                  {
+                     pgmoneta_log_error("System identifier mismatch on WAL reconnect: expected %s, got %s",
+                                        system_id, fresh_sys_id);
+                     free(fresh_sys_id);
+                     free(fresh_xlogpos);
+                     goto error;
+                  }
+                  free(fresh_sys_id);
+
+                  if (wal_convert_xlogpos(fresh_xlogpos, segsize, &high32, &low32))
+                  {
+                     free(fresh_xlogpos);
+                     goto error;
+                  }
+
+                  timeline = fresh_timeline;
+                  config->common.servers[srv].cur_timeline = fresh_timeline;
+
+                  pgmoneta_log_warn("WAL starting point for server %s not in history. Old: timeline %u, start %X/%X. "
+                                    "Fresh: timeline %u, reported pos %s, retry pos %X/%X. "
+                                    "Streaming may resume from that point, but the WAL gap remains and restore continuity is not guaranteed.",
+                                    config->common.servers[srv].name,
+                                    old_timeline, old_high32, old_low32,
+                                    fresh_timeline, fresh_xlogpos, high32, low32);
+
+                  free(fresh_xlogpos);
+                  restart_stream = true;
+                  break;
+               }
+            }
+
             pgmoneta_log_error("Error occurred when starting stream replication");
             pgmoneta_log_error_response_message(msg);
             goto error;
          }
          pgmoneta_consume_copy_stream_end(buffer, msg);
+      }
+
+      if (restart_stream)
+      {
+         restart_stream = false;
+         continue;
       }
 
       type = 0;
@@ -703,6 +821,7 @@ pgmoneta_wal(int srv, char** argv)
    free(wal_shipping);
    free(filename);
    free(xlogpos);
+   free(system_id);
    exit(0);
 
 error:
@@ -752,6 +871,7 @@ error:
    free(wal_shipping);
    free(filename);
    free(xlogpos);
+   free(system_id);
    exit(1);
 }
 
@@ -946,6 +1066,41 @@ pgmoneta_free_timeline_history(struct timeline_history* history)
    }
 }
 
+/*
+ * Classifies a PostgreSQL ErrorResponse message as a WAL start-point error
+ * indicating that the requested starting point is not in the server's history.
+ *
+ * Supported PostgreSQL message (from walsender.c):
+ *   "requested starting point %X/%X on timeline %u is not in this server's history"
+ *
+ * Other messages, altered wording, and localized variants intentionally stay fatal.
+ */
+bool
+pgmoneta_wal_is_history_start_error(const char* message)
+{
+   const char* p1;
+   const char* p2;
+
+   if (message == NULL || *message == '\0')
+   {
+      return false;
+   }
+
+   p1 = strstr(message, "requested starting point ");
+   if (p1 == NULL)
+   {
+      return false;
+   }
+
+   p2 = strstr(p1 + strlen("requested starting point "), "is not in this server's history");
+   if (p2 == NULL)
+   {
+      return false;
+   }
+
+   return true;
+}
+
 static int
 wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
 {
@@ -1017,6 +1172,133 @@ error:
    if (!history_flushed)
    {
       remove(path);
+   }
+   return 1;
+}
+
+/**
+ * Reconnect to the server and issue IDENTIFY_SYSTEM for WAL start fallback.
+ *
+ * @param srv The server index
+ * @param usr The user index
+ * @param out_ssl [out] The new SSL connection
+ * @param out_socket [out] The new socket descriptor
+ * @param out_buffer [out] The new stream buffer
+ * @param out_system_id [out] Fresh system identifier (malloc'd, caller owns)
+ * @param out_timeline [out] Fresh timeline
+ * @param out_xlogpos [out] Fresh xlogpos string (malloc'd, caller owns)
+ * @return 0 on success, 1 on failure
+ *
+ * Ownership: On success, caller takes ownership of *out_ssl, *out_socket,
+ * *out_buffer, *out_system_id, and *out_xlogpos. On failure, this helper cleans
+ * up everything it created and out-parameters remain NULL/invalid.
+ */
+static int
+wal_reconnect_and_identify(int srv, int usr, SSL** out_ssl, int* out_socket,
+                           struct stream_buffer** out_buffer,
+                           char** out_system_id, uint32_t* out_timeline,
+                           char** out_xlogpos)
+{
+   int auth;
+   SSL* ssl = NULL;
+   int socket = -1;
+   struct stream_buffer* buffer = NULL;
+   struct message* identify_system_msg = NULL;
+   struct query_response* identify_system_response = NULL;
+   char* sys_id = NULL;
+   char* pos = NULL;
+   int tli = 0;
+   char* raw_sys_id = NULL;
+   char* raw_pos = NULL;
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   *out_ssl = NULL;
+   *out_socket = -1;
+   *out_buffer = NULL;
+   *out_system_id = NULL;
+   *out_timeline = 0;
+   *out_xlogpos = NULL;
+
+   auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username,
+                                       config->common.users[usr].password, true, &ssl, &socket);
+   if (auth != AUTH_SUCCESS)
+   {
+      pgmoneta_log_error("Authentication failed during WAL reconnect for user %s on %s",
+                         config->common.users[usr].username,
+                         config->common.servers[srv].name);
+      goto error;
+   }
+
+   pgmoneta_memory_stream_buffer_init(&buffer);
+   if (buffer == NULL)
+   {
+      goto error;
+   }
+
+   pgmoneta_create_identify_system_message(&identify_system_msg);
+   if (pgmoneta_query_execute(ssl, socket, identify_system_msg, &identify_system_response))
+   {
+      pgmoneta_log_error("Error occurred when executing IDENTIFY_SYSTEM on WAL reconnect");
+      goto error;
+   }
+
+   if (identify_system_response == NULL || identify_system_response->number_of_columns < 4)
+   {
+      goto error;
+   }
+
+   tli = pgmoneta_atoi(pgmoneta_query_response_get_data(identify_system_response, 1));
+   if (tli < 1)
+   {
+      pgmoneta_log_error("IDENTIFY_SYSTEM on WAL reconnect returned invalid timeline %d", tli);
+      goto error;
+   }
+
+   raw_sys_id = pgmoneta_query_response_get_data(identify_system_response, 0);
+   if (raw_sys_id == NULL)
+   {
+      goto error;
+   }
+   sys_id = (char*)malloc(strlen(raw_sys_id) + 1);
+   if (sys_id == NULL)
+   {
+      goto error;
+   }
+   strcpy(sys_id, raw_sys_id);
+
+   raw_pos = pgmoneta_query_response_get_data(identify_system_response, 2);
+   if (raw_pos == NULL)
+   {
+      goto error;
+   }
+   pos = (char*)malloc(strlen(raw_pos) + 1);
+   if (pos == NULL)
+   {
+      goto error;
+   }
+   strcpy(pos, raw_pos);
+
+   pgmoneta_free_message(identify_system_msg);
+   pgmoneta_free_query_response(identify_system_response);
+
+   *out_ssl = ssl;
+   *out_socket = socket;
+   *out_buffer = buffer;
+   *out_system_id = sys_id;
+   *out_timeline = (uint32_t)tli;
+   *out_xlogpos = pos;
+   return 0;
+
+error:
+   free(sys_id);
+   free(pos);
+   pgmoneta_free_message(identify_system_msg);
+   pgmoneta_free_query_response(identify_system_response);
+   pgmoneta_memory_stream_buffer_free(buffer);
+   pgmoneta_close_ssl(ssl);
+   if (socket != -1)
+   {
+      pgmoneta_disconnect(socket);
    }
    return 1;
 }
