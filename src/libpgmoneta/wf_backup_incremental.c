@@ -578,6 +578,20 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
          }
       }
 
+      /*
+       * The reconstructed file can't be larger than a segment, so the
+       * truncation block length must not exceed the segment size. When the
+       * relation was truncated to a point in a higher segment, relative_limit
+       * (limit_block relative to this segment) can exceed rel_seg_size; left
+       * unclamped it would be written into the incremental file and then
+       * rejected by rfile initialization on restore, making the backup
+       * unrestorable. Mirrors the PostgreSQL core fix in commit ecd275718be.
+       */
+      if (truncation_block_length > rel_seg_size)
+      {
+         truncation_block_length = rel_seg_size;
+      }
+
       /* serialize the incremental changes */
       if (write_incremental_file(ssl, socket, backup_data, server_files[i],
                                  num_incr_blocks, incr_blocks, truncation_block_length, false))
