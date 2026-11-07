@@ -1840,6 +1840,7 @@ reconstruct_backup_file(int server,
    struct rfile** source_map = NULL;         // source to find each block
    off_t* offset_map = NULL;                 // offsets to find each block in corresponding file
    uint32_t block_length = 0;                // total number of blocks in the reconstructed file
+   uint32_t truncation_block_length = 0;     // running upper bound; tightens on an intermediate backup that truncated
    bool full_copy_possible = true;           // whether we could just copy over directly instead of block by block
    uint32_t b = 0;                           // temp variable for block numbers
    struct main_configuration* config;
@@ -1890,6 +1891,7 @@ reconstruct_backup_file(int server,
    // to some blocks getting modified), and then
    // if a block is the new limit block will be updated
    block_length = find_reconstructed_block_length(latest_source);
+   truncation_block_length = latest_source->truncation_block_length;
    pgmoneta_deque_add_with_config(sources, NULL, (uintptr_t)latest_source, &rfile_config);
 
    source_map = malloc(sizeof(struct rfile*) * block_length);
@@ -1960,7 +1962,7 @@ reconstruct_backup_file(int server,
          // no need to check for blocks beyond truncation_block_length
          // since those blocks should have been truncated away anyway,
          // we just need to zero fill them later.
-         for (b = 0; b < latest_source->truncation_block_length; b++)
+         for (b = 0; b < truncation_block_length; b++)
          {
             if (source_map[b] == NULL && b < nblocks)
             {
@@ -1983,14 +1985,25 @@ reconstruct_backup_file(int server,
       for (uint32_t i = 0; i < rf->num_blocks; i++)
       {
          b = rf->relative_block_numbers[i];
-         // only the latest source may contain blocks exceeding the latest truncation block length
-         // as for the rest...
-         if (b >= latest_source->truncation_block_length || source_map[b] != NULL)
+         // only blocks below the running truncation bound may be sourced; blocks at or beyond it
+         // were truncated away by some backup in the chain, so earlier contents are stale
+         if (b >= truncation_block_length || source_map[b] != NULL)
          {
             continue;
          }
          source_map[b] = rf;
          offset_map[b] = rf->header_length + (i * blocksz);
+         full_copy_possible = false;
+      }
+
+      // An intermediate backup that truncated the relation lowers the bound: blocks at or beyond its
+      // truncation_block_length were truncated away before this backup, so their contents in any earlier
+      // backup are stale and must not be used. This also stops an earlier full file from being copied
+      // whole when its size only matches the latest truncation length. Mirrors the PostgreSQL core fix
+      // for bug #19776 (pg_combinebackup).
+      if (rf->truncation_block_length < truncation_block_length)
+      {
+         truncation_block_length = rf->truncation_block_length;
          full_copy_possible = false;
       }
    }
