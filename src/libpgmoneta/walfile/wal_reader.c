@@ -2479,8 +2479,35 @@ summarize_smgr_record(struct decoded_xlog_record* record, block_ref_table* brt)
       }
       if ((xlrec->flags & SMGR_TRUNCATE_VM) != 0)
       {
+         /*
+          * xlrec->blkno is a heap block count; the visibility map fork is
+          * indexed by VM page, so convert it (visibilitymap_truncation_length):
+          * one VM page covers HEAPBLOCKS_PER_PAGE = 32672 heap blocks for an
+          * 8 KiB page. Using the raw heap block count would leave the VM fork
+          * at the wrong length.
+          */
+         block_number vmlimit = xlrec->blkno / 32672 +
+                                ((xlrec->blkno % 32672) != 0 ? 1 : 0);
+
          pgmoneta_brt_set_limit_block(brt, &rlocator,
-                                      VISIBILITYMAP_FORKNUM, xlrec->blkno);
+                                      VISIBILITYMAP_FORKNUM, vmlimit);
+
+         /*
+          * Truncation may clear trailing bits in the last remaining VM page
+          * without WAL-logging the page (data checksums and wal_log_hints
+          * disabled). Mark it modified so the incremental backup includes its
+          * current contents; do this even at a VM page boundary where no bits
+          * need clearing. Mirrors the PostgreSQL core fix for bug #19775.
+          */
+         if (vmlimit > 0)
+         {
+            if (pgmoneta_brt_mark_block_modified(brt, &rlocator,
+                                                 VISIBILITYMAP_FORKNUM, vmlimit - 1))
+            {
+               pgmoneta_log_error("summarize_smgr_record: cannot mark visibility map block %u modified",
+                                  vmlimit - 1);
+            }
+         }
       }
    }
 }
