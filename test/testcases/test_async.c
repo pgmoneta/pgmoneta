@@ -131,6 +131,26 @@ job_list_contains(struct json* response, char* job_id)
 }
 
 static bool
+job_is_completed(char* job_id)
+{
+   struct json* response = NULL;
+   struct json* job = NULL;
+   char* job_state = NULL;
+   bool completed = false;
+
+   if (pgmoneta_tsclient_job(job_id, &response, 0) == 0)
+   {
+      job = job_payload(response);
+      job_state = job != NULL ? (char*)pgmoneta_json_get(job, MANAGEMENT_ARGUMENT_JOB_STATE) : NULL;
+      completed = job_state != NULL && pgmoneta_compare_string(job_state, "Completed");
+   }
+
+   pgmoneta_json_destroy(response);
+
+   return completed;
+}
+
+static bool
 wait_for_job_completion(char* job_id)
 {
    struct json* response = NULL;
@@ -556,8 +576,9 @@ MCTF_TEST(test_async_job_lists_running_and_completed)
    pgmoneta_json_destroy(response);
    response = NULL;
 
+   /* A small backup can finish before the list request, so only then is it not running */
    MCTF_ASSERT_INT_EQ(pgmoneta_tsclient_job_list_status("Running", &response, 0), 0, cleanup, "failed to list running jobs");
-   MCTF_ASSERT(job_list_contains(response, job_id), cleanup, "backup is missing from running jobs");
+   MCTF_ASSERT(job_list_contains(response, job_id) || job_is_completed(job_id), cleanup, "backup is missing from running jobs");
    pgmoneta_json_destroy(response);
    response = NULL;
 
@@ -605,8 +626,12 @@ MCTF_TEST(test_async_job_status_running_then_latest)
    MCTF_ASSERT_PTR_NONNULL(status_job_id, cleanup, "current backup status has no job id");
    MCTF_ASSERT_PTR_NONNULL(job_state, cleanup, "current backup status has no state");
    MCTF_ASSERT_STR_EQ(status_job_id, job_id, cleanup, "current backup status returned a different job");
-   MCTF_ASSERT_STR_EQ(job_state, "Running", cleanup, "current backup status did not return a running job");
-   MCTF_ASSERT(response_has_progress(response), cleanup, "running job status response has no progress data");
+   /* A small backup can finish before the status request */
+   MCTF_ASSERT(pgmoneta_compare_string(job_state, "Running") || pgmoneta_compare_string(job_state, "Completed"), cleanup, "current backup status did not return a running or completed job");
+   if (pgmoneta_compare_string(job_state, "Running"))
+   {
+      MCTF_ASSERT(response_has_progress(response), cleanup, "running job status response has no progress data");
+   }
    pgmoneta_json_destroy(response);
    response = NULL;
 

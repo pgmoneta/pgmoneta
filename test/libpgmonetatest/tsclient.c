@@ -81,8 +81,12 @@ pgmoneta_tsclient_backup(char* server, char* incremental, bool async, struct jso
       goto error;
    }
 
-   // Wait for 1 second to avoid invoking backup too frequently
-   sleep(1);
+   // Wait for 1 second to avoid invoking backup too frequently. Not after an async
+   // backup: it returns while the backup is running, which the caller may check
+   if (!async)
+   {
+      sleep(1);
+   }
 
    pgmoneta_disconnect(socket);
    return 0;
