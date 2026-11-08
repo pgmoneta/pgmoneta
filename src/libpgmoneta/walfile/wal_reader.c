@@ -1626,7 +1626,7 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
          continue;
       }
 
-      if (!is_included(rmgr_table[record->header.xl_rmid].name, rms, record->header.xl_prev,
+      if (!is_included(pgmoneta_rmgr_get_name(record->header.xl_rmid), rms, record->header.xl_prev,
                        start_lsn, record->lsn, end_lsn, record->header.xl_xid, xids, included_objects,
                        NULL, record->header.xl_info, record->header.xl_rmid))
       {
@@ -1634,7 +1634,7 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
       }
 
       // Calculate Resource Manager width
-      temp_width = strlen(rmgr_table[record->header.xl_rmid].name);
+      temp_width = strlen(pgmoneta_rmgr_get_name(record->header.xl_rmid));
       if (temp_width > widths->rm_width)
       {
          widths->rm_width = temp_width;
@@ -1744,7 +1744,10 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
       }
 
       pgmoneta_wal_set_current_magic(magic_value);
-      rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
+      if (rmgr_table[record->header.xl_rmid].rm_desc != NULL)
+      {
+         rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
+      }
       backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
       char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);
 
@@ -1757,7 +1760,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          enhanced_desc = enhance_description(record_desc, record->header.xl_rmid, record->header.xl_info);
       }
 
-      if (!is_included(rmgr_table[record->header.xl_rmid].name, rms, record->header.xl_prev,
+      if (!is_included(pgmoneta_rmgr_get_name(record->header.xl_rmid), rms, record->header.xl_prev,
                        start_lsn, record->lsn, end_lsn, record->header.xl_xid, xids, included_objects,
                        record_desc, record->header.xl_info, record->header.xl_rmid))
       {
@@ -1837,7 +1840,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          if (color)
          {
             fprintf(out, "%s%-*s%s | %s%-*s%s | %s%-*s%s | %s%-*d%s | %s%-*d%s | %s%-*u%s | %s%-*s%s | %s%s%s%s%s\n",
-                    COLOR_RED, widths->rm_width, rmgr_table[record->header.xl_rmid].name, COLOR_RESET,
+                    COLOR_RED, widths->rm_width, pgmoneta_rmgr_get_name(record->header.xl_rmid), COLOR_RESET,
                     COLOR_MAGENTA, widths->lsn_width, start_lsn_string, COLOR_RESET,
                     COLOR_MAGENTA, widths->lsn_width, end_lsn_string, COLOR_RESET,
                     COLOR_BLUE, widths->rec_width, rec_len, COLOR_RESET,
@@ -1851,7 +1854,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          else
          {
             fprintf(out, "%-*s | %-*s | %-*s | %-*d | %-*d | %-*u | %-*s | %s%s%s\n",
-                    widths->rm_width, rmgr_table[record->header.xl_rmid].name,
+                    widths->rm_width, pgmoneta_rmgr_get_name(record->header.xl_rmid),
                     widths->lsn_width, start_lsn_string,
                     widths->lsn_width, end_lsn_string,
                     widths->rec_width, rec_len,
@@ -1883,7 +1886,7 @@ cleanup:
 void
 pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn)
 {
-   if (record->partial || !is_included(rmgr_table[record->header.xl_rmid].name, NULL, record->header.xl_prev,
+   if (record->partial || !is_included(pgmoneta_rmgr_get_name(record->header.xl_rmid), NULL, record->header.xl_prev,
                                        start_lsn, record->lsn, end_lsn, record->header.xl_xid, NULL, NULL, NULL,
                                        record->header.xl_info, record->header.xl_rmid))
    {
@@ -1899,7 +1902,7 @@ pgmoneta_wal_record_collect_stats(struct decoded_xlog_record* record, uint64_t s
    uint64_t rec_len;
    uint64_t fpi_len = 0;
 
-   if (record->partial || !is_included(rmgr_table[record->header.xl_rmid].name, NULL, record->header.xl_prev,
+   if (record->partial || !is_included(pgmoneta_rmgr_get_name(record->header.xl_rmid), NULL, record->header.xl_prev,
                                        start_lsn, record->lsn, end_lsn, record->header.xl_xid, NULL, NULL, NULL,
                                        record->header.xl_info, record->header.xl_rmid))
    {
@@ -2184,11 +2187,18 @@ record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct xid_
 
    get_record_length(record, &rec_len, &fpi_len);
 
-   rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
+   if (rmgr_table[record->header.xl_rmid].rm_desc != NULL)
+   {
+      rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
+   }
+   if (rm_desc == NULL)
+   {
+      rm_desc = pgmoneta_append(NULL, "");
+   }
    backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
 
    // Header serialization
-   pgmoneta_json_put(record_json, "ResourceManager", (uintptr_t)rmgr_table[record->header.xl_rmid].name, ValueString);
+   pgmoneta_json_put(record_json, "ResourceManager", (uintptr_t)pgmoneta_rmgr_get_name(record->header.xl_rmid), ValueString);
    pgmoneta_json_put(record_json, "RecordLength", rec_len, ValueUInt32);
    pgmoneta_json_put(record_json, "TotalLength", record->header.xl_tot_len, ValueUInt32);
    pgmoneta_json_put(record_json, "Xid", record->header.xl_xid, ValueUInt32);

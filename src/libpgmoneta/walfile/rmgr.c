@@ -110,5 +110,6 @@ pgmoneta_rmgr_get_name(uint8_t rmid)
    {
       return rmgr_table[rmid].name;
    }
-   return NULL;
+   /* Unknown or custom (extension-registered) resource manager; no table entry */
+   return "unknown";
 }
