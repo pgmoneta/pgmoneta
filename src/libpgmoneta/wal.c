@@ -1290,14 +1290,14 @@ wal_find_streaming_start(char* basedir, int segsize, uint32_t* timeline, uint32_
    pos = strtok(segname, ".");
    sscanf(pos, "%08X%08X%08X", timeline, high32, low32);
 
-   // high32 is the segment id, low32 is the number of segments
+   // high32 is the xlogid, low32 is the segment number within it
    int segments_per_id = 0x100000000ULL / segsize;
    // if the latest wal segment is partial, we start with this one
    // otherwise we start with the next one
    if (!high_is_partial)
    {
-      // handle possible overflow
-      if (*low32 == (uint32_t)segments_per_id)
+      // roll over to the next xlogid after its last segment
+      if (*low32 == (uint32_t)segments_per_id - 1)
       {
          *low32 = 0;
          *high32 = *high32 + 1;
