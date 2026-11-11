@@ -226,6 +226,259 @@ verify_deep_pages(int server, char* recon_base, char** problem)
    return broken;
 }
 
+/* The visibility map stores two bits per heap block after a standard page
+ * header, so one VM page covers (block_size - header) * 4 heap blocks. */
+#define VM_PAGE_HEADER     24
+#define VM_BITS_PER_BLOCK  2
+#define VM_BLOCKS_PER_BYTE 4
+
+/* Count the heap blocks of a relation: the size of its main-fork segments
+ * (relfilenode, relfilenode.1, ...) in block_size units. */
+static uint64_t
+heap_block_count(char* dir, char* relfilenode, size_t block_size)
+{
+   uint64_t blocks = 0;
+   uint32_t seg = 0;
+   char path[MAX_PATH];
+
+   while (true)
+   {
+      off_t size;
+
+      memset(path, 0, sizeof(path));
+      if (seg == 0)
+      {
+         snprintf(path, sizeof(path), "%s/%s", dir, relfilenode);
+      }
+      else
+      {
+         snprintf(path, sizeof(path), "%s/%s.%u", dir, relfilenode, seg);
+      }
+
+      if (!pgmoneta_exists(path))
+      {
+         break;
+      }
+
+      size = pgmoneta_get_file_size(path);
+      if (size > 0)
+      {
+         blocks += (uint64_t)size / block_size;
+      }
+      seg++;
+   }
+
+   return blocks;
+}
+
+/* Scan one visibility-map fork file for a bit set on a heap block at or past
+ * heap_blocks -- a stale all-visible/all-frozen marking left over a truncation.
+ * Returns 1 and sets *stale_block when one is found. */
+static int
+vm_fork_stale_bit(char* path, size_t block_size, uint32_t relseg_size, uint32_t vm_segno,
+                  uint64_t heap_blocks, uint64_t* stale_block)
+{
+   FILE* file = NULL;
+   unsigned char* page = NULL;
+   uint64_t heapblocks_per_vm_page;
+   uint64_t page_in_file = 0;
+   int found = 0;
+
+   heapblocks_per_vm_page = (uint64_t)(block_size - VM_PAGE_HEADER) * VM_BLOCKS_PER_BYTE;
+
+   page = (unsigned char*)malloc(block_size);
+   file = fopen(path, "rb");
+   if (page == NULL || file == NULL)
+   {
+      goto done;
+   }
+
+   while (!found)
+   {
+      size_t r = fread(page, 1, block_size, file);
+      uint64_t vm_page;
+      uint64_t heap_base;
+      size_t b;
+
+      if (r == 0)
+      {
+         break;
+      }
+      if (r != block_size)
+      {
+         /* A short trailing read is not whole blocks; the page check reports
+          * that, so there is nothing to add here. */
+         break;
+      }
+
+      vm_page = (uint64_t)vm_segno * relseg_size + page_in_file;
+      heap_base = vm_page * heapblocks_per_vm_page;
+      page_in_file++;
+
+      /* Every heap block this page can describe is within the relation: no bit
+       * here can be past the end. */
+      if (heap_base + heapblocks_per_vm_page <= heap_blocks)
+      {
+         continue;
+      }
+
+      for (b = VM_PAGE_HEADER; b < block_size && !found; b++)
+      {
+         int k;
+
+         if (page[b] == 0)
+         {
+            continue;
+         }
+
+         for (k = 0; k < VM_BLOCKS_PER_BYTE; k++)
+         {
+            uint64_t hb = heap_base + (uint64_t)(b - VM_PAGE_HEADER) * VM_BLOCKS_PER_BYTE + k;
+
+            if (hb < heap_blocks)
+            {
+               continue;
+            }
+            if ((page[b] >> (k * VM_BITS_PER_BLOCK)) & 0x3)
+            {
+               *stale_block = hb;
+               found = 1;
+               break;
+            }
+         }
+      }
+   }
+
+done:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   free(page);
+
+   return found;
+}
+
+/*
+ * Deep verification step 3: the reconstructed pages are intact, but is the
+ * visibility map consistent with the heap?
+ *
+ * A heap truncation shortens the main fork and the VM fork together, but the
+ * VM pages that remain can keep all-visible/all-frozen bits for blocks that no
+ * longer exist. Such a page passes its own checksum, so the page check does not
+ * see it, yet it makes an index-only scan return tuples from truncated-away
+ * blocks. Over the reconstructed data, for every VM fork confirm that no bit is
+ * set at or past the end of its relation's heap.
+ *
+ * Returns 1 and sets *problem (caller frees) on the first stale bit. Returns 0
+ * when every VM fork agrees with its heap, or when there is no readable
+ * pg_control to take the block and segment size from.
+ */
+static int
+verify_deep_vm_consistency(int server, char* recon_base, char** problem)
+{
+   struct control_file_data* controldata = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* iter = NULL;
+   uint32_t blcksz = 0;
+   uint32_t relseg_size = 0;
+   uint32_t checksum_version = 0;
+   size_t prefix;
+   int broken = 0;
+
+   *problem = NULL;
+
+   if (pgmoneta_read_control_data(server, recon_base, &controldata) || controldata == NULL)
+   {
+      return 0;
+   }
+
+   pgmoneta_control_data_page_layout(controldata, &blcksz, &relseg_size, &checksum_version);
+   free(controldata);
+
+   if (blcksz <= VM_PAGE_HEADER || relseg_size == 0)
+   {
+      return 0;
+   }
+
+   if (pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, recon_base, true, &files))
+   {
+      *problem = pgmoneta_append(NULL, "the reconstructed files could not be listed");
+      return 1;
+   }
+
+   prefix = strlen(recon_base);
+   if (prefix > 0 && recon_base[prefix - 1] == '/')
+   {
+      prefix--;
+   }
+
+   pgmoneta_deque_iterator_create(files, &iter);
+   while (!broken && pgmoneta_deque_iterator_next(iter))
+   {
+      char* full = (char*)pgmoneta_value_data(iter->value);
+      char* slash = strrchr(full, '/');
+      char* name = slash != NULL ? slash + 1 : full;
+      char* vm = strstr(name, "_vm");
+      char relfilenode[NAME_MAX];
+      char dir[MAX_PATH];
+      uint32_t vm_segno = 0;
+      uint64_t heap_blocks;
+      uint64_t stale_block = 0;
+
+      /* Only the visibility-map fork: <relfilenode>_vm or <relfilenode>_vm.<seg>,
+       * with a purely numeric relfilenode. */
+      if (vm == NULL || vm == name || (vm[3] != '\0' && vm[3] != '.'))
+      {
+         continue;
+      }
+      if (strspn(name, "0123456789") != (size_t)(vm - name))
+      {
+         continue;
+      }
+      if (vm[3] == '.')
+      {
+         char* end = NULL;
+         long s = strtol(vm + 4, &end, 10);
+
+         if (end == vm + 4 || *end != '\0' || s < 0 || s > UINT32_MAX)
+         {
+            continue;
+         }
+         vm_segno = (uint32_t)s;
+      }
+
+      memset(relfilenode, 0, sizeof(relfilenode));
+      memcpy(relfilenode, name, (size_t)(vm - name));
+
+      memset(dir, 0, sizeof(dir));
+      if (slash != NULL)
+      {
+         memcpy(dir, full, (size_t)(slash - full));
+      }
+      else
+      {
+         dir[0] = '.';
+      }
+
+      heap_blocks = heap_block_count(dir, relfilenode, (size_t)blcksz);
+
+      if (vm_fork_stale_bit(full, (size_t)blcksz, relseg_size, vm_segno, heap_blocks, &stale_block))
+      {
+         *problem = pgmoneta_format_and_append(NULL,
+                                               "reconstructed %s marks heap block %llu visible past the end of a %llu block relation (stale visibility map)",
+                                               full + prefix + (full[prefix] == '/' ? 1 : 0),
+                                               (unsigned long long)stale_block, (unsigned long long)heap_blocks);
+         broken = 1;
+      }
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(files);
+
+   return broken;
+}
+
 void
 pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
@@ -358,13 +611,20 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
          goto error;
       }
 
-      /* The chain combined; now confirm the reconstructed pages are intact. */
-      if (verify_deep_pages(server, recon_base, &deep_problem))
+      /*
+       * The chain combined; now confirm the reconstructed data is sound: every
+       * page's checksum, and that the visibility map does not mark heap blocks
+       * past the end of their relation. A stale all-visible VM page survives a
+       * heap truncation and passes its own checksum, but makes index-only scans
+       * return dead tuples, so it is not caught by the page check above.
+       */
+      if (verify_deep_pages(server, recon_base, &deep_problem) ||
+          verify_deep_vm_consistency(server, recon_base, &deep_problem))
       {
          struct json* outcome = NULL;
 
          pgmoneta_log_error("Verify (deep): %s/%s: %s", config->common.servers[server].name, identifier,
-                            deep_problem != NULL ? deep_problem : "a reconstructed page failed verification");
+                            deep_problem != NULL ? deep_problem : "the reconstructed data failed verification");
          free(deep_problem);
          deep_problem = NULL;
 
@@ -381,7 +641,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
          goto error;
       }
 
-      pgmoneta_log_info("Verify (deep): %s/%s reconstructs from its chain and its pages verify",
+      pgmoneta_log_info("Verify (deep): %s/%s reconstructs from its chain and its pages and visibility map verify",
                         config->common.servers[server].name, identifier);
 
       pgmoneta_delete_directory(recon_root);
