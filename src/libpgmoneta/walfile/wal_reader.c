@@ -629,6 +629,20 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          record = NULL;
          break;
       }
+      if (record->xl_tot_len < SIZE_OF_XLOG_RECORD)
+      {
+         /*
+          * A record can not be shorter than its own header. A smaller value is
+          * corruption; computing the data length from it would underflow the
+          * unsigned subtraction below and drive a multi-gigabyte allocation and
+          * read. Stop the parse here, as with a zero-length record.
+          */
+         pgmoneta_log_error("Invalid WAL record length %u (expected at least %zu); stopping parse",
+                            record->xl_tot_len, (size_t)SIZE_OF_XLOG_RECORD);
+         free(record);
+         record = NULL;
+         break;
+      }
       uint32_t data_length = record->xl_tot_len - SIZE_OF_XLOG_RECORD;
       next_record = ftell(file) + MAXALIGN(record->xl_tot_len - SIZE_OF_XLOG_RECORD);
       xlog_rec_ptr lsn = initialized ? partial_lsn : rec_start + base;
