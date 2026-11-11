@@ -29,6 +29,7 @@
 
 #include <pgmoneta.h>
 #include <art.h>
+#include <json.h>
 #include <tscommon.h>
 #include <mctf.h>
 #include <utils.h>
@@ -956,6 +957,47 @@ MCTF_TEST(test_art_insert_index_out_of_range)
    MCTF_ASSERT(!pgmoneta_art_insert(t, s1, 1, ValueUInt8), cleanup, "Insert s1 failed");
    MCTF_ASSERT(!pgmoneta_art_insert(t, s2, 1, ValueUInt8), cleanup, "Insert s2 failed");
    MCTF_ASSERT_INT_EQ(pgmoneta_art_search(t, s3), 0, cleanup, "Search s3 should be 0");
+
+cleanup:
+   pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_art_insert_same_object)
+{
+   struct art* t = NULL;
+   void* mem = NULL;
+   struct json* j = NULL;
+   struct art_test_obj* obj = NULL;
+   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
+
+   pgmoneta_test_setup();
+
+   pgmoneta_art_create(&t);
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
+
+   // ValueMem is owned by the tree, inserting it twice must not free it
+   mem = malloc(10);
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem), cleanup, "Insert key_mem failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem), cleanup, "Insert key_mem again failed");
+   MCTF_ASSERT_INT_EQ(t->size, 1, cleanup, "ART size should be 1");
+   MCTF_ASSERT(pgmoneta_art_search(t, "key_mem") == (uintptr_t)mem, cleanup, "Search key_mem mismatch");
+
+   // ValueJSON is owned by the tree
+   pgmoneta_json_create(&j);
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_json", (uintptr_t)j, ValueJSON), cleanup, "Insert key_json failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_json", (uintptr_t)j, ValueJSON), cleanup, "Insert key_json again failed");
+   MCTF_ASSERT_INT_EQ(t->size, 2, cleanup, "ART size should be 2");
+   MCTF_ASSERT(pgmoneta_art_search(t, "key_json") == (uintptr_t)j, cleanup, "Search key_json mismatch");
+
+   // Custom destroy callback, the object must stay intact
+   test_obj_create(1, &obj);
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config), cleanup, "Insert key_obj failed");
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config), cleanup, "Insert key_obj again failed");
+   MCTF_ASSERT_INT_EQ(t->size, 3, cleanup, "ART size should be 3");
+   MCTF_ASSERT_INT_EQ(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->idx, 1, cleanup, "Search key_obj idx mismatch");
+   MCTF_ASSERT_STR_EQ(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->str, "obj1", cleanup, "Search key_obj str mismatch");
 
 cleanup:
    pgmoneta_art_destroy(t);
