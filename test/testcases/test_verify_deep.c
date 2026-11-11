@@ -101,5 +101,8 @@ cleanup:
       pgmoneta_json_destroy(list_response);
    }
 
+   /* Leave a clean backup store for the next test. */
+   pgmoneta_test_basedir_cleanup();
+
    MCTF_FINISH();
 }
