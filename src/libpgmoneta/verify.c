@@ -38,6 +38,7 @@
 #include <security.h>
 #include <storage.h>
 #include <utils.h>
+#include <restore.h>
 #include <workflow.h>
 
 /* system */
@@ -165,6 +166,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
    files = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_FILES);
+   bool deep = (bool)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DEEP);
 
    if (pgmoneta_art_create(&nodes))
    {
@@ -224,6 +226,41 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
          goto error;
       }
+   }
+
+   /*
+    * Deep (opt-in) verification: actually reconstruct the incremental chain into
+    * a workspace scratch directory and confirm it combines without error. This
+    * reads and rebuilds the whole backup, so it is gated behind --deep and never
+    * runs on the default path (backups can be very large).
+    */
+   if (deep && backup != NULL && backup->type == TYPE_INCREMENTAL)
+   {
+      char* recon_root = NULL;
+      char* recon_base = NULL;
+
+      if (pgmoneta_extract_incremental_backup(server, backup->label, &recon_root, &recon_base))
+      {
+         struct json* outcome = NULL;
+
+         pgmoneta_log_error("Verify (deep): %s/%s could not be reconstructed from its chain",
+                            config->common.servers[server].name, identifier);
+
+         if (pgmoneta_management_create_outcome_failure(payload, MANAGEMENT_ERROR_VERIFY_ERROR, NAME, &outcome) ||
+             pgmoneta_management_write_json(ssl, client_fd, compression, encryption, payload))
+         {
+            pgmoneta_log_error("Verify: Error sending response for %s/%s", config->common.servers[server].name, identifier);
+         }
+
+         goto error;
+      }
+
+      pgmoneta_log_info("Verify (deep): %s/%s reconstructs from its chain", config->common.servers[server].name, identifier);
+
+      /* A later change will validate the reconstructed data before removing it. */
+      pgmoneta_delete_directory(recon_root);
+      free(recon_root);
+      free(recon_base);
    }
 
    real_directory = pgmoneta_append(real_directory, directory);

@@ -88,6 +88,19 @@ int
 pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, struct json** response, int expected_error);
 
 /**
+ * Execute a deep verify (opt-in incremental-chain reconstruction) on the server
+ * @param server the server
+ * @param backup_id the backup
+ * @param directory the directory
+ * @param files the files
+ * @param response optional output for JSON response (NULL to ignore)
+ * @param expected_error expected error code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_verify_deep(char* server, char* backup_id, char* directory, char* files, struct json** response, int expected_error);
+
+/**
  * Execute archive command on the server
  * @param server the server
  * @param backup_id the backup

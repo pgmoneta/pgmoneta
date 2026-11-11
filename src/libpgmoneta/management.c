@@ -313,7 +313,7 @@ error:
 }
 
 int
-pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, bool deep, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -332,6 +332,7 @@ pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* bac
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)directory, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_FILES, (uintptr_t)files, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_DEEP, (uintptr_t)deep, ValueBool);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {

@@ -50,10 +50,9 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
-
 /* Retry parameters for pgmoneta_test_wait_for_wal_streaming() */
-#define WAL_STREAMING_TEST_RETRY_MAX          5
-#define WAL_STREAMING_TEST_RETRY_DELAY_MICRO  2000000 // 2 seconds
+#define WAL_STREAMING_TEST_RETRY_MAX         5
+#define WAL_STREAMING_TEST_RETRY_DELAY_MICRO 2000000 // 2 seconds
 
 static int check_output_outcome(int socket, int expected_error, struct json** output);
 static int get_connection();
@@ -154,6 +153,34 @@ error:
 }
 
 int
+pgmoneta_tsclient_verify_deep(char* server, char* backup_id, char* directory, char* files, struct json** response, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_verify(NULL, socket, server, backup_id, directory, files, true, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, response))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
 pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, struct json** response, int expected_error)
 {
    int socket = -1;
@@ -164,7 +191,7 @@ pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* f
       goto error;
    }
 
-   if (pgmoneta_management_request_verify(NULL, socket, server, backup_id, directory, files, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   if (pgmoneta_management_request_verify(NULL, socket, server, backup_id, directory, files, false, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
@@ -893,7 +920,8 @@ pgmoneta_tsclient_job_list_all(struct json** response, int expected_error)
 {
    int socket = get_connection();
 
-   if(!pgmoneta_socket_isvalid(socket)){
+   if (!pgmoneta_socket_isvalid(socket))
+   {
       goto error;
    }
 
@@ -902,7 +930,7 @@ pgmoneta_tsclient_job_list_all(struct json** response, int expected_error)
       goto error;
    }
 
-   if(check_output_outcome(socket, expected_error, response))
+   if (check_output_outcome(socket, expected_error, response))
    {
       goto error;
    }
@@ -919,7 +947,8 @@ pgmoneta_tsclient_job_list_server(char* server, struct json** response, int expe
 {
    int socket = get_connection();
 
-   if(!pgmoneta_socket_isvalid(socket) || server == NULL){
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
       goto error;
    }
 
@@ -928,7 +957,7 @@ pgmoneta_tsclient_job_list_server(char* server, struct json** response, int expe
       goto error;
    }
 
-   if(check_output_outcome(socket, expected_error, response))
+   if (check_output_outcome(socket, expected_error, response))
    {
       goto error;
    }
@@ -945,7 +974,8 @@ pgmoneta_tsclient_job_list_status(char* status, struct json** response, int expe
 {
    int socket = get_connection();
 
-   if(!pgmoneta_socket_isvalid(socket) || status == NULL){
+   if (!pgmoneta_socket_isvalid(socket) || status == NULL)
+   {
       goto error;
    }
 
@@ -954,7 +984,7 @@ pgmoneta_tsclient_job_list_status(char* status, struct json** response, int expe
       goto error;
    }
 
-   if(check_output_outcome(socket, expected_error, response))
+   if (check_output_outcome(socket, expected_error, response))
    {
       goto error;
    }
@@ -971,7 +1001,8 @@ pgmoneta_tsclient_job_remove_job(char* job_id, struct json** response, int expec
 {
    int socket = get_connection();
 
-   if(!pgmoneta_socket_isvalid(socket)){
+   if (!pgmoneta_socket_isvalid(socket))
+   {
       goto error;
    }
 
@@ -980,7 +1011,7 @@ pgmoneta_tsclient_job_remove_job(char* job_id, struct json** response, int expec
       goto error;
    }
 
-   if(check_output_outcome(socket, expected_error, response))
+   if (check_output_outcome(socket, expected_error, response))
    {
       goto error;
    }
@@ -997,7 +1028,8 @@ pgmoneta_tsclient_job_remove_all(struct json** response, int expected_error)
 {
    int socket = get_connection();
 
-   if(!pgmoneta_socket_isvalid(socket)){
+   if (!pgmoneta_socket_isvalid(socket))
+   {
       goto error;
    }
 
@@ -1006,7 +1038,7 @@ pgmoneta_tsclient_job_remove_all(struct json** response, int expected_error)
       goto error;
    }
 
-   if(check_output_outcome(socket, expected_error, response))
+   if (check_output_outcome(socket, expected_error, response))
    {
       goto error;
    }

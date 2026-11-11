@@ -131,7 +131,7 @@ static int restore_s3_objects(SSL* ssl, int socket, char* server, char* prefix, 
 static int restore_azure_objects(SSL* ssl, int socket, char* server, char* label, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore_gcs_objects(SSL* ssl, int socket, char* server, char* label, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format, bool async);
-static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, bool deep, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format, bool async);
 static int delete(SSL* ssl, int socket, char* server, char* backup_id, bool force, uint8_t compression, uint8_t encryption, int32_t output_format, bool async);
 static int pgmoneta_shutdown(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -513,6 +513,7 @@ main(int argc, char** argv)
    bool cascade = false;
    bool force = false;
    bool async = false;
+   bool deep = false;
    char* sort_option = NULL;
    char port_buf[16] = {0};
 
@@ -532,6 +533,7 @@ main(int argc, char** argv)
       {"", "cascade", false},
       {"", "force", false},
       {"", "async", false},
+      {"", "deep", false},
       {"?", "help", false}};
 
    // Disable stdout buffering (i.e. write to stdout immediatelly).
@@ -690,6 +692,10 @@ main(int argc, char** argv)
       {
          async = true;
       }
+      else if (pgmoneta_compare_string(optname, "deep"))
+      {
+         deep = true;
+      }
       else if (pgmoneta_compare_string(optname, "?") || pgmoneta_compare_string(optname, "help"))
       {
          usage();
@@ -738,6 +744,12 @@ main(int argc, char** argv)
        parsed.cmd->action != MANAGEMENT_RESTORE)
    {
       warnx("pgmoneta-cli: --async is only supported for backup, delete, archive, and restore");
+      exit(1);
+   }
+
+   if (deep && parsed.cmd->action != MANAGEMENT_VERIFY)
+   {
+      warnx("pgmoneta-cli: --deep is only supported for verify");
       exit(1);
    }
 
@@ -1049,11 +1061,11 @@ execute:
    {
       if (parsed.args[3])
       {
-         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, encryption, output_format);
+         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], deep, compression, encryption, output_format);
       }
       else
       {
-         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], "failed", compression, encryption, output_format);
+         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], "failed", deep, compression, encryption, output_format);
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_ARCHIVE)
@@ -1312,6 +1324,7 @@ help_verify(void)
 {
    printf("Verify a backup for a server\n");
    printf("  pgmoneta-cli verify <server> <timestamp|oldest|newest> <directory> [failed|all]\n");
+   printf("  --deep                   Also reconstruct an incremental chain to confirm it is restorable\n");
 }
 
 static void
@@ -1691,9 +1704,9 @@ error:
 }
 
 static int
-verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format)
+verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, bool deep, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_verify(ssl, socket, server, backup_id, directory, files, compression, encryption, output_format))
+   if (pgmoneta_management_request_verify(ssl, socket, server, backup_id, directory, files, deep, compression, encryption, output_format))
    {
       goto error;
    }

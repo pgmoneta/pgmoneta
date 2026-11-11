@@ -152,6 +152,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_CONFIG_VALUE          "ConfigValue"
 #define MANAGEMENT_ARGUMENT_DELTA                 "Delta"
 #define MANAGEMENT_ARGUMENT_DESTINATION_FILE      "DestinationFile"
+#define MANAGEMENT_ARGUMENT_DEEP                  "Deep"
 #define MANAGEMENT_ARGUMENT_DIRECTORY             "Directory"
 #define MANAGEMENT_ARGUMENT_DONE                  "Done"
 #define MANAGEMENT_ARGUMENT_ELAPSED               "Elapsed"
@@ -633,7 +634,7 @@ pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* ba
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, bool deep, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an archive request
