@@ -58,7 +58,7 @@ verify_chain_pg_version(void)
  * precondition: an intact chain verifies, and an incremental whose parent is
  * gone must fail rather than silently attempt an impossible reconstruction.
  */
-MCTF_TEST(test_verify_incremental_chain_precondition)
+MCTF_TEST_NEGATIVE(test_verify_incremental_chain_precondition)
 {
    struct json* list_response = NULL;
    struct json* b0 = NULL;
