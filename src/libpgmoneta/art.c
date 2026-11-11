@@ -215,7 +215,8 @@ find_index(unsigned char ch, unsigned char* keys, int length);
  * @param type The value type
  * @param config The config
  * @param new If the key value is newly inserted (not replaced)
- * @return Old value if the key exists, otherwise NULL
+ * @return Old value if the key exists, otherwise NULL.
+ *         If the same data is inserted again under the same key, this is a no-op and NULL is returned
  */
 static struct value*
 art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, struct value_config* config, bool* new);
@@ -788,6 +789,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
    struct art_node** next = NULL;
    unsigned char* leaf_key = NULL;
    void* old_val = NULL;
+   struct value* cur_val = NULL;
    if (node == NULL)
    {
       // Lazy expansion, skip creating an inner node since it currently will have only this one leaf.
@@ -804,7 +806,17 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
       // If the key already exists, replace with new value and return old value
       if (leaf_match(GET_LEAF(node), key, key_len))
       {
-         old_val = GET_LEAF(node)->value;
+         cur_val = GET_LEAF(node)->value;
+         // Inserting the same object again is a no-op, otherwise destroying
+         // the old value would free the object the new value points to
+         if (cur_val != NULL && cur_val->data == value &&
+             ((config == NULL && cur_val->type == type) ||
+              (config != NULL && cur_val->type == ValueRef &&
+               (config->destroy_data == NULL || cur_val->destroy_data == config->destroy_data))))
+         {
+            return NULL;
+         }
+         old_val = cur_val;
          if (config != NULL)
          {
             pgmoneta_value_create_with_config(value, config, &(GET_LEAF(node)->value));
