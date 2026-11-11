@@ -482,11 +482,16 @@ response:
       pgmoneta_log_error("Failed to parse HTTP response header");
       goto error;
    }
-   status = http_read_response_body(connection->ssl, connection->socket, http_response);
-   if (status != MESSAGE_STATUS_OK)
+   /* A HEAD response carries the same headers as GET but no body. Reading
+    * Content-Length bytes would block waiting for data that never arrives. */
+   if (request->method != PGMONETA_HTTP_HEAD)
    {
-      pgmoneta_log_error("Failed to read HTTP response body");
-      goto error;
+      status = http_read_response_body(connection->ssl, connection->socket, http_response);
+      if (status != MESSAGE_STATUS_OK)
+      {
+         pgmoneta_log_error("Failed to read HTTP response body");
+         goto error;
+      }
    }
 
    *response = http_response;
@@ -1066,7 +1071,7 @@ http_build_request(struct http* connection, struct http_request* request, char**
 
    headers = pgmoneta_append(headers, "Connection: close\r\n");
 
-   if (request->read_cb == NULL)
+   if (request->read_cb == NULL && request->method != PGMONETA_HTTP_HEAD)
    {
       sprintf(content_length, "%zu", request->payload.data_size);
       headers = pgmoneta_append(headers, "Content-Length: ");
@@ -1138,6 +1143,8 @@ http_method_to_string(int method)
          return "POST";
       case PGMONETA_HTTP_PUT:
          return "PUT";
+      case PGMONETA_HTTP_HEAD:
+         return "HEAD";
       default:
          return NULL;
    }

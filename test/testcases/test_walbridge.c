@@ -181,7 +181,6 @@ destroy_decoded_record(struct decoded_xlog_record* rec)
    free(rec);
 }
 
-
 MCTF_TEST(test_walbridge_parse_wal_segment_size)
 {
    int size = 0;
@@ -1161,7 +1160,6 @@ cleanup:
    rmdir(base);
    MCTF_FINISH();
 }
-
 
 MCTF_TEST(test_walbridge_checksum_recompute_16k_database_page)
 {
@@ -2890,7 +2888,6 @@ cleanup:
    MCTF_FINISH();
 }
 
-
 MCTF_TEST(test_walbridge_store_resume_at_segment_boundary)
 {
    char base[512];
@@ -3279,7 +3276,7 @@ MCTF_TEST(test_walbridge_encoder_matches_store_16k)
 
    /* The long header must advertise the configured 16 KB WAL page size. */
    MCTF_ASSERT(stream_len > 16384 + SIZE_OF_XLOG_SHORT_PHD,
-              cleanup, "stream must include the second WAL page header");
+               cleanup, "stream must include the second WAL page header");
 
    {
       struct xlog_long_page_header_data* long_phd =
@@ -3908,7 +3905,6 @@ MCTF_TEST(test_walbridge_encoder_rotation_matches_store)
       MCTF_ASSERT_INT_EQ((int)long_phd->xlp_xlog_blcksz, 16384,
                          cleanup, "long header must advertise 16 KB WAL pages");
    }
-
 
    /* the stream must equal segment 0 (padded) followed by segment 1 */
    pgmoneta_snprintf(seg0_path, sizeof(seg0_path), "%s/000000010000000000000000", downstream_dir);

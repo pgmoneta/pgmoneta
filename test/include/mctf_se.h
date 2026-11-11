@@ -158,6 +158,16 @@ int
 mctf_se_restart(void);
 
 /**
+ * Detach a forked child from the managed backend lifecycle.
+ *
+ * Call this in the child immediately after fork(). The atexit handler that
+ * tears down the daemon and containers is process-global; without detaching,
+ * the child exiting would stop the backend that the parent test still uses.
+ */
+void
+mctf_se_disable_atexit_cleanup(void);
+
+/**
  * Run "pgmoneta-cli -c <managed cli conf> <args>" against the managed
  * instance and return the process exit code.
  *

@@ -74,6 +74,8 @@ static int azure_create_transfer_task(int server, char* azure_root, char* remote
 static int azure_upload_one_file(struct azure_transfer_task* task);
 
 static int azure_send_get_request(char* azure_root, char* relative_path, struct http_response** response);
+static int azure_send_head_request(char* azure_root, char* relative_path, struct http_response** response);
+static int azure_object_exists(char* azure_root, char* relative_path, int server);
 static char* azure_build_object_path(char* azure_root, char* relative_path);
 static int azure_build_authorization(char* signed_headers_prefix, char* azure_path,
                                      char* utc_date, char** auth_value);
@@ -911,6 +913,132 @@ error:
 }
 
 static int
+azure_send_head_request(char* azure_root, char* relative_path, struct http_response** response)
+{
+   char utc_date[UTC_TIME_LENGTH];
+   char* azure_path = NULL;
+   char* azure_host = NULL;
+   char* auth_value = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   char azure_head_path[MAX_PATH];
+
+   azure_path = azure_build_object_path(azure_root, relative_path);
+   if (azure_path == NULL)
+   {
+      goto error;
+   }
+
+   memset(&utc_date[0], 0, sizeof(utc_date));
+
+   if (pgmoneta_get_timestamp_UTC_format(utc_date))
+   {
+      goto error;
+   }
+
+   if (azure_build_authorization("HEAD\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:",
+                                 azure_path, utc_date, &auth_value))
+   {
+      goto error;
+   }
+
+   if (azure_http_prepare(azure_path, &azure_host, azure_head_path, sizeof(azure_head_path), &connection))
+   {
+      goto error;
+   }
+
+   pgmoneta_log_debug("Azure HEAD request prepared: host=%s, path=%s",
+                      azure_host, azure_head_path);
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_HEAD, azure_head_path, &request))
+   {
+      goto error;
+   }
+
+   if (azure_add_request_headers(request, auth_value, utc_date, false))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, response))
+   {
+      pgmoneta_log_error("Failed to execute HTTP HEAD request for %s", azure_path);
+      goto error;
+   }
+
+   pgmoneta_log_debug("Azure HEAD response: path=%s, status=%d", azure_path,
+                      (*response)->status_code);
+
+   free(azure_path);
+   free(azure_host);
+   free(auth_value);
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_destroy(connection);
+
+   return 0;
+
+error:
+
+   free(azure_path);
+   free(azure_host);
+   free(auth_value);
+
+   if (connection != NULL)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+
+   if (request != NULL)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+
+   return 1;
+}
+
+/*
+ * Check whether a blob exists in the container. Returns 1 when it does, 0 when
+ * it is missing, and -1 when the request could not be completed.
+ */
+static int
+azure_object_exists(char* azure_root, char* relative_path, int server)
+{
+   struct http_response* response = NULL;
+   int result = -1;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (azure_send_head_request(azure_root, relative_path, &response))
+   {
+      pgmoneta_log_error("Azure verify: HEAD request failed for %s", relative_path);
+      goto done;
+   }
+
+   if (response->status_code >= 200 && response->status_code < 300)
+   {
+      result = 1;
+   }
+   else if (response->status_code == 404)
+   {
+      result = 0;
+   }
+   else
+   {
+      pgmoneta_log_error("Azure verify: unexpected status %d for %s/%s",
+                         response->status_code,
+                         config->common.servers[server].name, relative_path);
+   }
+
+done:
+
+   pgmoneta_http_response_destroy(response);
+
+   return result;
+}
+
+static int
 azure_get_object(int server __attribute__((unused)), char* root, char* relative_path,
                  struct http_response** response)
 {
@@ -1017,5 +1145,107 @@ azure_download(int server, char* label, char* local_root)
    rc = pgmoneta_object_download(&azure_ops, azure_root, server, label, local_root);
 
    free(azure_root);
+   return rc;
+}
+
+/*
+ * Scheduled verification for an Azure-only backup. The local data/ directory is
+ * removed after upload, so check the blobs themselves instead of hashing local
+ * files. Local metadata is always kept for every backup, so the manifest is
+ * read from the local backup directory.
+ */
+int
+azure_verify_backup(int server, struct backup* backup_info)
+{
+   char* azure_root = NULL;
+   char* local_root = NULL;
+   char* manifest_path = NULL;
+   char* remote_path = NULL;
+   char* suffix = NULL;
+   struct deque* paths = NULL;
+   struct deque_iterator* iter = NULL;
+   struct main_configuration* config;
+   int rc = 1;
+
+   config = (struct main_configuration*)shmem;
+
+   if (backup_info == NULL)
+   {
+      return 1;
+   }
+
+   pgmoneta_log_debug("Azure storage engine (verify): %s/%s",
+                      config->common.servers[server].name, backup_info->label);
+
+   azure_root = azure_get_basepath(server, backup_info->label);
+   local_root = pgmoneta_get_server_backup_identifier(server, backup_info->label);
+
+   if (pgmoneta_extraction_get_suffix(backup_info->compression, backup_info->encryption, &suffix))
+   {
+      pgmoneta_log_error("Azure verify: failed to get suffix for %s/%s",
+                         config->common.servers[server].name, backup_info->label);
+      goto cleanup;
+   }
+
+   manifest_path = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
+
+   if (pgmoneta_manifest_get_paths(manifest_path, &paths))
+   {
+      pgmoneta_log_error("Azure verify: failed to read manifest %s", manifest_path);
+      goto cleanup;
+   }
+
+   if (pgmoneta_deque_iterator_create(paths, &iter))
+   {
+      pgmoneta_log_error("Azure verify: failed to create iterator");
+      goto cleanup;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* file_path = iter->tag;
+      int exists = 0;
+
+      remote_path = pgmoneta_append(remote_path, "data/");
+      remote_path = pgmoneta_append(remote_path, file_path);
+
+      /* Match the upload naming: backup_label and backup_manifest stay
+       * uncompressed/unencrypted. */
+      if (suffix != NULL &&
+          !pgmoneta_ends_with(file_path, "backup_label") &&
+          !pgmoneta_ends_with(file_path, "backup_manifest"))
+      {
+         remote_path = pgmoneta_append(remote_path, suffix);
+      }
+
+      exists = azure_object_exists(azure_root, remote_path, server);
+
+      if (exists != 1)
+      {
+         pgmoneta_log_error("Azure verify: %s object %s for %s/%s",
+                            exists == 0 ? "missing" : "could not check",
+                            remote_path,
+                            config->common.servers[server].name, backup_info->label);
+         goto cleanup;
+      }
+
+      free(remote_path);
+      remote_path = NULL;
+   }
+
+   pgmoneta_log_info("Azure verify: %s/%s completed",
+                     config->common.servers[server].name, backup_info->label);
+   rc = 0;
+
+cleanup:
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   free(azure_root);
+   free(local_root);
+   free(manifest_path);
+   free(remote_path);
+   free(suffix);
+
    return rc;
 }

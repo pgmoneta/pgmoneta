@@ -194,6 +194,11 @@ pgmoneta_storage_verify_backup(int server, struct backup* backup_info)
       return s3_verify_backup(server, backup_info);
    }
 
+   if (config->storage_engine & STORAGE_ENGINE_AZURE)
+   {
+      return azure_verify_backup(server, backup_info);
+   }
+
    return 0;
 }
 

@@ -478,6 +478,12 @@ mctf_se_restart(void)
    return daemon_up();
 }
 
+void
+mctf_se_disable_atexit_cleanup(void)
+{
+   storage_active = false;
+}
+
 int
 mctf_se_cli(const char* args, char** output)
 {

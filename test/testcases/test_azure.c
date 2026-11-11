@@ -47,13 +47,18 @@
 #include <mctf_se.h>
 #include <tscommon.h>
 #include <deque.h>
+#include <info.h>
 #include <manifest.h>
+#include <shmem.h>
+#include <storage.h>
 #include <utils.h>
+#include <verify.h>
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static int storage_status = MCTF_FAIL;
@@ -135,6 +140,233 @@ MCTF_INTEGRATION_TEST(test_azure_backup_removes_local_data)
                "local data/ directory still exists after azure-only backup (teardown failed)");
 
 cleanup:
+   MCTF_FINISH();
+}
+
+/*
+ * Run scheduled verification once in a child process, pointed at the managed
+ * instance's local metadata and Azurite connection.
+ *
+ * pgmoneta_sha512_verification() exits with its result, so it cannot run in
+ * the test process. The child opts out of the global backend teardown first.
+ *
+ * @return the verification exit code, or -1 if it could not be run
+ */
+static int
+run_verification_once(void)
+{
+   const struct mctf_se* ctx = NULL;
+   struct main_configuration* config = NULL;
+   char saved_base_dir[MAX_PATH];
+   char saved_azure_storage_account[MISC_LENGTH];
+   char saved_azure_container[MISC_LENGTH];
+   char saved_azure_shared_key[MISC_LENGTH];
+   char saved_azure_base_dir[MAX_PATH];
+   char saved_azure_endpoint[MISC_LENGTH];
+   int saved_azure_port = 0;
+   bool saved_azure_use_tls = false;
+   int saved_storage_engine = 0;
+   bool saved_online[NUMBER_OF_SERVERS];
+   bool saved = false;
+   pid_t pid;
+   int status = 0;
+   int rc = -1;
+
+   ctx = mctf_se_context();
+   config = (struct main_configuration*)shmem;
+
+   if (ctx == NULL || config == NULL)
+   {
+      return -1;
+   }
+
+   memset(saved_online, 0, sizeof(saved_online));
+
+   snprintf(saved_base_dir, sizeof(saved_base_dir), "%s", config->base_dir);
+   snprintf(saved_azure_storage_account, sizeof(saved_azure_storage_account), "%s", config->azure_storage_account);
+   snprintf(saved_azure_container, sizeof(saved_azure_container), "%s", config->azure_container);
+   snprintf(saved_azure_shared_key, sizeof(saved_azure_shared_key), "%s", config->azure_shared_key);
+   snprintf(saved_azure_base_dir, sizeof(saved_azure_base_dir), "%s", config->azure_base_dir);
+   snprintf(saved_azure_endpoint, sizeof(saved_azure_endpoint), "%s", config->azure_endpoint);
+   saved_azure_port = config->azure_port;
+   saved_azure_use_tls = config->azure_use_tls;
+   saved_storage_engine = config->storage_engine;
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      saved_online[i] = config->common.servers[i].online;
+   }
+   saved = true;
+
+   snprintf(config->base_dir, sizeof(config->base_dir), "%s/backup", mctf_se_run_dir());
+   snprintf(config->azure_storage_account, sizeof(config->azure_storage_account), "%s", ctx->access_key);
+   snprintf(config->azure_container, sizeof(config->azure_container), "%s", ctx->bucket);
+   snprintf(config->azure_shared_key, sizeof(config->azure_shared_key), "%s", ctx->secret_key);
+   snprintf(config->azure_base_dir, sizeof(config->azure_base_dir), "pgmoneta");
+   snprintf(config->azure_endpoint, sizeof(config->azure_endpoint), "%s", ctx->endpoint);
+   config->azure_port = ctx->port;
+   config->azure_use_tls = ctx->use_tls;
+   config->storage_engine = STORAGE_ENGINE_AZURE;
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      config->common.servers[i].online = true;
+   }
+
+   pid = fork();
+   if (pid < 0)
+   {
+      goto cleanup;
+   }
+
+   if (pid == 0)
+   {
+      char* argv[] = {"pgmoneta-test", NULL};
+
+      /* The verification job exits the process; keep the parent's daemon and
+       * Azurite container alive by opting out of the global teardown. It also
+       * rewrites the process title, but argv here is a local array, not the
+       * real command line, so leave the title alone in the child. */
+      mctf_se_disable_atexit_cleanup();
+      config->update_process_title = UPDATE_PROCESS_TITLE_NEVER;
+      pgmoneta_sha512_verification(argv);
+      _exit(1);
+   }
+
+   if (waitpid(pid, &status, 0) != pid)
+   {
+      goto cleanup;
+   }
+
+   if (WIFEXITED(status))
+   {
+      rc = WEXITSTATUS(status);
+   }
+
+cleanup:
+   if (saved)
+   {
+      snprintf(config->base_dir, sizeof(config->base_dir), "%s", saved_base_dir);
+      snprintf(config->azure_storage_account, sizeof(config->azure_storage_account), "%s", saved_azure_storage_account);
+      snprintf(config->azure_container, sizeof(config->azure_container), "%s", saved_azure_container);
+      snprintf(config->azure_shared_key, sizeof(config->azure_shared_key), "%s", saved_azure_shared_key);
+      snprintf(config->azure_base_dir, sizeof(config->azure_base_dir), "%s", saved_azure_base_dir);
+      snprintf(config->azure_endpoint, sizeof(config->azure_endpoint), "%s", saved_azure_endpoint);
+      config->azure_port = saved_azure_port;
+      config->azure_use_tls = saved_azure_use_tls;
+      config->storage_engine = saved_storage_engine;
+      for (int i = 0; i < config->common.number_of_servers; i++)
+      {
+         config->common.servers[i].online = saved_online[i];
+      }
+   }
+
+   return rc;
+}
+
+/*
+ * A healthy Azure-only backup must stay valid after scheduled verification.
+ * The local data/ directory is gone, so the job has to check the blobs in
+ * Azurite instead of hashing local files.
+ */
+MCTF_INTEGRATION_TEST(test_azure_scheduled_verification_keeps_backup_valid)
+{
+   char manifest_path[MAX_PATH];
+   int rc;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   /* Local metadata is always retained, even when the data lives only in
+    * Azure. Verification must read it locally rather than fetching it again. */
+   MCTF_ASSERT(mctf_se_has_local_metadata("primary"), cleanup,
+               "local metadata for the Azure-only backup is missing");
+   snprintf(manifest_path, sizeof(manifest_path),
+            "%s/backup/primary/backup/%s/backup.manifest",
+            mctf_se_run_dir(), shared_label);
+   MCTF_ASSERT(access(manifest_path, F_OK) == 0, cleanup,
+               "local backup.manifest is missing for %s", shared_label);
+
+   rc = run_verification_once();
+   MCTF_ASSERT_INT_EQ(rc, 0, cleanup,
+                      "scheduled verification failed for %s", shared_label);
+
+   MCTF_ASSERT(
+      mctf_sh(NULL, "grep -q 'STATUS=1' %s/backup/primary/backup/%s/backup.info",
+              mctf_se_run_dir(), shared_label) == 0,
+      cleanup, "scheduled verification marked the Azure-only backup invalid");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+/*
+ * A backup whose blobs are missing from the container must be marked invalid.
+ * Create a local copy of the metadata under a label that was never uploaded,
+ * so every HEAD request returns 404.
+ */
+MCTF_INTEGRATION_TEST(test_azure_verification_detects_missing_remote_blobs)
+{
+   char backup_root[MAX_PATH] = {0};
+   char fake_label[256] = {0};
+   char fake_root[MAX_PATH] = {0};
+   char real_manifest[MAX_PATH];
+   char fake_manifest[MAX_PATH];
+   char real_sha512[MAX_PATH];
+   char fake_sha512[MAX_PATH];
+   struct backup* info = NULL;
+   int rc;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   snprintf(backup_root, sizeof(backup_root), "%s/backup/primary/backup/", mctf_se_run_dir());
+   snprintf(fake_label, sizeof(fake_label), "verify-missing-%s", shared_label);
+   snprintf(fake_root, sizeof(fake_root), "%s%s", backup_root, fake_label);
+
+   MCTF_ASSERT(pgmoneta_load_info(backup_root, shared_label, &info) == 0, cleanup,
+               "could not load the real backup metadata");
+   MCTF_ASSERT_PTR_NONNULL(info, cleanup, "real backup metadata is NULL");
+
+   snprintf(info->label, sizeof(info->label), "%s", fake_label);
+
+   MCTF_ASSERT(pgmoneta_mkdir(fake_root) == 0, cleanup,
+               "could not create %s", fake_root);
+   MCTF_ASSERT(pgmoneta_save_info(backup_root, info) == 0, cleanup,
+               "could not save the fake backup.info");
+
+   snprintf(real_manifest, sizeof(real_manifest), "%s%s/backup.manifest",
+            backup_root, shared_label);
+   snprintf(fake_manifest, sizeof(fake_manifest), "%s/backup.manifest", fake_root);
+   snprintf(real_sha512, sizeof(real_sha512), "%s%s/backup.sha512",
+            backup_root, shared_label);
+   snprintf(fake_sha512, sizeof(fake_sha512), "%s/backup.sha512", fake_root);
+
+   MCTF_ASSERT(pgmoneta_copy_file(real_manifest, fake_manifest, NULL) == 0, cleanup,
+               "could not copy backup.manifest to %s", fake_root);
+   MCTF_ASSERT(pgmoneta_copy_file(real_sha512, fake_sha512, NULL) == 0, cleanup,
+               "could not copy backup.sha512 to %s", fake_root);
+
+   rc = run_verification_once();
+   MCTF_ASSERT_INT_EQ(rc, 1, cleanup,
+                      "verification did not fail for a backup without remote blobs");
+
+   MCTF_ASSERT(
+      mctf_sh(NULL, "grep -q 'STATUS=0' %s%s/backup.info", backup_root, fake_label) == 0,
+      cleanup, "verification did not mark the backup without remote blobs invalid");
+
+cleanup:
+   if (fake_root[0] != '\0' && pgmoneta_exists(fake_root))
+   {
+      pgmoneta_delete_directory(fake_root);
+   }
+   free(info);
    MCTF_FINISH();
 }
 

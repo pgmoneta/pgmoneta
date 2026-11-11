@@ -122,6 +122,45 @@ cleanup:
    teardown_echo_server();
    MCTF_FINISH();
 }
+MCTF_TEST(test_pgmoneta_http_head)
+{
+   int status;
+   char* content_length;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+
+   /* A HEAD response has the GET headers but no body, even though it
+    * advertises Content-Length. The client must not wait for those bytes. */
+   char* response_text =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: application/octet-stream\r\n"
+      "Connection: close\r\n"
+      "Content-Length: 1234\r\n"
+      "\r\n";
+
+   setup_echo_server(response_text);
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_HEAD, "/head", &request), cleanup, "failed to create request");
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP HEAD request failed");
+   MCTF_ASSERT_INT_EQ(response->status_code, 200, cleanup, "unexpected HEAD status code");
+   MCTF_ASSERT(response->payload.headers, cleanup, "headers is null");
+   content_length = (char*)pgmoneta_deque_get(response->payload.headers, "Content-Length");
+   MCTF_ASSERT_STR_EQ(content_length, "1234", cleanup, "Content-Length header mismatch");
+
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
+   MCTF_FINISH();
+}
 MCTF_TEST(test_pgmoneta_http_get_truncated_chunk)
 {
    int status;

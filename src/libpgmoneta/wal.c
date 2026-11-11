@@ -410,10 +410,7 @@ pgmoneta_wal(int srv, char** argv)
 
                   pgmoneta_free_message(start_replication_msg);
                   start_replication_msg = NULL;
-                  if (msg != NULL)
-                  {
-                     msg->data = NULL;
-                  }
+                  msg->data = NULL;
                   pgmoneta_close_ssl(ssl);
                   ssl = NULL;
                   if (socket != -1)
