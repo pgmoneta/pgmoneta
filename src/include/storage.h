@@ -89,7 +89,8 @@ pgmoneta_storage_list_backup_labels(int server, struct deque** labels);
  *
  * This is backend-specific scheduled verification, not necessarily full
  * file-content verification. For S3 this verifies metadata integrity and
- * manifest-listed object presence without downloading data objects.
+ * manifest-listed object presence without downloading data objects. For Azure
+ * this checks that every manifest-listed blob exists in the container.
  *
  * @param server The server index
  * @param backup_info The backup info
@@ -104,6 +105,20 @@ pgmoneta_storage_verify_backup(int server, struct backup* backup_info);
  */
 struct workflow*
 pgmoneta_storage_create_azure(void);
+
+/**
+ * Verify a backup against the Azure storage engine.
+ *
+ * Checks that every manifest-listed blob exists in the container. The local
+ * data/ directory is normally removed after upload, so this does not hash
+ * local files.
+ *
+ * @param server The server index
+ * @param backup_info The backup info
+ * @return 0 on success, otherwise 1
+ */
+int
+azure_verify_backup(int server, struct backup* backup_info);
 
 /**
  * Create a workflow for the GCS storage engine

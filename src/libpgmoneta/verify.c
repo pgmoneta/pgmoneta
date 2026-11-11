@@ -1080,6 +1080,8 @@ pgmoneta_sha512_verification(char** argv)
       for (int i = 0; i < number_of_backups; i++)
       {
          bool success = true;
+         bool remote_verify = false;
+         bool azure_verify = false;
 
 #ifdef HAVE_FREEBSD
          clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -1096,9 +1098,21 @@ pgmoneta_sha512_verification(char** argv)
          if ((config->storage_engine & STORAGE_ENGINE_S3) &&
              s3_labels != NULL && pgmoneta_art_contains_key(s3_labels, backups[i]->label))
          {
-            if (pgmoneta_storage_verify_backup(server, backups[i]))
+            remote_verify = true;
+         }
+         else if (config->storage_engine & STORAGE_ENGINE_AZURE)
+         {
+            remote_verify = true;
+            azure_verify = true;
+         }
+
+         if (remote_verify)
+         {
+            int verify_rc = azure_verify ? azure_verify_backup(server, backups[i]) : pgmoneta_storage_verify_backup(server, backups[i]);
+
+            if (verify_rc)
             {
-               pgmoneta_log_error("Verification: %s/%s S3 verification failed",
+               pgmoneta_log_error("Verification: %s/%s remote verification failed",
                                   config->common.servers[server].name, backups[i]->label);
                err = 1;
                success = false;

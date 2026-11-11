@@ -236,7 +236,6 @@ error:
    return 1;
 }
 
-
 int
 pgmoneta_read_backup_page_layout(int server, char* label,
                                  uint32_t* blcksz, uint32_t* relseg_size)

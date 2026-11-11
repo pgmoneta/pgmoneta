@@ -389,8 +389,8 @@ MCTF_TEST(test_pgmoneta_backup_incremental_basic)
    MCTF_ASSERT(pgmoneta_read_backup_page_layout(PRIMARY_SERVER,
                                                 pgmoneta_tsclient_get_backup_label(b0),
                                                 &block_size, &relseg_size) == 0 &&
-               block_size > 0 && relseg_size > 0,
-              cleanup, "failed to read full backup page layout");
+                  block_size > 0 && relseg_size > 0,
+               cleanup, "failed to read full backup page layout");
 
    expected_block_size = block_size;
    expected_relseg_size = relseg_size;
@@ -398,16 +398,16 @@ MCTF_TEST(test_pgmoneta_backup_incremental_basic)
    MCTF_ASSERT(pgmoneta_read_backup_page_layout(PRIMARY_SERVER,
                                                 pgmoneta_tsclient_get_backup_label(b1),
                                                 &block_size, &relseg_size) == 0 &&
-               block_size == expected_block_size &&
-               relseg_size == expected_relseg_size,
-              cleanup, "first incremental backup page layout mismatch");
+                  block_size == expected_block_size &&
+                  relseg_size == expected_relseg_size,
+               cleanup, "first incremental backup page layout mismatch");
 
    MCTF_ASSERT(pgmoneta_read_backup_page_layout(PRIMARY_SERVER,
                                                 pgmoneta_tsclient_get_backup_label(b2),
                                                 &block_size, &relseg_size) == 0 &&
-               block_size == expected_block_size &&
-               relseg_size == expected_relseg_size,
-              cleanup, "second incremental backup page layout mismatch");
+                  block_size == expected_block_size &&
+                  relseg_size == expected_relseg_size,
+               cleanup, "second incremental backup page layout mismatch");
 
    MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b0), "FULL", cleanup, "backup 0 type mismatch");
    MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b1), "INCREMENTAL", cleanup, "backup 1 type mismatch");

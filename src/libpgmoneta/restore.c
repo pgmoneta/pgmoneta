@@ -1900,7 +1900,6 @@ reconstruct_backup_file(int server,
    bool full_file_found = false;
    bool progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
 
-
    // since we are working with backup archives, these path will have compression and encryption suffix
    // ofullpath and manifest_path shouldn't have the decryption or decompression suffixes
    memset(ofullpath, 0, MAX_PATH_CONCAT);
