@@ -45,7 +45,83 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define NAME "verify"
+#define NAME            "verify"
+
+#define MAX_CHAIN_DEPTH 1000000
+
+/*
+ * Check whether the incremental backup chain is restorable from its metadata.
+ * Returns 1 and sets *problem (caller frees) on the first condition that makes
+ * the chain unrestorable: a missing or unreadable parent, a dangling
+ * incremental, a backup in the chain marked invalid, or a chain that does not
+ * terminate at a full backup within a sane depth. Returns 0 for a full backup
+ * or a sound chain. Reads backup.info only; no reconstruction.
+ */
+static int
+verify_chain_broken(int server, struct backup* backup, char** problem)
+{
+   struct backup* current = NULL;
+   struct backup* owned = NULL;
+   int depth = 0;
+   int broken = 0;
+
+   *problem = NULL;
+
+   if (backup == NULL || backup->type != TYPE_INCREMENTAL)
+   {
+      return 0;
+   }
+
+   current = backup;
+
+   while (current->type == TYPE_INCREMENTAL)
+   {
+      struct backup* parent = NULL;
+
+      if (depth++ > MAX_CHAIN_DEPTH)
+      {
+         *problem = pgmoneta_append(NULL, "incremental chain exceeds the maximum depth or is cyclic");
+         broken = 1;
+         break;
+      }
+
+      if (strlen(current->parent_label) == 0)
+      {
+         *problem = pgmoneta_append(NULL, "incremental backup has no parent (dangling chain)");
+         broken = 1;
+         break;
+      }
+
+      if (pgmoneta_get_backup_parent(server, current, &parent) || parent == NULL || strlen(parent->label) == 0)
+      {
+         /* load_info returns an empty struct (no label) when backup.info is
+          * absent, so an empty label means the parent is gone, not full. */
+         *problem = pgmoneta_format_and_append(NULL, "parent backup %s is missing or unreadable (broken chain)", current->parent_label);
+         broken = 1;
+         free(parent);
+         break;
+      }
+
+      if (parent->valid == VALID_FALSE)
+      {
+         *problem = pgmoneta_format_and_append(NULL, "backup %s in the chain is marked invalid", parent->label);
+         broken = 1;
+         free(parent);
+         break;
+      }
+
+      if (owned != NULL)
+      {
+         free(owned);
+      }
+      owned = parent;
+      current = parent;
+   }
+
+   free(owned);
+
+   return broken;
+}
 
 void
 pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
@@ -123,6 +199,31 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
       goto error;
+   }
+
+   /* An incremental backup is only restorable if its whole parent chain is
+    * present and valid. Verify otherwise reconstructs and hashes files, which
+    * for a broken chain produces a flood of "missing file" errors instead of
+    * the real cause. Check the chain first and fail fast with a clear reason. */
+   if (backup != NULL && backup->type == TYPE_INCREMENTAL)
+   {
+      char* chain_problem = NULL;
+
+      if (verify_chain_broken(server, backup, &chain_problem))
+      {
+         struct json* outcome = NULL;
+
+         pgmoneta_log_error("Verify: %s/%s: %s", config->common.servers[server].name, identifier, chain_problem);
+         free(chain_problem);
+
+         if (pgmoneta_management_create_outcome_failure(payload, MANAGEMENT_ERROR_VERIFY_ERROR, NAME, &outcome) ||
+             pgmoneta_management_write_json(ssl, client_fd, compression, encryption, payload))
+         {
+            pgmoneta_log_error("Verify: Error sending response for %s/%s", config->common.servers[server].name, identifier);
+         }
+
+         goto error;
+      }
    }
 
    real_directory = pgmoneta_append(real_directory, directory);
