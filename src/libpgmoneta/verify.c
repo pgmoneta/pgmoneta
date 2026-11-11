@@ -35,11 +35,13 @@
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <pagechecksum.h>
 #include <security.h>
 #include <storage.h>
 #include <utils.h>
 #include <restore.h>
 #include <workflow.h>
+#include <walfile/pg_control.h>
 
 /* system */
 #include <errno.h>
@@ -120,6 +122,106 @@ verify_chain_broken(int server, struct backup* backup, char** problem)
    }
 
    free(owned);
+
+   return broken;
+}
+
+/*
+ * Verify the pages of a reconstructed incremental backup.
+ *
+ * A reconstructed chain that combines without error can still hold damaged
+ * pages: the normal verify path checks page checksums only on a backup's own
+ * stored files, and an incremental stores deltas, not whole relations, so its
+ * actual restored pages are first seen here -- after the combine. Read the
+ * reconstructed pg_control for the block size and whether checksums are on,
+ * then verify every page of every checksummable file under the root.
+ *
+ * Returns 1 and sets *problem (caller frees) on the first page that fails.
+ * Returns 0 when every page verifies, or when the cluster has no page checksums
+ * or no readable pg_control (there is then nothing that can be checked, exactly
+ * as the normal verify path treats such a backup).
+ */
+static int
+verify_deep_pages(int server, char* recon_base, char** problem)
+{
+   struct control_file_data* controldata = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* iter = NULL;
+   uint32_t blcksz = 0;
+   uint32_t relseg_size = 0;
+   uint32_t checksum_version = 0;
+   size_t prefix;
+   int broken = 0;
+
+   *problem = NULL;
+
+   if (pgmoneta_read_control_data(server, recon_base, &controldata) || controldata == NULL)
+   {
+      pgmoneta_log_warn("Verify (deep): could not read the reconstructed pg_control, skipping page checks");
+      return 0;
+   }
+
+   pgmoneta_control_data_page_layout(controldata, &blcksz, &relseg_size, &checksum_version);
+   free(controldata);
+
+   if (!(checksum_version != 0 && blcksz > 0 && relseg_size > 0))
+   {
+      /* The cluster was built without page checksums: nothing to check. */
+      return 0;
+   }
+
+   if (pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, recon_base, true, &files))
+   {
+      *problem = pgmoneta_append(NULL, "the reconstructed files could not be listed");
+      return 1;
+   }
+
+   prefix = strlen(recon_base);
+   if (prefix > 0 && recon_base[prefix - 1] == '/')
+   {
+      prefix--;
+   }
+
+   pgmoneta_deque_iterator_create(files, &iter);
+   while (!broken && pgmoneta_deque_iterator_next(iter))
+   {
+      char* full = (char*)pgmoneta_value_data(iter->value);
+      char* relative = full + prefix;
+      uint32_t segno = 0;
+
+      while (*relative == '/')
+      {
+         relative++;
+      }
+
+      if (pgmoneta_page_checksummable(relative, &segno))
+      {
+         uint32_t blockno = 0;
+         uint16_t computed = 0;
+         uint16_t stored = 0;
+         int number_of_bad = 0;
+
+         if (pgmoneta_page_verify_file(full, (size_t)blcksz, relseg_size, segno,
+                                       &blockno, &computed, &stored, &number_of_bad))
+         {
+            if (number_of_bad > 0)
+            {
+               *problem = pgmoneta_format_and_append(NULL,
+                                                     "reconstructed %s fails its page checksum at block %u (calculated %04X but block contains %04X)",
+                                                     relative, blockno, computed, stored);
+            }
+            else
+            {
+               *problem = pgmoneta_format_and_append(NULL,
+                                                     "reconstructed %s is not a whole number of blocks", relative);
+            }
+            broken = 1;
+         }
+      }
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(files);
 
    return broken;
 }
@@ -238,6 +340,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    {
       char* recon_root = NULL;
       char* recon_base = NULL;
+      char* deep_problem = NULL;
 
       if (pgmoneta_extract_incremental_backup(server, backup->label, &recon_root, &recon_base))
       {
@@ -255,9 +358,32 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
          goto error;
       }
 
-      pgmoneta_log_info("Verify (deep): %s/%s reconstructs from its chain", config->common.servers[server].name, identifier);
+      /* The chain combined; now confirm the reconstructed pages are intact. */
+      if (verify_deep_pages(server, recon_base, &deep_problem))
+      {
+         struct json* outcome = NULL;
 
-      /* A later change will validate the reconstructed data before removing it. */
+         pgmoneta_log_error("Verify (deep): %s/%s: %s", config->common.servers[server].name, identifier,
+                            deep_problem != NULL ? deep_problem : "a reconstructed page failed verification");
+         free(deep_problem);
+         deep_problem = NULL;
+
+         pgmoneta_delete_directory(recon_root);
+         free(recon_root);
+         free(recon_base);
+
+         if (pgmoneta_management_create_outcome_failure(payload, MANAGEMENT_ERROR_VERIFY_ERROR, NAME, &outcome) ||
+             pgmoneta_management_write_json(ssl, client_fd, compression, encryption, payload))
+         {
+            pgmoneta_log_error("Verify: Error sending response for %s/%s", config->common.servers[server].name, identifier);
+         }
+
+         goto error;
+      }
+
+      pgmoneta_log_info("Verify (deep): %s/%s reconstructs from its chain and its pages verify",
+                        config->common.servers[server].name, identifier);
+
       pgmoneta_delete_directory(recon_root);
       free(recon_root);
       free(recon_base);
