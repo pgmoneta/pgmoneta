@@ -201,6 +201,35 @@ pgmoneta_storage_remote_download(int server, char* label, char** root)
    return 1;
 }
 
+int
+pgmoneta_storage_remote_cleanup(int server, char* label)
+{
+   int ret = 0;
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   for (int i = 0; i < N_ENGINES; i++)
+   {
+      if (!(config->storage_engine & engines[i].engine_flag))
+      {
+         continue;
+      }
+
+      if (engines[i].cleanup == NULL)
+      {
+         pgmoneta_log_warn("remote_cleanup: %s has no cleanup implementation; orphaned objects may remain for %s/%s",
+                           engines[i].name, config->common.servers[server].name, label);
+      }
+      else if (engines[i].cleanup(server, label))
+      {
+         pgmoneta_log_warn("remote_cleanup: cleanup of %s failed; orphaned objects may remain for %s/%s",
+                           engines[i].name, config->common.servers[server].name, label);
+         ret = 1;
+      }
+   }
+
+   return ret;
+}
+
 static char*
 remote_upload_name(void)
 {
@@ -345,23 +374,7 @@ remote_upload_execute(char* name __attribute__((unused)), struct art* nodes)
    if (any_failed)
    {
       /* Atomic policy: sweep every backend on any failure. TODO: partial-success policy. */
-      for (int i = 0; i < n; i++)
-      {
-         if (tasks[i].engine->cleanup != NULL)
-         {
-            if (tasks[i].engine->cleanup(server, label) != 0)
-            {
-               pgmoneta_log_warn("remote_upload: cleanup of %s failed; orphaned objects may remain",
-                                 tasks[i].engine->name);
-            }
-         }
-         else
-         {
-            pgmoneta_log_warn("remote_upload: %s has no cleanup implementation; "
-                              "orphaned objects may remain after upload failure",
-                              tasks[i].engine->name);
-         }
-      }
+      pgmoneta_storage_remote_cleanup(server, label);
       return 1;
    }
 

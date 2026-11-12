@@ -54,6 +54,27 @@ pgmoneta_delete(int srv, char* backup_id);
 int
 pgmoneta_delete_wal(int srv);
 
+/**
+ * Delete the backups of a server that did not finish, locally and on the
+ * remote storage engines: the ones marked as incomplete and the backup
+ * directories without backup.info. A marker stays until the remote cleanup
+ * of its backup succeeds, so the next call tries again.
+ * The caller holds the repository lock of the server, or nothing runs yet
+ * @param srv The server index
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_incomplete_backups(int srv);
+
+/**
+ * Delete the incomplete backup of a backup process that died,
+ * then release the repository lock
+ * @param argv The argv
+ * @param srv The server index
+ */
+void
+pgmoneta_delete_failed_backup(char** argv, int srv);
+
 #ifdef __cplusplus
 }
 #endif

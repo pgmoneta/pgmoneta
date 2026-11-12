@@ -359,9 +359,10 @@ error:
 int
 pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** backups)
 {
-   char* d = NULL;
+   char* path = NULL;
    struct backup** bcks = NULL;
    int number_of_bcks = 0;
+   int number_of_dirs = 0;
    char** dirs = NULL;
 
 #ifdef DEBUG
@@ -372,38 +373,55 @@ pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** ba
    *number_of_backups = 0;
    *backups = NULL;
 
-   pgmoneta_get_directories(directory, &number_of_bcks, &dirs);
+   pgmoneta_get_directories(directory, &number_of_dirs, &dirs);
 
-   if (number_of_bcks > 0)
+   if (number_of_dirs > 0)
    {
-      bcks = (struct backup**)malloc(number_of_bcks * sizeof(struct backup*));
+      bcks = (struct backup**)malloc(number_of_dirs * sizeof(struct backup*));
 
       if (bcks == NULL)
       {
          goto error;
       }
 
-      memset(bcks, 0, number_of_bcks * sizeof(struct backup*));
+      memset(bcks, 0, number_of_dirs * sizeof(struct backup*));
 
-      for (int i = 0; i < number_of_bcks; i++)
+      for (int i = 0; i < number_of_dirs; i++)
       {
-         d = pgmoneta_append(d, directory);
+         path = pgmoneta_format_and_append(NULL, "%s%s%s/backup.info", directory,
+                                           pgmoneta_ends_with(directory, "/") ? "" : "/", dirs[i]);
 
-         if (pgmoneta_load_info(d, dirs[i], &bcks[i]))
+         if (path == NULL)
          {
-            pgmoneta_log_error("Unable to load backup for %s", d);
             goto error;
          }
 
-         free(d);
-         d = NULL;
+         if (pgmoneta_exists(path))
+         {
+            if (pgmoneta_load_info_file(path, &bcks[number_of_bcks]))
+            {
+               pgmoneta_log_error("Unable to load backup for %s", path);
+               goto error;
+            }
+
+            number_of_bcks++;
+         }
+
+         free(path);
+         path = NULL;
       }
 
-      for (int i = 0; i < number_of_bcks; i++)
+      for (int i = 0; i < number_of_dirs; i++)
       {
          free(dirs[i]);
       }
       free(dirs);
+   }
+
+   if (number_of_bcks == 0)
+   {
+      free(bcks);
+      bcks = NULL;
    }
 
    *number_of_backups = number_of_bcks;
@@ -413,11 +431,11 @@ pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** ba
 
 error:
 
-   free(d);
+   free(path);
 
    if (dirs != NULL)
    {
-      for (int i = 0; i < number_of_bcks; i++)
+      for (int i = 0; i < number_of_dirs; i++)
       {
          free(dirs[i]);
       }
@@ -1378,6 +1396,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    char buffer[INFO_BUFFER_SIZE];
    char* bck_root_dir = NULL;
    char* bck_info_file = NULL;
+   char* bck_info_tmp = NULL;
    FILE* sfile = NULL;
 
 #ifdef DEBUG
@@ -1389,10 +1408,18 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    bck_info_file = pgmoneta_append(bck_info_file, directory);
    bck_info_file = pgmoneta_append(bck_info_file, backup->label);
    bck_info_file = pgmoneta_append(bck_info_file, "/backup.info");
+   bck_info_tmp = pgmoneta_format_and_append(NULL, "%s.new", bck_info_file);
 
-   if (pgmoneta_fopen_secure(bck_info_file, "w", &sfile))
+   if (bck_info_file == NULL || bck_info_tmp == NULL)
    {
-      pgmoneta_log_error("Could not open file %s due to %s", bck_info_file, strerror(errno));
+      goto error;
+   }
+
+   /* Written next to backup.info and renamed over it, so a process that dies
+    * while saving never leaves an empty or partial backup.info behind */
+   if (pgmoneta_fopen_secure(bck_info_tmp, "w", &sfile))
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", bck_info_tmp, strerror(errno));
       errno = 0;
       goto error;
    }
@@ -1446,20 +1473,26 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    pgmoneta_snprintf(&buffer[0], sizeof(buffer), "%s=%.1024s\n", INFO_EXTRA, backup->extra);
    fputs(&buffer[0], sfile);
 
-   pgmoneta_permission(bck_info_file, 6, 0, 0);
+   pgmoneta_permission(bck_info_tmp, 6, 0, 0);
 
    if (fflush(sfile) != 0 || fsync(fileno(sfile)) != 0)
    {
-      pgmoneta_log_error("Could not write %s: %s", bck_info_file, strerror(errno));
+      pgmoneta_log_error("Could not write %s: %s", bck_info_tmp, strerror(errno));
       goto error;
    }
    if (fclose(sfile) != 0)
    {
-      pgmoneta_log_error("Could not write %s: %s", bck_info_file, strerror(errno));
+      pgmoneta_log_error("Could not write %s: %s", bck_info_tmp, strerror(errno));
       sfile = NULL;
       goto error;
    }
    sfile = NULL;
+
+   if (rename(bck_info_tmp, bck_info_file) != 0)
+   {
+      pgmoneta_log_error("Could not rename %s to %s: %s", bck_info_tmp, bck_info_file, strerror(errno));
+      goto error;
+   }
 
    bck_root_dir = pgmoneta_append(bck_root_dir, directory);
    bck_root_dir = pgmoneta_append(bck_root_dir, backup->label);
@@ -1471,18 +1504,24 @@ pgmoneta_save_info(char* directory, struct backup* backup)
 
    free(bck_root_dir);
    free(bck_info_file);
+   free(bck_info_tmp);
    return 0;
 
 error:
 
    if (sfile != NULL)
    {
-      fflush(sfile);
       fclose(sfile);
+   }
+
+   if (pgmoneta_exists(bck_info_tmp))
+   {
+      pgmoneta_delete_file(bck_info_tmp, NULL);
    }
 
    free(bck_root_dir);
    free(bck_info_file);
+   free(bck_info_tmp);
    return 1;
 }
 
