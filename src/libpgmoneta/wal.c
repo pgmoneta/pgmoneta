@@ -376,7 +376,7 @@ pgmoneta_wal(int srv, char** argv)
 
       // wait for the CopyBothResponse message
 
-      while (config->running && pgmoneta_server_is_online(srv) && (msg == NULL || type != 'W'))
+      while (config->running && pgmoneta_server_is_online(srv) && type != 'W')
       {
          ret = pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg);
          if (ret != 1)
