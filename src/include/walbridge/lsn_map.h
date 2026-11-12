@@ -31,11 +31,22 @@
 
 #include <stdint.h>
 
+/*
+ * The in-memory map is sorted by upstream LSN and holds one pair per
+ * upstream LSN, so lookups are O(log n). The file on disk stays append
+ * ordered and may contain legacy duplicates, malformed lines or a partial
+ * trailing line; loading and tail reads normalize it.
+ *
+ * Reverse lookups by downstream LSN return, on a tie, the pair with the
+ * smallest upstream LSN.
+ */
 struct lsn_map;
 
 int
 pgmoneta_lsn_map_create(const char* path, struct lsn_map** map);
 
+/* Add a mapping. Idempotent for a pair that is already present; returns 1
+ * for a conflicting pair (same upstream, different downstream). */
 int
 pgmoneta_lsn_map_put(struct lsn_map* map, uint64_t upstream, uint64_t downstream);
 
@@ -52,31 +63,37 @@ pgmoneta_lsn_map_get_upstream(struct lsn_map* map, uint64_t downstream, uint64_t
 int
 pgmoneta_lsn_map_get_upstream_at_or_before(struct lsn_map* map, uint64_t downstream, uint64_t* upstream);
 
-/* Return the oldest (first written) upstream/downstream pair, an anchor for
- * the origin of the translated stream. Returns 1 if the map has no entries. */
+/* Return the pair with the smallest downstream LSN (smallest upstream LSN on
+ * a tie), an anchor for the origin of the translated stream. Returns 1 if the
+ * map has no entries. */
 int
 pgmoneta_lsn_map_get_first(struct lsn_map* map, uint64_t* upstream, uint64_t* downstream);
 
 /**
  * Force a durable persist of the map. The file is written append-only: only
  * the pairs added since the last persist are appended and fsynced, so the
- * per-record persistence cost is O(1) regardless of map size.
+ * per-record persistence cost is O(1) regardless of map size. On failure the
+ * file is truncated back to its size before the batch and the batch stays
+ * pending for the next attempt.
  * Returns 0 on success, nonzero on failure.
  */
 int
 pgmoneta_lsn_map_flush(struct lsn_map* map);
 
 /* Incrementally extend an in-memory map with the tail of the persisted file
- * starting at `offset`, without re-parsing the pairs already resident. Only
- * whole lines are committed; a partial trailing line (the writer mid-persist)
- * is left for the next call with *next_offset still pointing at it. Returns 0
+ * starting at `offset`, without re-parsing the pairs already resident. Pairs
+ * the map already holds are skipped and tail pairs are never persisted again.
+ * Only whole lines are committed; a partial trailing line (the writer
+ * mid-persist) is left for the next call with *next_offset still pointing at
+ * it. The map's durable offset advances to *next_offset. Returns 0
  * on success; returns 1 on I/O failure, in which case the caller should fall
  * back to a fresh load. */
 int
 pgmoneta_lsn_map_append_tail(struct lsn_map* map, uint64_t offset, uint64_t* next_offset);
 
-/* The byte offset in the persisted file that the map already reflects. An
- * incremental tail reader resumes from here. */
+/* The byte offset in the persisted file that the map already reflects, both
+ * through its own persists and through tail reads. An incremental tail reader
+ * resumes from here. */
 uint64_t
 pgmoneta_lsn_map_durable_bytes(struct lsn_map* map);
 

@@ -1133,10 +1133,13 @@ sender_map_top(char* map_path, uint64_t* downstream_top)
    return 0;
 }
 
-/* Refresh the in-memory LSN map view incrementally. The receiver persists the
- * map file append-only, so the sender resumes from the byte offset it already
- * loaded and parses only the appended tail: O(new bytes) per refresh instead
- * of O(whole map), which matters once the map reaches tens/hundreds of MB.
+/* Refresh the in-memory LSN map view incrementally. The map file is
+ * append-only and the sender is its writer, so the refresh resumes from the
+ * byte offset the map already reflects and parses only the appended tail:
+ * O(new bytes) per refresh instead of O(whole map), which matters once the
+ * map reaches tens/hundreds of MB. The map's own durable offset is the single
+ * source of truth: it advances on the sender's own persists as well as on
+ * tail reads, so the sender never reads its own appends back as new pairs.
  * Falls back to a full reload only when the file shrank (reset/recreated) or
  * the tail read failed. */
 static void
@@ -1144,6 +1147,8 @@ sender_refresh_map(char* map_path, struct lsn_map** map, uint64_t* last_map_offs
 {
    struct stat st;
    struct lsn_map* fresh = NULL;
+
+   *last_map_offset = pgmoneta_lsn_map_durable_bytes(*map);
 
    if (stat(map_path, &st) != 0)
    {
@@ -2319,7 +2324,7 @@ phase_a_serve:
       }
 
       /* Keep the LSN-map view fresh while serving archived bytes. The map is
-       * persisted append-only by the receiver and grows one entry per
+       * persisted append-only by the sender and grows one entry per
        * translated record (tens of MB for a few GB of stream), so the refresh
        * is incremental: only the appended tail is re-parsed, never the whole
        * file. */

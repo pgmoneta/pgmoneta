@@ -77,8 +77,25 @@ int pgmoneta_lsn_map_get_downstream(struct lsn_map* map, uint64_t upstream, uint
 int pgmoneta_lsn_map_get_downstream_at_or_before(struct lsn_map* map, uint64_t upstream,
                                                   uint64_t* upstream_found, uint64_t* downstream);
 int pgmoneta_lsn_map_get_upstream(struct lsn_map* map, uint64_t downstream, uint64_t* upstream);
+int pgmoneta_lsn_map_get_upstream_at_or_before(struct lsn_map* map, uint64_t downstream, uint64_t* upstream);
+int pgmoneta_lsn_map_get_first(struct lsn_map* map, uint64_t* upstream, uint64_t* downstream);
+int pgmoneta_lsn_map_flush(struct lsn_map* map);
+int pgmoneta_lsn_map_append_tail(struct lsn_map* map, uint64_t offset, uint64_t* next_offset);
+uint64_t pgmoneta_lsn_map_durable_bytes(struct lsn_map* map);
 void pgmoneta_lsn_map_destroy(struct lsn_map* map);
 ```
+
+The sender is the only process that writes `walbridge.lsnmap`. The file is
+append-only, one `<upstream> <downstream>` pair per line in persist order, and
+may contain legacy duplicate pairs, malformed lines or a partial trailing line
+left by a crash. Loading and tail reads normalize it: the in-memory map is kept
+sorted by upstream LSN with one pair per upstream LSN, so all lookups are
+O(log n). Putting a pair that is already present is a no-op; putting a
+conflicting pair (same upstream, different downstream) fails. When several
+pairs share a downstream LSN, the reverse lookups (`get_upstream`,
+`get_upstream_at_or_before`, `get_first`) return the one with the smallest
+upstream LSN. A failed persist truncates the file back to its size before the
+batch and keeps the batch pending, so a retry does not duplicate pairs.
 
 ### Migration engine (`migration_engine.h`)
 

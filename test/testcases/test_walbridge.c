@@ -211,6 +211,370 @@ cleanup:
    MCTF_FINISH();
 }
 
+static int
+lsnmap_test_write(const char* path, const char* mode, const char* content)
+{
+   FILE* f = fopen(path, mode);
+   if (f == NULL)
+   {
+      return 1;
+   }
+   fputs(content, f);
+   fclose(f);
+   return 0;
+}
+
+static long
+lsnmap_test_lines(const char* path)
+{
+   FILE* f = fopen(path, "r");
+   long lines = 0;
+   int c;
+
+   if (f == NULL)
+   {
+      return -1;
+   }
+   while ((c = fgetc(f)) != EOF)
+   {
+      if (c == '\n')
+      {
+         lines++;
+      }
+   }
+   fclose(f);
+   return lines;
+}
+
+static uint64_t
+lsnmap_test_size(const char* path)
+{
+   struct stat st;
+
+   if (stat(path, &st) != 0)
+   {
+      return 0;
+   }
+   return (uint64_t)st.st_size;
+}
+
+MCTF_TEST(test_walbridge_lsn_map_put_idempotent)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_idem.map";
+   uint64_t down = 0;
+
+   unlink(path);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x1000, 40), 0, cleanup, "put 1 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x1000, 40), 0, cleanup, "identical put must be a no-op");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x2000, 80), 0, cleanup, "put 2 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x1000, 40), 0, cleanup, "identical out-of-order put must be a no-op");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_flush(map), 0, cleanup, "flush failed");
+   MCTF_ASSERT_INT_EQ(lsnmap_test_lines(path), 2, cleanup, "file must hold each pair once");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_durable_bytes(map), lsnmap_test_size(path), cleanup, "durable offset must match the file size");
+
+   pgmoneta_lsn_map_destroy(map);
+   map = NULL;
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "reload failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 0x1000, &down), 0, cleanup, "lookup after reload failed");
+   MCTF_ASSERT_INT_EQ(down, 40, cleanup, "wrong downstream after reload");
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_walbridge_lsn_map_put_conflict)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_conflict.map";
+   uint64_t down = 0;
+
+   unlink(path);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x1000, 40), 0, cleanup, "put failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x1000, 41), 1, cleanup, "conflicting put must fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 0x1000, &down), 0, cleanup, "lookup failed");
+   MCTF_ASSERT_INT_EQ(down, 40, cleanup, "conflicting put must not replace the mapping");
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walbridge_lsn_map_load_dedups)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_dedup.map";
+   uint64_t up = 0;
+   uint64_t down = 0;
+   long lines_before = 0;
+
+   unlink(path);
+
+   /* the shape seen in the field: the same run repeated, plus a conflict */
+   MCTF_ASSERT_INT_EQ(lsnmap_test_write(path, "w",
+                                        "100 40\n200 80\n300 120\n"
+                                        "100 40\n200 80\n300 120\n"
+                                        "100 40\n200 80\n300 120\n"
+                                        "200 99\n"),
+                      0, cleanup, "write fixture failed");
+   lines_before = lsnmap_test_lines(path);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_durable_bytes(map), lsnmap_test_size(path), cleanup, "durable offset must cover the file");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 200, &down), 0, cleanup, "lookup 200 failed");
+   MCTF_ASSERT_INT_EQ(down, 80, cleanup, "first mapping must win over the conflict");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_first(map, &up, &down), 0, cleanup, "get_first failed");
+   MCTF_ASSERT_INT_EQ(up, 100, cleanup, "wrong first upstream");
+   MCTF_ASSERT_INT_EQ(down, 40, cleanup, "wrong first downstream");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream(map, 120, &up), 0, cleanup, "reverse lookup failed");
+   MCTF_ASSERT_INT_EQ(up, 300, cleanup, "wrong reverse lookup");
+
+   /* loaded pairs are durable: putting them again writes nothing */
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 300, 120), 0, cleanup, "re-put failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 400, 160), 0, cleanup, "new put failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_flush(map), 0, cleanup, "flush failed");
+   MCTF_ASSERT_INT_EQ(lsnmap_test_lines(path), lines_before + 1, cleanup, "only the new pair may be appended");
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walbridge_lsn_map_append_tail_no_reappend)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_noreappend.map";
+   uint64_t next = 0;
+
+   unlink(path);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x1000, 40), 0, cleanup, "put 1 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x2000, 80), 0, cleanup, "put 2 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x3000, 120), 0, cleanup, "put 3 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_flush(map), 0, cleanup, "flush failed");
+   MCTF_ASSERT_INT_EQ(lsnmap_test_lines(path), 3, cleanup, "expected 3 lines");
+
+   /* the writer reading its own appends back (the #1529 feedback loop) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_append_tail(map, 0, &next), 0, cleanup, "append_tail failed");
+   MCTF_ASSERT_INT_EQ(next, lsnmap_test_size(path), cleanup, "tail read must reach the end of the file");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_durable_bytes(map), next, cleanup, "durable offset must follow the tail read");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_flush(map), 0, cleanup, "second flush failed");
+   MCTF_ASSERT_INT_EQ(lsnmap_test_lines(path), 3, cleanup, "re-read pairs must not be persisted again");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x4000, 160), 0, cleanup, "put 4 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_flush(map), 0, cleanup, "third flush failed");
+   MCTF_ASSERT_INT_EQ(lsnmap_test_lines(path), 4, cleanup, "expected exactly one new line");
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walbridge_lsn_map_out_of_order_put)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_order.map";
+   uint64_t up = 0;
+   uint64_t down = 0;
+
+   unlink(path);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x3000, 120), 0, cleanup, "put 3 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x1000, 40), 0, cleanup, "put 1 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x2000, 80), 0, cleanup, "put 2 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_flush(map), 0, cleanup, "flush failed");
+
+   for (int pass = 0; pass < 2; pass++)
+   {
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 0x2000, &down), 0, cleanup, "exact lookup failed");
+      MCTF_ASSERT_INT_EQ(down, 80, cleanup, "wrong exact downstream");
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream_at_or_before(map, 0x2500, &up, &down), 0, cleanup, "at-or-before failed");
+      MCTF_ASSERT_INT_EQ(up, 0x2000, cleanup, "wrong at-or-before upstream");
+      MCTF_ASSERT_INT_EQ(down, 80, cleanup, "wrong at-or-before downstream");
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream_at_or_before(map, 0x0fff, &up, &down), 1, cleanup, "nothing at or before must fail");
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream_at_or_before(map, 100, &up), 0, cleanup, "reverse at-or-before failed");
+      MCTF_ASSERT_INT_EQ(up, 0x2000, cleanup, "wrong reverse at-or-before");
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_first(map, &up, &down), 0, cleanup, "get_first failed");
+      MCTF_ASSERT_INT_EQ(up, 0x1000, cleanup, "wrong first upstream");
+      MCTF_ASSERT_INT_EQ(down, 40, cleanup, "wrong first downstream");
+
+      /* the same answers after a reload of the append-ordered file */
+      pgmoneta_lsn_map_destroy(map);
+      map = NULL;
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "reload failed");
+   }
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walbridge_lsn_map_reverse_ties)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_ties.map";
+   uint64_t up = 0;
+   uint64_t down = 0;
+
+   unlink(path);
+
+   /* the results the previous linear scans returned: first match wins */
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x100, 40), 0, cleanup, "put 1 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x200, 80), 0, cleanup, "put 2 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x300, 80), 0, cleanup, "put 3 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 0x400, 120), 0, cleanup, "put 4 failed");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream(map, 80, &up), 0, cleanup, "get_upstream failed");
+   MCTF_ASSERT_INT_EQ(up, 0x200, cleanup, "tie must return the smallest upstream");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream_at_or_before(map, 100, &up), 0, cleanup, "at-or-before 100 failed");
+   MCTF_ASSERT_INT_EQ(up, 0x200, cleanup, "at-or-before tie must return the smallest upstream");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream_at_or_before(map, 80, &up), 0, cleanup, "at-or-before 80 failed");
+   MCTF_ASSERT_INT_EQ(up, 0x200, cleanup, "exact at-or-before tie must return the smallest upstream");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream_at_or_before(map, 39, &up), 1, cleanup, "before the first pair must fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream(map, 81, &up), 1, cleanup, "missing exact downstream must fail");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_first(map, &up, &down), 0, cleanup, "get_first failed");
+   MCTF_ASSERT_INT_EQ(up, 0x100, cleanup, "wrong first upstream");
+   MCTF_ASSERT_INT_EQ(down, 40, cleanup, "wrong first downstream");
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walbridge_lsn_map_tail_advances_offset)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_tail.map";
+   uint64_t next = 0;
+   uint64_t next2 = 0;
+   uint64_t down = 0;
+
+   unlink(path);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+
+   /* another writer appends whole lines */
+   MCTF_ASSERT_INT_EQ(lsnmap_test_write(path, "a", "100 40\n200 80\n"), 0, cleanup, "append 1 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_append_tail(map, pgmoneta_lsn_map_durable_bytes(map), &next), 0, cleanup, "tail 1 failed");
+   MCTF_ASSERT_INT_EQ(next, lsnmap_test_size(path), cleanup, "tail must reach the end");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_durable_bytes(map), next, cleanup, "durable offset must follow");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 200, &down), 0, cleanup, "lookup 200 failed");
+   MCTF_ASSERT_INT_EQ(down, 80, cleanup, "wrong downstream for 200");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_append_tail(map, next, &next2), 0, cleanup, "tail 2 failed");
+   MCTF_ASSERT_INT_EQ(next2, next, cleanup, "nothing new must keep the offset");
+
+   /* a partial line is left for later, then committed once complete */
+   MCTF_ASSERT_INT_EQ(lsnmap_test_write(path, "a", "300 12"), 0, cleanup, "append partial failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_append_tail(map, next, &next2), 0, cleanup, "tail 3 failed");
+   MCTF_ASSERT_INT_EQ(next2, next, cleanup, "partial line must not advance the offset");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 300, &down), 1, cleanup, "partial pair must not be visible");
+   MCTF_ASSERT_INT_EQ(lsnmap_test_write(path, "a", "0\n"), 0, cleanup, "complete partial failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_append_tail(map, next, &next2), 0, cleanup, "tail 4 failed");
+   MCTF_ASSERT_INT_EQ(next2, lsnmap_test_size(path), cleanup, "completed line must advance the offset");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 300, &down), 0, cleanup, "lookup 300 failed");
+   MCTF_ASSERT_INT_EQ(down, 120, cleanup, "wrong downstream for 300");
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walbridge_lsn_map_load_partial_line)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_partial.map";
+   uint64_t down = 0;
+
+   unlink(path);
+
+   /* "200 8" is "200 80" torn by a crash */
+   MCTF_ASSERT_INT_EQ(lsnmap_test_write(path, "w", "100 40\n200 8"), 0, cleanup, "write fixture failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_durable_bytes(map), 7, cleanup, "durable offset must stop before the partial line");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 200, &down), 1, cleanup, "partial pair must not load");
+
+   /* the next persist must not glue onto, or revive, the torn line */
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, 300, 120), 0, cleanup, "put failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_flush(map), 0, cleanup, "flush failed");
+   pgmoneta_lsn_map_destroy(map);
+   map = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "reload failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 100, &down), 0, cleanup, "lookup 100 failed");
+   MCTF_ASSERT_INT_EQ(down, 40, cleanup, "wrong downstream for 100");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 300, &down), 0, cleanup, "lookup 300 failed");
+   MCTF_ASSERT_INT_EQ(down, 120, cleanup, "wrong downstream for 300");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, 200, &down), 1, cleanup, "torn pair must stay invisible");
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_durable_bytes(map), lsnmap_test_size(path), cleanup, "durable offset must cover the file");
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walbridge_lsn_map_stress)
+{
+   struct lsn_map* map = NULL;
+   const char* path = "/tmp/walbridge_lsnmap_stress.map";
+   const uint64_t n = 1000000;
+   uint64_t up = 0;
+   uint64_t down = 0;
+
+   unlink(path);
+
+   /* correctness at scale only, no wall-clock assertion: with the old
+    * linear lookups this loop runs for a very long time */
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_create(path, &map), 0, cleanup, "create failed");
+   for (uint64_t i = 0; i < n; i++)
+   {
+      uint64_t u = 0x1000028 + i * 64;
+      uint64_t d = 40 + i * 48;
+      if (pgmoneta_lsn_map_get_downstream(map, u, &down) == 0)
+      {
+         MCTF_ASSERT(false, cleanup, "pair must not exist before put");
+      }
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_put(map, u, d), 0, cleanup, "put failed");
+   }
+   MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_flush(map), 0, cleanup, "flush failed");
+
+   for (uint64_t i = 0; i < n; i++)
+   {
+      uint64_t u = 0x1000028 + i * 64;
+      uint64_t d = 40 + i * 48;
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream(map, u, &down), 0, cleanup, "get_downstream failed");
+      MCTF_ASSERT_INT_EQ(down, d, cleanup, "wrong downstream");
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream(map, d, &up), 0, cleanup, "get_upstream failed");
+      MCTF_ASSERT_INT_EQ(up, u, cleanup, "wrong upstream");
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_downstream_at_or_before(map, u + 63, &up, &down), 0, cleanup, "at-or-before failed");
+      MCTF_ASSERT_INT_EQ(up, u, cleanup, "wrong at-or-before upstream");
+      MCTF_ASSERT_INT_EQ(pgmoneta_lsn_map_get_upstream_at_or_before(map, d + 47, &up), 0, cleanup, "reverse at-or-before failed");
+      MCTF_ASSERT_INT_EQ(up, u, cleanup, "wrong reverse at-or-before upstream");
+   }
+   MCTF_ASSERT_INT_EQ(lsnmap_test_lines(path), (long)n, cleanup, "file must hold one line per pair");
+
+cleanup:
+   pgmoneta_lsn_map_destroy(map);
+   unlink(path);
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_walbridge_feedback_never_acknowledges_unsent_wal)
 {
    /* A requested resume LSN is not evidence that the peer received it. */
