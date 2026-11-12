@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <deque.h>
 #include <json.h>
 #include <storage.h>
 
@@ -57,6 +58,29 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
  */
 void
 pgmoneta_sha512_verification(char** argv);
+
+/**
+ * Check the files of a backup, as stored, against its backup.sha512
+ * @param server The server
+ * @param label The label of the backup
+ * @param missing_ok Whether a missing file is skipped (a backup staged from a remote storage engine)
+ * @param failed A deque that gets an entry for each failed file, or NULL
+ * @return 0 if all files match, 1 if a file is missing, unreadable or different, 2 if there is no backup.sha512
+ */
+int
+pgmoneta_verify_sha512(int server, char* label, bool missing_ok, struct deque* failed);
+
+/**
+ * Check a backup and the backups it is built on against their backup.sha512
+ * @param server The server
+ * @param label The label of the backup
+ * @param self Whether to check the backup itself, or only the backups it is built on
+ * @param missing_ok Whether a missing file is skipped (a backup staged from a remote storage engine)
+ * @param failed A deque that gets an entry for each failed file, or NULL
+ * @return 0 if all files match, otherwise 1
+ */
+int
+pgmoneta_verify_sha512_chain(int server, char* label, bool self, bool missing_ok, struct deque* failed);
 
 #ifdef __cplusplus
 }
