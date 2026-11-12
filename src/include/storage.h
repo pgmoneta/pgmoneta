@@ -100,10 +100,11 @@ pgmoneta_storage_verify_backup(int server, struct backup* backup_info);
 
 /**
  * Create a workflow for the Azure storage engine
+ * @param workflow_type The workflow type
  * @return The workflow
  */
 struct workflow*
-pgmoneta_storage_create_azure(void);
+pgmoneta_storage_create_azure(int workflow_type);
 
 /**
  * Create a workflow for the GCS storage engine

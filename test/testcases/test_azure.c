@@ -283,6 +283,117 @@ cleanup:
    MCTF_FINISH();
 }
 
+static int
+take_backup_and_get_label(const char* server, char* out, size_t size)
+{
+   char previous_label[256] = {0};
+
+   if (newest_backup_label(previous_label, sizeof(previous_label)) != MCTF_OK)
+   {
+      return MCTF_FAIL;
+   }
+
+   if (mctf_se_backup(server) != 0)
+   {
+      return MCTF_FAIL;
+   }
+
+   if (newest_backup_label(out, size) != MCTF_OK)
+   {
+      return MCTF_FAIL;
+   }
+
+   if (strcmp(previous_label, out) == 0)
+   {
+      return MCTF_FAIL;
+   }
+
+   return MCTF_OK;
+}
+
+MCTF_INTEGRATION_TEST(test_azure_delete_removes_blobs)
+{
+   char label[256] = {0};
+   char prefix[MAX_PATH];
+   char* backup_list = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+
+   snprintf(prefix, sizeof(prefix), "pgmoneta/primary/backup/%s/", label);
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(prefix) > 0, cleanup,
+               "no blobs found for the backup before delete");
+
+   MCTF_ASSERT(mctf_se_delete("primary", label) == 0, cleanup, "delete command failed");
+
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(prefix) == 0, cleanup,
+               "Azure blobs remain after delete");
+
+   MCTF_ASSERT(mctf_se_list_backup("primary", &backup_list) == 0, cleanup,
+               "list-backup failed after delete");
+   MCTF_ASSERT_PTR_NONNULL(backup_list, cleanup,
+                           "empty list-backup response after delete");
+
+   MCTF_ASSERT(strstr(backup_list, label) == NULL, cleanup,
+               "deleted backup is still present in list-backup output");
+
+   MCTF_ASSERT(strstr(backup_list, "\"Status\": true") != NULL, cleanup,
+               "list-backup did not report success after delete");
+
+cleanup:
+   free(backup_list);
+   MCTF_FINISH();
+}
+
+MCTF_INTEGRATION_TEST(test_azure_delete_one_backup_keeps_the_other)
+{
+   char first_label[256] = {0};
+   char second_label[256] = {0};
+   char first_prefix[MAX_PATH];
+   char second_prefix[MAX_PATH];
+   int second_blob_count = 0;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", first_label, sizeof(first_label)) == MCTF_OK,
+               cleanup, "could not create first backup and resolve its label");
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", second_label, sizeof(second_label)) == MCTF_OK,
+               cleanup, "could not create second backup and resolve its label");
+
+   MCTF_ASSERT(strcmp(first_label, second_label) != 0, cleanup,
+               "two backups have the same label");
+
+   snprintf(first_prefix, sizeof(first_prefix), "pgmoneta/primary/backup/%s/", first_label);
+   snprintf(second_prefix, sizeof(second_prefix), "pgmoneta/primary/backup/%s/", second_label);
+
+   second_blob_count = mctf_se_azure_blob_count_prefix(second_prefix);
+   MCTF_ASSERT(second_blob_count > 0, cleanup,
+               "second backup has no Azure blobs before delete");
+
+   MCTF_ASSERT(mctf_se_delete("primary", first_label) == 0, cleanup,
+               "delete of first backup failed");
+
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(first_prefix) == 0, cleanup,
+               "first backup blobs remain after delete");
+
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(second_prefix) == second_blob_count, cleanup,
+               "deleting the first backup changed the number of blobs in the second backup");
+
+cleanup:
+   MCTF_FINISH();
+}
+
 /*
  * Restore a backup that exists only in Azure.
  *

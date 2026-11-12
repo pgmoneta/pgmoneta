@@ -1139,6 +1139,12 @@ wf_delete_backup(void)
       current = current->next;
    }
 
+   if (config->storage_engine & STORAGE_ENGINE_AZURE)
+   {
+      current->next = pgmoneta_storage_create_azure(WORKFLOW_TYPE_DELETE_BACKUP);
+      current = current->next;
+   }
+
 #ifdef DEBUG
    current = head;
    while (current != NULL)
