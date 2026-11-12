@@ -479,6 +479,137 @@ verify_deep_vm_consistency(int server, char* recon_base, char** problem)
    return broken;
 }
 
+/*
+ * Deep verification step 4 (the restorability guarantee): a reconstructed chain
+ * is only restorable if every backup it is built on is itself intact.
+ *
+ * The page and visibility-map checks above look at the combined result, and a
+ * cluster without data checksums has no page checksum to compare, so a single
+ * changed byte in a parent backup can flow through the combine unseen. Verify
+ * every ancestor backup against its own manifest -- which is taken over the
+ * decompressed, decrypted file contents -- by running the same verify workflow
+ * the target backup gets. A changed byte anywhere in the chain then fails the
+ * deep verify, with or without page checksums.
+ *
+ * Returns 1 and sets *problem (caller frees) on the first ancestor that does
+ * not verify. Returns 0 when every ancestor verifies.
+ */
+static int
+verify_deep_chain(int server, struct backup* backup, char** problem)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   struct backup* current = backup;
+   struct backup* owned = NULL;
+   char* workspace = NULL;
+   int broken = 0;
+
+   *problem = NULL;
+
+   workspace = pgmoneta_get_server_workspace(server);
+   workspace = pgmoneta_append(workspace, "verify_chain");
+   pgmoneta_delete_directory(workspace);
+   pgmoneta_mkdir(workspace);
+
+   while (!broken && current != NULL && current->type == TYPE_INCREMENTAL)
+   {
+      struct backup* parent = NULL;
+      struct art* nodes = NULL;
+      struct workflow* workflow = NULL;
+      struct workflow* step = NULL;
+      struct backup* anc = NULL;
+      struct deque* failed = NULL;
+      char* base = NULL;
+
+      if (pgmoneta_get_backup_parent(server, current, &parent) || parent == NULL || strlen(parent->label) == 0)
+      {
+         /* The chain precondition already reports a missing parent; nothing to
+          * add here. */
+         free(parent);
+         break;
+      }
+
+      if (pgmoneta_art_create(&nodes))
+      {
+         *problem = pgmoneta_append(NULL, "out of memory while verifying the chain");
+         broken = 1;
+         free(parent);
+         break;
+      }
+
+      base = pgmoneta_append(base, workspace);
+      base = pgmoneta_append_char(base, '/');
+      base = pgmoneta_append(base, config->common.servers[server].name);
+      base = pgmoneta_append_char(base, '-');
+      base = pgmoneta_append(base, parent->label);
+      if (pgmoneta_exists(base))
+      {
+         pgmoneta_delete_directory(base);
+      }
+      pgmoneta_mkdir(base);
+
+      pgmoneta_art_insert(nodes, USER_POSITION, (uintptr_t)"", ValueString);
+      pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)workspace, ValueString);
+      pgmoneta_art_insert(nodes, USER_FILES, (uintptr_t)MANAGEMENT_ARGUMENT_FAILED, ValueString);
+      pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)workspace, ValueString);
+      pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)base, ValueString);
+
+      if (pgmoneta_workflow_nodes(server, parent->label, nodes, &anc))
+      {
+         *problem = pgmoneta_format_and_append(NULL, "could not prepare verification of backup %s", parent->label);
+         broken = 1;
+         pgmoneta_art_destroy(nodes);
+         free(base);
+         free(parent);
+         break;
+      }
+
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_VERIFY, anc);
+
+      step = workflow;
+      while (step != NULL && !broken)
+      {
+         if (step->setup(step->name(), nodes) ||
+             step->execute(step->name(), nodes) ||
+             step->teardown(step->name(), nodes))
+         {
+            *problem = pgmoneta_format_and_append(NULL, "verification of backup %s could not be run", parent->label);
+            broken = 1;
+         }
+         step = step->next;
+      }
+
+      if (!broken)
+      {
+         failed = (struct deque*)pgmoneta_art_search(nodes, NODE_FAILED);
+         if (failed != NULL && pgmoneta_deque_size(failed) > 0)
+         {
+            *problem = pgmoneta_format_and_append(NULL,
+                                                  "backup %s in the chain has %d file(s) that do not match its manifest",
+                                                  parent->label, (int)pgmoneta_deque_size(failed));
+            broken = 1;
+         }
+      }
+
+      pgmoneta_workflow_destroy(workflow);
+      pgmoneta_delete_directory(base);
+      pgmoneta_art_destroy(nodes);
+      free(base);
+
+      if (owned != NULL)
+      {
+         free(owned);
+      }
+      owned = parent;
+      current = parent;
+   }
+
+   free(owned);
+   pgmoneta_delete_directory(workspace);
+   free(workspace);
+
+   return broken;
+}
+
 void
 pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
@@ -618,7 +749,8 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
        * heap truncation and passes its own checksum, but makes index-only scans
        * return dead tuples, so it is not caught by the page check above.
        */
-      if (verify_deep_pages(server, recon_base, &deep_problem) ||
+      if (verify_deep_chain(server, backup, &deep_problem) ||
+          verify_deep_pages(server, recon_base, &deep_problem) ||
           verify_deep_vm_consistency(server, recon_base, &deep_problem))
       {
          struct json* outcome = NULL;
