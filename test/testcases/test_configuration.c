@@ -612,3 +612,67 @@ cleanup:
    unlink(path);
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_configuration_as_seconds_rejects_unrepresentable)
+{
+   char path[] = "/tmp/pgmoneta_as_seconds_XXXXXX";
+   void* shmem = NULL;
+   struct main_configuration* config = NULL;
+   FILE* file = NULL;
+   int fd = -1;
+   char digits[400];
+
+   memset(digits, '0', sizeof(digits) - 1);
+   digits[sizeof(digits) - 1] = '\0';
+   digits[sizeof(digits) - 2] = '5';
+
+   fd = mkstemp(path);
+   MCTF_ASSERT(fd != -1, cleanup, "could not create a temporary configuration");
+   file = fdopen(fd, "w");
+   MCTF_ASSERT(file != NULL, cleanup, "could not open the temporary configuration");
+
+   fprintf(file, "[pgmoneta]\n");
+   fprintf(file, "host = localhost\n");
+   fprintf(file, "unix_socket_dir = /tmp/\n");
+   fprintf(file, "base_dir = /tmp/pgmoneta\n");
+   fprintf(file, "authentication_timeout = %ss\n", digits);
+   fprintf(file, "blocking_timeout = 5000000000\n");
+   fprintf(file, "metrics_cache_max_age = 1000000w\n");
+   fprintf(file, "log_rotation_age = 2147483647m\n");
+   fprintf(file, "verification = 2h\n");
+   fclose(file);
+   file = NULL;
+
+   MCTF_ASSERT(pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem) == 0,
+               cleanup, "failed to create shared memory for the test configuration");
+   MCTF_ASSERT_PTR_NONNULL(shmem, cleanup, "shared memory pointer is NULL");
+
+   pgmoneta_init_main_configuration(shmem);
+   config = (struct main_configuration*)shmem;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_main_configuration(shmem, path), 0,
+                      cleanup, "an over-long or unrepresentable age must not fail the whole parse");
+
+   MCTF_ASSERT(config->authentication_timeout.s >= 0, cleanup,
+               "an over-long digit run must not produce a negative timeout");
+   MCTF_ASSERT(config->blocking_timeout.s >= 0, cleanup,
+               "a value above INT_MAX must not be truncated into a negative timeout");
+   MCTF_ASSERT(config->common.log_rotation_age.s >= 0, cleanup,
+               "an overflowing product must not produce a negative age");
+   MCTF_ASSERT(config->metrics_cache_max_age.s >= 0, cleanup,
+               "an overflowing product must not produce a negative age");
+   MCTF_ASSERT(config->verification.s == 7200, cleanup,
+               "a valid suffixed value must still parse");
+
+cleanup:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   if (shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+   }
+   unlink(path);
+   MCTF_FINISH();
+}
