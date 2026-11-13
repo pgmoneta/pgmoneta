@@ -31,6 +31,7 @@
 #include <backup.h>
 #include <delete.h>
 #include <deque.h>
+#include <info.h>
 #include <logging.h>
 #include <management.h>
 #include <progress.h>
@@ -151,7 +152,9 @@ int
 pgmoneta_delete_wal(int srv)
 {
    char* d = NULL;
-   struct backup* backup = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   bool do_delete = false;
    char* srv_wal = NULL;
    char* wal_shipping = NULL;
    struct deque* srv_wal_files = NULL;
@@ -159,7 +162,7 @@ pgmoneta_delete_wal(int srv)
    /* Find the oldest backup */
    d = pgmoneta_get_server_backup(srv);
 
-   if (pgmoneta_load_info(d, "oldest", &backup))
+   if (pgmoneta_load_infos(d, &number_of_backups, &backups))
    {
       goto error;
    }
@@ -167,11 +170,13 @@ pgmoneta_delete_wal(int srv)
    free(d);
    d = NULL;
 
-   if (backup != NULL)
+   if (number_of_backups == 0)
    {
-      d = pgmoneta_get_server_backup_identifier_data_wal(srv, backup->label);
-
-      srv_wal_files = NULL;
+      do_delete = true;
+   }
+   else if (backups[0]->valid == VALID_TRUE && !backups[0]->keep)
+   {
+      d = pgmoneta_get_server_backup_identifier_data_wal(srv, backups[0]->label);
 
       pgmoneta_get_wal_files(d, &srv_wal_files);
 
@@ -182,10 +187,12 @@ pgmoneta_delete_wal(int srv)
 
       free(d);
       d = NULL;
+
+      do_delete = srv_wal != NULL;
    }
 
    /* Delete WAL if there are no backups, or the oldest one is valid */
-   if (backup == NULL)
+   if (do_delete)
    {
       d = pgmoneta_get_server_wal(srv);
       delete_wal_older_than(srv, srv_wal, d);
@@ -203,7 +210,11 @@ pgmoneta_delete_wal(int srv)
       wal_shipping = NULL;
    }
 
-   free(backup);
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
 
    pgmoneta_deque_destroy(srv_wal_files);
 
@@ -214,7 +225,11 @@ error:
    free(d);
    free(wal_shipping);
 
-   free(backup);
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
 
    pgmoneta_deque_destroy(srv_wal_files);
 
@@ -526,6 +541,11 @@ delete_wal_older_than(int srv, char* srv_wal, char* base)
          }
          else
          {
+            /* Keep the segment being streamed */
+            if (pgmoneta_ends_with(file, ".partial"))
+            {
+               continue;
+            }
             delete = true;
          }
 
