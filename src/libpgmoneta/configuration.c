@@ -5982,11 +5982,12 @@ as_logging_rotation_size(char* str, int* size)
 static int
 as_seconds(char* str, pgmoneta_time_t* age, pgmoneta_time_t default_age)
 {
-   int multiplier = 1;
+   int64_t multiplier = 1;
    int index;
    char value[MISC_LENGTH];
    bool multiplier_set = false;
-   int i_value = 0;
+   int64_t i_value = 0;
+   char* end = NULL;
 
    if (is_empty_string(str))
    {
@@ -5999,6 +6000,10 @@ as_seconds(char* str, pgmoneta_time_t* age, pgmoneta_time_t default_age)
    {
       if (isdigit(str[i]))
       {
+         if (index >= (int)sizeof(value) - 1)
+         {
+            goto error;
+         }
          value[index++] = str[i];
       }
       else if (isalpha(str[i]) && multiplier_set)
@@ -6047,27 +6052,29 @@ as_seconds(char* str, pgmoneta_time_t* age, pgmoneta_time_t default_age)
    }
 
    value[index] = '\0';
-   if (!as_int(value, &i_value))
-   {
-      // sanity check: the value
-      // must be a positive number!
-      if (i_value >= 0)
-      {
-         *age = PGMONETA_TIME_SEC(i_value * multiplier);
-      }
-      else
-      {
-         goto error;
-      }
 
-      return 0;
-   }
-   else
+   errno = 0;
+   i_value = strtoll(value, &end, 10);
+   if (errno == ERANGE || end == value || *end != '\0')
    {
-error:
-      *age = default_age;
-      return 1;
+      goto error;
    }
+
+   // sanity check: the value must be a positive number,
+   // and the product must stay within the supported range
+   if (i_value < 0 || i_value > INT_MAX / multiplier)
+   {
+      goto error;
+   }
+
+   *age = PGMONETA_TIME_SEC(i_value * multiplier);
+
+   return 0;
+
+error:
+   errno = 0;
+   *age = default_age;
+   return 1;
 }
 
 /**
