@@ -612,3 +612,142 @@ cleanup:
    unlink(path);
    MCTF_FINISH();
 }
+
+static int
+read_compression(char* value, int* compression_type, int* warnings)
+{
+   char conf_path[] = "/tmp/pgmoneta_test_compression_XXXXXX";
+   char err_path[] = "/tmp/pgmoneta_test_compression_err_XXXXXX";
+   char line[MISC_LENGTH * 4];
+   struct main_configuration* config = NULL;
+   FILE* f = NULL;
+   int conf_fd = -1;
+   int err_fd = -1;
+   int saved_stderr = -1;
+   int ret = 1;
+
+   *warnings = 0;
+
+   conf_fd = mkstemp(conf_path);
+   err_fd = mkstemp(err_path);
+   if (conf_fd == -1 || err_fd == -1)
+   {
+      goto done;
+   }
+
+   f = fdopen(conf_fd, "w");
+   if (f == NULL)
+   {
+      goto done;
+   }
+   conf_fd = -1;
+   fprintf(f, "[pgmoneta]\nhost = localhost\nbase_dir = /tmp\n"
+              "compression = %s\n\n"
+              "[primary]\nhost = localhost\nport = 5432\nuser = repl\n",
+           value);
+   fclose(f);
+   f = NULL;
+
+   fflush(stderr);
+   saved_stderr = dup(STDERR_FILENO);
+   if (saved_stderr == -1 || dup2(err_fd, STDERR_FILENO) == -1)
+   {
+      goto done;
+   }
+   ret = pgmoneta_test_load_conf(conf_path);
+   fflush(stderr);
+   dup2(saved_stderr, STDERR_FILENO);
+
+   config = (struct main_configuration*)shmem;
+   *compression_type = config->compression_type;
+
+   f = fopen(err_path, "r");
+   while (f != NULL && fgets(line, sizeof(line), f) != NULL)
+   {
+      if (strstr(line, "Unknown:") != NULL)
+      {
+         (*warnings)++;
+      }
+   }
+
+done:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   if (saved_stderr != -1)
+   {
+      close(saved_stderr);
+   }
+   if (conf_fd != -1)
+   {
+      close(conf_fd);
+   }
+   if (err_fd != -1)
+   {
+      close(err_fd);
+   }
+   unlink(conf_path);
+   unlink(err_path);
+
+   return ret;
+}
+
+MCTF_TEST(test_configuration_compression)
+{
+   struct
+   {
+      char* value;
+      int expected;
+   } valid_cases[] = {
+      {"none", COMPRESSION_NONE},
+      {"gzip", COMPRESSION_CLIENT_GZIP},
+      {"client-gzip", COMPRESSION_CLIENT_GZIP},
+      {"server-gzip", COMPRESSION_SERVER_GZIP},
+      {"zstd", COMPRESSION_CLIENT_ZSTD},
+      {"client-zstd", COMPRESSION_CLIENT_ZSTD},
+      {"server-zstd", COMPRESSION_SERVER_ZSTD},
+      {"lz4", COMPRESSION_CLIENT_LZ4},
+      {"client-lz4", COMPRESSION_CLIENT_LZ4},
+      {"server-lz4", COMPRESSION_SERVER_LZ4},
+      {"bz2", COMPRESSION_CLIENT_BZIP2},
+      {"client-bz2", COMPRESSION_CLIENT_BZIP2},
+      {"bzip2", COMPRESSION_CLIENT_BZIP2},
+      {"client-bzip2", COMPRESSION_CLIENT_BZIP2},
+      {"BZIP2", COMPRESSION_CLIENT_BZIP2},
+      {"CLIENT-BZIP2", COMPRESSION_CLIENT_BZIP2},
+   };
+   char* invalid_cases[] = {
+      "unknown",
+      "invalid",
+      "server-bz2",
+      "server-bzip2",
+      "snappy",
+   };
+   int compression_type = -1;
+   int warnings = 0;
+
+   for (size_t i = 0; i < sizeof(valid_cases) / sizeof(valid_cases[0]); i++)
+   {
+      MCTF_ASSERT_INT_EQ(read_compression(valid_cases[i].value, &compression_type, &warnings), 0,
+                         cleanup, "'%s': failed to read the configuration", valid_cases[i].value);
+      MCTF_ASSERT_INT_EQ(compression_type, valid_cases[i].expected, cleanup,
+                         "'%s': unexpected compression_type", valid_cases[i].value);
+      MCTF_ASSERT_INT_EQ(warnings, 0, cleanup,
+                         "'%s': accepted value should not emit Unknown warning", valid_cases[i].value);
+   }
+
+   for (size_t i = 0; i < sizeof(invalid_cases) / sizeof(invalid_cases[0]); i++)
+   {
+      MCTF_ASSERT_INT_EQ(read_compression(invalid_cases[i], &compression_type, &warnings), 0,
+                         cleanup, "'%s': failed to read the configuration", invalid_cases[i]);
+      MCTF_ASSERT_INT_EQ(warnings, 1, cleanup,
+                         "'%s': invalid compression value should report Unknown warning", invalid_cases[i]);
+      MCTF_ASSERT_INT_EQ(compression_type, COMPRESSION_CLIENT_ZSTD, cleanup,
+                         "'%s': compression_type should remain default COMPRESSION_CLIENT_ZSTD", invalid_cases[i]);
+   }
+
+cleanup:
+   pgmoneta_test_config_restore();
+   MCTF_FINISH();
+}
