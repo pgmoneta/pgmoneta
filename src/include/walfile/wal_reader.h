@@ -511,7 +511,7 @@ pgmoneta_wal_get_record_block_data(struct decoded_xlog_record* record, uint8_t b
 char*
 get_record_block_ref_info(char* buf, struct decoded_xlog_record* record,
                           bool pretty, bool detailed_format,
-                          uint32_t* fpi_len, uint8_t magic_value);
+                          uint32_t* fpi_len, uint16_t magic_value);
 
 /**
  * Enhance WAL record description with operation context

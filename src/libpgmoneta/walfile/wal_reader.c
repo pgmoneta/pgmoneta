@@ -69,7 +69,7 @@ pgmoneta_wal_get_current_magic(void)
 }
 
 static int decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value, xlog_rec_ptr lsn);
-static void record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct xid_timestamp_map* xid_ts_map, struct value** value);
+static void record_json(struct decoded_xlog_record* record, uint16_t magic_value, struct xid_timestamp_map* xid_ts_map, struct value** value);
 static bool get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struct rel_file_locator* pLocator, enum fork_number* pNumber, block_number* pInt, buffer* pVoid);
 static int magic_value_to_postgres_version(uint16_t magic_value);
 static int compare_xid_timestamp_entries(struct value* a, struct value* b);
@@ -1230,7 +1230,7 @@ get_record_length(struct decoded_xlog_record* record, uint32_t* rec_len, uint32_
 }
 
 char*
-get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pretty, bool detailed_format, uint32_t* fpi_len, uint8_t magic_value)
+get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pretty, bool detailed_format, uint32_t* fpi_len, uint16_t magic_value)
 {
    int block_id;
 
@@ -2218,7 +2218,7 @@ no:
 }
 
 static void
-record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct xid_timestamp_map* xid_ts_map, struct value** value)
+record_json(struct decoded_xlog_record* record, uint16_t magic_value, struct xid_timestamp_map* xid_ts_map, struct value** value)
 {
    char* rm_desc = NULL;
    char* backup_str = NULL;
