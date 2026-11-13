@@ -999,14 +999,7 @@ get_simple_record_description(struct decoded_xlog_record* record, uint16_t magic
    }
    else if (has_enhanced)
    {
-      if (has_backup)
-      {
-         final_desc = pgmoneta_format_and_append(NULL, "%s %s", enhanced_desc, backup_str);
-      }
-      else
-      {
-         final_desc = strdup(enhanced_desc);
-      }
+      final_desc = strdup(enhanced_desc);
    }
    else
    {

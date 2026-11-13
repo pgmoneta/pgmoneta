@@ -1867,7 +1867,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
 
          if (color)
          {
-            fprintf(out, "%s%-*s%s | %s%-*s%s | %s%-*s%s | %s%-*d%s | %s%-*d%s | %s%-*u%s | %s%-*s%s | %s%s%s%s%s\n",
+            fprintf(out, "%s%-*s%s | %s%-*s%s | %s%-*s%s | %s%-*d%s | %s%-*d%s | %s%-*u%s | %s%-*s%s | %s%s%s\n",
                     COLOR_RED, widths->rm_width, pgmoneta_rmgr_get_name(record->header.xl_rmid), COLOR_RESET,
                     COLOR_MAGENTA, widths->lsn_width, start_lsn_string, COLOR_RESET,
                     COLOR_MAGENTA, widths->lsn_width, end_lsn_string, COLOR_RESET,
@@ -1875,13 +1875,11 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
                     COLOR_YELLOW, widths->tot_width, record->header.xl_tot_len, COLOR_RESET,
                     COLOR_CYAN, widths->xid_width, record->header.xl_xid, COLOR_RESET,
                     COLOR_MAGENTA, widths->ts_width, timestamp_str ? timestamp_str : "", COLOR_RESET,
-                    COLOR_GREEN, both_empty ? "<empty>" : (has_desc ? enhanced_desc : ""),
-                    has_backup ? " " : "",
-                    has_backup ? backup_str : "", COLOR_RESET);
+                    COLOR_GREEN, both_empty ? "<empty>" : (has_desc ? enhanced_desc : backup_str), COLOR_RESET);
          }
          else
          {
-            fprintf(out, "%-*s | %-*s | %-*s | %-*d | %-*d | %-*u | %-*s | %s%s%s\n",
+            fprintf(out, "%-*s | %-*s | %-*s | %-*d | %-*d | %-*u | %-*s | %s\n",
                     widths->rm_width, pgmoneta_rmgr_get_name(record->header.xl_rmid),
                     widths->lsn_width, start_lsn_string,
                     widths->lsn_width, end_lsn_string,
@@ -1889,9 +1887,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
                     widths->tot_width, record->header.xl_tot_len,
                     widths->xid_width, record->header.xl_xid,
                     widths->ts_width, timestamp_str ? timestamp_str : "",
-                    both_empty ? "<empty>" : (has_desc ? enhanced_desc : ""),
-                    has_backup ? " " : "",
-                    has_backup ? backup_str : "");
+                    both_empty ? "<empty>" : (has_desc ? enhanced_desc : backup_str));
          }
       }
       goto cleanup;
