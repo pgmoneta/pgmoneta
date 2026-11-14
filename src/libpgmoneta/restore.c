@@ -1895,6 +1895,10 @@ combine_backups_recursive(uint32_t tsoid,
                                                     relseg_size,
                                                     workers,
                                                     &wi);
+               if (wi == NULL)
+               {
+                  goto error;
+               }
                pgmoneta_workers_add(workers, do_reconstruct_backup_file, (struct worker_common*)wi);
             }
             else
@@ -1931,6 +1935,10 @@ combine_backups_recursive(uint32_t tsoid,
             if (pgmoneta_workers_outcome_ok(workers))
             {
                create_copy_backup_file_input(server, label, ofulldir, relative_prefix, entry->d_name, exclude, workers, &wi);
+               if (wi == NULL)
+               {
+                  goto error;
+               }
                pgmoneta_workers_add(workers, do_copy_backup_file, (struct worker_common*)wi);
             }
             else
@@ -3407,6 +3415,12 @@ create_reconstruct_backup_file_input(int server,
 {
    struct build_backup_file_input* input = NULL;
    input = (struct build_backup_file_input*)malloc(sizeof(struct build_backup_file_input));
+   if (input == NULL)
+   {
+      pgmoneta_log_error("Unable to allocate memory for backup file input");
+      *wi = NULL;
+      return;
+   }
    memset(input, 0, sizeof(struct build_backup_file_input));
    input->common.workers = workers;
    input->server = server;
@@ -3436,6 +3450,12 @@ create_copy_backup_file_input(
 {
    struct build_backup_file_input* input = NULL;
    input = (struct build_backup_file_input*)malloc(sizeof(struct build_backup_file_input));
+   if (input == NULL)
+   {
+      pgmoneta_log_error("Unable to allocate memory for backup file input");
+      *wi = NULL;
+      return;
+   }
    memset(input, 0, sizeof(struct build_backup_file_input));
    input->common.workers = workers;
    input->server = server;

@@ -30,7 +30,6 @@ nullPointerOutOfMemory:src/libpgmoneta/json.c 9
 nullPointerOutOfMemory:src/libpgmoneta/keep.c 1
 nullPointerOutOfMemory:src/libpgmoneta/lz4_compression.c 6
 nullPointerOutOfMemory:src/libpgmoneta/message.c 15
-nullPointerOutOfMemory:src/libpgmoneta/restore.c 21
 nullPointerOutOfMemory:src/libpgmoneta/se_azure.c 5
 nullPointerOutOfMemory:src/libpgmoneta/se_s3.c 1
 nullPointerOutOfMemory:src/libpgmoneta/security.c 19
