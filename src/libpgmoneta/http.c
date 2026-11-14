@@ -36,11 +36,14 @@
 #include <utils.h>
 
 /* system */
+#include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
 #include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 
 static int http_parse_header(char** header, struct http_response* http_response);
 static int http_read_response_body(SSL* ssl, int socket, struct http_response* http_response);
@@ -48,6 +51,7 @@ static int http_read_response_header(SSL* ssl, int socket, char** header_text, s
 static int http_build_request(struct http* connection, struct http_request* request, char** full_request, size_t* full_request_size);
 static bool http_request_has_header(struct http_request* request, char* name);
 static char* http_method_to_string(int method);
+static int http_set_peer_verification(SSL* ssl, char* hostname);
 
 int
 pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result)
@@ -112,9 +116,8 @@ pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result
          goto error;
       }
 
-      if (SSL_set_tlsext_host_name(ssl, hostname) == 0)
+      if (http_set_peer_verification(ssl, hostname))
       {
-         pgmoneta_log_error("Failed to set SNI hostname");
          goto error;
       }
 
@@ -132,12 +135,31 @@ pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result
                case SSL_ERROR_WANT_WRITE:
                   continue;
                default:
-                  pgmoneta_log_error("SSL connection failed: %s", ERR_error_string(err, NULL));
+               {
+                  long verify_result = SSL_get_verify_result(ssl);
+
+                  if (verify_result != X509_V_OK)
+                  {
+                     pgmoneta_log_error("SSL certificate verification failed for %s: %s",
+                                        hostname, X509_verify_cert_error_string(verify_result));
+                  }
+                  else
+                  {
+                     pgmoneta_log_error("SSL connection failed (%d): %s", err,
+                                        ERR_error_string(ERR_get_error(), NULL));
+                  }
                   goto error;
+               }
             }
          }
       }
       while (connect_result != 1);
+
+      if (SSL_get_verify_result(ssl) != X509_V_OK)
+      {
+         pgmoneta_log_error("SSL certificate verification failed for %s", hostname);
+         goto error;
+      }
 
       connection->ssl = ssl;
    }
@@ -1180,4 +1202,49 @@ http_method_to_string(int method)
       default:
          return NULL;
    }
+}
+
+static int
+http_set_peer_verification(SSL* ssl, char* hostname)
+{
+   struct in_addr addr4;
+   struct in6_addr addr6;
+   X509_VERIFY_PARAM* param = NULL;
+
+   param = SSL_get0_param(ssl);
+   if (param == NULL)
+   {
+      pgmoneta_log_error("Failed to get SSL verification parameters");
+      return 1;
+   }
+
+   if (inet_pton(AF_INET, hostname, &addr4) == 1 ||
+       inet_pton(AF_INET6, hostname, &addr6) == 1)
+   {
+      /* IP literal: match against the certificate's IP SANs; no SNI (RFC 6066) */
+      if (X509_VERIFY_PARAM_set1_ip_asc(param, hostname) != 1)
+      {
+         pgmoneta_log_error("Failed to set expected certificate IP address %s", hostname);
+         return 1;
+      }
+   }
+   else
+   {
+      if (SSL_set_tlsext_host_name(ssl, hostname) == 0)
+      {
+         pgmoneta_log_error("Failed to set SNI hostname");
+         return 1;
+      }
+
+      X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+      if (X509_VERIFY_PARAM_set1_host(param, hostname, 0) != 1)
+      {
+         pgmoneta_log_error("Failed to set expected certificate hostname %s", hostname);
+         return 1;
+      }
+   }
+
+   SSL_set_verify(ssl, SSL_VERIFY_PEER, NULL);
+
+   return 0;
 }
