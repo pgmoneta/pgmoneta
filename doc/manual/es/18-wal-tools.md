@@ -33,7 +33,7 @@ Opciones:
   -u,  --users       Establece la ruta al archivo pgmoneta_users.conf
   -RT, --tablespaces Filtrar por espacios de tabla
   -RD, --databases   Filtrar por bases de datos
-  -RT, --relations   Filtrar por relaciones
+  -RR, --relations   Filtrar por relaciones
   -R,  --filter      Combinación de -RT, -RD, -RR
   -o,  --output      Archivo de salida
   -F,  --format      Formato de salida (raw, json)
