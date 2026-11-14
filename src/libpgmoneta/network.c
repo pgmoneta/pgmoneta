@@ -45,6 +45,7 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -203,6 +204,14 @@ pgmoneta_bind_unix_socket(char* directory, char* file, int* fd)
    if (bind(*fd, (struct sockaddr*)&addr, sizeof(addr)) == -1)
    {
       pgmoneta_log_error("pgmoneta_bind_unix_socket: bind: %s/%s %s", directory, file, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   /* The management socket is unauthenticated, so only the owner may connect */
+   if (chmod(&buf[0], S_IRUSR | S_IWUSR) == -1)
+   {
+      pgmoneta_log_error("pgmoneta_bind_unix_socket: chmod: %s/%s %s", directory, file, strerror(errno));
       errno = 0;
       goto error;
    }
