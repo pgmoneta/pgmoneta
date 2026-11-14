@@ -66,12 +66,12 @@ OPTIONS
   The JSON file that contains the mapping of the OIDs to the corresponding object names
 
 -RT, --tablespaces
-  Filter on tablspaces
+  Filter on tablespaces
 
 -RD, --databases
   Filter on databases
 
--RT, --relations
+-RR, --relations
   Filter on relations
 
 -R,   --filter

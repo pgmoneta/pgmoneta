@@ -31,9 +31,9 @@ Options:
   -I,  --interactive Interactive mode with ncurses UI
   -c,  --config      Set the path to the pgmoneta_walinfo.conf file
   -u,  --users       Set the path to the pgmoneta_users.conf file
-  -RT, --tablespaces Filter on tablspaces
+  -RT, --tablespaces Filter on tablespaces
   -RD, --databases   Filter on databases
-  -RT, --relations   Filter on relations
+  -RR, --relations   Filter on relations
   -R,  --filter      Combination of -RT, -RD, -RR
   -o,  --output      Output file
   -F,  --format      Output format (raw, json)

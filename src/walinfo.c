@@ -5097,9 +5097,9 @@ usage(void)
    printf("  -I,  --interactive Interactive mode with ncurses UI\n");
    printf("  -c,  --config      Set the path to the pgmoneta_walinfo.conf file\n");
    printf("  -u,  --users       Set the path to the pgmoneta_users.conf file \n");
-   printf("  -RT, --tablespaces Filter on tablspaces\n");
+   printf("  -RT, --tablespaces Filter on tablespaces\n");
    printf("  -RD, --databases   Filter on databases\n");
-   printf("  -RT, --relations   Filter on relations\n");
+   printf("  -RR, --relations   Filter on relations\n");
    printf("  -R,  --filter      Combination of -RT, -RD, -RR\n");
    printf("  -o,  --output      Output file\n");
    printf("  -F,  --format      Output format (raw, json)\n");
