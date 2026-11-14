@@ -772,7 +772,8 @@ main(int argc, char** argv)
       }
 
       /* We are a daemon now */
-      umask(0);
+      /* Never create world-accessible files: management socket, logs, backups */
+      umask(S_IWGRP | S_IRWXO);
       sid = setsid();
 
       if (sid < 0)
