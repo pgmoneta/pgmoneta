@@ -1095,7 +1095,7 @@ MCTF_TEST(test_walbridge_checksum_recompute)
    rec->blocks[0].in_use = true;
    rec->blocks[0].apply_image = true;
    rec->blocks[0].has_image = true;
-   rec->blocks[0].bimg_info = 0;
+   rec->blocks[0].bimg_info = 0x02; /* BKPIMAGE_APPLY on PostgreSQL 15+ */
    rec->blocks[0].blkno = 42;
    rec->blocks[0].bkp_image = (char*)page;
    rec->blocks[0].bimg_len = 8192;
@@ -1126,7 +1126,7 @@ MCTF_TEST(test_walbridge_checksum_recompute)
       rec2->blocks[0].in_use = true;
       rec2->blocks[0].apply_image = true;
       rec2->blocks[0].has_image = true;
-      rec2->blocks[0].bimg_info = 0;
+      rec2->blocks[0].bimg_info = 0x02; /* BKPIMAGE_APPLY on PostgreSQL 15+ */
       rec2->blocks[0].blkno = 43;
       rec2->blocks[0].bkp_image = (char*)page2;
       rec2->blocks[0].bimg_len = 8192;
@@ -1219,7 +1219,7 @@ MCTF_TEST(test_walbridge_checksum_recompute_16k_database_page)
    rec->blocks[0].in_use = true;
    rec->blocks[0].apply_image = true;
    rec->blocks[0].has_image = true;
-   rec->blocks[0].bimg_info = 0;
+   rec->blocks[0].bimg_info = 0x02; /* BKPIMAGE_APPLY on PostgreSQL 15+ */
    rec->blocks[0].blkno = blockno;
    rec->blocks[0].bkp_image = (char*)page;
    rec->blocks[0].bimg_len = (uint16_t)page_size;
