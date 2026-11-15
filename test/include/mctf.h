@@ -158,9 +158,10 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
  * @param module The module name
  * @param file The source file name
  * @param func The test function
+ * @param is_negative Whether this test is a negative test (expects errors in logs)
  */
 void
-mctf_register_integration_test(const char* name, const char* module, const char* file, mctf_test_func_t func);
+mctf_register_integration_test(const char* name, const char* module, const char* file, mctf_test_func_t func, bool is_negative);
 
 /**
  * Register a test function with additional flags.
@@ -471,14 +472,29 @@ mctf_get_results(size_t* count);
  * -t/-m; it is skipped by the default full-suite run.
  * Usage: MCTF_INTEGRATION_TEST(test_function_name) { ... }
  */
-#define MCTF_INTEGRATION_TEST(name)                                                               \
-   static int name(void);                                                                         \
-   static void __attribute__((constructor)) mctf_register_integration_##name(void)                \
-   {                                                                                              \
-      const char* file_path = __FILE__;                                                           \
-      const char* filename = mctf_extract_filename(file_path);                                    \
-      mctf_register_integration_test(#name, mctf_extract_module_name(file_path), filename, name); \
-   }                                                                                              \
+#define MCTF_INTEGRATION_TEST(name)                                                                      \
+   static int name(void);                                                                                \
+   static void __attribute__((constructor)) mctf_register_integration_##name(void)                       \
+   {                                                                                                     \
+      const char* file_path = __FILE__;                                                                  \
+      const char* filename = mctf_extract_filename(file_path);                                           \
+      mctf_register_integration_test(#name, mctf_extract_module_name(file_path), filename, name, false); \
+   }                                                                                                     \
+   static int name(void)
+
+/**
+ * Register an opt-in integration test that is expected to produce errors in
+ * pgmoneta.log, like MCTF_TEST_NEGATIVE does for a regular test.
+ * Usage: MCTF_INTEGRATION_TEST_NEGATIVE(test_function_name) { ... }
+ */
+#define MCTF_INTEGRATION_TEST_NEGATIVE(name)                                                            \
+   static int name(void);                                                                               \
+   static void __attribute__((constructor)) mctf_register_integration_negative_##name(void)             \
+   {                                                                                                    \
+      const char* file_path = __FILE__;                                                                 \
+      const char* filename = mctf_extract_filename(file_path);                                          \
+      mctf_register_integration_test(#name, mctf_extract_module_name(file_path), filename, name, true); \
+   }                                                                                                    \
    static int name(void)
 
 /**
