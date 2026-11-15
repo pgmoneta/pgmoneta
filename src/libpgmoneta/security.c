@@ -61,6 +61,7 @@
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 #include <openssl/params.h>
 #include <openssl/core_names.h>
 #include <netinet/in.h>
@@ -122,6 +123,7 @@ int pgmoneta_server_signature(char* password, char* salt, int salt_length, int i
                               unsigned char** result, size_t* result_length);
 
 static int create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
+static int ssl_set_peer_hostname(SSL* ssl, char* hostname);
 
 static int create_hash_file(char* filename, char* algorithm, char** hash);
 
@@ -1065,6 +1067,7 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    int ret;
    int status = AUTH_ERROR;
    int connect;
+   bool tls_required = false;
    SSL* c_ssl = NULL;
    struct message* ssl_msg = NULL;
    struct message* startup_msg = NULL;
@@ -1119,6 +1122,17 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
       goto error;
    }
 
+   /* TLS is not used over Unix domain sockets, so only enforce it for TCP */
+   tls_required = config->common.servers[server].host[0] != '/' &&
+                  (strlen(config->common.servers[server].tls_ca_file) > 0 ||
+                   strlen(config->common.servers[server].tls_cert_file) > 0);
+
+   if (msg->kind != 'S' && tls_required)
+   {
+      pgmoneta_log_error("%s: TLS is configured but the server refused the SSLRequest", config->common.servers[server].name);
+      goto error;
+   }
+
    if (msg->kind == 'S')
    {
       SSL_CTX* ctx = NULL;
@@ -1135,6 +1149,14 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
       if (create_ssl_client(ctx, config->common.servers[server].tls_key_file, config->common.servers[server].tls_cert_file, config->common.servers[server].tls_ca_file, server_fd, &c_ssl))
       {
          goto error;
+      }
+
+      if (config->common.servers[server].host[0] != '/')
+      {
+         if (ssl_set_peer_hostname(c_ssl, config->common.servers[server].host))
+         {
+            goto error;
+         }
       }
 
       do
@@ -2835,6 +2857,55 @@ error:
    pgmoneta_close_ssl(s);
 
    return 1;
+}
+
+static int
+ssl_set_peer_hostname(SSL* ssl, char* hostname)
+{
+   struct in_addr addr4;
+   struct in6_addr addr6;
+   X509_VERIFY_PARAM* param = NULL;
+
+   if (ssl == NULL || hostname == NULL || strlen(hostname) == 0)
+   {
+      pgmoneta_log_error("No hostname available for TLS peer verification");
+      return 1;
+   }
+
+   param = SSL_get0_param(ssl);
+   if (param == NULL)
+   {
+      pgmoneta_log_error("Failed to get SSL verification parameters");
+      return 1;
+   }
+
+   if (inet_pton(AF_INET, hostname, &addr4) == 1 ||
+       inet_pton(AF_INET6, hostname, &addr6) == 1)
+   {
+      /* IP literal: match against the certificate's IP SANs; no SNI (RFC 6066) */
+      if (X509_VERIFY_PARAM_set1_ip_asc(param, hostname) != 1)
+      {
+         pgmoneta_log_error("Failed to set expected certificate IP address %s", hostname);
+         return 1;
+      }
+   }
+   else
+   {
+      if (SSL_set_tlsext_host_name(ssl, hostname) == 0)
+      {
+         pgmoneta_log_error("Failed to set SNI hostname %s", hostname);
+         return 1;
+      }
+
+      X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+      if (X509_VERIFY_PARAM_set1_host(param, hostname, 0) != 1)
+      {
+         pgmoneta_log_error("Failed to set expected certificate hostname %s", hostname);
+         return 1;
+      }
+   }
+
+   return 0;
 }
 
 int
