@@ -212,7 +212,7 @@ wal_store_recompute_page_checksum(struct decoded_bkp_block* block)
    }
 
    /* only full-page images can be checksummed in place */
-   if ((block->bimg_info & BKPIMAGE_HAS_HOLE) || (block->bimg_info & BKPIMAGE_IS_COMPRESSED))
+   if ((block->bimg_info & BKPIMAGE_HAS_HOLE) || pgmoneta_wal_is_bkp_image_compressed(WAL_MAGIC_V19, block->bimg_info))
    {
       return;
    }
