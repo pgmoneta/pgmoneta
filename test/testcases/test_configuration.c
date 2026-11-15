@@ -36,9 +36,11 @@
 #include <tscommon.h>
 #include <utils.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 MCTF_TEST(test_configuration_accept_time)
@@ -749,5 +751,367 @@ MCTF_TEST(test_configuration_compression)
 
 cleanup:
    pgmoneta_test_config_restore();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_configuration_config_large_files)
+{
+   char config_bin[MAX_PATH];
+   char path[MAX_PATH];
+   char cmd[MAX_PATH * 3];
+   char* output = NULL;
+   int exit_code = 0;
+   FILE* f = NULL;
+   char line_buf[1024];
+   size_t line_count = 0;
+   bool found_modified_key = false;
+   bool found_new_key = false;
+   bool found_server_section = false;
+   bool found_server_host = false;
+   bool found_server_port = false;
+   bool found_first_comment = false;
+   bool found_last_comment = false;
+
+   /* Resolve pgmoneta-config binary path */
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_resolve_binary_path("pgmoneta-config", config_bin), 0, cleanup,
+                      "pgmoneta-config binary not found or not executable");
+
+   pgmoneta_snprintf(path, sizeof(path), "test_config_large_files.conf");
+
+   /* 1. Create a configuration file with >8192 lines (8305 lines) */
+   f = fopen(path, "w");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not create test configuration file");
+
+   fprintf(f, "[general]\n");
+   fprintf(f, "key = original_value\n");
+   for (int i = 0; i < 8300; i++)
+   {
+      fprintf(f, "# comment line %d\n", i);
+   }
+   fprintf(f, "[server]\n");
+   fprintf(f, "host = 127.0.0.1\n");
+   fprintf(f, "port = 5432\n");
+   fclose(f);
+   f = NULL;
+
+   /* 2. Update an existing key in [general] exceeding the 8192 line threshold */
+   pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" set \"%s\" general key modified_value", config_bin, path);
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_exec_command(cmd, &output, &exit_code), 0, cleanup,
+                      "failed to execute pgmoneta-config set command");
+   MCTF_ASSERT_INT_EQ(exit_code, 0, cleanup, "pgmoneta-config set returned error: %s",
+                      output != NULL ? output : "<null>");
+   free(output);
+   output = NULL;
+
+   /* Verify [general] key is updated and all lines beyond 8192 remain intact */
+   f = fopen(path, "r");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not read modified configuration file");
+   line_count = 0;
+   found_modified_key = false;
+   found_server_section = false;
+   found_server_host = false;
+   found_server_port = false;
+   found_first_comment = false;
+   found_last_comment = false;
+
+   while (fgets(line_buf, sizeof(line_buf), f) != NULL)
+   {
+      line_count++;
+      if (strstr(line_buf, "key = modified_value") != NULL)
+      {
+         found_modified_key = true;
+      }
+      if (strstr(line_buf, "# comment line 0\n") != NULL || strcmp(line_buf, "# comment line 0\n") == 0)
+      {
+         found_first_comment = true;
+      }
+      if (strstr(line_buf, "# comment line 8299") != NULL)
+      {
+         found_last_comment = true;
+      }
+      if (strstr(line_buf, "[server]") != NULL)
+      {
+         found_server_section = true;
+      }
+      if (strstr(line_buf, "host = 127.0.0.1") != NULL)
+      {
+         found_server_host = true;
+      }
+      if (strstr(line_buf, "port = 5432") != NULL)
+      {
+         found_server_port = true;
+      }
+   }
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT(found_modified_key, cleanup, "modified key not found in configuration file");
+   MCTF_ASSERT(found_first_comment, cleanup, "first comment line missing");
+   MCTF_ASSERT(found_last_comment, cleanup, "last comment line (8299) missing - file was truncated");
+   MCTF_ASSERT(found_server_section, cleanup, "[server] section missing - file was truncated");
+   MCTF_ASSERT(found_server_host, cleanup, "server host missing - file was truncated");
+   MCTF_ASSERT(found_server_port, cleanup, "server port missing - file was truncated");
+   MCTF_ASSERT_INT_EQ(line_count, 8305, cleanup, "unexpected line count after config set (expected 8305, got %zu)", line_count);
+
+   /* 3. Add a new key to [general] */
+   pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" set \"%s\" general new_key new_value", config_bin, path);
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_exec_command(cmd, &output, &exit_code), 0, cleanup,
+                      "failed to execute pgmoneta-config set for new key");
+   MCTF_ASSERT_INT_EQ(exit_code, 0, cleanup, "pgmoneta-config set new_key failed: %s",
+                      output != NULL ? output : "<null>");
+   free(output);
+   output = NULL;
+
+   /* 4. Delete the added key from [general] */
+   pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" del \"%s\" general new_key", config_bin, path);
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_exec_command(cmd, &output, &exit_code), 0, cleanup,
+                      "failed to execute pgmoneta-config del for new key");
+   MCTF_ASSERT_INT_EQ(exit_code, 0, cleanup, "pgmoneta-config del new_key failed: %s",
+                      output != NULL ? output : "<null>");
+   free(output);
+   output = NULL;
+
+   /* Verify new_key was deleted while modified key and subsequent lines remain intact */
+   f = fopen(path, "r");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not read configuration file after del");
+   line_count = 0;
+   found_modified_key = false;
+   found_new_key = false;
+   found_last_comment = false;
+   found_server_section = false;
+
+   while (fgets(line_buf, sizeof(line_buf), f) != NULL)
+   {
+      line_count++;
+      if (strstr(line_buf, "key = modified_value") != NULL)
+      {
+         found_modified_key = true;
+      }
+      if (strstr(line_buf, "new_key") != NULL)
+      {
+         found_new_key = true;
+      }
+      if (strstr(line_buf, "# comment line 8299") != NULL)
+      {
+         found_last_comment = true;
+      }
+      if (strstr(line_buf, "[server]") != NULL)
+      {
+         found_server_section = true;
+      }
+   }
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT(found_modified_key, cleanup, "modified key missing after del");
+   MCTF_ASSERT(!found_new_key, cleanup, "deleted new_key should not be present");
+   MCTF_ASSERT(found_last_comment, cleanup, "comment line 8299 missing after key del");
+   MCTF_ASSERT(found_server_section, cleanup, "[server] section missing after key del");
+
+   /* 5. Delete the [server] section */
+   pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" del \"%s\" server", config_bin, path);
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_exec_command(cmd, &output, &exit_code), 0, cleanup,
+                      "failed to execute pgmoneta-config del section");
+   MCTF_ASSERT_INT_EQ(exit_code, 0, cleanup, "pgmoneta-config del section failed: %s",
+                      output != NULL ? output : "<null>");
+   free(output);
+   output = NULL;
+
+   /* Verify [server] section was deleted while [general] and comments remain */
+   f = fopen(path, "r");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not read configuration file after section del");
+   found_modified_key = false;
+   found_server_section = false;
+   found_server_host = false;
+   found_last_comment = false;
+
+   while (fgets(line_buf, sizeof(line_buf), f) != NULL)
+   {
+      if (strstr(line_buf, "key = modified_value") != NULL)
+      {
+         found_modified_key = true;
+      }
+      if (strstr(line_buf, "[server]") != NULL)
+      {
+         found_server_section = true;
+      }
+      if (strstr(line_buf, "host = 127.0.0.1") != NULL)
+      {
+         found_server_host = true;
+      }
+      if (strstr(line_buf, "# comment line 8299") != NULL)
+      {
+         found_last_comment = true;
+      }
+   }
+   fclose(f);
+   f = NULL;
+
+   MCTF_ASSERT(found_modified_key, cleanup, "[general] key missing after section del");
+   MCTF_ASSERT(found_last_comment, cleanup, "comments missing after section del");
+   MCTF_ASSERT(!found_server_section, cleanup, "[server] section should be deleted");
+   MCTF_ASSERT(!found_server_host, cleanup, "server host should be deleted");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   free(output);
+   unlink(path);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_configuration_config_failure_paths)
+{
+   char config_bin[MAX_PATH];
+   char path[MAX_PATH];
+   char tmp_path[MAX_PATH];
+   char cmd[MAX_PATH * 3];
+   char* output = NULL;
+   int exit_code = 0;
+   FILE* f = NULL;
+   char line_buf[1024];
+   bool found_key = false;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_resolve_binary_path("pgmoneta-config", config_bin), 0, cleanup,
+                      "pgmoneta-config binary not found or not executable");
+
+   pgmoneta_snprintf(path, sizeof(path), "test_config_failure_paths.conf");
+   pgmoneta_snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+
+   /* 1. Setup initial configuration file */
+   f = fopen(path, "w");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not create test configuration file");
+   fprintf(f, "[general]\n");
+   fprintf(f, "key = original_value\n");
+   fclose(f);
+   f = NULL;
+
+   /* 2. Failure: Temp file cannot be created (directory blocking tmp_path) */
+   unlink(tmp_path);
+#ifndef _WIN32
+   mkdir(tmp_path, 0700);
+#else
+   mkdir(tmp_path);
+#endif
+
+   /* Run set with unopenable temp file */
+   pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" set \"%s\" general key modified_value", config_bin, path);
+   pgmoneta_test_exec_command(cmd, &output, &exit_code);
+   MCTF_ASSERT(exit_code != 0, cleanup, "config set should fail when temp file cannot be opened");
+   free(output);
+   output = NULL;
+
+   /* Verify original file remains intact */
+   f = fopen(path, "r");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "original file missing after failed config set");
+   found_key = false;
+   while (fgets(line_buf, sizeof(line_buf), f) != NULL)
+   {
+      if (strstr(line_buf, "key = original_value") != NULL)
+      {
+         found_key = true;
+      }
+   }
+   fclose(f);
+   f = NULL;
+   MCTF_ASSERT(found_key, cleanup, "original configuration was modified after failed fopen");
+
+   /* Run del with unopenable temp file */
+   pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" del \"%s\" general key", config_bin, path);
+   pgmoneta_test_exec_command(cmd, &output, &exit_code);
+   MCTF_ASSERT(exit_code != 0, cleanup, "config del should fail when temp file cannot be opened");
+   free(output);
+   output = NULL;
+
+   /* Verify original file remains intact */
+   f = fopen(path, "r");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "original file missing after failed config del");
+   found_key = false;
+   while (fgets(line_buf, sizeof(line_buf), f) != NULL)
+   {
+      if (strstr(line_buf, "key = original_value") != NULL)
+      {
+         found_key = true;
+      }
+   }
+   fclose(f);
+   f = NULL;
+   MCTF_ASSERT(found_key, cleanup, "original configuration was modified after failed fopen in del");
+
+   rmdir(tmp_path);
+
+   /* 3. Failure on non-Windows platforms via /dev/full write failure */
+#ifndef _WIN32
+   if (access("/dev/full", W_OK) == 0)
+   {
+      unlink(tmp_path);
+      if (symlink("/dev/full", tmp_path) == 0)
+      {
+         pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" set \"%s\" general key modified_value", config_bin, path);
+         pgmoneta_test_exec_command(cmd, &output, &exit_code);
+         MCTF_ASSERT(exit_code != 0, cleanup, "config set should fail on /dev/full write failure");
+         free(output);
+         output = NULL;
+
+         /* Verify original file is still intact */
+         f = fopen(path, "r");
+         MCTF_ASSERT_PTR_NONNULL(f, cleanup, "original file missing after failed set on /dev/full");
+         found_key = false;
+         while (fgets(line_buf, sizeof(line_buf), f) != NULL)
+         {
+            if (strstr(line_buf, "key = original_value") != NULL)
+            {
+               found_key = true;
+            }
+         }
+         fclose(f);
+         f = NULL;
+         MCTF_ASSERT(found_key, cleanup, "original configuration was modified after failed write on /dev/full");
+
+         unlink(tmp_path);
+      }
+   }
+#endif
+
+   /* 4. Failure: Non-existent section deletion */
+   pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" del \"%s\" nonexistent_section", config_bin, path);
+   pgmoneta_test_exec_command(cmd, &output, &exit_code);
+   MCTF_ASSERT(exit_code != 0, cleanup, "config del should fail when section is not found");
+   free(output);
+   output = NULL;
+
+   /* 5. Failure: Non-existent key deletion */
+   pgmoneta_snprintf(cmd, sizeof(cmd), "\"%s\" del \"%s\" general nonexistent_key", config_bin, path);
+   pgmoneta_test_exec_command(cmd, &output, &exit_code);
+   MCTF_ASSERT(exit_code != 0, cleanup, "config del should fail when key is not found");
+   free(output);
+   output = NULL;
+
+   /* Verify original file remains intact */
+   f = fopen(path, "r");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "original file missing after non-existent key del");
+   found_key = false;
+   while (fgets(line_buf, sizeof(line_buf), f) != NULL)
+   {
+      if (strstr(line_buf, "key = original_value") != NULL)
+      {
+         found_key = true;
+      }
+   }
+   fclose(f);
+   f = NULL;
+   MCTF_ASSERT(found_key, cleanup, "original configuration was modified after non-existent key del");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   free(output);
+   unlink(tmp_path);
+   rmdir(tmp_path);
+   unlink(path);
    MCTF_FINISH();
 }
