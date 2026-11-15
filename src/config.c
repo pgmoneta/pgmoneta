@@ -741,9 +741,9 @@ config_set(const char* file_path, const char* section, const char* key, const ch
    size_t line_count = 0;
    char line_buf[MAX_LINE_LENGTH];
    char section_header[MISC_LENGTH];
-   ssize_t section_start = -1;
-   ssize_t section_end = -1;
-   ssize_t key_line = -1;
+   size_t section_start = 0;
+   size_t section_end = 0;
+   size_t key_line = 0;
    bool key_found = false;
    bool section_found = false;
    char tmp_path[MAX_PATH];
@@ -775,7 +775,17 @@ config_set(const char* file_path, const char* section, const char* key, const ch
          }
          line_count++;
       }
-      fclose(file);
+      if (ferror(file))
+      {
+         warn("Error reading configuration file %s", file_path);
+         goto error;
+      }
+      if (fclose(file) != 0)
+      {
+         file = NULL;
+         warn("Could not close configuration file %s", file_path);
+         goto error;
+      }
       file = NULL;
    }
    /* If file doesn't exist, we'll create it */
@@ -807,18 +817,18 @@ config_set(const char* file_path, const char* section, const char* key, const ch
          if (pgmoneta_compare_string(trimmed, section_header))
          {
             section_found = true;
-            section_start = (ssize_t)i;
-            section_end = (ssize_t)line_count; /* default to end of file */
+            section_start = i;
+            section_end = line_count; /* default to end of file */
          }
-         else if (section_found && section_end == (ssize_t)line_count)
+         else if (section_found && section_end == line_count)
          {
             /* Found the next section, so the previous section ends here */
-            section_end = (ssize_t)i;
+            section_end = i;
          }
       }
 
       /* Look for key in our section */
-      if (section_found && !key_found && (ssize_t)i > section_start && (section_end == (ssize_t)line_count || (ssize_t)i < section_end))
+      if (section_found && !key_found && i > section_start && i < section_end)
       {
          char key_temp[MAX_LINE_LENGTH];
          memset(key_temp, 0, sizeof(key_temp));
@@ -835,7 +845,7 @@ config_set(const char* file_path, const char* section, const char* key, const ch
                if (pgmoneta_compare_string(found_key, key))
                {
                   key_found = true;
-                  key_line = (ssize_t)i;
+                  key_line = i;
                }
             }
          }
@@ -869,16 +879,18 @@ config_set(const char* file_path, const char* section, const char* key, const ch
       }
 
       /* Find the last content line in this section (skip trailing blank lines) */
-      size_t insert_at = (size_t)section_end;
-      for (ssize_t i = section_end - 1; i > section_start; i--)
+      size_t insert_at = section_end;
+      size_t idx = section_end;
+      while (idx > section_start + 1)
       {
+         idx--;
          char check_temp[MAX_LINE_LENGTH];
          memset(check_temp, 0, sizeof(check_temp));
-         memcpy(check_temp, lines[i], MIN(sizeof(check_temp) - 1, strlen(lines[i])));
+         memcpy(check_temp, lines[idx], MIN(sizeof(check_temp) - 1, strlen(lines[idx])));
          char* ct = trim(check_temp);
          if (ct[0] != '\0')
          {
-            insert_at = (size_t)(i + 1);
+            insert_at = idx + 1;
             break;
          }
       }
@@ -984,7 +996,11 @@ config_set(const char* file_path, const char* section, const char* key, const ch
    }
    file = NULL;
 
-   chmod(tmp_path, S_IRUSR | S_IWUSR);
+   if (chmod(tmp_path, S_IRUSR | S_IWUSR) != 0)
+   {
+      warn("Could not set permissions on %s", tmp_path);
+      goto error;
+   }
 
    if (rename(tmp_path, file_path) != 0)
    {
@@ -1045,10 +1061,11 @@ config_del(const char* file_path, const char* section, const char* key)
    size_t line_count = 0;
    char line_buf[MAX_LINE_LENGTH];
    char section_header[MISC_LENGTH];
-   ssize_t section_start = -1;
-   ssize_t section_end = -1;
+   size_t section_start = 0;
+   size_t section_end = 0;
    bool section_found = false;
-   ssize_t key_line = -1;
+   size_t key_line = 0;
+   bool key_found = false;
    char tmp_path[MAX_PATH];
 
    tmp_path[0] = '\0';
@@ -1080,7 +1097,17 @@ config_del(const char* file_path, const char* section, const char* key)
       }
       line_count++;
    }
-   fclose(file);
+   if (ferror(file))
+   {
+      warn("Error reading configuration file %s", file_path);
+      goto error;
+   }
+   if (fclose(file) != 0)
+   {
+      file = NULL;
+      warn("Could not close configuration file %s", file_path);
+      goto error;
+   }
    file = NULL;
 
    for (size_t i = 0; i < line_count; i++)
@@ -1091,27 +1118,31 @@ config_del(const char* file_path, const char* section, const char* key)
       char* trimmed = trim(temp);
 
       if (trimmed[0] == '#' || trimmed[0] == ';' || trimmed[0] == '\0')
+      {
          continue;
+      }
 
       if (trimmed[0] == '[')
       {
          char* bracket_end = strchr(trimmed, ']');
          if (bracket_end)
+         {
             *(bracket_end + 1) = '\0';
+         }
 
          if (pgmoneta_compare_string(trimmed, section_header))
          {
             section_found = true;
-            section_start = (ssize_t)i;
-            section_end = (ssize_t)line_count;
+            section_start = i;
+            section_end = line_count;
          }
-         else if (section_found && section_end == (ssize_t)line_count)
+         else if (section_found && section_end == line_count)
          {
-            section_end = (ssize_t)i;
+            section_end = i;
          }
       }
 
-      if (section_found && key != NULL && (ssize_t)i > section_start && (section_end == (ssize_t)line_count || (ssize_t)i < section_end))
+      if (section_found && key != NULL && !key_found && i > section_start && i < section_end)
       {
          char key_temp[MAX_LINE_LENGTH];
          memset(key_temp, 0, sizeof(key_temp));
@@ -1126,7 +1157,8 @@ config_del(const char* file_path, const char* section, const char* key)
                *eq = '\0';
                if (pgmoneta_compare_string(trim(kt), key))
                {
-                  key_line = (ssize_t)i;
+                  key_found = true;
+                  key_line = i;
                }
             }
          }
@@ -1139,7 +1171,7 @@ config_del(const char* file_path, const char* section, const char* key)
       goto error;
    }
 
-   if (key != NULL && key_line == -1)
+   if (key != NULL && !key_found)
    {
       warnx("Key '%s' not found in section [%s]", key, section);
       goto error;
@@ -1156,19 +1188,25 @@ config_del(const char* file_path, const char* section, const char* key)
    for (size_t i = 0; i < line_count; i++)
    {
       if (lines[i] == NULL)
+      {
          continue;
+      }
 
       if (key == NULL)
       {
          /* Delete section: skip lines in section bounds */
-         if ((ssize_t)i >= section_start && (ssize_t)i < section_end)
+         if (i >= section_start && i < section_end)
+         {
             continue;
+         }
       }
       else
       {
          /* Delete key: skip key line */
-         if ((ssize_t)i == key_line)
+         if (i == key_line)
+         {
             continue;
+         }
       }
 
       if (fputs(lines[i], file) == EOF)
@@ -1198,7 +1236,11 @@ config_del(const char* file_path, const char* section, const char* key)
    }
    file = NULL;
 
-   chmod(tmp_path, S_IRUSR | S_IWUSR);
+   if (chmod(tmp_path, S_IRUSR | S_IWUSR) != 0)
+   {
+      warn("Could not set permissions on %s", tmp_path);
+      goto error;
+   }
 
    if (rename(tmp_path, file_path) != 0)
    {
