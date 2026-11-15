@@ -424,6 +424,10 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
                         switch (err)
                         {
                            case SSL_ERROR_ZERO_RETURN:
+                              /* Peer sent close_notify; retrying would spin forever */
+                              pgmoneta_log_error("SSL connection closed by peer during handshake (%d)", server_fd);
+                              goto error;
+                              break;
                            case SSL_ERROR_WANT_READ:
                            case SSL_ERROR_WANT_WRITE:
                            case SSL_ERROR_WANT_CONNECT:
@@ -1169,6 +1173,10 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
             switch (err)
             {
                case SSL_ERROR_ZERO_RETURN:
+                  /* Peer sent close_notify; retrying would spin forever */
+                  pgmoneta_log_error("SSL connection closed by peer during handshake (%d)", server_fd);
+                  goto error;
+                  break;
                case SSL_ERROR_WANT_READ:
                case SSL_ERROR_WANT_WRITE:
                case SSL_ERROR_WANT_CONNECT:

@@ -55,6 +55,13 @@ extern "C" {
 
 #define MAX_HEADER_SIZE            (16 * 1024)
 
+/**
+ * Inactivity timeout, in seconds, for HTTP connections (TLS handshake, sending a
+ * request and reading a response). The deadline is reset whenever data moves,
+ * so it bounds how long a stalled peer can block, not the total transfer time.
+ */
+#define PGMONETA_HTTP_IO_TIMEOUT 300
+
 /** @struct http_payload
  * Defines shared HTTP message content
  */

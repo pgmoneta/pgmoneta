@@ -38,13 +38,20 @@
 /* system */
 #include <arpa/inet.h>
 #include <errno.h>
+#include <poll.h>
 #include <string.h>
 #include <strings.h>
+#include <time.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <openssl/x509v3.h>
 
+static void http_set_socket_timeouts(int socket);
+static int http_wait(int socket, short events, time_t deadline);
+static ssize_t http_write_bytes(SSL* ssl, int socket, char* buffer, size_t size);
 static int http_parse_header(char** header, struct http_response* http_response);
 static int http_read_response_body(SSL* ssl, int socket, struct http_response* http_response);
 static int http_read_response_header(SSL* ssl, int socket, char** header_text, struct http_response* http_response);
@@ -84,6 +91,8 @@ pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result
       goto error;
    }
 
+   http_set_socket_timeouts(socket_fd);
+
    connection->socket = socket_fd;
    pgmoneta_copy_string(hostname, &connection->hostname);
    connection->port = port;
@@ -122,6 +131,7 @@ pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result
       }
 
       int connect_result;
+      time_t deadline = time(NULL) + PGMONETA_HTTP_IO_TIMEOUT;
       do
       {
          connect_result = SSL_connect(ssl);
@@ -132,7 +142,18 @@ pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result
             switch (err)
             {
                case SSL_ERROR_WANT_READ:
+                  if (http_wait(socket_fd, POLLIN, deadline))
+                  {
+                     pgmoneta_log_error("SSL handshake with %s:%d timed out", hostname, port);
+                     goto error;
+                  }
+                  continue;
                case SSL_ERROR_WANT_WRITE:
+                  if (http_wait(socket_fd, POLLOUT, deadline))
+                  {
+                     pgmoneta_log_error("SSL handshake with %s:%d timed out", hostname, port);
+                     goto error;
+                  }
                   continue;
                default:
                {
@@ -401,12 +422,10 @@ pgmoneta_http_get_response_header(struct http_response* response, char* name)
 int
 pgmoneta_http_invoke(struct http* connection, struct http_request* request, struct http_response** response)
 {
-   struct message* msg_request = NULL;
    char* full_request = NULL;
    size_t full_request_size = 0;
    char* header_text = NULL;
    struct http_response* http_response = NULL;
-   int error = 0;
    int status;
 
    if (connection == NULL || request == NULL || response == NULL)
@@ -440,60 +459,36 @@ pgmoneta_http_invoke(struct http* connection, struct http_request* request, stru
       goto error;
    }
 
-   msg_request = (struct message*)malloc(sizeof(struct message));
-   if (msg_request == NULL)
-   {
-      pgmoneta_log_error("Failed to allocate message structure");
-      goto error;
-   }
-
-   memset(msg_request, 0, sizeof(struct message));
-   msg_request->data = full_request;
-   msg_request->length = full_request_size;
-
-   error = 0;
    if (request->read_cb != NULL)
    {
       char stream_buffer[8192];
-      struct message stream_msg;
       ssize_t n;
 
-      memset(&stream_msg, 0, sizeof(struct message));
-      if (pgmoneta_write_message(connection->ssl, connection->socket, msg_request) != MESSAGE_STATUS_OK)
+      if (http_write_bytes(connection->ssl, connection->socket, full_request, full_request_size) < 0)
       {
          pgmoneta_log_error("Failed to send HTTP headers for streaming request");
          goto error;
       }
       while ((n = (ssize_t)request->read_cb(stream_buffer, sizeof(stream_buffer), request->read_userdata)) > 0)
       {
-         stream_msg.data = stream_buffer;
-         stream_msg.length = n;
-         if (pgmoneta_write_message(connection->ssl, connection->socket, &stream_msg) != MESSAGE_STATUS_OK)
+         if (http_write_bytes(connection->ssl, connection->socket, stream_buffer, (size_t)n) < 0)
          {
             pgmoneta_log_error("Failed to stream HTTP request body");
             goto error;
          }
       }
-      goto response;
-   }
-req:
-   if (error < 5)
-   {
-      status = pgmoneta_write_message(connection->ssl, connection->socket, msg_request);
-      if (status != MESSAGE_STATUS_OK)
-      {
-         error++;
-         pgmoneta_log_debug("Write failed, retrying (%d/5)", error);
-         goto req;
-      }
    }
    else
    {
-      pgmoneta_log_error("Failed to write after 5 attempts");
-      goto error;
+      /* No retry: after a partial write the stream is in an unknown state,
+       * and resending would corrupt the request. */
+      if (http_write_bytes(connection->ssl, connection->socket, full_request, full_request_size) < 0)
+      {
+         pgmoneta_log_error("Failed to send HTTP request");
+         goto error;
+      }
    }
 
-response:
    status = http_read_response_header(connection->ssl, connection->socket, &header_text, http_response);
    if (status != MESSAGE_STATUS_OK)
    {
@@ -522,14 +517,12 @@ response:
 
    free(full_request);
    free(header_text);
-   free(msg_request);
 
    return PGMONETA_HTTP_STATUS_OK;
 
 error:
    free(full_request);
    free(header_text);
-   free(msg_request);
    if (http_response != NULL && response_owned)
    {
       pgmoneta_http_response_destroy(http_response);
@@ -587,10 +580,77 @@ pgmoneta_http_destroy(struct http* connection)
    return PGMONETA_HTTP_STATUS_OK;
 }
 
+static void
+http_set_socket_timeouts(int socket)
+{
+   struct timeval tv;
+
+   /* Bound each blocking read()/write() so a stalled peer cannot block forever;
+    * http_wait() then enforces the overall inactivity deadline. */
+   tv.tv_sec = PGMONETA_HTTP_IO_TIMEOUT;
+   tv.tv_usec = 0;
+
+   if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv)) == -1)
+   {
+      pgmoneta_log_debug("Could not set SO_RCVTIMEO on %d: %s", socket, strerror(errno));
+      errno = 0;
+   }
+
+   if (setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv, sizeof(tv)) == -1)
+   {
+      pgmoneta_log_debug("Could not set SO_SNDTIMEO on %d: %s", socket, strerror(errno));
+      errno = 0;
+   }
+}
+
+/**
+ * Wait until the socket is ready for the given events or the deadline passes.
+ * @return 0 when ready, 1 on timeout or error
+ */
+static int
+http_wait(int socket, short events, time_t deadline)
+{
+   struct pollfd pfd;
+   time_t now;
+   int ret;
+
+   while (1)
+   {
+      now = time(NULL);
+      if (now >= deadline)
+      {
+         pgmoneta_log_error("HTTP connection timed out after %d seconds of inactivity", PGMONETA_HTTP_IO_TIMEOUT);
+         return 1;
+      }
+
+      pfd.fd = socket;
+      pfd.events = events;
+      pfd.revents = 0;
+
+      ret = poll(&pfd, 1, (int)((deadline - now) * 1000));
+
+      if (ret > 0)
+      {
+         /* Readiness, or an error/hangup the next I/O call will report */
+         return 0;
+      }
+
+      if (ret < 0 && errno != EINTR)
+      {
+         pgmoneta_log_debug("poll failed on %d: %s", socket, strerror(errno));
+         errno = 0;
+         return 1;
+      }
+
+      errno = 0;
+   }
+}
+
 static ssize_t
 http_read_bytes(SSL* ssl, int socket, char* buffer, size_t size)
 {
    ssize_t bytes_read;
+   time_t deadline = time(NULL) + PGMONETA_HTTP_IO_TIMEOUT;
 
    while (1)
    {
@@ -600,10 +660,21 @@ http_read_bytes(SSL* ssl, int socket, char* buffer, size_t size)
          if (bytes_read <= 0)
          {
             int err = SSL_get_error(ssl, bytes_read);
-            if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
+            if (err == SSL_ERROR_WANT_READ)
+            {
+               if (http_wait(socket, POLLIN, deadline))
+                  goto error;
                continue;
+            }
+            if (err == SSL_ERROR_WANT_WRITE)
+            {
+               if (http_wait(socket, POLLOUT, deadline))
+                  goto error;
+               continue;
+            }
             if (err == SSL_ERROR_ZERO_RETURN)
                break;
+            ERR_clear_error();
             goto error;
          }
       }
@@ -614,8 +685,18 @@ http_read_bytes(SSL* ssl, int socket, char* buffer, size_t size)
             break;
          if (bytes_read < 0)
          {
-            if (bytes_read < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
+            if (errno == EINTR)
+            {
+               errno = 0;
                continue;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+               errno = 0;
+               if (http_wait(socket, POLLIN, deadline))
+                  goto error;
+               continue;
+            }
             goto error;
          }
       }
@@ -624,6 +705,74 @@ http_read_bytes(SSL* ssl, int socket, char* buffer, size_t size)
    return 0;
 error:
    return -1;
+}
+
+/**
+ * Write the whole buffer, failing if no progress is made for
+ * PGMONETA_HTTP_IO_TIMEOUT seconds.
+ * @return the number of bytes written, or -1 on error or timeout
+ */
+static ssize_t
+http_write_bytes(SSL* ssl, int socket, char* buffer, size_t size)
+{
+   size_t offset = 0;
+   ssize_t n;
+   time_t deadline = time(NULL) + PGMONETA_HTTP_IO_TIMEOUT;
+
+   while (offset < size)
+   {
+      if (ssl)
+      {
+         n = SSL_write(ssl, buffer + offset, (int)(size - offset));
+         if (n <= 0)
+         {
+            int err = SSL_get_error(ssl, (int)n);
+            if (err == SSL_ERROR_WANT_WRITE)
+            {
+               if (http_wait(socket, POLLOUT, deadline))
+                  return -1;
+               continue;
+            }
+            if (err == SSL_ERROR_WANT_READ)
+            {
+               if (http_wait(socket, POLLIN, deadline))
+                  return -1;
+               continue;
+            }
+            pgmoneta_log_debug("SSL_write failed on %d: %d", socket, err);
+            ERR_clear_error();
+            return -1;
+         }
+      }
+      else
+      {
+         n = write(socket, buffer + offset, size - offset);
+         if (n < 0)
+         {
+            if (errno == EINTR)
+            {
+               errno = 0;
+               continue;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+               errno = 0;
+               if (http_wait(socket, POLLOUT, deadline))
+                  return -1;
+               continue;
+            }
+            pgmoneta_log_debug("write failed on %d: %s", socket, strerror(errno));
+            errno = 0;
+            return -1;
+         }
+      }
+
+      offset += (size_t)n;
+      /* Progress was made: restart the inactivity deadline */
+      deadline = time(NULL) + PGMONETA_HTTP_IO_TIMEOUT;
+   }
+
+   return (ssize_t)offset;
 }
 
 static int
