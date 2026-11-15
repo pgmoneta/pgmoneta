@@ -49,6 +49,7 @@ static int run_queries(char* queries[]);
 static int relation_in_standby(char* standby_dir, char* relation);
 static bool standby_has(char* standby_dir, char* relative);
 static int create_file(char* dir, char* name);
+static int set_primary_hot_standby(char* path, char* value);
 
 static int
 check_files_recursive(const char* dir_path, int* found_files)
@@ -367,8 +368,8 @@ MCTF_TEST(test_pgmoneta_hot_standby_two_directories)
 {
    char standby_dir[MAX_PATH];
    char second_dir[MAX_PATH];
+   char value[MAX_PATH * 2];
    int found_files = 0;
-   FILE* f = NULL;
    struct main_configuration* config = NULL;
 
    pgmoneta_test_setup();
@@ -378,12 +379,9 @@ MCTF_TEST(test_pgmoneta_hot_standby_two_directories)
    pgmoneta_snprintf(standby_dir, sizeof(standby_dir), "%s/primary", TEST_HOT_STANDBY_DIR);
    pgmoneta_snprintf(second_dir, sizeof(second_dir), "%s/hs2/primary", TEST_HOT_STANDBY_DIR);
 
-   /* [primary] is the last section, so this line overrides hot_standby */
-   f = fopen(config->common.configuration_path, "a");
-   MCTF_ASSERT(f != NULL, cleanup, "failed to open %s", config->common.configuration_path);
-   fprintf(f, "\nhot_standby = %s,%s/hs2\n", TEST_HOT_STANDBY_DIR, TEST_HOT_STANDBY_DIR);
-   fclose(f);
-   f = NULL;
+   /* Other servers, such as [replica] on PostgreSQL 17, may follow [primary] */
+   pgmoneta_snprintf(value, sizeof(value), "%s,%s/hs2", TEST_HOT_STANDBY_DIR, TEST_HOT_STANDBY_DIR);
+   MCTF_ASSERT(set_primary_hot_standby(config->common.configuration_path, value) == 0, cleanup, "failed to set hot_standby in %s", config->common.configuration_path);
    MCTF_ASSERT(pgmoneta_tsclient_reload(0) == 0, cleanup, "failed to reload pgmoneta");
 
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "first backup failed");
@@ -399,10 +397,6 @@ MCTF_TEST(test_pgmoneta_hot_standby_two_directories)
    MCTF_ASSERT(check_files_recursive(second_dir, &found_files) == 0, cleanup, "Found encrypted or compressed files in second hot standby");
 
 cleanup:
-   if (f != NULL)
-   {
-      fclose(f);
-   }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }
@@ -434,6 +428,98 @@ MCTF_TEST_NEGATIVE(test_pgmoneta_hot_standby_reset)
 cleanup:
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
+}
+
+/*
+ * Set hot_standby in the [primary] section of a configuration file.
+ * An existing hot_standby line is replaced, otherwise one is added
+ * at the end of the section.
+ */
+static int
+set_primary_hot_standby(char* path, char* value)
+{
+   FILE* in = NULL;
+   FILE* out = NULL;
+   char tmp[MAX_PATH];
+   char line[MAX_PATH * 2];
+   bool in_primary = false;
+   bool done = false;
+   char* p = NULL;
+
+   pgmoneta_snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+
+   in = fopen(path, "r");
+   if (in == NULL)
+   {
+      goto error;
+   }
+   out = fopen(tmp, "w");
+   if (out == NULL)
+   {
+      goto error;
+   }
+
+   while (fgets(line, sizeof(line), in) != NULL)
+   {
+      p = line;
+      while (*p == ' ' || *p == '\t')
+      {
+         p++;
+      }
+
+      if (*p == '[')
+      {
+         if (in_primary && !done)
+         {
+            fprintf(out, "hot_standby = %s\n", value);
+            done = true;
+         }
+         in_primary = strncmp(p, "[primary]", 9) == 0;
+      }
+      else if (in_primary && !done && strncmp(p, "hot_standby", 11) == 0 &&
+               (p[11] == ' ' || p[11] == '\t' || p[11] == '='))
+      {
+         fprintf(out, "hot_standby = %s\n", value);
+         done = true;
+         continue;
+      }
+
+      fputs(line, out);
+   }
+
+   if (in_primary && !done)
+   {
+      fprintf(out, "hot_standby = %s\n", value);
+      done = true;
+   }
+
+   if (!done || fclose(out) != 0)
+   {
+      out = NULL;
+      goto error;
+   }
+   out = NULL;
+   fclose(in);
+   in = NULL;
+
+   if (rename(tmp, path) != 0)
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+   if (in != NULL)
+   {
+      fclose(in);
+   }
+   if (out != NULL)
+   {
+      fclose(out);
+   }
+   remove(tmp);
+   return 1;
 }
 
 static int
