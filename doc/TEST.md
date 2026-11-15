@@ -66,6 +66,7 @@ Behavior:
 
 - `MCTF_TEST`: fails if the test itself passes but the log slice contains unexpected `ERROR` lines
 - `MCTF_TEST_NEGATIVE`: skips the log-error failure gate for that test (still must satisfy test assertions)
+- `MCTF_INTEGRATION_TEST_NEGATIVE`: the same for an opt-in integration test
 - `WARN` lines are included in summaries but do not fail a passing test
 
 **Maximum test runtime (performance gate)**

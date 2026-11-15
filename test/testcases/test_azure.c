@@ -307,7 +307,7 @@ cleanup:
  * Create a local copy of the metadata under a label that was never uploaded,
  * so every HEAD request returns 404.
  */
-MCTF_INTEGRATION_TEST(test_azure_verification_detects_missing_remote_blobs)
+MCTF_INTEGRATION_TEST_NEGATIVE(test_azure_verification_detects_missing_remote_blobs)
 {
    char backup_root[MAX_PATH] = {0};
    char fake_label[256] = {0};

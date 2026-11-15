@@ -291,9 +291,9 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
 }
 
 void
-mctf_register_integration_test(const char* name, const char* module, const char* file, mctf_test_func_t func)
+mctf_register_integration_test(const char* name, const char* module, const char* file, mctf_test_func_t func, bool is_negative)
 {
-   mctf_register_test_with_options(name, module, file, func, false, 0);
+   mctf_register_test_with_options(name, module, file, func, is_negative, 0);
    /* Mark the just-appended test as opt-in (full-suite runs skip it). */
    if (g_runner.tests_tail != NULL)
    {
