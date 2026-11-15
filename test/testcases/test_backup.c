@@ -41,6 +41,7 @@
 #include <mctf.h>
 #include <utils.h>
 #include <walfile/pg_control.h>
+#include <walfile/wal_reader.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -236,6 +237,122 @@ insert_data_in_primary_server()
       ret = poll_replica(&primary_lsn);
    }
 
+   return ret;
+}
+
+/*
+ * A restore with position "current" writes recovery_target = 'immediate',
+ * which makes PostgreSQL stop at the first WAL record it reads after
+ * reaching consistency. A backup taken from a standby writes no end of
+ * backup record, so the WAL pgmoneta has received from the replica can end
+ * exactly at the backup's end LSN and recovery then fails with "recovery
+ * ended before configured recovery target was reached".
+ *
+ * Write WAL on the primary, switch the segment and wait until pgmoneta
+ * holds the completed segment that contains the end LSN of the backup.
+ */
+static int
+wait_for_wal_after_replica_backup(char* label)
+{
+   int ret = 1;
+   char* output = NULL;
+   uint64_t switch_lsn = 0;
+   uint64_t end_lsn = 0;
+   struct backup* backup = NULL;
+   struct main_configuration* config = NULL;
+   char* backup_dir = NULL;
+   char* wal_dir = NULL;
+   char* segment = NULL;
+   size_t segment_length = 0;
+   int segsize = 0;
+   time_t start_time = 0;
+
+   config = (struct main_configuration*)shmem;
+
+   if (pgmoneta_test_superuser_query("SELECT pg_logical_emit_message(true, 'pgmoneta-test', 'wal after backup')", NULL) != 0)
+   {
+      pgmoneta_log_error("wait_for_wal_after_replica_backup: failed to write WAL on the primary");
+      goto cleanup;
+   }
+
+   if (pgmoneta_test_superuser_query("SELECT pg_switch_wal()", &output) != 0 ||
+       output == NULL || pgmoneta_string_to_lsn(output, &switch_lsn) != 0)
+   {
+      pgmoneta_log_error("wait_for_wal_after_replica_backup: pg_switch_wal failed");
+      goto cleanup;
+   }
+
+   /* The replica has to receive the switched segment before pgmoneta can */
+   if (poll_replica(&switch_lsn))
+   {
+      pgmoneta_log_error("wait_for_wal_after_replica_backup: the replica did not replay %s", output);
+      goto cleanup;
+   }
+
+   backup_dir = pgmoneta_get_server_backup(REPLICA_SERVER);
+   if (pgmoneta_load_info(backup_dir, label, &backup) != 0 || backup == NULL)
+   {
+      pgmoneta_log_error("wait_for_wal_after_replica_backup: failed to load backup %s", label);
+      goto cleanup;
+   }
+
+   end_lsn = ((uint64_t)backup->end_lsn_hi32 << 32) | backup->end_lsn_lo32;
+   segsize = config->common.servers[REPLICA_SERVER].wal_size > 0 ? config->common.servers[REPLICA_SERVER].wal_size : DEFAULT_WAL_SEGZ_BYTES;
+   segment = pgmoneta_wal_file_name(backup->end_timeline, end_lsn / segsize, segsize);
+   if (segment == NULL)
+   {
+      pgmoneta_log_error("wait_for_wal_after_replica_backup: no WAL file name");
+      goto cleanup;
+   }
+   segment_length = strlen(segment);
+
+   wal_dir = pgmoneta_get_server_wal(REPLICA_SERVER);
+
+   /* The segment is complete once it no longer carries the .partial suffix */
+   start_time = time(NULL);
+   while (difftime(time(NULL), start_time) < 60)
+   {
+      struct deque* files = NULL;
+      struct deque_iterator* it = NULL;
+      bool complete = false;
+
+      if (pgmoneta_get_wal_files(wal_dir, &files) == 0)
+      {
+         pgmoneta_deque_iterator_create(files, &it);
+         while (pgmoneta_deque_iterator_next(it))
+         {
+            char* name = (char*)pgmoneta_value_data(it->value);
+
+            if (strncmp(name, segment, segment_length) == 0 && strstr(name, ".partial") == NULL)
+            {
+               complete = true;
+               break;
+            }
+         }
+      }
+
+      pgmoneta_deque_iterator_destroy(it);
+      pgmoneta_deque_destroy(files);
+
+      if (complete)
+      {
+         ret = 0;
+         break;
+      }
+
+      sleep(1);
+   }
+
+cleanup:
+   free(output);
+   if (ret != 0 && segment != NULL)
+   {
+      pgmoneta_log_error("wait_for_wal_after_replica_backup: %s was not completed in %s", segment, wal_dir);
+   }
+   free(backup);
+   free(backup_dir);
+   free(wal_dir);
+   free(segment);
    return ret;
 }
 
@@ -494,14 +611,18 @@ MCTF_TEST(test_pgmoneta_replica_backup_incremental)
    MCTF_ASSERT(pgmoneta_tsclient_verify_backup_chain(b0, b1),
                cleanup, "backup 1 parent mismatch (should be b0)");
 
-   MCTF_ASSERT(pgmoneta_tsclient_restore("replica", "newest", "current", NULL, 0) == 0,
-               cleanup, "restore incremental replica backup failed");
-
    label = pgmoneta_tsclient_get_backup_label(b1);
    MCTF_ASSERT(label != NULL, cleanup, "failed to get replica backup label");
 
    label = strdup(label);
    MCTF_ASSERT(label != NULL, cleanup, "failed to duplicate replica backup label");
+
+   /* "current" stops at the first record after consistency, so WAL has to exist past the backup */
+   MCTF_ASSERT(wait_for_wal_after_replica_backup(label) == 0,
+               cleanup, "no WAL past the end of the replica backup was received");
+
+   MCTF_ASSERT(pgmoneta_tsclient_restore("replica", "newest", "current", NULL, 0) == 0,
+               cleanup, "restore incremental replica backup failed");
 
    pgmoneta_snprintf(restore_path, sizeof(restore_path),
                      "%s/replica-%s", TEST_RESTORE_DIR, label);
