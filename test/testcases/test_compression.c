@@ -640,6 +640,36 @@ write_test_input(char* path, char* data, size_t size)
    return fclose(f) != 0;
 }
 
+MCTF_TEST(test_compress_directory_skips_symlinked_directories)
+{
+   /* like a backup's data/pg_tblspc/<oid> -> tblspc_<name>/, the link target
+    * must only be compressed when the walk reaches it directly */
+   char* root = "test_compress_symlink";
+   char* target = "test_compress_symlink_target";
+
+   pgmoneta_delete_directory(root);
+   pgmoneta_delete_directory(target);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(root), 0, cleanup, "could not create %s", root);
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(target), 0, cleanup, "could not create %s", target);
+   MCTF_ASSERT_INT_EQ(write_test_input("test_compress_symlink/file", "data", 4), 0, cleanup, "could not write file");
+   MCTF_ASSERT_INT_EQ(write_test_input("test_compress_symlink_target/file", "data", 4), 0, cleanup, "could not write file");
+   MCTF_ASSERT_INT_EQ(pgmoneta_symlink_file("test_compress_symlink/link", "../test_compress_symlink_target/"), 0,
+                      cleanup, "could not create symlink");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_compress_directory(-1, root, COMPRESSION_SERVER_LZ4, NULL, NULL), 0,
+                      cleanup, "compressing %s failed", root);
+
+   MCTF_ASSERT(pgmoneta_exists("test_compress_symlink/file.lz4"), cleanup, "file in the walked directory was not compressed");
+   MCTF_ASSERT(pgmoneta_exists("test_compress_symlink_target/file"), cleanup, "file behind the symlink was compressed");
+   MCTF_ASSERT(!pgmoneta_exists("test_compress_symlink_target/file.lz4"), cleanup, "file behind the symlink was compressed");
+
+cleanup:
+   pgmoneta_delete_directory(root);
+   pgmoneta_delete_directory(target);
+   MCTF_FINISH();
+}
+
 MCTF_TEST_NEGATIVE(test_compression_failed_final_write)
 {
    struct
