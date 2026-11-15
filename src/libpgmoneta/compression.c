@@ -444,6 +444,14 @@ process_directory_operation(int server, char* directory, int type, struct worker
 
       if (is_directory_entry(entry, full_path))
       {
+         /* A backup's data/pg_tblspc/<oid> links to tblspc_<name>/ inside the same
+          * backup, which is processed on its own, so following the link would
+          * compress the same files twice */
+         if (!decompress && pgmoneta_is_symlink(full_path))
+         {
+            continue;
+         }
+
          if (process_directory_operation(server, full_path, type, workers, excludes, decompress))
          {
             goto error;
