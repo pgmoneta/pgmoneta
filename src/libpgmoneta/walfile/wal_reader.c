@@ -120,6 +120,63 @@ continuation_end_offset(uint32_t rem_len, uint32_t block_size, uint32_t first_he
    return MAXALIGN(offset);
 }
 
+/*
+ * A page that is expected to carry the rest of a record is valid only when it
+ * is flagged XLP_FIRST_IS_CONTRECORD and has a non-zero xlp_rem_len.
+ *
+ * After a crash in the middle of a record that spans pages, PostgreSQL
+ * abandons that record: the next page is written with
+ * XLP_FIRST_IS_OVERWRITE_CONTRECORD (and no XLP_FIRST_IS_CONTRECORD) and
+ * starts with an XLOG_OVERWRITE_CONTRECORD record. A never-written, zeroed
+ * page fails the check as well. Like PostgreSQL's own reader, the caller then
+ * drops the incomplete record and resumes right after that page's header.
+ */
+static bool
+is_continuation_page(uint16_t xlp_info, uint32_t xlp_rem_len)
+{
+   return (xlp_info & XLP_FIRST_IS_CONTRECORD) != 0 && xlp_rem_len > 0;
+}
+
+/*
+ * The overwrite-contrecord bit is 0x0008 up to PostgreSQL 18 (0x0004 was
+ * XLP_BKP_REMOVABLE there) and 0x0004 from PostgreSQL 19 on.
+ */
+static bool
+is_overwrite_contrecord_page(uint16_t xlp_info, int pg_version)
+{
+   uint16_t flag = (pg_version >= 19) ? XLP_FIRST_IS_OVERWRITE_CONTRECORD : XLP_FIRST_IS_OVERWRITE_CONTRECORD_V18;
+
+   return (xlp_info & flag) != 0;
+}
+
+/*
+ * Read the short page header at the current file position and leave the
+ * cursor right after it (at SIZE_OF_XLOG_SHORT_PHD). Returns 0 on success.
+ */
+static int
+read_short_page_header(FILE* file, struct xlog_page_header_data* header)
+{
+   if (fread(header, sizeof(struct xlog_page_header_data), 1, file) != 1)
+   {
+      return 1;
+   }
+
+   if (SIZE_OF_XLOG_SHORT_PHD > sizeof(struct xlog_page_header_data))
+   {
+      fseek(file, SIZE_OF_XLOG_SHORT_PHD - sizeof(struct xlog_page_header_data), SEEK_CUR);
+   }
+
+   return 0;
+}
+
+static void
+log_abandoned_record(xlog_rec_ptr lsn, uint16_t xlp_info, int pg_version, char* path)
+{
+   pgmoneta_log_debug("wal_reader: record at %X/%X in %s is not continued on the next page (%s); skipping it",
+                      LSN_FORMAT_ARGS(lsn), path,
+                      is_overwrite_contrecord_page(xlp_info, pg_version) ? "overwrite contrecord" : "no contrecord flag");
+}
+
 bool
 is_bimg_apply(uint8_t bimg_info)
 {
@@ -330,6 +387,8 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    size_t lsn_array_size = 0;
    size_t lsn_array_capacity = 100;
    FILE* file = NULL;
+   struct xlog_page_header_data cont_header;
+   bool abandoned = false;
 
    /* Allocate partial_record if not already allocated */
    if (partial_record == NULL)
@@ -461,6 +520,26 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       }
    }
 
+   /*
+    * The saved tail can only be completed if this segment starts with its
+    * continuation. If the primary crashed mid-record, this page instead
+    * carries an overwrite contrecord (xlp_rem_len 0, no contrecord flag), and
+    * gluing the saved bytes onto it would corrupt the first record here.
+    */
+   if ((partial_record->xlog_record != NULL || partial_record->data_buffer != NULL) &&
+       !is_continuation_page(long_header->std.xlp_info, long_header->std.xlp_rem_len))
+   {
+      log_abandoned_record(partial_record->lsn, long_header->std.xlp_info, pg_version, path);
+      free(partial_record->data_buffer);
+      free(partial_record->xlog_record);
+      partial_record->data_buffer = NULL;
+      partial_record->xlog_record = NULL;
+      partial_record->data_buffer_bytes_read = 0;
+      partial_record->xlog_record_bytes_read = 0;
+      partial_record->from_seg = 0;
+      partial_record->lsn = 0;
+   }
+
    if (long_header->std.xlp_rem_len > 0)
    {
       next_record = continuation_end_offset(long_header->std.xlp_rem_len,
@@ -569,8 +648,20 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
          bytes_read = fread(temp_buffer, 1, end_of_page - ftell(file), file);
 
-         fseek(file, SIZE_OF_XLOG_SHORT_PHD, SEEK_CUR);
-         bytes_read += fread(temp_buffer + bytes_read, 1, SIZE_OF_XLOG_RECORD - bytes_read, file);
+         /* At the segment end this read hits EOF and the tail is saved below */
+         if (read_short_page_header(file, &cont_header) == 0)
+         {
+            if (!is_continuation_page(cont_header.xlp_info, cont_header.xlp_rem_len))
+            {
+               log_abandoned_record(rec_start + base, cont_header.xlp_info, pg_version, path);
+               free(temp_buffer);
+               temp_buffer = NULL;
+               page_number++;
+               next_record = end_of_page + SIZE_OF_XLOG_SHORT_PHD;
+               continue;
+            }
+            bytes_read += fread(temp_buffer + bytes_read, 1, SIZE_OF_XLOG_RECORD - bytes_read, file);
+         }
 
          if (feof(file) && bytes_read != SIZE_OF_XLOG_RECORD)
          {
@@ -710,14 +801,42 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
                buffer = NULL;
                goto finish;
             }
-            fseek(file, SIZE_OF_XLOG_SHORT_PHD, SEEK_CUR);
+            if (read_short_page_header(file, &cont_header))
+            {
+               if (feof(file))
+               {
+                  /* End of segment: the loop head saves the torn tail */
+                  continue;
+               }
+               pgmoneta_log_error("Error: Failed to read the complete data");
+               goto error;
+            }
             page_number++;
+            if (!is_continuation_page(cont_header.xlp_info, cont_header.xlp_rem_len))
+            {
+               log_abandoned_record(lsn, cont_header.xlp_info, pg_version, path);
+               next_record = page_number * wal_file->long_phd->xlp_xlog_blcksz + SIZE_OF_XLOG_SHORT_PHD;
+               abandoned = true;
+               break;
+            }
             bytes_read = fread(buffer + total_bytes_read, 1,
                                MIN(remaining_data_length, wal_file->long_phd->xlp_xlog_blcksz - SIZE_OF_XLOG_SHORT_PHD), file);
             remaining_data_length -= bytes_read;
             total_bytes_read += bytes_read;
          }
-         assert(total_bytes_read == data_length);
+         assert(abandoned || total_bytes_read == data_length);
+      }
+
+      if (abandoned)
+      {
+         /* The record was cut short by a crash; resume after the page header */
+         abandoned = false;
+         initialized = false;
+         free(record);
+         record = NULL;
+         free(buffer);
+         buffer = NULL;
+         continue;
       }
 
       /*
