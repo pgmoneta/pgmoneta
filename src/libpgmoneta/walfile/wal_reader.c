@@ -847,31 +847,28 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
        * region decodes "successfully" here with zeroed bytes, gets fed
        * downstream with corrupt content, and is then never re-read because
        * consumed-LSN tracking skips its corrected copy from the sealed
-       * re-parse. A CRC mismatch identifies exactly that case: stop the parse
-       * so the sealed segment supplies the real record instead.
+       * re-parse. For a *.partial segment a CRC mismatch identifies exactly
+       * that case: stop the parse so the sealed segment supplies the real
+       * record instead.
        *
-       * A stored CRC of zero marks a record that carries no CRC at all: the
-       * unit suite crafts byte streams by hand (cross-segment reassembly
-       * fixtures) and leaves xl_crc at its zeroed default. PostgreSQL always
-       * computes a real record CRC (independent of data checksums) and so do
-       * pgmoneta's store and encoder, so a zero xl_crc cannot appear in a
-       * production stream - and the growing-tail corruption above always
-       * presents the record's genuine (nonzero) xl_crc against zeroed data,
-       * so it still fails the check here.
+       * Any other segment is complete, so a mismatch there is corruption.
+       * Fail the parse rather than return a silently truncated record list:
+       * callers such as wal_summary and walfilter would otherwise miss every
+       * record after the damaged one.
        */
       {
          char* crc_buf = NULL;
          uint32_t total_len = record->xl_tot_len;
 
-         if (record->xl_crc != 0)
-         {
-            MALLOC(crc_buf, total_len);
-            memcpy(crc_buf, record, SIZE_OF_XLOG_RECORD);
-            memcpy(crc_buf + SIZE_OF_XLOG_RECORD, buffer, data_length);
-            uint32_t computed_crc = pgmoneta_wal_store_compute_crc(crc_buf, total_len);
-            free(crc_buf);
+         MALLOC(crc_buf, total_len);
+         memcpy(crc_buf, record, SIZE_OF_XLOG_RECORD);
+         memcpy(crc_buf + SIZE_OF_XLOG_RECORD, buffer, data_length);
+         uint32_t computed_crc = pgmoneta_wal_store_compute_crc(crc_buf, total_len);
+         free(crc_buf);
 
-            if (computed_crc != record->xl_crc)
+         if (computed_crc != record->xl_crc)
+         {
+            if (pgmoneta_ends_with(path, ".partial"))
             {
                pgmoneta_log_warn("wal_reader: record at %X/%X in %s failed CRC validation (stored %08X, computed %08X); unwritten tail of a growing segment, deferring to a later parse",
                                  LSN_FORMAT_ARGS(lsn), path, record->xl_crc, computed_crc);
@@ -882,6 +879,10 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
                decoded = NULL;
                goto finish;
             }
+
+            pgmoneta_log_error("wal_reader: record at %X/%X in %s failed CRC validation (stored %08X, computed %08X)",
+                               LSN_FORMAT_ARGS(lsn), path, record->xl_crc, computed_crc);
+            goto error;
          }
       }
 

@@ -1707,8 +1707,57 @@ write_record_header_craft(char* buf, uint32_t offset, uint32_t tot_len)
    r->xl_rmid = RM_XLOG_ID;
 }
 
+/* Stamp the xl_crc of the record whose header sits at `offset` in a crafted
+ * segment buffer. The record bytes are gathered as the WAL reader sees them:
+ * a short page header is skipped at every page boundary the record crosses.
+ * The record must end inside the buffer; a record that continues into the
+ * next segment uses stamp_crc_split_craft instead. */
+static void
+stamp_crc_craft(char* buf, uint32_t offset, uint32_t blcksz)
+{
+   struct xlog_record* r = (struct xlog_record*)(buf + offset);
+   uint32_t tot_len = r->xl_tot_len;
+   uint32_t pos = offset;
+   char* logical = malloc(tot_len);
+
+   if (logical == NULL)
+   {
+      return;
+   }
+   for (uint32_t i = 0; i < tot_len; i++)
+   {
+      if (i > 0 && pos % blcksz == 0)
+      {
+         pos += SIZE_OF_XLOG_SHORT_PHD;
+      }
+      logical[i] = buf[pos++];
+   }
+   r->xl_crc = pgmoneta_wal_store_compute_crc(logical, tot_len);
+   free(logical);
+}
+
+/* Stamp the xl_crc of a record whose header sits at `offset` but whose body
+ * continues in the next segment: the caller supplies the whole logical body
+ * (xl_tot_len - SIZE_OF_XLOG_RECORD bytes). */
+static void
+stamp_crc_split_craft(char* buf, uint32_t offset, const void* body, uint32_t body_len)
+{
+   struct xlog_record* r = (struct xlog_record*)(buf + offset);
+   char* logical = malloc(SIZE_OF_XLOG_RECORD + body_len);
+
+   if (logical == NULL)
+   {
+      return;
+   }
+   memcpy(logical, r, SIZE_OF_XLOG_RECORD);
+   memcpy(logical + SIZE_OF_XLOG_RECORD, body, body_len);
+   r->xl_crc = pgmoneta_wal_store_compute_crc(logical, SIZE_OF_XLOG_RECORD + body_len);
+   free(logical);
+}
+
 /* Filler record: 24-byte header + [DataLong][u32 len][payload], the whole
- * record exactly fills data_len bytes of the record body. */
+ * record exactly fills data_len bytes of the record body. Every crafted
+ * segment uses 8192-byte pages. */
 static void
 write_filler_craft(char* buf, uint32_t offset, uint32_t data_len, uint8_t fill)
 {
@@ -1717,6 +1766,7 @@ write_filler_craft(char* buf, uint32_t offset, uint32_t data_len, uint8_t fill)
    ((uint8_t*)buf)[offset + SIZE_OF_XLOG_RECORD] = (uint8_t)XLR_BLOCK_ID_DATA_LONG;
    memcpy(buf + offset + SIZE_OF_XLOG_RECORD + 1, &payload_len, sizeof(uint32_t));
    memset(buf + offset + SIZE_OF_XLOG_RECORD + 5, fill, payload_len);
+   stamp_crc_craft(buf, offset, 8192);
 }
 
 /* convenience: parse path, count non-partial decoded records */
@@ -1841,6 +1891,13 @@ MCTF_TEST(test_walbridge_reader_cross_segment)
    for (i = 0; i < 38; i++)
    {
       buf[32704 + SIZE_OF_XLOG_RECORD + 2 + i] = (uint8_t)i;
+   }
+   {
+      uint8_t body[96];
+      body[0] = (uint8_t)XLR_BLOCK_ID_DATA_SHORT;
+      body[1] = 94;
+      memcpy(body + 2, expect, 94);
+      stamp_crc_split_craft(buf, 32704, body, sizeof(body));
    }
 
    fd = fopen(seg_a, "wb");
@@ -2082,6 +2139,15 @@ MCTF_TEST(test_walbridge_reader_cross_segment_long)
    ((uint8_t*)buf)[32704 + SIZE_OF_XLOG_RECORD] = (uint8_t)XLR_BLOCK_ID_DATA_LONG;
    memcpy(buf + 32704 + SIZE_OF_XLOG_RECORD + 1, &payload_len, sizeof(uint32_t));
    memcpy(buf + 32704 + SIZE_OF_XLOG_RECORD + 5, expect, 35);
+   {
+      uint8_t* body = malloc(data_len);
+      MCTF_ASSERT_PTR_NONNULL(body, cleanup, "alloc body failed");
+      body[0] = (uint8_t)XLR_BLOCK_ID_DATA_LONG;
+      memcpy(body + 1, &payload_len, sizeof(uint32_t));
+      memcpy(body + 5, expect, payload_len);
+      stamp_crc_split_craft(buf, 32704, body, data_len);
+      free(body);
+   }
 
    fd = fopen(seg_a, "wb");
    MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open seg_a failed");
@@ -2215,6 +2281,8 @@ MCTF_TEST(test_walbridge_reader_rejects_bad_data_length)
    ((uint8_t*)buf)[40 + SIZE_OF_XLOG_RECORD] = (uint8_t)XLR_BLOCK_ID_DATA_LONG;
    memcpy(buf + 40 + SIZE_OF_XLOG_RECORD + 1, &claimed_len, sizeof(uint32_t));
    memset(buf + 40 + SIZE_OF_XLOG_RECORD + 5, 0x41, 16);
+   /* a valid CRC, so the data-length check is what rejects the record */
+   stamp_crc_craft(buf, 40, blcksz);
 
    fd = fopen(seg, "wb");
    MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open seg failed");
@@ -2236,6 +2304,93 @@ cleanup:
       pgmoneta_destroy_walfile(wf);
    }
    unlink(seg);
+   rmdir(base);
+   MCTF_FINISH();
+}
+
+/* A record that fails CRC validation in a complete segment is corruption and
+ * must fail the parse; it must not end the parse early and report success,
+ * which would hand callers (wal_summary, walfilter) a truncated record list.
+ * The same damage in a still-growing *.partial segment is the unwritten tail
+ * and stops the parse cleanly with the records before it. */
+MCTF_TEST(test_walbridge_reader_crc_mismatch)
+{
+   char base[PATH_MAX];
+   char seg[PATH_MAX];
+   char seg_partial[PATH_MAX];
+   char* buf = NULL;
+   FILE* fd = NULL;
+   struct walfile* wf = NULL;
+   uint64_t sysid = 0x0102030405060708ULL;
+   uint32_t seg_size = 32768;
+   uint32_t blcksz = 8192;
+   int count = 0;
+
+   pgmoneta_snprintf(base, sizeof(base), "%s", "/tmp/walbridge_test_crc_mismatch");
+   pgmoneta_mkdir(base);
+   pgmoneta_snprintf(seg, sizeof(seg), "%s/%s", base, "000000010000000000000001");
+   pgmoneta_snprintf(seg_partial, sizeof(seg_partial), "%s.partial", seg);
+
+   unlink(seg);
+   unlink(seg_partial);
+
+   buf = calloc(1, seg_size);
+   MCTF_ASSERT_PTR_NONNULL(buf, cleanup, "alloc buf failed");
+
+   write_long_header_craft(buf, XLP_LONG_HEADER, 32768, 0, sysid, seg_size, blcksz);
+   write_page_header_craft(buf, 8192, WAL_MAGIC_V18, 0, 40960, 0);
+   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, 0, 49152, 0);
+   write_page_header_craft(buf, 24576, WAL_MAGIC_V18, 0, 57344, 0);
+
+   /* two valid records, then damage one payload byte of the second */
+   write_filler_craft(buf, 40, 64, 0x41);
+   write_filler_craft(buf, 128, 64, 0x42);
+   buf[128 + SIZE_OF_XLOG_RECORD + 10] ^= 0x01;
+
+   fd = fopen(seg, "wb");
+   MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open seg failed");
+   MCTF_ASSERT_INT_EQ(fwrite(buf, 1, seg_size, fd), (int)seg_size, cleanup, "write seg failed");
+   fclose(fd);
+   fd = NULL;
+
+   fd = fopen(seg_partial, "wb");
+   MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open seg_partial failed");
+   MCTF_ASSERT_INT_EQ(fwrite(buf, 1, seg_size, fd), (int)seg_size, cleanup, "write seg_partial failed");
+   fclose(fd);
+   fd = NULL;
+
+   MCTF_ASSERT(parse_craft_segment(seg, &wf, &count) != 0, cleanup,
+               "a CRC mismatch in a complete segment must fail the parse");
+   if (wf)
+   {
+      pgmoneta_destroy_walfile(wf);
+      wf = NULL;
+   }
+
+   MCTF_ASSERT(pgmoneta_read_walfile(-1, seg, &wf) != 0, cleanup,
+               "the public WAL reader must report a CRC mismatch in a complete segment");
+   if (wf)
+   {
+      pgmoneta_destroy_walfile(wf);
+      wf = NULL;
+   }
+
+   MCTF_ASSERT_INT_EQ(parse_craft_segment(seg_partial, &wf, &count), 0, cleanup,
+                      "a CRC mismatch in a .partial segment must stop the parse cleanly");
+   MCTF_ASSERT_INT_EQ(count, 1, cleanup, "only the record before the damaged one may be returned");
+
+cleanup:
+   if (fd)
+   {
+      fclose(fd);
+   }
+   free(buf);
+   if (wf)
+   {
+      pgmoneta_destroy_walfile(wf);
+   }
+   unlink(seg);
+   unlink(seg_partial);
    rmdir(base);
    MCTF_FINISH();
 }
@@ -2434,6 +2589,13 @@ MCTF_TEST(test_walbridge_reader_multi_page_segment_continuations)
                          blcksz - SIZE_OF_XLOG_SHORT_PHD - (2 * SIZE_OF_XLOG_RECORD), 0x43);
       write_record_header_craft(buf, seg_size - SIZE_OF_XLOG_RECORD, SIZE_OF_XLOG_RECORD + rem_len);
 
+      continuation = malloc(rem_len);
+      MCTF_ASSERT_PTR_NONNULL(continuation, cleanup, "allocate continuation failed");
+      continuation[0] = (char)XLR_BLOCK_ID_DATA_LONG;
+      memcpy(continuation + 1, &(uint32_t){rem_len - 5}, sizeof(uint32_t));
+      memset(continuation + 5, (int)(0x50 + case_idx), rem_len - 5);
+      stamp_crc_split_craft(buf, seg_size - SIZE_OF_XLOG_RECORD, continuation, rem_len);
+
       fd = fopen(seg_a, "wb");
       MCTF_ASSERT_PTR_NONNULL(fd, cleanup, "open source segment failed");
       MCTF_ASSERT_INT_EQ(fwrite(buf, 1, seg_size, fd), (int)seg_size, cleanup, "write source segment failed");
@@ -2454,11 +2616,6 @@ MCTF_TEST(test_walbridge_reader_multi_page_segment_continuations)
          write_page_header_craft(buf, page, WAL_MAGIC_V18, 0, seg_size + page, 0);
       }
 
-      continuation = malloc(rem_len);
-      MCTF_ASSERT_PTR_NONNULL(continuation, cleanup, "allocate continuation failed");
-      continuation[0] = (char)XLR_BLOCK_ID_DATA_LONG;
-      memcpy(continuation + 1, &(uint32_t){rem_len - 5}, sizeof(uint32_t));
-      memset(continuation + 5, (int)(0x50 + case_idx), rem_len - 5);
       next_offset = write_multi_page_continuation_craft(buf, blcksz, seg_size, continuation, rem_len);
       write_filler_craft(buf, next_offset, 16, 0x60);
 

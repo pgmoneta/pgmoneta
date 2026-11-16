@@ -31,6 +31,7 @@
 #include <utils.h>
 #include <walfile.h>
 #include <walfile/wal_reader.h>
+#include <walbridge/wal_store.h>
 
 #include <dirent.h>
 #include <errno.h>
@@ -225,6 +226,10 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
 
       total_length = record->header.xl_tot_len;
       written = 0;
+
+      /* The encoder zeroes xl_crc; stamp the real CRC so the record can be
+       * validated by PostgreSQL and by the WAL reader. */
+      ((struct xlog_record*)encoded_record)->xl_crc = pgmoneta_wal_store_compute_crc(encoded_record, total_length);
 
       while (written < total_length)
       {
