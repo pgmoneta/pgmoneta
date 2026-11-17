@@ -48,6 +48,7 @@
 
 /* system */
 #include <assert.h>
+#include <openssl/evp.h>
 #include <dirent.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -73,6 +74,7 @@ static int s3_list_backup_prefixes(int server, struct deque** labels);
 static int s3_verify_backup(int server, struct backup* backup_info);
 
 static int s3_send_delete_request(char* relative_path, char* s3_list, int server, char* xml_body, struct http_response** response);
+static int s3_content_md5(char* body, size_t length, char** md5);
 static int s3_send_get_request(char* relative_path, char* s3_root, int server, long range_start, long range_end, struct http_response** response);
 
 static int s3_build_signing_key(char* secret_access_key, char* short_date, char* region,
@@ -1655,6 +1657,7 @@ s3_send_delete_request(char* relative_path, char* s3_root, int server, char* xml
    char* request_path = NULL;
    char* query_string = NULL;
    char* body_hash = NULL;
+   char* body_md5 = NULL;
    char* canonical_uri = NULL;
    struct deque* sign_headers = NULL;
    struct http* connection = NULL;
@@ -1776,6 +1779,14 @@ s3_send_delete_request(char* relative_path, char* s3_root, int server, char* xml
       goto error;
    }
 
+   /* DeleteObjects requires Content-MD5 (or a checksum header); S3 answers
+    * 400 without it. */
+   if (s3_content_md5(xml_body, strlen(xml_body), &body_md5) ||
+       pgmoneta_http_request_add_header(request, "Content-MD5", body_md5))
+   {
+      goto error;
+   }
+
    if (pgmoneta_http_set_data(request, xml_body, strlen(xml_body)))
    {
       goto error;
@@ -1814,6 +1825,7 @@ s3_send_delete_request(char* relative_path, char* s3_root, int server, char* xml
    free(request_path);
    free(s3_path);
    free(body_hash);
+   free(body_md5);
    free(auth_value);
    free(query_string);
    free(canonical_uri);
@@ -1829,6 +1841,7 @@ error:
    free(request_path);
    free(s3_path);
    free(body_hash);
+   free(body_md5);
    free(auth_value);
    free(query_string);
    free(canonical_uri);
@@ -2683,4 +2696,22 @@ s3_download(int server, char* label, char* local_root)
 
    free(s3_root);
    return rc;
+}
+
+static int
+s3_content_md5(char* body, size_t length, char** md5)
+{
+   unsigned char digest[EVP_MAX_MD_SIZE];
+   unsigned int digest_length = 0;
+   size_t encoded_length = 0;
+
+   *md5 = NULL;
+
+   if (!EVP_Digest(body, length, digest, &digest_length, EVP_md5(), NULL))
+   {
+      pgmoneta_log_error("S3: could not compute the Content-MD5 of the request body");
+      return 1;
+   }
+
+   return pgmoneta_base64_encode(digest, digest_length, md5, &encoded_length);
 }
