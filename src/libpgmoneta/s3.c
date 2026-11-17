@@ -267,7 +267,7 @@ pgmoneta_restore_s3_objects(int client_fd, int server, char* prefix, uint8_t com
       goto error;
    }
 
-   if (pgmoneta_storage_remote_download(server, prefix, &staging))
+   if (pgmoneta_storage_remote_download(server, STORAGE_ENGINE_S3, prefix, &staging))
    {
       ec = MANAGEMENT_ERROR_RESTORE_S3_DOWNLOAD;
       pgmoneta_log_error("S3 restore: failed to stage %s/%s", config->common.servers[server].name, prefix);

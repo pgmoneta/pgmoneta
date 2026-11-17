@@ -115,7 +115,7 @@ pgmoneta_restore_azure_objects(int client_fd, int server, char* label, uint8_t c
       goto error;
    }
 
-   if (pgmoneta_storage_remote_download(server, label, &staging))
+   if (pgmoneta_storage_remote_download(server, STORAGE_ENGINE_AZURE, label, &staging))
    {
       ec = MANAGEMENT_ERROR_RESTORE_AZURE_DOWNLOAD;
       pgmoneta_log_error("Azure restore: failed to stage %s/%s",
