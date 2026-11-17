@@ -115,7 +115,7 @@ pgmoneta_restore_gcs_objects(int client_fd, int server, char* label, uint8_t com
       goto error;
    }
 
-   if (pgmoneta_storage_remote_download(server, label, &staging))
+   if (pgmoneta_storage_remote_download(server, STORAGE_ENGINE_GCS, label, &staging))
    {
       ec = MANAGEMENT_ERROR_RESTORE_GCS_DOWNLOAD;
       pgmoneta_log_error("GCS restore: failed to stage %s/%s",

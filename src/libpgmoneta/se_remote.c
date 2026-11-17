@@ -150,7 +150,7 @@ pgmoneta_storage_create_remote(void)
 }
 
 int
-pgmoneta_storage_remote_download(int server, char* label, char** root)
+pgmoneta_storage_remote_download(int server, int engine_flag, char* label, char** root)
 {
    char staging[MAX_PATH];
    char* ws = NULL;
@@ -162,9 +162,23 @@ pgmoneta_storage_remote_download(int server, char* label, char** root)
 
    for (int i = 0; i < N_ENGINES; i++)
    {
-      if (!(config->storage_engine & engines[i].engine_flag) || engines[i].download == NULL)
+      if (engines[i].engine_flag != engine_flag)
       {
          continue;
+      }
+
+      if (!(config->storage_engine & engines[i].engine_flag))
+      {
+         pgmoneta_log_error("remote_download: %s storage engine is not configured for %s",
+                            engines[i].name, config->common.servers[server].name);
+         return 1;
+      }
+
+      if (engines[i].download == NULL)
+      {
+         pgmoneta_log_error("remote_download: %s storage engine does not support download for %s",
+                            engines[i].name, config->common.servers[server].name);
+         return 1;
       }
 
       ws = pgmoneta_get_server_workspace(server);
@@ -195,8 +209,8 @@ pgmoneta_storage_remote_download(int server, char* label, char** root)
       return rc;
    }
 
-   pgmoneta_log_error("remote_download: no configured storage engine supports download for %s",
-                      config->common.servers[server].name);
+   pgmoneta_log_error("remote_download: unknown storage engine %d for %s",
+                      engine_flag, config->common.servers[server].name);
 
    return 1;
 }
