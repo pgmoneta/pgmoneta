@@ -38,6 +38,7 @@
 /* system */
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <openssl/err.h>
 
@@ -45,6 +46,7 @@ static int http_parse_header(char** header, struct http_response* http_response)
 static int http_read_response_body(SSL* ssl, int socket, struct http_response* http_response);
 static int http_read_response_header(SSL* ssl, int socket, char** header_text, struct http_response* http_response);
 static int http_build_request(struct http* connection, struct http_request* request, char** full_request, size_t* full_request_size);
+static bool http_request_has_header(struct http_request* request, char* name);
 static char* http_method_to_string(int method);
 
 int
@@ -1030,6 +1032,30 @@ error:
    return PGMONETA_HTTP_STATUS_ERROR;
 }
 
+static bool
+http_request_has_header(struct http_request* request, char* name)
+{
+   struct deque_iterator* iter = NULL;
+   bool found = false;
+
+   if (request->payload.headers == NULL || pgmoneta_deque_empty(request->payload.headers))
+   {
+      return false;
+   }
+
+   if (pgmoneta_deque_iterator_create(request->payload.headers, &iter))
+   {
+      return false;
+   }
+   while (!found && pgmoneta_deque_iterator_next(iter))
+   {
+      found = iter->tag != NULL && strcasecmp(iter->tag, name) == 0;
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+
+   return found;
+}
+
 static int
 http_build_request(struct http* connection, struct http_request* request, char** full_request, size_t* full_request_size)
 {
@@ -1059,9 +1085,15 @@ http_build_request(struct http* connection, struct http_request* request, char**
    request_line = pgmoneta_append(request_line, request->path);
    request_line = pgmoneta_append(request_line, " HTTP/1.1\r\n");
 
-   headers = pgmoneta_append(headers, "Host: ");
-   headers = pgmoneta_append(headers, connection->hostname);
-   headers = pgmoneta_append(headers, "\r\n");
+   /* A request carries exactly one Host header (RFC 9112), and servers
+    * answer a second one with 400. Callers that sign the Host header,
+    * such as S3, set it themselves. */
+   if (!http_request_has_header(request, "Host"))
+   {
+      headers = pgmoneta_append(headers, "Host: ");
+      headers = pgmoneta_append(headers, connection->hostname);
+      headers = pgmoneta_append(headers, "\r\n");
+   }
 
    user_agent = pgmoneta_append(user_agent, "pgmoneta/");
    user_agent = pgmoneta_append(user_agent, VERSION);
