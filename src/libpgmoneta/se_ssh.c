@@ -268,9 +268,11 @@ error:
    ssh_key_free(client_privkey);
 
    sftp_free(sftp);
+   sftp = NULL;
 
    ssh_disconnect(session);
    ssh_free(session);
+   session = NULL;
    return 1;
 }
 
