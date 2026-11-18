@@ -54,10 +54,20 @@ extern "C" {
 /**
  * Well-known container kinds the framework knows how to start.
  */
-#define MCTF_CONTAINER_GARAGE   0 /**< Garage, an S3-compatible object store */
-#define MCTF_CONTAINER_AZURITE  1 /**< Azurite, a local Azure Blob Storage emulator */
-#define MCTF_CONTAINER_SFTP     2 /**< atmoz/sftp, SSH/SFTP test server */
-#define MCTF_CONTAINER_FAKE_GCS 3 /**< fake-gcs-server, a local Google Cloud Storage emulator */
+#define MCTF_CONTAINER_VERSITYGW 0 /**< versitygw, an S3 gateway over a local directory */
+#define MCTF_CONTAINER_AZURITE   1 /**< Azurite, a local Azure Blob Storage emulator */
+#define MCTF_CONTAINER_SFTP      2 /**< atmoz/sftp, SSH/SFTP test server */
+#define MCTF_CONTAINER_FAKE_GCS  3 /**< fake-gcs-server, a local Google Cloud Storage emulator */
+
+/**
+ * Fixed connection details of the versitygw container. The bucket exists
+ * as soon as the container is ready.
+ */
+#define MCTF_VERSITYGW_PORT       7070
+#define MCTF_VERSITYGW_REGION     "us-east-1"
+#define MCTF_VERSITYGW_BUCKET     "pgmoneta-test-bucket"
+#define MCTF_VERSITYGW_ACCESS_KEY "pgmoneta-test"
+#define MCTF_VERSITYGW_SECRET_KEY "pgmoneta-test-secret-key"
 
 /**
  * A running container handle.

@@ -93,7 +93,7 @@ MCTF_INTEGRATION_TEST(test_remote_backup_lands_on_all_backends)
    }
    MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
 
-   /* S3 (Garage) */
+   /* S3 (versitygw) */
    MCTF_ASSERT(mctf_se_s3_ls("primary", shared_label, &s3_listing) == 0, cleanup, "s3 ls failed");
    MCTF_ASSERT_PTR_NONNULL(s3_listing, cleanup, "empty s3 ls response");
    MCTF_ASSERT(strstr(s3_listing, "backup.info") != NULL, cleanup,

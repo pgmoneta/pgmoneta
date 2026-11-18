@@ -78,7 +78,7 @@ load, and the worker count is capped by core count. `compare` warns when the cor
 normal even with a median.
 
 **The `phase (emulated)` block is not a measurement.** Those phases upload to a local container
-(Azurite, Garage, SFTP) rather than a real object store, so they show the direction of a change but
+(Azurite, versitygw, SFTP) rather than a real object store, so they show the direction of a change but
 are not a figure to quote for production.
 
 ## Adding a benchmark case
@@ -98,7 +98,7 @@ BENCH_CASE(backup_azure, MCTF_BACKEND_AZURITE)
 
 The body runs one iteration of the work being measured. The harness brings the backend up, runs an
 unmeasured warmup, runs the body N times, reads the per-phase timings from `backup.info`, takes the
-median and writes the result. Backends are `MCTF_BACKEND_AZURITE`, `MCTF_BACKEND_GARAGE` (S3) and
+median and writes the result. Backends are `MCTF_BACKEND_AZURITE`, `MCTF_BACKEND_VERSITYGW` (S3) and
 `MCTF_BACKEND_SSH`.
 
 Reported phases come from the `bench_phases` table in `benchmarks/src/bench.c`; each entry is a name

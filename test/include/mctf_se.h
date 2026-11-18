@@ -36,7 +36,7 @@ extern "C" {
 
 /*
  * mctf_se: storage-engine integration test layer. mctf_se_up() starts an
- * emulated backend (e.g. Garage for S3) and a dedicated pgmoneta instance
+ * emulated backend (e.g. versitygw for S3) and a dedicated pgmoneta instance
  * configured for it; mctf_se_down() tears everything down. Tests express
  * pure intent with no container-management boilerplate.
  *
@@ -52,10 +52,10 @@ extern "C" {
 /**
  * Storage backends supported by the integration-test layer.
  */
-#define MCTF_BACKEND_GARAGE  0 /**< S3, emulated by Garage */
-#define MCTF_BACKEND_AZURITE 1 /**< Azure Blob Storage, emulated by Azurite */
-#define MCTF_BACKEND_SSH     2 /**< SSH, emulated by atmoz/sftp */
-#define MCTF_BACKEND_GCS     3 /**< GCS, emulated by fake-gcs-server */
+#define MCTF_BACKEND_VERSITYGW 0 /**< S3, emulated by versitygw */
+#define MCTF_BACKEND_AZURITE   1 /**< Azure Blob Storage, emulated by Azurite */
+#define MCTF_BACKEND_SSH       2 /**< SSH, emulated by atmoz/sftp */
+#define MCTF_BACKEND_GCS       3 /**< GCS, emulated by fake-gcs-server */
 
 /**
  * Shared context for one active backend, filled by the driver's start()
@@ -82,7 +82,7 @@ struct mctf_se
  */
 struct mctf_se_driver
 {
-   const char* name;           /**< Short name, e.g. "garage" */
+   const char* name;           /**< Short name, e.g. "versitygw" */
    const char* storage_engine; /**< pgmoneta storage_engine value, e.g. "s3" */
 
    /**
