@@ -62,6 +62,7 @@
 #define RESTORE_TYPE_UNKNOWN  3
 #define RESTORE_ERROR         4
 #define RESTORE_DAMAGED       5
+#define POSITION_MAX_LENGTH   512
 #define MAX_PATH_CONCAT       (MAX_PATH * 2)
 #define TMP_SUFFIX            ".tmp"
 
@@ -381,6 +382,38 @@ pgmoneta_is_restore_last_name(char* file_name)
    return result;
 }
 
+/**
+ * Check a restore position before it is used. The position is parsed into
+ * fixed size buffers and its values are written to postgresql.auto.conf,
+ * where a line break would start a new setting.
+ *
+ * @return 0 if the position can be used, 1 if not
+ */
+static int
+check_position(const char* position)
+{
+   size_t len = strlen(position);
+
+   if (len >= POSITION_MAX_LENGTH)
+   {
+      pgmoneta_log_error("Restore: The position is too long (%zu bytes, the maximum is %d)", len, POSITION_MAX_LENGTH - 1);
+      return 1;
+   }
+
+   for (size_t i = 0; i < len; i++)
+   {
+      unsigned char c = (unsigned char)position[i];
+
+      if (c < 0x20 || c == 0x7f)
+      {
+         pgmoneta_log_error("Restore: The position contains a control character");
+         return 1;
+      }
+   }
+
+   return 0;
+}
+
 void
 pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
@@ -449,6 +482,12 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
+   if (position != NULL && check_position(position))
+   {
+      ec = MANAGEMENT_ERROR_RESTORE_ERROR;
+      goto error;
+   }
+
    if (pgmoneta_art_create(&nodes))
    {
       goto error;
@@ -470,7 +509,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
     * not a primary recovery target. */
    if (position != NULL && strlen(position) > 0)
    {
-      char tokens[512];
+      char tokens[POSITION_MAX_LENGTH];
       char* ptr = NULL;
       int target_count = 0;
       size_t len = 0;
@@ -854,10 +893,16 @@ pgmoneta_restore_backup(struct art* nodes)
 
    if (position != NULL && strlen(position) > 0)
    {
-      char tokens[512];
+      char tokens[POSITION_MAX_LENGTH];
       bool primary = true;
       bool copy_wal = false;
       char* ptr = NULL;
+
+      if (strlen(position) >= sizeof(tokens))
+      {
+         pgmoneta_log_error("Restore: The position is too long (%zu bytes, the maximum is %zu)", strlen(position), sizeof(tokens) - 1);
+         return RESTORE_ERROR;
+      }
 
       memset(&tokens[0], 0, sizeof(tokens));
       memcpy(&tokens[0], position, strlen(position));
@@ -877,10 +922,20 @@ pgmoneta_restore_backup(struct art* nodes)
 
          if (equal == NULL)
          {
+            if (strlen(ptr) >= sizeof(key))
+            {
+               pgmoneta_log_error("Restore: A recovery option in the position is too long");
+               return RESTORE_ERROR;
+            }
             memcpy(&key[0], ptr, strlen(ptr));
          }
          else
          {
+            if (strlen(ptr) - strlen(equal) >= sizeof(key) || strlen(equal) - 1 >= sizeof(value))
+            {
+               pgmoneta_log_error("Restore: A recovery option in the position is too long");
+               return RESTORE_ERROR;
+            }
             memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
             memcpy(&value[0], equal + 1, strlen(equal) - 1);
          }
