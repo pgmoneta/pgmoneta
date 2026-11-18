@@ -798,7 +798,15 @@ sftp_wal_prepare(sftp_file* file, int segsize)
 
    while (written < (size_t)segsize)
    {
-      written += sftp_write(*file, buffer, sizeof(buffer));
+      ssize_t w = sftp_write(*file, buffer, sizeof(buffer));
+
+      if (w <= 0)
+      {
+         pgmoneta_log_error("WAL error: %s", ssh_get_error(session));
+         return 1;
+      }
+
+      written += w;
    }
 
    if (sftp_seek(*file, 0) < 0)
@@ -1047,8 +1055,11 @@ error:
 static bool
 sftp_exists(char* path)
 {
-   if (sftp_stat(sftp, path) != NULL)
+   sftp_attributes attributes = sftp_stat(sftp, path);
+
+   if (attributes != NULL)
    {
+      sftp_attributes_free(attributes);
       return true;
    }
    return false;
