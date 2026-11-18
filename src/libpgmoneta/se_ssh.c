@@ -347,8 +347,12 @@ ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes
       }
    }
 
-   sftp_copy_file(local_root, remote_root, "/backup.info");
-   sftp_copy_file(local_root, remote_root, "/backup.sha256");
+   if (sftp_copy_file(local_root, remote_root, "/backup.info") ||
+       sftp_copy_file(local_root, remote_root, "/backup.sha256"))
+   {
+      pgmoneta_log_error("failed to transfer the backup metadata to the remote server");
+      goto error;
+   }
 
    local_root = pgmoneta_append(local_root, "/data");
    remote_root = pgmoneta_append(remote_root, "/data");
@@ -556,7 +560,7 @@ sftp_copy_directory(char* local_root, char* remote_root, char* relative_path)
    char* to = NULL;
    char* relative_file;
    int rc;
-   DIR* dir;
+   DIR* dir = NULL;
    struct dirent* entry;
    mode_t mode = 0;
 
@@ -584,7 +588,18 @@ sftp_copy_directory(char* local_root, char* remote_root, char* relative_path)
 
    while ((entry = readdir(dir)) != NULL)
    {
-      if (entry->d_type == DT_DIR)
+      bool is_dir = entry->d_type == DT_DIR;
+
+      if (entry->d_type == DT_LNK)
+      {
+         char link_path[MAX_PATH];
+
+         /* Tablespaces are symbolic links to directories */
+         pgmoneta_snprintf(link_path, sizeof(link_path), "%s/%s", from, entry->d_name);
+         is_dir = pgmoneta_is_directory(link_path);
+      }
+
+      if (is_dir)
       {
          char relative_dir[1024];
 
@@ -595,7 +610,10 @@ sftp_copy_directory(char* local_root, char* remote_root, char* relative_path)
 
          pgmoneta_snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
 
-         sftp_copy_directory(local_root, remote_root, relative_dir);
+         if (sftp_copy_directory(local_root, remote_root, relative_dir))
+         {
+            goto error;
+         }
       }
       else
       {
@@ -624,7 +642,10 @@ sftp_copy_directory(char* local_root, char* remote_root, char* relative_path)
 
 error:
 
-   closedir(dir);
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
 
    free(from);
    free(to);
@@ -699,7 +720,17 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
 
       while ((read_bytes = fread(buffer, 1, sizeof(buffer), sfile)) > 0)
       {
-         sftp_write(dfile, buffer, read_bytes);
+         if (sftp_write(dfile, buffer, read_bytes) != (ssize_t)read_bytes)
+         {
+            pgmoneta_log_error("Failed to write %s to the remote server: %s", d, ssh_get_error(session));
+            goto error;
+         }
+      }
+
+      if (ferror(sfile))
+      {
+         pgmoneta_log_error("Failed to read %s", s);
+         goto error;
       }
    }
 
@@ -710,7 +741,13 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
 
    if (dfile != NULL)
    {
-      sftp_close(dfile);
+      if (sftp_close(dfile) != SSH_OK)
+      {
+         dfile = NULL;
+         sfile = NULL;
+         pgmoneta_log_error("Failed to close %s on the remote server: %s", d, ssh_get_error(session));
+         goto error;
+      }
    }
 
    free(s);
