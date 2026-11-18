@@ -167,7 +167,7 @@ gcs_port
   The port number for the GCS endpoint
 
 gcs_use_tls
-  Use TLS for GCS connections. Default is off
+  Use TLS for a custom GCS endpoint. storage.googleapis.com and https:// endpoints always use TLS. Default is off
 
 gcs_endpoint
   The GCS endpoint override. Default is storage.googleapis.com

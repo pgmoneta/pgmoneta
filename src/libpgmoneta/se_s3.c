@@ -86,6 +86,7 @@ static int s3_sign_request(char* method, char* canonical_uri, char* query_string
 static int s3_apply_signed_headers(struct http_request* request, struct deque* headers, char* auth_value);
 
 static char* s3_get_host(int server);
+static char* s3_get_effective_endpoint(int server);
 
 static int
 s3_get_object(int server, char* root, char* relative_path, struct http_response** response)
@@ -269,8 +270,24 @@ s3_get_effective_use_tls(int server)
    struct main_configuration* config;
    struct server* srv;
 
+   char* endpoint = NULL;
+
    config = (struct main_configuration*)shmem;
    srv = &config->common.servers[server];
+
+   endpoint = s3_get_effective_endpoint(server);
+
+   /* AWS S3 always uses TLS. s3_use_tls only applies to a custom
+    * endpoint (e.g. MinIO, Garage, VersityGW). */
+   if (endpoint == NULL || strlen(endpoint) == 0)
+   {
+      return true;
+   }
+
+   if (!strncmp(endpoint, "https://", 8))
+   {
+      return true;
+   }
 
    if (srv != NULL && (srv->s3.port != 0 || strlen(srv->s3.endpoint) > 0))
    {

@@ -112,7 +112,7 @@ Nota: Si `host` comienza con un `/`, representa una ruta y `pgmoneta` se conecta
 | s3_base_dir | | String | Sí | El directorio base para el bucket S3 |
 | s3_storage_class | REDUCED_REDUNDANCY | String | No | La clase de almacenamiento S3 |
 | s3_port | | Int | No | El número de puerto para el endpoint S3 |
-| s3_use_tls | `off` | Bool | No | Usar TLS para conexiones S3 |
+| s3_use_tls | `off` | Bool | No | Usar TLS para un endpoint S3 personalizado (`s3_endpoint`). AWS S3 y los endpoints `https://` siempre usan TLS |
 | s3_endpoint | | String | No | La URL del endpoint S3 |
 
 **Azure**

@@ -45,7 +45,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | ssh_private_key_file | `$HOME/.ssh/id_rsa` | String | No | The SSH private key file path. Can interpolate environment variables (e.g., `$HOME`) | 
 | s3_storage_class | REDUCED_REDUNDANCY | String | No | The S3 storage class | 
 | s3_port   | | Int | No | The port number for the S3 endpoint |
-| s3_use_tls | `off` | Bool | No | Use TLS for S3 connections |
+| s3_use_tls | `off` | Bool | No | Use TLS for a custom S3 endpoint (`s3_endpoint`). AWS S3 and `https://` endpoints always use TLS |
 | s3_endpoint | String | No | s3 endpoint url |
 | s3_region | | String | Yes | The AWS region |
 | s3_access_key_id | | String | Yes | The IAM access key ID |

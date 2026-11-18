@@ -113,7 +113,7 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | s3_base_dir | | String | Yes | The base directory for the S3 bucket |
 | s3_storage_class | REDUCED_REDUNDANCY | String | No | The S3 storage class |
 | s3_port | | Int | No | The port number for the S3 endpoint |
-| s3_use_tls | `off` | Bool | No | Use TLS for S3 connections |
+| s3_use_tls | `off` | Bool | No | Use TLS for a custom S3 endpoint (`s3_endpoint`). AWS S3 and `https://` endpoints always use TLS |
 | s3_endpoint | | String | No | The S3 endpoint URL |
 
 **Azure**
@@ -133,7 +133,7 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | gcs_base_dir | | String | Yes | The base directory for the GCS bucket |
 | gcs_credentials_file | | String | No | Path to a GCS service account JSON key; blank for unauthenticated (emulator) use |
 | gcs_port | | Int | No | The port number for the GCS endpoint |
-| gcs_use_tls | `off` | Bool | No | Use TLS for GCS connections |
+| gcs_use_tls | `off` | Bool | No | Use TLS for a custom GCS endpoint (`gcs_endpoint`). storage.googleapis.com and `https://` endpoints always use TLS |
 | gcs_endpoint | | String | No | The GCS endpoint override (blank for storage.googleapis.com) |
 
 **Retention**

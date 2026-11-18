@@ -232,8 +232,24 @@ gcs_get_effective_use_tls(int server)
    struct main_configuration* config;
    struct server* srv;
 
+   char* endpoint = NULL;
+
    config = (struct main_configuration*)shmem;
    srv = &config->common.servers[server];
+
+   endpoint = gcs_get_effective_endpoint(server);
+
+   /* The public GCS API is sent an OAuth bearer token, so it always uses TLS.
+    * gcs_use_tls only applies to a custom endpoint (e.g. a local emulator). */
+   if (endpoint == NULL || strlen(endpoint) == 0)
+   {
+      return true;
+   }
+
+   if (!strncmp(endpoint, "https://", 8))
+   {
+      return true;
+   }
 
    if (srv != NULL && (srv->gcs.port != 0 || strlen(srv->gcs.endpoint) > 0))
    {
