@@ -590,9 +590,11 @@ pgmoneta_wal(int srv, char** argv)
                         goto error;
                      }
 
-                     if (sftp_wal_file != NULL)
+                     if (sftp_wal_file != NULL &&
+                         sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_to_write) != (ssize_t)bytes_to_write)
                      {
-                        sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_to_write);
+                        pgmoneta_log_error("Could not write %zu bytes to WAL file %s on remote ssh storage engine", bytes_to_write, filename);
+                        goto error;
                      }
 
                      if (wal_shipping_file != NULL)
@@ -673,9 +675,11 @@ pgmoneta_wal(int srv, char** argv)
                               pgmoneta_log_error("Could not write to WAL file %s: %s", filename, strerror(errno));
                               goto error;
                            }
-                           if (sftp_wal_file != NULL)
+                           if (sftp_wal_file != NULL &&
+                               sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_left) != (ssize_t)bytes_left)
                            {
-                              sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_left);
+                              pgmoneta_log_error("Could not write %zu bytes to WAL file %s on remote ssh storage engine", bytes_left, filename);
+                              goto error;
                            }
                            if (wal_shipping_file != NULL)
                            {
