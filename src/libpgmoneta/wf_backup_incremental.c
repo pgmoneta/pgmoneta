@@ -1029,6 +1029,11 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    {
       goto error;
    }
+   if (response == NULL || response->tuples == NULL)
+   {
+      pgmoneta_log_error("Backup: No WAL start position was returned for %s", config->common.servers[server].name);
+      goto error;
+   }
    memset(startpos, 0, sizeof(startpos));
    memcpy(startpos, response->tuples[0].data[0], strlen(response->tuples[0].data[0]));
    start_timeline = atoi(response->tuples[0].data[1]);
@@ -1055,6 +1060,11 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    // Receive the final result set, which contains the WAL ending point
    if (pgmoneta_consume_data_row_messages(server, ssl, socket, buffer, &response))
    {
+      goto error;
+   }
+   if (response == NULL || response->tuples == NULL)
+   {
+      pgmoneta_log_error("Backup: No WAL end position was returned for %s", config->common.servers[server].name);
       goto error;
    }
    memset(endpos, 0, sizeof(endpos));

@@ -2387,6 +2387,23 @@ pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_
 
       pgmoneta_consume_copy_stream_end(buffer, msg);
    }
+
+   /* The loop also ends when pgmoneta is shutting down or the server went
+    * offline, before the CommandComplete message. That is an error and not an
+    * empty result. A command without a result set, like UPLOAD_MANIFEST, does
+    * end with CommandComplete and leaves *response NULL. The connection is
+    * left to the caller, which closes it on its own error path */
+   if (msg->kind != 'C')
+   {
+      pgmoneta_log_warn("Data rows: the result set from %s is incomplete (running: %s, online: %s)",
+                        config->common.servers[srv].name,
+                        config->running ? "yes" : "no",
+                        pgmoneta_server_is_online(srv) ? "yes" : "no");
+      pgmoneta_free_query_response(r);
+      free(msg);
+      return 1;
+   }
+
    *response = r;
    // msg is reusable, it doesn't actually hold data,
    // but merely points to somewhere in the stream buffer
