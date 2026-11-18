@@ -158,7 +158,7 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
       {
          mark_retention(i, retention_days, retention_weeks, retention_months,
                         retention_years, number_of_backups, backups, &retention_keep);
-         for (int j = 0; j < number_of_backups; j++)
+         for (int j = 0; retention_keep != NULL && j < number_of_backups; j++)
          {
             if (!retention_keep[j])
             {
@@ -267,7 +267,9 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
 
    config = (struct main_configuration*)shmem;
 
-   keep = (bool*)malloc(sizeof(bool*) * number_of_backups);
+   *retention_keep = NULL;
+
+   keep = (bool*)malloc(sizeof(bool) * number_of_backups);
 
    if (keep == NULL)
    {
@@ -426,5 +428,21 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
          }
       }
    }
+
+   // never delete the newest valid backup, otherwise a period of failed
+   // (or missing) backups could age out the only restorable backup
+   for (int j = number_of_backups - 1; j >= 0; j--)
+   {
+      if (backups[j]->valid == VALID_TRUE)
+      {
+         if (!keep[j])
+         {
+            pgmoneta_log_debug("Retention: keeping latest valid backup %s/%s", config->common.servers[server].name, backups[j]->label);
+         }
+         keep[j] = true;
+         break;
+      }
+   }
+
    *retention_keep = keep;
 }
