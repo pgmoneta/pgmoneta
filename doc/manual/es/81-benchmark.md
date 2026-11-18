@@ -81,7 +81,7 @@ número de núcleos difiere.
 variación entre ejecuciones son normales incluso con la mediana.
 
 **El bloque `phase (emulated)` no es una medición.** Esas fases suben a un contenedor local (Azurite,
-Garage, SFTP) en lugar de a un almacén de objetos real, así que muestran la dirección de un cambio
+versitygw, SFTP) en lugar de a un almacén de objetos real, así que muestran la dirección de un cambio
 pero no son una cifra que puedas citar para producción.
 
 ## Añadir un caso
@@ -101,7 +101,7 @@ BENCH_CASE(backup_azure, MCTF_BACKEND_AZURITE)
 
 El cuerpo ejecuta una iteración del trabajo a medir. El arnés levanta el backend, ejecuta un
 calentamiento no medido, ejecuta el cuerpo N veces, lee los tiempos por fase de `backup.info`, toma la
-mediana y escribe el resultado. Los backends son `MCTF_BACKEND_AZURITE`, `MCTF_BACKEND_GARAGE` (S3) y
+mediana y escribe el resultado. Los backends son `MCTF_BACKEND_AZURITE`, `MCTF_BACKEND_VERSITYGW` (S3) y
 `MCTF_BACKEND_SSH`.
 
 Las fases reportadas vienen de la tabla `bench_phases` en `benchmarks/src/bench.c`; cada entrada es un

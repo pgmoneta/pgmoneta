@@ -28,9 +28,9 @@
  */
 
 /*
- * Storage-engine integration tests: S3 via Garage.
+ * Storage-engine integration tests: S3 via versitygw.
  *
- * The entire backend lifecycle (start the Garage container, provision it,
+ * The entire backend lifecycle (start the versitygw container, provision it,
  * configure and start a dedicated pgmoneta, tear everything down) is handled
  * by mctf_se. A test only states intent.
  */
@@ -147,7 +147,7 @@ cleanup:
 MCTF_MODULE_SETUP(s3)
 {
    memset(shared_label, 0, sizeof(shared_label));
-   storage_status = mctf_se_up(MCTF_BACKEND_GARAGE);
+   storage_status = mctf_se_up(MCTF_BACKEND_VERSITYGW);
    if (storage_status == MCTF_OK)
    {
       if (mctf_se_backup("primary") != 0 ||

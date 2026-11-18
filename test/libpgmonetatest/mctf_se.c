@@ -63,13 +63,13 @@
  * here. Adding a backend means: implement backends/<name>.c, declare its
  * driver below, and add one row to the table. Nothing else changes.
  */
-extern const struct mctf_se_driver mctf_garage_driver;
+extern const struct mctf_se_driver mctf_versitygw_driver;
 extern const struct mctf_se_driver mctf_azurite_driver;
 extern const struct mctf_se_driver mctf_ssh_driver;
 extern const struct mctf_se_driver mctf_fake_gcs_driver;
 
 static const struct mctf_se_driver* registry[] = {
-   [MCTF_BACKEND_GARAGE]  = &mctf_garage_driver,
+   [MCTF_BACKEND_VERSITYGW] = &mctf_versitygw_driver,
    [MCTF_BACKEND_AZURITE] = &mctf_azurite_driver,
    [MCTF_BACKEND_SSH]     = &mctf_ssh_driver,
    [MCTF_BACKEND_GCS]     = &mctf_fake_gcs_driver,

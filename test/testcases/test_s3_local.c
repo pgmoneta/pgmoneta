@@ -28,7 +28,7 @@
  */
 
 /*
- * Storage-engine integration tests: S3 via Garage with the local storage
+ * Storage-engine integration tests: S3 via versitygw with the local storage
  * engine enabled too (storage_engine = local, s3), so archive and incremental
  * backup/restore run on the local data that is kept after the upload.
  */
@@ -69,7 +69,7 @@ incremental_backup(char* parent, char* child, size_t size, char** output)
 
 MCTF_MODULE_SETUP(s3_local)
 {
-   storage_status = mctf_se_up_local(MCTF_BACKEND_GARAGE);
+   storage_status = mctf_se_up_local(MCTF_BACKEND_VERSITYGW);
    if (storage_status == MCTF_OK && mctf_se_backup("primary") != 0)
    {
       storage_status = MCTF_FAIL;

@@ -750,7 +750,7 @@ usage() {
    echo "  $0 -t backup_full            Run test matching 'backup_full' (runs build if needed)"
    echo "  $0 -m restore                Run all tests in module 'restore'"
    echo "  $0 -m azure                  Run Azure integration tests"
-   echo "  $0 -m s3                     Run S3/Garage integration tests"
+   echo "  $0 -m s3                     Run S3/versitygw integration tests"
    echo "  $0 -i                        Run all storage-engine integration tests"
    echo "  PGMONETA_TEST_PORT=6433 $0   Use port 6433 for the PostgreSQL container"
    exit 1

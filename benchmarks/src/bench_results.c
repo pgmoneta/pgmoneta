@@ -206,7 +206,7 @@ bench_compare(const char* results_dir, const char* baseline,
 
    if (render(base, cand, true))
    {
-      printf("\nEmulated phases upload to a local container (Azurite, Garage, SFTP),\n");
+      printf("\nEmulated phases upload to a local container (Azurite, versitygw, SFTP),\n");
       printf("not a real object store. They show the direction of a change, not a\n");
       printf("figure you can quote for production.\n");
    }

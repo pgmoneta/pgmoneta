@@ -41,11 +41,9 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Garage (S3-compatible object store) container definition. */
-#define GARAGE_IMAGE         "dxflrs/garage:v2.2.0"
-#define GARAGE_TOML          "contrib/garage/garage-ci.toml"
-#define GARAGE_READY_CMD     "/garage -c /etc/garage.toml status"
-#define GARAGE_READY_RETRIES 30
+/* versitygw (S3 gateway over a local directory) container definition. */
+#define VERSITYGW_IMAGE         "versity/versitygw:v1.11.0"
+#define VERSITYGW_READY_RETRIES 30
 
 /* Azurite (Azure Blob Storage emulator) container definition. */
 #define AZURITE_IMAGE         "mcr.microsoft.com/azure-storage/azurite"
@@ -70,7 +68,7 @@
 #define PULL_RETRIES         3
 #define PULL_BACKOFF_SECONDS 2
 
-static int start_garage(struct mctf_container* c);
+static int start_versitygw(struct mctf_container* c);
 static int start_azurite(struct mctf_container* c);
 static int start_sftp(struct mctf_container* c);
 static int start_fake_gcs(struct mctf_container* c);
@@ -275,8 +273,8 @@ mctf_container_start(struct mctf_container* c, int kind)
 
    switch (kind)
    {
-      case MCTF_CONTAINER_GARAGE:
-         return start_garage(c);
+      case MCTF_CONTAINER_VERSITYGW:
+         return start_versitygw(c);
       case MCTF_CONTAINER_AZURITE:
          return start_azurite(c);
       case MCTF_CONTAINER_SFTP:
@@ -424,31 +422,49 @@ start_fake_gcs(struct mctf_container* c)
 }
 
 static int
-start_garage(struct mctf_container* c)
+start_versitygw(struct mctf_container* c)
 {
-   char root[MAX_PATH];
-   char toml[MAX_PATH];
    char name[128];
-   char run_args[2 * MAX_PATH];
+   int i;
 
-   if (mctf_project_root(root, sizeof(root)) != MCTF_OK)
+   pgmoneta_snprintf(name, sizeof(name), "pgmoneta-mctf-versitygw-%d", (int)getpid());
+   pgmoneta_snprintf(c->name, sizeof(c->name), "%s", name);
+
+   mctf_container_pull(c->engine, VERSITYGW_IMAGE, PULL_RETRIES);
+
+   /* Remove any stale container with the same name. */
+   mctf_sh(NULL, "%s rm -f %s 2>/dev/null", c->engine, name);
+
+   /* The posix backend serves the directories under its data directory as
+    * buckets, so creating the bucket's directory before the gateway starts
+    * provisions it. The versioning directory enables bucket versioning and
+    * with it Object Lock. */
+   if (mctf_sh(NULL, "%s run -d --name %s --label %s --network host "
+               "-e ROOT_ACCESS_KEY=%s -e ROOT_SECRET_KEY=%s --entrypoint sh %s -c "
+               "'mkdir -p /tmp/versitygw/data/%s /tmp/versitygw/versions && "
+               "exec versitygw --port :%d posix --versioning-dir /tmp/versitygw/versions /tmp/versitygw/data'",
+               c->engine, name, MCTF_CONTAINER_LABEL,
+               MCTF_VERSITYGW_ACCESS_KEY, MCTF_VERSITYGW_SECRET_KEY, VERSITYGW_IMAGE,
+               MCTF_VERSITYGW_BUCKET, MCTF_VERSITYGW_PORT) != 0)
    {
-      pgmoneta_log_error("mctf_container: cannot resolve project root");
+      pgmoneta_log_error("mctf_container: failed to start versitygw");
       return MCTF_FAIL;
    }
-   pgmoneta_snprintf(toml, sizeof(toml), "%s/%s", root, GARAGE_TOML);
+   c->running = true;
 
-   if (access(toml, R_OK) != 0)
+   /* Wait until the S3 port accepts connections (checked from the host). */
+   for (i = 0; i < VERSITYGW_READY_RETRIES; i++)
    {
-      pgmoneta_log_error("mctf_container: garage config not found: %s", toml);
-      return MCTF_FAIL;
+      if (mctf_sh(NULL, "python3 -c \""
+                  "import socket; "
+                  "socket.create_connection(('127.0.0.1', %d), timeout=1).close()"
+                  "\" 2>/dev/null", MCTF_VERSITYGW_PORT) == 0)
+      {
+         return MCTF_OK;
+      }
+      sleep(1);
    }
 
-   pgmoneta_snprintf(name, sizeof(name), "pgmoneta-mctf-garage-%d", (int)getpid());
-   pgmoneta_snprintf(run_args, sizeof(run_args), "--network host -v %s:/etc/garage.toml:ro", toml);
-
-   /* The image's default command is already ["/garage","server"] and reads
-    * /etc/garage.toml; do not append a command (that would override it). */
-   return mctf_container_run(c, name, GARAGE_IMAGE, run_args,
-                             GARAGE_READY_CMD, GARAGE_READY_RETRIES);
+   pgmoneta_log_error("mctf_container: versitygw not ready after %d s", VERSITYGW_READY_RETRIES);
+   return MCTF_FAIL;
 }
