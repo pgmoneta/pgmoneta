@@ -377,3 +377,105 @@ cleanup:
    pgmoneta_memory_stream_buffer_free(buffer);
    MCTF_FINISH();
 }
+
+/*
+ * Run pgmoneta_consume_data_row_messages() in a child process with a private
+ * configuration where pgmoneta is, or isn't, running and the server is, or
+ * isn't, online. No message is sent, so a result set can only be incomplete.
+ *
+ * @return the exit status of the child: 0 if the call failed and left the
+ * response alone, 1 if it reported success or returned a response
+ */
+static int
+consume_data_rows_without_result(bool running, bool online)
+{
+   int sv[2] = {-1, -1};
+   struct stream_buffer* buffer = NULL;
+   pid_t pid;
+   int wstatus = 0;
+   int result = -1;
+
+   pgmoneta_memory_stream_buffer_init(&buffer);
+   if (buffer == NULL || buffer->buffer == NULL)
+   {
+      goto done;
+   }
+
+   if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0)
+   {
+      goto done;
+   }
+
+   pid = fork();
+   if (pid < 0)
+   {
+      goto done;
+   }
+
+   if (pid == 0)
+   {
+      struct main_configuration* config = NULL;
+      struct query_response* response = NULL;
+      int status;
+
+      alarm(5);
+
+      /* private configuration so the shared one is left untouched */
+      config = (struct main_configuration*)calloc(1, sizeof(struct main_configuration));
+      if (config == NULL)
+      {
+         _exit(2);
+      }
+      if (shmem != NULL)
+      {
+         memcpy(config, shmem, sizeof(struct main_configuration));
+      }
+      config->running = running;
+      config->common.servers[0].online = online;
+      shmem = config;
+
+      status = pgmoneta_consume_data_row_messages(0, NULL, sv[0], buffer, &response);
+
+      _exit(status != 0 && response == NULL ? 0 : 1);
+   }
+
+   if (waitpid(pid, &wstatus, 0) == pid && WIFEXITED(wstatus))
+   {
+      result = WEXITSTATUS(wstatus);
+   }
+
+done:
+   if (sv[0] >= 0)
+   {
+      close(sv[0]);
+   }
+   if (sv[1] >= 0)
+   {
+      close(sv[1]);
+   }
+   pgmoneta_memory_stream_buffer_free(buffer);
+
+   return result;
+}
+
+/* When pgmoneta is shutting down the loop that reads the result set never runs.
+ * That used to be reported as success with a NULL response, and the backup
+ * worker then read response->tuples[0]. */
+MCTF_TEST(test_data_row_messages_incomplete_when_shutting_down)
+{
+   MCTF_ASSERT_INT_EQ(consume_data_rows_without_result(false, true), 0, cleanup,
+                      "an empty result set was reported as success while pgmoneta shuts down");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+/* Same when the server was marked offline, e.g. by "mode offline" during a backup */
+MCTF_TEST(test_data_row_messages_incomplete_when_server_offline)
+{
+   MCTF_ASSERT_INT_EQ(consume_data_rows_without_result(true, false), 0, cleanup,
+                      "an empty result set was reported as success while the server is offline");
+
+cleanup:
+   MCTF_FINISH();
+}

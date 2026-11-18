@@ -389,6 +389,11 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
    {
       goto error;
    }
+   if (response == NULL)
+   {
+      pgmoneta_log_error("Backup: No tablespace listing was returned");
+      goto error;
+   }
    tup = response->tuples;
    while (tup != NULL)
    {
@@ -642,6 +647,12 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    // Receive the second result set
    if (pgmoneta_consume_data_row_messages(srv, ssl, socket, buffer, &response))
    {
+      goto error;
+   }
+
+   if (response == NULL)
+   {
+      pgmoneta_log_error("Backup: No tablespace listing was returned");
       goto error;
    }
 

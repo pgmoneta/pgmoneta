@@ -524,7 +524,9 @@ pgmoneta_consume_copy_stream_end(struct stream_buffer* buffer, struct message* m
  * @param socket The socket
  * @param buffer The stream buffer holding the messages
  * @param response The query response
- * @return 0 upon success, otherwise 1
+ * @return 0 upon success, otherwise 1. A result set that ends early, because pgmoneta
+ * is shutting down or the server went offline, is an error and *response is left alone.
+ * *response is NULL on success when the command returned no result set
  */
 int
 pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct query_response** response);
