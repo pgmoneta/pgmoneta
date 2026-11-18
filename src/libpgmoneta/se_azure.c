@@ -85,6 +85,14 @@ static int azure_http_prepare(char* azure_path, char** azure_host, char* request
 static char* azure_get_host(void);
 static char* azure_get_basepath(int server, char* identifier);
 
+struct azure_upload_file_context
+{
+   struct vfile* file;
+   char* path;
+};
+
+static size_t azure_upload_read_cb(void* buffer, size_t size, void* userdata);
+
 struct workflow*
 pgmoneta_storage_create_azure(void)
 {
@@ -649,9 +657,8 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    char* azure_host = NULL;
    char* auth_value = NULL;
    char* signed_headers_prefix = NULL;
-   FILE* file = NULL;
+   struct azure_upload_file_context upload_ctx = {0};
    struct stat file_info;
-   void* file_data = NULL;
    struct http* connection = NULL;
    struct http_request* request = NULL;
    struct http_response* response = NULL;
@@ -684,29 +691,11 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
-   if (pgmoneta_fopen_secure(local_path, "rb", &file))
+   if (stat(local_path, &file_info) != 0)
    {
+      pgmoneta_log_error("Azure upload: local file stat failed for %s", local_path);
       goto error;
    }
-
-   if (fstat(fileno(file), &file_info) != 0)
-   {
-      goto error;
-   }
-
-   file_data = malloc(file_info.st_size);
-   if (file_data == NULL)
-   {
-      goto error;
-   }
-
-   if (fread(file_data, 1, file_info.st_size, file) != (size_t)file_info.st_size)
-   {
-      goto error;
-   }
-
-   fclose(file);
-   file = NULL;
 
    if (file_info.st_size == 0)
    {
@@ -750,10 +739,22 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
-   if (pgmoneta_http_set_data(request, file_data, file_info.st_size))
+   /* Stream the file instead of reading it into memory */
+   pgmoneta_snprintf(size_str, sizeof(size_str), "%ld", (long)file_info.st_size);
+   if (pgmoneta_http_request_add_header(request, "Content-Length", size_str))
    {
       goto error;
    }
+
+   if (pgmoneta_vfile_create_local(local_path, "rb", &upload_ctx.file))
+   {
+      pgmoneta_log_error("Azure upload: failed to open local file %s", local_path);
+      goto error;
+   }
+   upload_ctx.path = local_path;
+
+   request->read_cb = azure_upload_read_cb;
+   request->read_userdata = &upload_ctx;
 
    if (pgmoneta_http_invoke(connection, request, &response))
    {
@@ -787,11 +788,11 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    free(azure_host);
    free(auth_value);
    free(signed_headers_prefix);
-   free(file_data);
 
    pgmoneta_http_request_destroy(request);
    pgmoneta_http_response_destroy(response);
    pgmoneta_http_destroy(connection);
+   pgmoneta_vfile_destroy(upload_ctx.file);
 
    return 0;
 
@@ -802,7 +803,6 @@ error:
    free(azure_host);
    free(auth_value);
    free(signed_headers_prefix);
-   free(file_data);
 
    if (connection != NULL)
    {
@@ -819,12 +819,33 @@ error:
       pgmoneta_http_response_destroy(response);
    }
 
-   if (file != NULL)
+   if (upload_ctx.file != NULL)
    {
-      fclose(file);
+      pgmoneta_vfile_destroy(upload_ctx.file);
    }
 
    return 1;
+}
+
+static size_t
+azure_upload_read_cb(void* buffer, size_t size, void* userdata)
+{
+   struct azure_upload_file_context* ctx = (struct azure_upload_file_context*)userdata;
+   size_t bytes_read = 0;
+   bool last_chunk = false;
+
+   if (ctx == NULL || ctx->file == NULL)
+   {
+      return 0;
+   }
+
+   if (ctx->file->read(ctx->file, buffer, size, &bytes_read, &last_chunk))
+   {
+      pgmoneta_log_error("Azure upload: failed to read chunk from %s", ctx->path);
+      return 0;
+   }
+
+   return bytes_read;
 }
 
 static int
