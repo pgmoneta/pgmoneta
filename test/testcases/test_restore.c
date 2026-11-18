@@ -36,6 +36,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -102,6 +103,99 @@ cleanup:
    free(backups);
    free(backup_dir);
    free(label_file);
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+static int
+file_has_line(char* path, char* expected)
+{
+   FILE* f = NULL;
+   char buffer[2048];
+   int found = 0;
+
+   f = fopen(path, "r");
+   if (f == NULL)
+   {
+      return 0;
+   }
+
+   while (fgets(buffer, sizeof(buffer), f) != NULL)
+   {
+      buffer[strcspn(buffer, "\r\n")] = '\0';
+      if (strcmp(buffer, expected) == 0)
+      {
+         found = 1;
+         break;
+      }
+   }
+
+   fclose(f);
+
+   return found;
+}
+
+MCTF_TEST(test_pgmoneta_restore_position_quote)
+{
+   char* backup_dir = NULL;
+   char path[MAX_PATH];
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
+
+   /* A restore point name can hold a quote, which has to survive postgresql.auto.conf */
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "name=before it's deployed", false, 0) == 0, cleanup, "restore operation failed");
+
+   backup_dir = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   MCTF_ASSERT(pgmoneta_load_infos(backup_dir, &number_of_backups, &backups) == 0 && number_of_backups == 1, cleanup, "failed to load the backup");
+
+   pgmoneta_snprintf(path, sizeof(path), "%s/primary-%s/postgresql.auto.conf", TEST_RESTORE_DIR, backups[0]->label);
+   MCTF_ASSERT(file_has_line(path, "recovery_target_name = 'before it''s deployed'"), cleanup, "the restore point name is not quoted in %s", path);
+
+cleanup:
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+   free(backup_dir);
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_pgmoneta_restore_position_line_break)
+{
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
+
+   /* A line break would start a new setting in postgresql.auto.conf */
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "name=x\nshared_preload_libraries=evil", false, MANAGEMENT_ERROR_RESTORE_ERROR) == 0, cleanup, "restore must fail when the position has a line break");
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_pgmoneta_restore_position_too_long)
+{
+   char position[1024];
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
+
+   /* The position is parsed into fixed size buffers */
+   memset(position, 0, sizeof(position));
+   memcpy(position, "name=", 5);
+   memset(position + 5, 'a', 700);
+
+   MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", position, false, MANAGEMENT_ERROR_RESTORE_ERROR) == 0, cleanup, "restore must fail when the position is too long");
+
+cleanup:
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }
