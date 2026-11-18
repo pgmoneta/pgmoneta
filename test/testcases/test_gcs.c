@@ -49,11 +49,16 @@
 #include <deque.h>
 #include <manifest.h>
 #include <utils.h>
+#include <info.h>
+#include <shmem.h>
+#include <storage.h>
+#include <verify.h>
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static int storage_status = MCTF_FAIL;
@@ -466,6 +471,102 @@ MCTF_INTEGRATION_TEST(test_gcs_restored_cluster_starts)
 
    MCTF_ASSERT(start_restored_cluster(pgdata) == 0, cleanup,
                "PostgreSQL did not start on the restored data directory");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+/**
+ * Run the scheduled verification job once in a child process
+ * @return the verification exit code, or -1 if it could not be run
+ */
+static int
+run_verification_once(void)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   char saved_base_dir[MAX_PATH];
+   int saved_storage_engine = config->storage_engine;
+   struct gcs_configuration saved_gcs;
+   const struct mctf_se* ctx = mctf_se_context();
+   bool saved_online[NUMBER_OF_SERVERS];
+   pid_t pid;
+   int status = 0;
+   int rc = -1;
+
+   snprintf(saved_base_dir, sizeof(saved_base_dir), "%s", config->base_dir);
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      saved_online[i] = config->common.servers[i].online;
+      config->common.servers[i].online = true;
+   }
+   if (ctx == NULL)
+   {
+      return -1;
+   }
+
+   /* Point the job at the emulator the backend driver configured */
+   memcpy(&saved_gcs, &config->gcs, sizeof(saved_gcs));
+   snprintf(config->gcs.endpoint, sizeof(config->gcs.endpoint), "%s", ctx->endpoint);
+   snprintf(config->gcs.bucket, sizeof(config->gcs.bucket), "%s", ctx->bucket);
+   snprintf(config->gcs.base_dir, sizeof(config->gcs.base_dir), "pgmoneta");
+   config->gcs.port = ctx->port;
+   config->gcs.use_tls = ctx->use_tls;
+   config->gcs.credentials_file[0] = '\0';
+
+   snprintf(config->base_dir, sizeof(config->base_dir), "%s/backup", mctf_se_run_dir());
+   config->storage_engine = STORAGE_ENGINE_GCS;
+
+   pid = fork();
+   if (pid == 0)
+   {
+      char* argv[] = {"pgmoneta-test", NULL};
+
+      /* The verification job exits the process; keep the parent's daemon and
+       * the GCS container alive by opting out of the global teardown. */
+      mctf_se_disable_atexit_cleanup();
+      config->update_process_title = UPDATE_PROCESS_TITLE_NEVER;
+      pgmoneta_sha512_verification(argv);
+      _exit(1);
+   }
+
+   if (pid > 0 && waitpid(pid, &status, 0) == pid && WIFEXITED(status))
+   {
+      rc = WEXITSTATUS(status);
+   }
+
+   snprintf(config->base_dir, sizeof(config->base_dir), "%s", saved_base_dir);
+   config->storage_engine = saved_storage_engine;
+   memcpy(&config->gcs, &saved_gcs, sizeof(saved_gcs));
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      config->common.servers[i].online = saved_online[i];
+   }
+
+   return rc;
+}
+
+/*
+ * A healthy GCS-only backup must stay valid after scheduled verification.
+ * The local data/ directory is gone, so the job has to check the objects in
+ * GCS instead of hashing local files.
+ */
+MCTF_INTEGRATION_TEST(test_gcs_scheduled_verification_keeps_backup_valid)
+{
+   int rc;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   rc = run_verification_once();
+   MCTF_ASSERT_INT_EQ(rc, 0, cleanup, "scheduled verification failed for %s", shared_label);
+
+   MCTF_ASSERT(mctf_sh(NULL, "grep -q 'STATUS=1' %s/backup/primary/backup/%s/backup.info",
+                       mctf_se_run_dir(), shared_label) == 0,
+               cleanup, "scheduled verification marked the GCS-only backup invalid");
 
 cleanup:
    MCTF_FINISH();

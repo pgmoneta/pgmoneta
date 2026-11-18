@@ -96,6 +96,8 @@ static int gcs_upload_files(char* local_root, char* gcs_root, int server, int co
 static int gcs_send_upload_request(char* local_root, char* gcs_root, char* relative_path, char* file_sha512, int server);
 
 static int gcs_send_get_request(char* gcs_root, char* relative_path, struct http_response** response, int server);
+static int gcs_send_object_request(char* gcs_root, char* relative_path, char* query, struct http_response** response, int server);
+static int gcs_object_exists(char* gcs_root, char* relative_path, int server);
 static char* gcs_build_object_path(char* gcs_root, char* relative_path);
 static int gcs_get_object(int server, char* root, char* relative_path, struct http_response** response);
 
@@ -1360,6 +1362,12 @@ gcs_build_object_path(char* gcs_root, char* relative_path)
 static int
 gcs_send_get_request(char* gcs_root, char* relative_path, struct http_response** response, int server)
 {
+   return gcs_send_object_request(gcs_root, relative_path, "?alt=media", response, server);
+}
+
+static int
+gcs_send_object_request(char* gcs_root, char* relative_path, char* query, struct http_response** response, int server)
+{
    char* auth_token = NULL;
    char* gcs_host = NULL;
    char* object_name = NULL;
@@ -1413,7 +1421,7 @@ gcs_send_get_request(char* gcs_root, char* relative_path, struct http_response**
    request_path = pgmoneta_append(request_path, effective_bucket);
    request_path = pgmoneta_append(request_path, "/o/");
    request_path = pgmoneta_append(request_path, encoded_object_name);
-   request_path = pgmoneta_append(request_path, "?alt=media");
+   request_path = pgmoneta_append(request_path, query);
 
    pgmoneta_log_debug("GCS restore request prepared: host=%s, path=%s", gcs_host, request_path);
 
@@ -1593,5 +1601,123 @@ gcs_download(int server, char* label, char* local_root)
    rc = pgmoneta_object_download(&gcs_ops, gcs_root, server, label, local_root);
 
    free(gcs_root);
+   return rc;
+}
+
+/* Without alt=media the request returns the object's metadata only */
+static int
+gcs_object_exists(char* gcs_root, char* relative_path, int server)
+{
+   struct http_response* response = NULL;
+   int result = -1;
+
+   if (gcs_send_object_request(gcs_root, relative_path, "", &response, server))
+   {
+      pgmoneta_log_error("GCS verify: request failed for %s", relative_path);
+      goto done;
+   }
+
+   if (response->status_code >= 200 && response->status_code < 300)
+   {
+      result = 1;
+   }
+   else if (response->status_code == 404)
+   {
+      result = 0;
+   }
+   else
+   {
+      pgmoneta_log_error("GCS verify: unexpected status %d for %s", response->status_code, relative_path);
+   }
+
+done:
+   pgmoneta_http_response_destroy(response);
+   return result;
+}
+
+int
+gcs_verify_backup(int server, struct backup* backup_info)
+{
+   char* gcs_root = NULL;
+   char* local_root = NULL;
+   char* manifest_path = NULL;
+   char* remote_path = NULL;
+   char* suffix = NULL;
+   struct deque* paths = NULL;
+   struct deque_iterator* iter = NULL;
+   struct main_configuration* config;
+   int rc = 1;
+
+   config = (struct main_configuration*)shmem;
+
+   if (backup_info == NULL)
+   {
+      return 1;
+   }
+
+   gcs_root = gcs_get_basepath(server, backup_info->label);
+   local_root = pgmoneta_get_server_backup_identifier(server, backup_info->label);
+
+   if (pgmoneta_extraction_get_suffix(backup_info->compression, backup_info->encryption, &suffix))
+   {
+      pgmoneta_log_error("GCS verify: failed to get suffix for %s/%s",
+                         config->common.servers[server].name, backup_info->label);
+      goto cleanup;
+   }
+
+   manifest_path = pgmoneta_append(pgmoneta_append(NULL, local_root), "backup.manifest");
+   if (pgmoneta_manifest_get_paths(manifest_path, &paths))
+   {
+      pgmoneta_log_error("GCS verify: failed to read manifest %s", manifest_path);
+      goto cleanup;
+   }
+
+   if (pgmoneta_deque_iterator_create(paths, &iter))
+   {
+      goto cleanup;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* file_path = iter->tag;
+      int exists;
+
+      remote_path = pgmoneta_append(remote_path, "data/");
+      remote_path = pgmoneta_append(remote_path, file_path);
+
+      /* Same naming as the upload */
+      if (suffix != NULL &&
+          !pgmoneta_ends_with(file_path, "backup_label") &&
+          !pgmoneta_ends_with(file_path, "backup_manifest"))
+      {
+         remote_path = pgmoneta_append(remote_path, suffix);
+      }
+
+      exists = gcs_object_exists(gcs_root, remote_path, server);
+      if (exists != 1)
+      {
+         pgmoneta_log_error("GCS verify: %s object %s for %s/%s",
+                            exists == 0 ? "missing" : "could not check",
+                            remote_path, config->common.servers[server].name, backup_info->label);
+         goto cleanup;
+      }
+
+      free(remote_path);
+      remote_path = NULL;
+   }
+
+   pgmoneta_log_info("GCS verify: %s/%s completed",
+                     config->common.servers[server].name, backup_info->label);
+   rc = 0;
+
+cleanup:
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(paths);
+   free(gcs_root);
+   free(local_root);
+   free(manifest_path);
+   free(remote_path);
+   free(suffix);
+
    return rc;
 }

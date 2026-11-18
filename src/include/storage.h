@@ -121,6 +121,16 @@ int
 azure_verify_backup(int server, struct backup* backup_info);
 
 /**
+ * Verify a GCS-only backup by checking that every object exists
+ *
+ * @param server The server index
+ * @param backup_info The backup info
+ * @return 0 on success, otherwise 1
+ */
+int
+gcs_verify_backup(int server, struct backup* backup_info);
+
+/**
  * Create a workflow for the GCS storage engine
  * @param workflow_type The workflow type
  * @return The workflow

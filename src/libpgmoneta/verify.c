@@ -1105,6 +1105,12 @@ pgmoneta_sha512_verification(char** argv)
             remote_verify = true;
             azure_verify = true;
          }
+         else if ((config->storage_engine & STORAGE_ENGINE_GCS) &&
+                  !pgmoneta_is_storage_engine_enabled(STORAGE_ENGINE_LOCAL))
+         {
+            /* The local data/ directory is removed after the upload */
+            remote_verify = true;
+         }
 
          if (remote_verify)
          {
