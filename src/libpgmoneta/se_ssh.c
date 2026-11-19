@@ -62,6 +62,8 @@ static int read_latest_backup_sha256(char* path);
 static int sftp_make_directory(char* local_dir, char* remote_dir);
 static int sftp_copy_directory(char* local_root, char* remote_root, char* relative_path);
 static int sftp_copy_file(char* local_root, char* remote_root, char* relative_path);
+static char* sftp_resolve_link_target(char* path);
+static int sftp_link_file(char* target, char* path);
 static int sftp_wal_prepare(sftp_file* file, int segsize);
 static bool sftp_exists(char* path);
 static int sftp_get_file_size(char* file_path, size_t* file_size);
@@ -661,6 +663,7 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
    char* sha256 = NULL;
    char* latest_sha256 = NULL;
    char* latest_backup_path = NULL;
+   char* link_target = NULL;
    char buffer[16384];
    FILE* sfile = NULL;
    sftp_file dfile = NULL;
@@ -692,9 +695,21 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
 
    if (is_link)
    {
-      if (sftp_symlink(sftp, latest_backup_path, d) < 0)
+      /* Link to the file that holds the data, never to another link */
+      link_target = sftp_resolve_link_target(latest_backup_path);
+
+      if (link_target == NULL)
       {
-         pgmoneta_log_error("Failed to link remotely: %s", ssh_get_error(session));
+         pgmoneta_log_debug("Could not resolve %s on the remote server, copying %s instead",
+                            latest_backup_path, relative_path);
+         is_link = false;
+      }
+   }
+
+   if (is_link)
+   {
+      if (sftp_link_file(link_target, d))
+      {
          goto error;
       }
    }
@@ -753,6 +768,7 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
    free(s);
    free(d);
    free(sha256);
+   free(link_target);
 
    if (latest_backup_path != NULL)
    {
@@ -776,6 +792,7 @@ error:
    free(s);
    free(d);
    free(sha256);
+   free(link_target);
 
    if (latest_backup_path != NULL)
    {
@@ -783,6 +800,104 @@ error:
    }
 
    return 1;
+}
+
+/**
+ * Find the remote file that actually holds the data for path.
+ *
+ * Unchanged files reference the previous backup. If that entry is itself
+ * a symlink (made by an older pgmoneta, or by a server without hard link
+ * support), follow it so the new entry points at the data directly
+ * instead of growing a chain that ends in ELOOP and breaks on delete.
+ *
+ * @param path The path in the previous backup
+ * @return The resolved path (caller frees), or NULL if it can't be resolved
+ */
+static char*
+sftp_resolve_link_target(char* path)
+{
+   char* current = NULL;
+   char* target = NULL;
+   sftp_attributes attr = NULL;
+
+   current = pgmoneta_append(current, path);
+
+   /* Bounded like the kernel's MAXSYMLINKS so a loop can't spin forever */
+   for (int i = 0; i < 40; i++)
+   {
+      attr = sftp_lstat(sftp, current);
+
+      if (attr == NULL)
+      {
+         goto error;
+      }
+
+      if (attr->type != SSH_FILEXFER_TYPE_SYMLINK)
+      {
+         sftp_attributes_free(attr);
+         return current;
+      }
+
+      sftp_attributes_free(attr);
+      attr = NULL;
+
+      target = sftp_readlink(sftp, current);
+
+      if (target == NULL)
+      {
+         goto error;
+      }
+
+      free(current);
+      current = NULL;
+      current = pgmoneta_append(current, target);
+      ssh_string_free_char(target);
+      target = NULL;
+   }
+
+   pgmoneta_log_warn("Too many levels of symbolic links: %s", path);
+
+error:
+
+   free(current);
+
+   return NULL;
+}
+
+/**
+ * Make path reference target, preferring a hard link.
+ *
+ * A hard link has no chain depth and keeps the data alive until the last
+ * backup referencing it is removed. Fall back to a symlink when libssh or
+ * the server doesn't support hardlink@openssh.com.
+ *
+ * @param target The resolved file holding the data
+ * @param path The new entry in the current backup
+ * @return 0 upon success, otherwise 1
+ */
+static int
+sftp_link_file(char* target, char* path)
+{
+#if LIBSSH_VERSION_INT >= SSH_VERSION_INT(0, 11, 0)
+   if (sftp_extension_supported(sftp, "hardlink@openssh.com", "1"))
+   {
+      if (sftp_hardlink(sftp, target, path) == SSH_OK)
+      {
+         return 0;
+      }
+
+      pgmoneta_log_debug("Hard link %s -> %s failed, using a symbolic link: %s",
+                         path, target, ssh_get_error(session));
+   }
+#endif
+
+   if (sftp_symlink(sftp, target, path) < 0)
+   {
+      pgmoneta_log_error("Failed to link remotely: %s", ssh_get_error(session));
+      return 1;
+   }
+
+   return 0;
 }
 
 static int
