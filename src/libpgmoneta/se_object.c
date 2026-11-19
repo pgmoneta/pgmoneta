@@ -509,8 +509,18 @@ pgmoneta_object_download_files(const struct object_storage_ops* ops, char* root,
          goto error;
       }
 
-      if (workers != NULL && pgmoneta_workers_outcome_ok(workers))
+      if (workers != NULL)
       {
+         if (!pgmoneta_workers_outcome_ok(workers))
+         {
+            /* a worker already failed: stop queueing, the outcome check below fails the job */
+            free(task);
+            task = NULL;
+            free(relative_file);
+            relative_file = NULL;
+            break;
+         }
+
          if (pgmoneta_workers_add(workers, do_download_file, (struct worker_common*)task))
          {
             free(task);
