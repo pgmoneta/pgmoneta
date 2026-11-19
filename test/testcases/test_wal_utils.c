@@ -305,7 +305,15 @@ compare_xlog_record(void* a, void* b)
       return 1;
    }
 
-   if (memcmp(&rec1->header, &rec2->header, sizeof(struct xlog_record)) != 0)
+   /* The writer stamps xl_crc, and the reader has already checked it, so a
+    * record built in memory differs from its read-back copy only there. */
+   struct xlog_record h1;
+   struct xlog_record h2;
+   memcpy(&h1, &rec1->header, sizeof(struct xlog_record));
+   memcpy(&h2, &rec2->header, sizeof(struct xlog_record));
+   h1.xl_crc = 0;
+   h2.xl_crc = 0;
+   if (memcmp(&h1, &h2, sizeof(struct xlog_record)) != 0)
    {
       return 1;
    }
