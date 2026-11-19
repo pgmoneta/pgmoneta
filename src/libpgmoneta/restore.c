@@ -157,7 +157,7 @@ reconstruct_backup_file(int server,
 static void
 do_reconstruct_backup_file(struct worker_common* wc);
 
-static void
+static int
 create_reconstruct_backup_file_input(int server,
                                      char* label,
                                      char* output_dir,
@@ -1835,19 +1835,22 @@ combine_backups_recursive(uint32_t tsoid,
             struct build_backup_file_input* wi = NULL;
             if (pgmoneta_workers_outcome_ok(workers))
             {
-               create_reconstruct_backup_file_input(server,
-                                                    label,
-                                                    ofulldir,
-                                                    relative_prefix,
-                                                    entry->d_name + INCREMENTAL_PREFIX_LENGTH,
-                                                    prior_labels,
-                                                    backups,
-                                                    incremental,
-                                                    files,
-                                                    block_size,
-                                                    relseg_size,
-                                                    workers,
-                                                    &wi);
+               if (create_reconstruct_backup_file_input(server,
+                                                        label,
+                                                        ofulldir,
+                                                        relative_prefix,
+                                                        entry->d_name + INCREMENTAL_PREFIX_LENGTH,
+                                                        prior_labels,
+                                                        backups,
+                                                        incremental,
+                                                        files,
+                                                        block_size,
+                                                        relseg_size,
+                                                        workers,
+                                                        &wi))
+               {
+                  goto error;
+               }
                pgmoneta_workers_add(workers, do_reconstruct_backup_file, (struct worker_common*)wi);
             }
             else
@@ -3350,7 +3353,7 @@ error:
    return;
 }
 
-static void
+static int
 create_reconstruct_backup_file_input(int server,
                                      char* label,
                                      char* output_dir,
@@ -3367,6 +3370,11 @@ create_reconstruct_backup_file_input(int server,
 {
    struct build_backup_file_input* input = NULL;
    input = (struct build_backup_file_input*)malloc(sizeof(struct build_backup_file_input));
+   if (input == NULL)
+   {
+      pgmoneta_log_error("Combine backups: out of memory");
+      return 1;
+   }
    memset(input, 0, sizeof(struct build_backup_file_input));
    input->common.workers = workers;
    input->server = server;
@@ -3381,6 +3389,7 @@ create_reconstruct_backup_file_input(int server,
    input->incremental = incremental;
    input->files = files;
    *wi = input;
+   return 0;
 }
 
 static void

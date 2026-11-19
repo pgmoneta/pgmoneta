@@ -44,7 +44,7 @@ nullPointerOutOfMemory:src/libpgmoneta/keep.c 1
 nullPointerOutOfMemory:src/libpgmoneta/lz4_compression.c 6
 nullPointerOutOfMemory:src/libpgmoneta/message.c 13
 nullPointerOutOfMemory:src/libpgmoneta/network.c 1
-nullPointerOutOfMemory:src/libpgmoneta/restore.c 22
+nullPointerOutOfMemory:src/libpgmoneta/restore.c 10
 nullPointerOutOfMemory:src/libpgmoneta/rfile.c 3
 nullPointerOutOfMemory:src/libpgmoneta/se_azure.c 5
 nullPointerOutOfMemory:src/libpgmoneta/se_s3.c 1
@@ -53,7 +53,6 @@ nullPointerOutOfMemory:src/libpgmoneta/stream.c 4
 nullPointerOutOfMemory:src/libpgmoneta/utils.c 30
 nullPointerOutOfMemory:src/libpgmoneta/vfile_local.c 5
 nullPointerOutOfMemory:src/libpgmoneta/walfile/rm_standby.c 2
-nullPointerOutOfMemory:src/libpgmoneta/walfile/wal_summary.c 4
 nullPointerOutOfMemory:src/libpgmoneta/wf_bzip2.c 1
 nullPointerOutOfMemory:src/libpgmoneta/wf_sha256.c 5
 nullPointerOutOfMemory:src/libpgmoneta/wf_sha512.c 5
