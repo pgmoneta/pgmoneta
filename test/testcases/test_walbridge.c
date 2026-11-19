@@ -1871,7 +1871,6 @@ MCTF_TEST(test_walbridge_reader_cross_segment)
 
    write_long_header_craft(buf, XLP_LONG_HEADER, 32768, 0, sysid, seg_size, blcksz);
    write_page_header_craft(buf, 8192, WAL_MAGIC_V18, 0, 40960, 0);
-   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, 0, 49152, 0);
    write_page_header_craft(buf, 24576, WAL_MAGIC_V18, 0, 57344, 0);
 
    /* fillers exactly fill pages 0-2 and land on page 3. NOTE: a record that
@@ -1879,6 +1878,8 @@ MCTF_TEST(test_walbridge_reader_cross_segment)
     * record starts 24 bytes past the overflow point. */
    write_filler_craft(buf, 40, 8128, 0x41);    /* fills page 0, ends at LSN 8192       */
    write_filler_craft(buf, 8216, 8168, 0x42);  /* overflows p1, ends at LSN 16432      */
+   /* the record above spills 24 bytes onto page 2, which it overwrote */
+   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, XLP_FIRST_IS_CONTRECORD, 49152, 24);
    write_filler_craft(buf, 16432, 8120, 0x43); /* fills page 2, ends at LSN 24576      */
    write_filler_craft(buf, 24600, 8080, 0x44); /* ends at LSN 32704                    */
 
@@ -1916,7 +1917,6 @@ MCTF_TEST(test_walbridge_reader_cross_segment)
    write_long_header_craft(buf, XLP_LONG_HEADER | XLP_FIRST_IS_CONTRECORD, 65536, 56,
                            sysid, seg_size, blcksz);
    write_page_header_craft(buf, 8192, WAL_MAGIC_V18, 0, 73728, 0);
-   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, 0, 81920, 0);
    write_page_header_craft(buf, 24576, WAL_MAGIC_V18, 0, 90112, 0);
 
    /* continuation = payload[38..93] that crossed out of A */
@@ -1927,6 +1927,8 @@ MCTF_TEST(test_walbridge_reader_cross_segment)
 
    write_filler_craft(buf, 96, 8072, 0x51);    /* fills page 0, ends at LSN 8192       */
    write_filler_craft(buf, 8216, 8168, 0x52);  /* overflows p1, ends at LSN 16432      */
+   /* the record above spills 24 bytes onto page 2, which it overwrote */
+   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, XLP_FIRST_IS_CONTRECORD, 81920, 24);
    write_filler_craft(buf, 16432, 8120, 0x53); /* fills page 2, ends at LSN 24576      */
    write_filler_craft(buf, 24600, 8144, 0x54); /* fills page 3, ends at LSN 32768 (EOF) */
 
@@ -2125,11 +2127,12 @@ MCTF_TEST(test_walbridge_reader_cross_segment_long)
 
    write_long_header_craft(buf, XLP_LONG_HEADER, 32768, 0, sysid, seg_size, blcksz);
    write_page_header_craft(buf, 8192, WAL_MAGIC_V18, 0, 40960, 0);
-   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, 0, 49152, 0);
    write_page_header_craft(buf, 24576, WAL_MAGIC_V18, 0, 57344, 0);
 
    write_filler_craft(buf, 40, 8128, 0x41);
    write_filler_craft(buf, 8216, 8168, 0x42);
+   /* the record above spills 24 bytes onto page 2, which it overwrote */
+   write_page_header_craft(buf, 16384, WAL_MAGIC_V18, XLP_FIRST_IS_CONTRECORD, 49152, 24);
    write_filler_craft(buf, 16432, 8120, 0x43);
    write_filler_craft(buf, 24600, 8080, 0x44);
 
