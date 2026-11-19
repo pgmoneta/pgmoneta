@@ -2313,7 +2313,7 @@ cleanup:
  * which would hand callers (wal_summary, walfilter) a truncated record list.
  * The same damage in a still-growing *.partial segment is the unwritten tail
  * and stops the parse cleanly with the records before it. */
-MCTF_TEST(test_walbridge_reader_crc_mismatch)
+MCTF_TEST_NEGATIVE(test_walbridge_reader_crc_mismatch)
 {
    char base[PATH_MAX];
    char seg[PATH_MAX];
