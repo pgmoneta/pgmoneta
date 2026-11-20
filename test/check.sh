@@ -183,7 +183,7 @@ cleanup() {
      remove_postgresql_replica_container
    fi
 
-   if [[ $MODE == "ci" ]] && [[ "$PG_VERSION" == "17" ]] ; then
+   if [[ $MODE == "ci" ]] && [[ "$PG_VERSION" -ge 17 ]] ; then
      echo "Stopping local PostgreSQL $PG_VERSION replica"
      /usr/pgsql-$PG_VERSION/bin/pg_ctl -D /pgdata_replica/ stop 2>/dev/null || true
      $SUDO rm -Rf /pgdata_replica
@@ -490,7 +490,7 @@ workers = 4
 hot_standby = $HOT_STANDBY_DIRECTORY
 hot_standby_overrides = $HOT_STANDBY_DIRECTORY/overrides
 EOF
-   if [[ "$PG_VERSION" == "17" ]]; then
+   if [[ "$PG_VERSION" -ge 17 ]]; then
    cat <<EOF >>$CONFIGURATION_DIRECTORY/pgmoneta.conf
 # replica configuration
 [replica]
@@ -622,7 +622,7 @@ do_setup() {
   if [[ $MODE == "ci" ]]; then
     echo "Start PostgreSQL $PG_VERSION locally"
     start_postgresql
-    if [[ "$PG_VERSION" == "17" ]]; then
+    if [[ "$PG_VERSION" -ge 17 ]]; then
       echo "Start PostgreSQL $PG_VERSION replica locally"
       start_postgresql_replica_local
     fi
@@ -634,7 +634,7 @@ do_setup() {
     rm -Rf "$TABLESPACE_DIR"
     mkdir -p "$TABLESPACE_DIR"
     chmod 777 "$TABLESPACE_DIR"
-    if [[ "$PG_VERSION" == "17" ]]; then
+    if [[ "$PG_VERSION" -ge 17 ]]; then
       echo "Start PostgreSQL $PG_VERSION replica container"
       start_postgresql_replica
     fi
