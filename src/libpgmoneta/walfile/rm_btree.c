@@ -399,7 +399,9 @@ pgmoneta_wal_parse_xl_btree_unlink_page_v13(struct xl_btree_unlink_page* wrapper
 void
 pgmoneta_wal_parse_xl_btree_unlink_page_v14(struct xl_btree_unlink_page* wrapper, void* rec)
 {
-   memcpy(&wrapper->data.v14, rec, sizeof(struct xl_btree_unlink_page_v14));
+   /* The on-disk record stops at leaftopparent; the struct's trailing padding is not in the WAL */
+   memset(&wrapper->data.v14, 0, sizeof(struct xl_btree_unlink_page_v14));
+   memcpy(&wrapper->data.v14, rec, SIZE_OF_BTREE_UNLINK_PAGE_V14);
 }
 
 /**

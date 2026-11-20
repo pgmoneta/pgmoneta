@@ -31,6 +31,8 @@
 
 #include <walfile/wal_reader.h>
 
+#include <stddef.h>
+
 #define XLOG_MULTIXACT_ZERO_OFF_PAGE 0x00
 #define XLOG_MULTIXACT_ZERO_MEM_PAGE 0x10
 #define XLOG_MULTIXACT_CREATE_ID     0x20
@@ -94,6 +96,36 @@ struct xl_multixact_truncate
    multi_xact_offset start_trunc_memb; /**< Starting member offset for truncation. */
    multi_xact_offset end_trunc_memb;   /**< Ending member offset for truncation. */
 };
+
+/**
+ * @struct xl_multixact_create_v19
+ * @brief The PostgreSQL 19 multixact creation record (64-bit member offset).
+ */
+struct xl_multixact_create_v19
+{
+   multi_xact_id mid;                                       /**< New MultiXact's ID. */
+   uint64_t moff;                                           /**< Starting offset in the members file. */
+   int32_t nmembers;                                        /**< Number of member XIDs. */
+   struct multi_xact_member members[FLEXIBLE_ARRAY_MEMBER]; /**< Array of multixact members. */
+};
+
+/**
+ * @struct xl_multixact_truncate_v19
+ * @brief The PostgreSQL 19 multixact truncation record.
+ *
+ * PostgreSQL 19 records the new oldest watermarks instead of the truncated ranges.
+ */
+struct xl_multixact_truncate_v19
+{
+   oid oldest_multi_db;        /**< OID of the oldest database with active multixacts. */
+   multi_xact_id oldest_multi; /**< Truncate multixact offsets older than this. */
+   uint64_t oldest_offset;     /**< Truncate multixact members older than this. */
+};
+
+#define SIZE_OF_MULTIXACT_CREATE       (offsetof(struct xl_multixact_create, members))
+#define SIZE_OF_MULTIXACT_CREATE_V19   (offsetof(struct xl_multixact_create_v19, members))
+#define SIZE_OF_MULTIXACT_TRUNCATE     (sizeof(struct xl_multixact_truncate))
+#define SIZE_OF_MULTIXACT_TRUNCATE_V19 (sizeof(struct xl_multixact_truncate_v19))
 
 /**
  * Describes a multixact operation from a decoded XLOG record.
