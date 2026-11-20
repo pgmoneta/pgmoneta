@@ -100,7 +100,7 @@ jobs:
       matrix:
         compiler: [gcc, clang]
         build_type: [Debug, Release]
-        pg_version: [14, 15, 17]
+        pg_version: [14, 15, 17, 19]
         exclude:
           - pg_version: 14
             compiler: gcc
@@ -118,6 +118,15 @@ jobs:
             compiler: gcc
             build_type: Release
           - pg_version: 15
+            compiler: clang
+            build_type: Release
+          - pg_version: 19
+            compiler: gcc
+            build_type: Debug
+          - pg_version: 19
+            compiler: gcc
+            build_type: Release
+          - pg_version: 19
             compiler: clang
             build_type: Release
       fail-fast: false
