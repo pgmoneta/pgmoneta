@@ -400,6 +400,9 @@ struct xl_btree_unlink_page_v14
    block_number leaftopparent;         /**< Next child down in the subtree. */
 };
 
+/* WAL size of xl_btree_unlink_page_v14, excluding the struct's trailing padding */
+#define SIZE_OF_BTREE_UNLINK_PAGE_V14 (offsetof(struct xl_btree_unlink_page_v14, leaftopparent) + sizeof(block_number))
+
 /**
  * @struct xl_btree_unlink_page
  * @brief A wrapper struct containing versioned xl_btree_unlink_page data.

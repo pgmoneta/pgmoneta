@@ -38,6 +38,7 @@
 #include <walfile/rmgr.h>
 #include <walfile/rm_heap.h>
 #include <walfile/rm_mxact.h>
+#include <walfile/rm_btree.h>
 #include <walfile/rm_gist.h>
 #include <walfile/rm_clog.h>
 #include <walfile/rm_commit_ts.h>
@@ -2795,6 +2796,260 @@ MCTF_TEST(test_walbridge_clog_commit_ts_zeropage_version_boundary)
    desc = pgmoneta_wal_commit_ts_desc(NULL, rec);
    MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe PG17 CommitTs record failed");
    MCTF_ASSERT_INT_EQ(strcmp(desc, "4295090752"), 0, cleanup, "PG17 CommitTs must read a 8-byte page number");
+
+cleanup:
+   free(desc);
+   destroy_decoded_record(rec);
+   if (config)
+   {
+      server_config = NULL;
+   }
+   MCTF_FINISH();
+}
+
+static void
+put_multixact_members(char* dst, const uint32_t* xids, const int32_t* statuses, int n)
+{
+   for (int i = 0; i < n; i++)
+   {
+      memcpy(dst + (size_t)i * 8, &xids[i], sizeof(uint32_t));
+      memcpy(dst + (size_t)i * 8 + 4, &statuses[i], sizeof(int32_t));
+   }
+}
+
+MCTF_TEST(test_walinfo_multixact_create_members)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   struct decoded_xlog_record* rec = NULL;
+   char data[12 + 4 * 8];
+   uint32_t mid = 42;
+   uint32_t moff = 1000;
+   int32_t nmembers = 4;
+   uint32_t xids[4] = {100, 101, 102, 103};
+   int32_t statuses[4] = {MULTI_XACT_STATUS_FOR_KEY_SHARE, MULTI_XACT_STATUS_FOR_SHARE,
+                          MULTI_XACT_STATUS_FOR_UPDATE, MULTI_XACT_STATUS_UPDATE};
+   char* desc = NULL;
+
+   MCTF_ASSERT_PTR_NONNULL(config, cleanup, "shared configuration unavailable");
+   MCTF_ASSERT_INT_EQ((int)sizeof(struct multi_xact_member), 8, cleanup, "multixact member must be 8 bytes on disk");
+   server_config = &config->common.servers[0];
+
+   memcpy(data, &mid, 4);
+   memcpy(data + 4, &moff, 4);
+   memcpy(data + 8, &nmembers, 4);
+   put_multixact_members(data + 12, xids, statuses, 4);
+
+   rec = create_decoded_record(RM_MULTIXACT_ID, XLOG_MULTIXACT_CREATE_ID, 0x1000, data, sizeof(data));
+   MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "create multixact record failed");
+   server_config->version = 18;
+   desc = pgmoneta_wal_multixact_desc(NULL, rec);
+   MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe multixact create failed");
+   MCTF_ASSERT_INT_EQ(strcmp(desc, "42 offset 1000 nmembers 4: 100 (keysh) 101 (sh) 102 (forupd) 103 (upd) "), 0,
+                      cleanup, "every multixact member must be in the output");
+
+cleanup:
+   free(desc);
+   destroy_decoded_record(rec);
+   if (config)
+   {
+      server_config = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walinfo_multixact_create_v19)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   struct decoded_xlog_record* rec = NULL;
+   char data_v18[12 + 2 * 8];
+   char data_v19[20 + 2 * 8];
+   uint32_t mid = 7;
+   uint32_t moff32 = 300;
+   uint64_t moff64 = UINT64_C(4294967396);
+   int32_t nmembers = 2;
+   uint32_t xids[2] = {500, 501};
+   int32_t statuses[2] = {MULTI_XACT_STATUS_FOR_NO_KEY_UPDATE, MULTI_XACT_STATUS_NO_KEY_UPDATE};
+   char* desc = NULL;
+
+   MCTF_ASSERT_PTR_NONNULL(config, cleanup, "shared configuration unavailable");
+   MCTF_ASSERT_INT_EQ((int)SIZE_OF_MULTIXACT_CREATE, 12, cleanup, "PG18 multixact create header must be 12 bytes");
+   MCTF_ASSERT_INT_EQ((int)SIZE_OF_MULTIXACT_CREATE_V19, 20, cleanup, "PG19 multixact create header must be 20 bytes");
+   server_config = &config->common.servers[0];
+
+   /* PG19: {mid; pad; uint64 moff; nmembers; members} */
+   memset(data_v19, 0, sizeof(data_v19));
+   memcpy(data_v19, &mid, 4);
+   memcpy(data_v19 + 8, &moff64, 8);
+   memcpy(data_v19 + 16, &nmembers, 4);
+   put_multixact_members(data_v19 + 20, xids, statuses, 2);
+
+   rec = create_decoded_record(RM_MULTIXACT_ID, XLOG_MULTIXACT_CREATE_ID, 0x1000, data_v19, sizeof(data_v19));
+   MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "create PG19 multixact record failed");
+   server_config->version = 19;
+   desc = pgmoneta_wal_multixact_desc(NULL, rec);
+   MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe PG19 multixact create failed");
+   MCTF_ASSERT_INT_EQ(strcmp(desc, "7 offset 4294967396 nmembers 2: 500 (fornokeyupd) 501 (nokeyupd) "), 0,
+                      cleanup, "PG19 multixact create must read a 64-bit offset");
+   free(desc);
+   desc = NULL;
+   destroy_decoded_record(rec);
+   rec = NULL;
+
+   /* PG18: {mid; uint32 moff; nmembers; members} */
+   memcpy(data_v18, &mid, 4);
+   memcpy(data_v18 + 4, &moff32, 4);
+   memcpy(data_v18 + 8, &nmembers, 4);
+   put_multixact_members(data_v18 + 12, xids, statuses, 2);
+
+   rec = create_decoded_record(RM_MULTIXACT_ID, XLOG_MULTIXACT_CREATE_ID, 0x1000, data_v18, sizeof(data_v18));
+   MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "create PG18 multixact record failed");
+   server_config->version = 18;
+   desc = pgmoneta_wal_multixact_desc(NULL, rec);
+   MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe PG18 multixact create failed");
+   MCTF_ASSERT_INT_EQ(strcmp(desc, "7 offset 300 nmembers 2: 500 (fornokeyupd) 501 (nokeyupd) "), 0,
+                      cleanup, "PG18 multixact create must read a 32-bit offset");
+
+cleanup:
+   free(desc);
+   destroy_decoded_record(rec);
+   if (config)
+   {
+      server_config = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walinfo_multixact_truncate_v19)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   struct decoded_xlog_record* rec = NULL;
+   char data_v19[16];
+   uint32_t data_v18[5] = {1, 1, 7, 2, 9};
+   uint32_t oldest_db = 1;
+   uint32_t oldest_multi = 7;
+   uint64_t oldest_offset = UINT64_C(4294967301);
+   char* desc = NULL;
+
+   MCTF_ASSERT_PTR_NONNULL(config, cleanup, "shared configuration unavailable");
+   MCTF_ASSERT_INT_EQ((int)SIZE_OF_MULTIXACT_TRUNCATE_V19, 16, cleanup, "PG19 multixact truncate must be 16 bytes");
+   server_config = &config->common.servers[0];
+
+   memcpy(data_v19, &oldest_db, 4);
+   memcpy(data_v19 + 4, &oldest_multi, 4);
+   memcpy(data_v19 + 8, &oldest_offset, 8);
+
+   rec = create_decoded_record(RM_MULTIXACT_ID, XLOG_MULTIXACT_TRUNCATE_ID, 0x1000, data_v19, sizeof(data_v19));
+   MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "create PG19 truncate record failed");
+   server_config->version = 19;
+   desc = pgmoneta_wal_multixact_desc(NULL, rec);
+   MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe PG19 truncate failed");
+   MCTF_ASSERT_INT_EQ(strcmp(desc, "oldestMulti 7, oldestOffset 4294967301"), 0,
+                      cleanup, "PG19 multixact truncate must match pg_waldump");
+   free(desc);
+   desc = NULL;
+   destroy_decoded_record(rec);
+   rec = NULL;
+
+   rec = create_decoded_record(RM_MULTIXACT_ID, XLOG_MULTIXACT_TRUNCATE_ID, 0x1000, data_v18, sizeof(data_v18));
+   MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "create PG18 truncate record failed");
+   server_config->version = 18;
+   desc = pgmoneta_wal_multixact_desc(NULL, rec);
+   MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe PG18 truncate failed");
+   MCTF_ASSERT_INT_EQ(strcmp(desc, "offsets [1, 7), members [2, 9)"), 0,
+                      cleanup, "PG18 multixact truncate must match pg_waldump");
+
+cleanup:
+   free(desc);
+   destroy_decoded_record(rec);
+   if (config)
+   {
+      server_config = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walinfo_multixact_zero_page_version_boundary)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   struct decoded_xlog_record* rec = NULL;
+   int pageno_v16 = 123456;
+   int64_t pageno_v17 = INT64_C(4295090752);
+   uint8_t infos[2] = {XLOG_MULTIXACT_ZERO_OFF_PAGE, XLOG_MULTIXACT_ZERO_MEM_PAGE};
+   char* desc = NULL;
+
+   MCTF_ASSERT_PTR_NONNULL(config, cleanup, "shared configuration unavailable");
+   server_config = &config->common.servers[0];
+
+   for (int i = 0; i < 2; i++)
+   {
+      rec = create_decoded_record(RM_MULTIXACT_ID, infos[i], 0x1000, &pageno_v16, sizeof(pageno_v16));
+      MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "create PG16 zero page record failed");
+      server_config->version = 16;
+      desc = pgmoneta_wal_multixact_desc(NULL, rec);
+      MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe PG16 zero page failed");
+      MCTF_ASSERT_INT_EQ(strcmp(desc, "123456"), 0, cleanup, "PG16 multixact zero page must read a 4-byte page number");
+      free(desc);
+      desc = NULL;
+      destroy_decoded_record(rec);
+      rec = NULL;
+
+      rec = create_decoded_record(RM_MULTIXACT_ID, infos[i], 0x1000, &pageno_v17, sizeof(pageno_v17));
+      MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "create PG17 zero page record failed");
+      server_config->version = 17;
+      desc = pgmoneta_wal_multixact_desc(NULL, rec);
+      MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe PG17 zero page failed");
+      MCTF_ASSERT_INT_EQ(strcmp(desc, "4295090752"), 0, cleanup, "PG17 multixact zero page must read an 8-byte page number");
+      free(desc);
+      desc = NULL;
+      destroy_decoded_record(rec);
+      rec = NULL;
+   }
+
+cleanup:
+   free(desc);
+   destroy_decoded_record(rec);
+   if (config)
+   {
+      server_config = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_walinfo_btree_unlink_page_v14)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+   struct decoded_xlog_record* rec = NULL;
+   char data[36];
+   uint32_t leftsib = 1;
+   uint32_t rightsib = 2;
+   uint32_t level = 3;
+   uint64_t safexid = ((uint64_t)5 << 32) | 77;
+   uint32_t leafleftsib = 10;
+   uint32_t leafrightsib = 11;
+   uint32_t leaftopparent = 12;
+   char* desc = NULL;
+
+   MCTF_ASSERT_PTR_NONNULL(config, cleanup, "shared configuration unavailable");
+   MCTF_ASSERT_INT_EQ((int)SIZE_OF_BTREE_UNLINK_PAGE_V14, 36, cleanup, "PG14+ btree unlink page record must be 36 bytes");
+   server_config = &config->common.servers[0];
+
+   memset(data, 0, sizeof(data));
+   memcpy(data, &leftsib, 4);
+   memcpy(data + 4, &rightsib, 4);
+   memcpy(data + 8, &level, 4);
+   memcpy(data + 16, &safexid, 8);
+   memcpy(data + 24, &leafleftsib, 4);
+   memcpy(data + 28, &leafrightsib, 4);
+   memcpy(data + 32, &leaftopparent, 4);
+
+   /* The record buffer is exactly 36 bytes, so an overread trips ASan */
+   rec = create_decoded_record(RM_BTREE_ID, XLOG_BTREE_UNLINK_PAGE, 0x1000, data, sizeof(data));
+   MCTF_ASSERT_PTR_NONNULL(rec, cleanup, "create btree unlink page record failed");
+   server_config->version = 14;
+   desc = pgmoneta_wal_btree_desc(NULL, rec);
+   MCTF_ASSERT_PTR_NONNULL(desc, cleanup, "describe btree unlink page failed");
+   MCTF_ASSERT_INT_EQ(strcmp(desc, "left 1; right 2; level 3; safexid 5:77; leafleft 10; leafright 11; leaftopparent 12"), 0,
+                      cleanup, "btree unlink page must match pg_waldump");
 
 cleanup:
    free(desc);

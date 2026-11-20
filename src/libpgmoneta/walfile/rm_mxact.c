@@ -30,6 +30,10 @@
 #include <walfile/rm_mxact.h>
 #include <utils.h>
 
+#include <inttypes.h>
+#include <stddef.h>
+#include <string.h>
+
 static char*
 out_member(char* buf, struct multi_xact_member* member)
 {
@@ -65,35 +69,120 @@ char*
 pgmoneta_wal_multixact_desc(char* buf, struct decoded_xlog_record* record)
 {
    char* rec = XLOG_REC_GET_DATA(record);
+   uint32_t rec_len = XLOG_REC_GET_DATA_LEN(record);
    uint8_t info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
 
    if (info == XLOG_MULTIXACT_ZERO_OFF_PAGE ||
        info == XLOG_MULTIXACT_ZERO_MEM_PAGE)
    {
-      int pageno;
+      if (server_config->version >= 17)
+      {
+         /* PostgreSQL 17 widened SLRU page numbers to 64 bits */
+         int64_t pageno = 0;
+         size_t pageno_len = sizeof(int64_t);
 
-      memcpy(&pageno, rec, sizeof(int));
-      buf = pgmoneta_format_and_append(buf, "%d", pageno);
+         if (pageno_len > rec_len)
+         {
+            pageno_len = rec_len;
+         }
+         memcpy(&pageno, rec, pageno_len);
+         buf = pgmoneta_format_and_append(buf, "%" PRId64, pageno);
+      }
+      else
+      {
+         int pageno = 0;
+         size_t pageno_len = sizeof(int);
+
+         if (pageno_len > rec_len)
+         {
+            pageno_len = rec_len;
+         }
+         memcpy(&pageno, rec, pageno_len);
+         buf = pgmoneta_format_and_append(buf, "%d", pageno);
+      }
    }
    else if (info == XLOG_MULTIXACT_CREATE_ID)
    {
-      struct xl_multixact_create* xlrec = (struct xl_multixact_create*)rec;
-      int i;
+      multi_xact_id mid = 0;
+      int32_t nmembers = 0;
+      int32_t max_members;
+      size_t hdr_len;
+      char* members;
 
-      buf = pgmoneta_format_and_append(buf, "%u offset %u nmembers %d: ", xlrec->mid,
-                                       xlrec->moff, xlrec->nmembers);
-      for (i = 0; i < xlrec->nmembers; i++)
+      if (server_config->version >= 19)
       {
-         out_member(buf, &xlrec->members[i]);
+         /* PostgreSQL 19 widened the member offset to 64 bits */
+         uint64_t moff = 0;
+
+         hdr_len = SIZE_OF_MULTIXACT_CREATE_V19;
+         if (rec_len < hdr_len)
+         {
+            return buf;
+         }
+         memcpy(&mid, rec + offsetof(struct xl_multixact_create_v19, mid), sizeof(mid));
+         memcpy(&moff, rec + offsetof(struct xl_multixact_create_v19, moff), sizeof(moff));
+         memcpy(&nmembers, rec + offsetof(struct xl_multixact_create_v19, nmembers), sizeof(nmembers));
+         buf = pgmoneta_format_and_append(buf, "%u offset %" PRIu64 " nmembers %d: ", mid, moff, nmembers);
+      }
+      else
+      {
+         multi_xact_offset moff = 0;
+
+         hdr_len = SIZE_OF_MULTIXACT_CREATE;
+         if (rec_len < hdr_len)
+         {
+            return buf;
+         }
+         memcpy(&mid, rec + offsetof(struct xl_multixact_create, mid), sizeof(mid));
+         memcpy(&moff, rec + offsetof(struct xl_multixact_create, moff), sizeof(moff));
+         memcpy(&nmembers, rec + offsetof(struct xl_multixact_create, nmembers), sizeof(nmembers));
+         buf = pgmoneta_format_and_append(buf, "%u offset %u nmembers %d: ", mid, moff, nmembers);
+      }
+
+      /* Never read members beyond the decoded payload */
+      members = rec + hdr_len;
+      max_members = (int32_t)((rec_len - hdr_len) / sizeof(struct multi_xact_member));
+      if (nmembers > max_members)
+      {
+         nmembers = max_members;
+      }
+
+      for (int32_t i = 0; i < nmembers; i++)
+      {
+         struct multi_xact_member member;
+
+         memcpy(&member, members + (size_t)i * sizeof(struct multi_xact_member), sizeof(member));
+         /* out_member() may reallocate the buffer */
+         buf = out_member(buf, &member);
       }
    }
    else if (info == XLOG_MULTIXACT_TRUNCATE_ID)
    {
-      struct xl_multixact_truncate* xlrec = (struct xl_multixact_truncate*)rec;
+      if (server_config->version >= 19)
+      {
+         struct xl_multixact_truncate_v19 xlrec;
 
-      buf = pgmoneta_format_and_append(buf, "offsets [%u, %u), members [%u, %u)",
-                                       xlrec->start_trunc_off, xlrec->end_trunc_off,
-                                       xlrec->start_trunc_memb, xlrec->end_trunc_memb);
+         if (rec_len < SIZE_OF_MULTIXACT_TRUNCATE_V19)
+         {
+            return buf;
+         }
+         memcpy(&xlrec, rec, sizeof(xlrec));
+         buf = pgmoneta_format_and_append(buf, "oldestMulti %u, oldestOffset %" PRIu64,
+                                          xlrec.oldest_multi, xlrec.oldest_offset);
+      }
+      else
+      {
+         struct xl_multixact_truncate xlrec;
+
+         if (rec_len < SIZE_OF_MULTIXACT_TRUNCATE)
+         {
+            return buf;
+         }
+         memcpy(&xlrec, rec, sizeof(xlrec));
+         buf = pgmoneta_format_and_append(buf, "offsets [%u, %u), members [%u, %u)",
+                                          xlrec.start_trunc_off, xlrec.end_trunc_off,
+                                          xlrec.start_trunc_memb, xlrec.end_trunc_memb);
+      }
    }
    return buf;
 }
