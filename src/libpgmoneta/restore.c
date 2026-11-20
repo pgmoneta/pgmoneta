@@ -1760,7 +1760,7 @@ combine_backups_recursive(uint32_t tsoid,
 
    if (!(dir = opendir(ifulldir)))
    {
-      pgmoneta_log_error("combine backup: could not open directory %s", ofulldir);
+      pgmoneta_log_error("combine backup: could not open directory %s", ifulldir);
       goto error;
    }
    while ((entry = readdir(dir)) != NULL)
@@ -1991,6 +1991,12 @@ reconstruct_backup_file(int server,
    source_map = malloc(sizeof(struct rfile*) * block_length);
    offset_map = malloc(sizeof(off_t) * block_length);
 
+   if ((source_map == NULL || offset_map == NULL) && block_length > 0)
+   {
+      pgmoneta_log_error("reconstruct: could not allocate block maps for %u blocks at file path %s%s", block_length, relative_dir, bare_file_name);
+      goto error;
+   }
+
    memset(source_map, 0, sizeof(struct rfile*) * block_length);
    memset(offset_map, 0, sizeof(off_t) * block_length);
 
@@ -2105,7 +2111,7 @@ reconstruct_backup_file(int server,
    // non-incremental combine must have a full file
    if (!full_file_found && !incremental)
    {
-      pgmoneta_log_error("reconstruct: unable to find full file %s for backup %s", ofullpath, label);
+      pgmoneta_log_error("reconstruct: unable to find full file %s%s for backup %s", relative_dir, base_file_name, label);
       goto error;
    }
 

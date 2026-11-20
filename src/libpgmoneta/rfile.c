@@ -241,6 +241,16 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
          pgmoneta_record_failure(failures, "rfile_initialize: corrupt header in %s (label %s) - cannot read block numbers", rf->filepath, label);
          goto error;
       }
+
+      for (uint32_t i = 0; i < rf->num_blocks; i++)
+      {
+         if (rf->relative_block_numbers[i] >= relseg_size)
+         {
+            pgmoneta_log_error("rfile initialize: file %s has block number %u which is not below the server's segment size %u", rf->filepath, rf->relative_block_numbers[i], relseg_size);
+            pgmoneta_record_failure(failures, "rfile_initialize: block number %u >= segment size in %s (label %s)", rf->relative_block_numbers[i], rf->filepath, label);
+            goto error;
+         }
+      }
    }
 
    rf->header_length = sizeof(uint32_t) * (1 + 1 + 1 + rf->num_blocks);
