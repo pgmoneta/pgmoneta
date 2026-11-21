@@ -89,6 +89,11 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn,
    }
 
    partial_record = malloc(sizeof(struct partial_xlog_record));
+   if (partial_record == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_summarize_wal: failed to allocate partial record");
+      goto error;
+   }
    partial_record->data_buffer_bytes_read = 0;
    partial_record->xlog_record_bytes_read = 0;
    partial_record->xlog_record = NULL;
