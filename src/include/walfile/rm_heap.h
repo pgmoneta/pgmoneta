@@ -257,7 +257,7 @@ struct xl_heap_prune_v17
  * @struct xl_heap_prune_v19
  * @brief Represents a prune operation in the heap (PostgreSQL 19).
  *
- * From PostgreSQL 19 (WAL magic >= 0xD119), the main xl_heap_prune record
+ * From PostgreSQL 19 (WAL magic >= 0xD122), the main xl_heap_prune record
  * contains a 16-bit flags field (no "reason" byte). If XLHP_HAS_CONFLICT_HORIZON
  * is set, snapshot_conflict_horizon follows immediately after flags, unaligned.
  */

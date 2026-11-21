@@ -1732,6 +1732,16 @@ enhance_description(char* record_desc, uint8_t rmid, uint8_t info)
             case XLOG_CHECKPOINT_REDO:
                operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_REDO %s", record_desc);
                break;
+            case XLOG_LOGICAL_DECODING_STATUS_CHANGE:
+               if (server_config->version >= 19)
+               {
+                  operation_desc = pgmoneta_format_and_append(NULL, "LOGICAL_DECODING_STATUS_CHANGE %s", record_desc);
+               }
+               else
+               {
+                  pgmoneta_copy_string(record_desc, &operation_desc);
+               }
+               break;
             default:
                pgmoneta_copy_string(record_desc, &operation_desc);
                break;

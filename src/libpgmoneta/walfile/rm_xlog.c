@@ -390,6 +390,18 @@ pgmoneta_wal_xlog_desc(char* buf, struct decoded_xlog_record* record)
    {
       /* no further information to print */
    }
+   else if (info == XLOG_LOGICAL_DECODING_STATUS_CHANGE && server_config->version >= 19)
+   {
+      bool enabled;
+
+      if (rec == NULL || XLOG_REC_GET_DATA_LEN(record) < sizeof(bool))
+      {
+         return buf;
+      }
+
+      memcpy(&enabled, rec, sizeof(bool));
+      buf = pgmoneta_format_and_append(buf, enabled ? "true" : "false");
+   }
    else if (info == XLOG_BACKUP_END)
    {
       xlog_rec_ptr startpoint;

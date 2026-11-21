@@ -47,6 +47,14 @@
  */
 #define XLOG_ASSIGN_LSN 0xC0
 
+/*
+ * PostgreSQL 19:
+ * XLOG_LOGICAL_DECODING_STATUS_CHANGE (RM_XLOG_ID, 0xF0) records that logical
+ * decoding was enabled or disabled (effective_wal_level). The main data is a
+ * single bool holding the new status.
+ */
+#define XLOG_LOGICAL_DECODING_STATUS_CHANGE 0xF0
+
 /**
  * @struct xl_parameter_change
  * @brief Structure representing a change in parameters important for Hot Standby.
