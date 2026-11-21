@@ -878,6 +878,7 @@ error:
 static int
 sftp_link_file(char* target, char* path)
 {
+// cppcheck-suppress syntaxError ; SSH_VERSION_INT comes from libssh headers that cppcheck does not see
 #if LIBSSH_VERSION_INT >= SSH_VERSION_INT(0, 11, 0)
    if (sftp_extension_supported(sftp, "hardlink@openssh.com", "1"))
    {
