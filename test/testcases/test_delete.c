@@ -26,6 +26,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <management.h>
 #include <pgmoneta.h>
 #include <server.h>
 #include <tsclient.h>
@@ -285,6 +286,46 @@ cleanup:
    if (response_after != NULL)
    {
       pgmoneta_json_destroy(response_after);
+   }
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_pgmoneta_s3_delete_without_s3_engine_fails_early)
+{
+   struct json* response = NULL;
+   struct json* backup = NULL;
+   char* label = NULL;
+   int num_backups = 0;
+
+   pgmoneta_test_setup();
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
+
+   /* The default suite runs with storage_engine = local (no S3):
+    * resolve a real label to keep the request realistic. */
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
+   backup = pgmoneta_tsclient_get_backup(response, 0);
+   MCTF_ASSERT_PTR_NONNULL(backup, cleanup, "backup[0] not found");
+   label = pgmoneta_tsclient_get_backup_label(backup);
+   MCTF_ASSERT_PTR_NONNULL(label, cleanup, "label is null");
+
+   /* s3 delete must fail early with the S3 error code ... */
+   MCTF_ASSERT(pgmoneta_tsclient_s3_delete("primary", label, MANAGEMENT_ERROR_DELETE_S3_ERROR) == 0, cleanup, "s3 delete without S3 engine did not report 3403");
+   pgmoneta_json_destroy(response);
+   response = NULL;
+
+   /* ... and the local backup must stay listed */
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed after refused s3 delete");
+   num_backups = pgmoneta_tsclient_get_backup_count(response);
+   MCTF_ASSERT_INT_EQ(num_backups, 1, cleanup, "expected 1 backup after refused s3 delete");
+   pgmoneta_json_destroy(response);
+   response = NULL;
+
+cleanup:
+   if (response != NULL)
+   {
+      pgmoneta_json_destroy(response);
    }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
