@@ -42,6 +42,7 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
@@ -52,8 +53,10 @@ extern int s3_upload(int server, char* label, int compression, int encryption);
 extern int s3_cleanup(int server, char* label);
 extern int s3_download(int server, char* label, char* local_root);
 extern int azure_upload(int server, char* label, int compression, int encryption);
+extern int azure_cleanup(int server, char* label);
 extern int azure_download(int server, char* label, char* local_root);
 extern int gcs_upload(int server, char* label, int compression, int encryption);
+extern int gcs_cleanup(int server, char* label);
 extern int gcs_download(int server, char* label, char* local_root);
 
 /* The contract each remote backend must implement */
@@ -76,10 +79,10 @@ static const struct storage_engine engines[] = {
     s3_upload, s3_cleanup, s3_download},
    {"Azure", STORAGE_ENGINE_AZURE,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
-    azure_upload, NULL, azure_download},
+    azure_upload, azure_cleanup, azure_download},
    {"GCS", STORAGE_ENGINE_GCS,
     STORAGE_CAP_RANGE_GET | STORAGE_CAP_PARALLEL_SAFE,
-    gcs_upload, NULL, gcs_download},
+    gcs_upload, gcs_cleanup, gcs_download},
 };
 
 #define N_ENGINES ((int)(sizeof(engines) / sizeof(engines[0])))
@@ -101,6 +104,10 @@ static int remote_upload_setup(char*, struct art*);
 static int remote_upload_execute(char*, struct art*);
 static int remote_upload_teardown(char*, struct art*);
 static void maybe_delete_local_data(int server, char* label);
+
+static char* remote_delete_name(void);
+static int remote_delete_execute(char*, struct art*);
+static int remote_noop(char*, struct art*);
 
 static void
 backend_task(struct worker_common* wc)
@@ -144,6 +151,25 @@ pgmoneta_storage_create_remote(void)
    wf->setup = &remote_upload_setup;
    wf->execute = &remote_upload_execute;
    wf->teardown = &remote_upload_teardown;
+   wf->next = NULL;
+
+   return wf;
+}
+
+struct workflow*
+pgmoneta_storage_create_remote_delete(void)
+{
+   struct workflow* wf = malloc(sizeof(struct workflow));
+
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
+   wf->name = &remote_delete_name;
+   wf->setup = &remote_noop;
+   wf->execute = &remote_delete_execute;
+   wf->teardown = &remote_noop;
    wf->next = NULL;
 
    return wf;
@@ -450,4 +476,37 @@ maybe_delete_local_data(int server, char* label)
       pgmoneta_delete_directory(root);
       free(root);
    }
+}
+
+static char*
+remote_delete_name(void)
+{
+   return PHASE_NAME_DELETE;
+}
+
+static int
+remote_delete_execute(char* name __attribute__((unused)), struct art* nodes)
+{
+   int server;
+   char* label;
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+#ifdef DEBUG
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Remote storage engine (delete): %s/%s",
+                      config->common.servers[server].name, label);
+
+   return pgmoneta_storage_remote_cleanup(server, label);
+}
+
+static int
+remote_noop(char* name __attribute__((unused)), struct art* nodes __attribute__((unused)))
+{
+   return 0;
 }

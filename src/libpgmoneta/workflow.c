@@ -1134,9 +1134,11 @@ wf_delete_backup(void)
 
    config = (struct main_configuration*)shmem;
 
-   if (config->storage_engine & STORAGE_ENGINE_S3)
+   if ((config->storage_engine & STORAGE_ENGINE_S3) ||
+       (config->storage_engine & STORAGE_ENGINE_AZURE) ||
+       (config->storage_engine & STORAGE_ENGINE_GCS))
    {
-      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_DELETE_BACKUP);
+      current->next = pgmoneta_storage_create_remote_delete();
       current = current->next;
    }
 
