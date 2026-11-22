@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <tar.h>
 #include <logging.h>
+#include <restore.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -87,8 +88,9 @@ archive_execute(char* name __attribute__((unused)), struct art* nodes)
    char* label = NULL;
    char* root = NULL;
    char* base = NULL;
-   char* src = NULL;
    char* dst = NULL;
+   struct backup* backup = NULL;
+   struct deque* directories = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -100,16 +102,35 @@ archive_execute(char* name __attribute__((unused)), struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
    root = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    pgmoneta_log_debug("Archive (execute): %s/%s", config->common.servers[server].name, label);
 
-   src = pgmoneta_append(src, base);
+   if (pgmoneta_deque_create(false, &directories))
+   {
+      goto error;
+   }
+
+   pgmoneta_deque_add(directories, NULL, (uintptr_t)base, ValueString);
+
+   for (uint64_t i = 0; i < backup->number_of_tablespaces; i++)
+   {
+      char tblspc[MAX_PATH];
+
+      memset(tblspc, 0, MAX_PATH);
+      pgmoneta_snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", root,
+                        config->common.servers[server].name, label,
+                        backup->tablespaces[i]);
+
+      pgmoneta_deque_add(directories, NULL, (uintptr_t)tblspc, ValueString);
+   }
 
    dst = pgmoneta_append(dst, root);
    if (!pgmoneta_ends_with(dst, "/"))
@@ -127,7 +148,7 @@ archive_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_delete_file(dst, NULL);
    }
 
-   if (pgmoneta_tar(src, dst))
+   if (pgmoneta_tar(directories, dst))
    {
       goto error;
    }
@@ -137,14 +158,14 @@ archive_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   free(src);
+   pgmoneta_deque_destroy(directories);
    free(dst);
 
    return 0;
 
 error:
 
-   free(src);
+   pgmoneta_deque_destroy(directories);
    free(dst);
 
    return 1;
@@ -155,7 +176,9 @@ archive_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
+   char* root = NULL;
    char* destination = NULL;
+   struct backup* backup = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -165,11 +188,15 @@ archive_teardown(char* name __attribute__((unused)), struct art* nodes)
 
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   root = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    pgmoneta_log_debug("Archive (teardown): %s/%s", config->common.servers[server].name, label);
 
@@ -179,6 +206,8 @@ archive_teardown(char* name __attribute__((unused)), struct art* nodes)
    {
       pgmoneta_delete_directory(destination);
    }
+
+   pgmoneta_delete_restore_tablespaces(server, root, backup);
 
    return 0;
 }

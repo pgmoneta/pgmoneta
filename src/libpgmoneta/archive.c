@@ -64,6 +64,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 {
    bool active = false;
    bool locked = false;
+   bool restored = false;
    char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
@@ -236,6 +237,7 @@ job_error:
       ec = MANAGEMENT_ERROR_ARCHIVE_RESTORE;
       goto error;
    }
+   restored = true;
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, backup);
 
@@ -334,6 +336,11 @@ error:
    if (pgmoneta_exists(real_directory))
    {
       pgmoneta_delete_directory(real_directory);
+   }
+
+   if (restored)
+   {
+      pgmoneta_delete_restore_tablespaces(server, directory, backup);
    }
 
    pgmoneta_management_response_error_with_nodes(ssl, client_fd,

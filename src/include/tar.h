@@ -33,14 +33,16 @@
 extern "C" {
 #endif
 
+#include <deque.h>
+
 /**
- * Create a tar archive of the given directory
- * @param src The source directory
+ * Create a tar archive of the given directories
+ * @param directories The source directories
  * @param dst The destination tar file path
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tar(char* src, char* dst);
+pgmoneta_tar(struct deque* directories, char* dst);
 
 /**
  * Extract a tar archive to the given directory

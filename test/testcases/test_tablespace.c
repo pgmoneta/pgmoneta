@@ -28,6 +28,8 @@
  */
 
 #include <pgmoneta.h>
+#include <deque.h>
+#include <extraction.h>
 #include <mctf.h>
 #include <message.h>
 #include <network.h>
@@ -54,7 +56,7 @@
 
 static int populate_tablespaces(SSL* ssl, int socket);
 static int append_tablespace_rows(SSL* ssl, int socket);
-static int count_restored_tablespace_links(void);
+static int count_tablespace_links(char* directory);
 
 MCTF_TEST(test_pgmoneta_tablespace_backup)
 {
@@ -100,7 +102,7 @@ MCTF_TEST(test_pgmoneta_tablespace_restore)
    MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "Backup of a cluster with tablespaces failed");
 
    MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "Restore of a cluster with tablespaces failed");
-   MCTF_ASSERT(count_restored_tablespace_links() >= 2, cleanup, "Restored cluster does not contain the two tablespaces");
+   MCTF_ASSERT(count_tablespace_links(TEST_RESTORE_DIR) >= 2, cleanup, "Restored cluster does not contain the two tablespaces");
 
 cleanup:
 
@@ -177,9 +179,70 @@ MCTF_TEST(test_pgmoneta_tablespace_restore_incremental)
    MCTF_ASSERT(pgmoneta_tsclient_backup("primary", "newest", false, NULL, 0) == 0, cleanup, "Incremental backup of a cluster with tablespaces failed");
 
    MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", false, 0) == 0, cleanup, "Restore of an incremental backup with tablespaces failed");
-   MCTF_ASSERT(count_restored_tablespace_links() >= 2, cleanup, "Restored cluster does not contain the two tablespaces");
+   MCTF_ASSERT(count_tablespace_links(TEST_RESTORE_DIR) >= 2, cleanup, "Restored cluster does not contain the two tablespaces");
 
 cleanup:
+
+   pgmoneta_test_cleanup_connection(&ssl, &socket);
+   pgmoneta_test_basedir_cleanup();
+
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_tablespace_archive)
+{
+   SSL* ssl = NULL;
+   int socket = -1;
+   char archive_dir[MAX_PATH];
+   char extract_dir[MAX_PATH];
+   char archive[MAX_PATH];
+   char* destination = NULL;
+   int number_of_directories = 0;
+   char** directories = NULL;
+   struct deque* files = NULL;
+
+   pgmoneta_test_setup();
+
+   memset(archive_dir, 0, MAX_PATH);
+   pgmoneta_snprintf(archive_dir, MAX_PATH, "%s/archive_tablespace", TEST_BASE_DIR);
+   pgmoneta_mkdir(archive_dir);
+
+   memset(extract_dir, 0, MAX_PATH);
+   pgmoneta_snprintf(extract_dir, MAX_PATH, "%s/archive_tablespace_extract", TEST_BASE_DIR);
+   pgmoneta_mkdir(extract_dir);
+
+   MCTF_ASSERT(pgmoneta_test_connect_user(&ssl, &socket) == 0, cleanup, "Failed to connect to %s as the test user", "mydb");
+   MCTF_ASSERT(populate_tablespaces(ssl, socket) == 0, cleanup, "Failed to create/populate tables in tablespaces");
+   pgmoneta_test_cleanup_connection(&ssl, &socket);
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "Backup of a cluster with tablespaces failed");
+
+   MCTF_ASSERT(pgmoneta_tsclient_archive("primary", "newest", "current", archive_dir, false, 0) == 0, cleanup, "Archive of a cluster with tablespaces failed");
+
+   MCTF_ASSERT(pgmoneta_get_directories(archive_dir, &number_of_directories, &directories) == 0, cleanup, "Failed to list the archive directory");
+   MCTF_ASSERT_INT_EQ(number_of_directories, 0, cleanup, "Archive left restored directories behind");
+
+   MCTF_ASSERT(pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, archive_dir, false, &files) == 0, cleanup, "Failed to list the archive files");
+   MCTF_ASSERT_INT_EQ(pgmoneta_deque_size(files), 1, cleanup, "Expected exactly one archive file");
+
+   memset(archive, 0, MAX_PATH);
+   pgmoneta_snprintf(archive, MAX_PATH, "%s/%s", archive_dir, (char*)pgmoneta_deque_peek(files, NULL));
+
+   destination = extract_dir;
+   MCTF_ASSERT(pgmoneta_extract_file(archive, PGMONETA_FILE_TYPE_UNKNOWN, false, NULL, &destination) == 0, cleanup, "Failed to extract the archive");
+   MCTF_ASSERT(count_tablespace_links(extract_dir) >= 2, cleanup, "Archive does not contain the two tablespaces");
+
+cleanup:
+
+   for (int i = 0; i < number_of_directories; i++)
+   {
+      free(directories[i]);
+   }
+   free(directories);
+
+   pgmoneta_deque_destroy(files);
+   pgmoneta_delete_directory(archive_dir);
+   pgmoneta_delete_directory(extract_dir);
 
    pgmoneta_test_cleanup_connection(&ssl, &socket);
    pgmoneta_test_basedir_cleanup();
@@ -236,13 +299,13 @@ append_tablespace_rows(SSL* ssl, int socket)
 }
 
 static int
-count_restored_tablespace_links(void)
+count_tablespace_links(char* directory)
 {
    DIR* root = NULL;
    struct dirent* entry = NULL;
    int count = 0;
 
-   root = opendir(TEST_RESTORE_DIR);
+   root = opendir(directory);
    if (root == NULL)
    {
       return 0;
@@ -259,7 +322,7 @@ count_restored_tablespace_links(void)
          continue;
       }
 
-      tblspc_dir = pgmoneta_append(tblspc_dir, TEST_RESTORE_DIR);
+      tblspc_dir = pgmoneta_append(tblspc_dir, directory);
 
       if (!pgmoneta_ends_with(tblspc_dir, "/"))
       {
@@ -275,7 +338,17 @@ count_restored_tablespace_links(void)
       {
          while ((link = readdir(tblspc)) != NULL)
          {
-            if (strcmp(link->d_name, ".") && strcmp(link->d_name, ".."))
+            char path[MAX_PATH];
+
+            if (!strcmp(link->d_name, ".") || !strcmp(link->d_name, ".."))
+            {
+               continue;
+            }
+
+            memset(path, 0, MAX_PATH);
+            pgmoneta_snprintf(path, MAX_PATH, "%s/%s", tblspc_dir, link->d_name);
+
+            if (pgmoneta_is_directory(path))
             {
                count++;
             }

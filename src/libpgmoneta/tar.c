@@ -39,55 +39,20 @@
 #include <string.h>
 #include <sys/stat.h>
 
+static int write_tar_directory(struct archive* a, char* src);
 static int write_tar_file(struct archive* a, char* src, char* dst);
 
 int
-pgmoneta_tar(char* src, char* dst)
+pgmoneta_tar(struct deque* directories, char* dst)
 {
    struct archive* a = NULL;
-   char archive_root[MAX_PATH];
+   struct deque_iterator* iter = NULL;
    int status;
-   size_t src_len = 0;
-   size_t end = 0;
-   char* start = NULL;
-   size_t root_len = 0;
 
-   if (src == NULL || dst == NULL)
+   if (pgmoneta_deque_empty(directories) || dst == NULL)
    {
       goto error;
    }
-
-   src_len = strlen(src);
-   end = src_len;
-   while (end > 0 && src[end - 1] == '/')
-   {
-      end--;
-   }
-
-   if (end == 0)
-   {
-      goto error;
-   }
-
-   start = src;
-   for (size_t i = end; i > 0; i--)
-   {
-      if (src[i - 1] == '/')
-      {
-         start = &src[i];
-         break;
-      }
-   }
-
-   root_len = end - (size_t)(start - src);
-   if (root_len == 0 || root_len >= sizeof(archive_root))
-   {
-      goto error;
-   }
-
-   memset(archive_root, 0, sizeof(archive_root));
-   memcpy(archive_root, start, root_len);
-   archive_root[root_len] = '\0';
 
    a = archive_write_new();
    if (a == NULL)
@@ -103,10 +68,17 @@ pgmoneta_tar(char* src, char* dst)
       pgmoneta_log_error("Could not create tar file %s", dst);
       goto error;
    }
-   if (write_tar_file(a, src, archive_root))
+
+   pgmoneta_deque_iterator_create(directories, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
    {
-      goto error;
+      if (write_tar_directory(a, (char*)pgmoneta_value_data(iter->value)))
+      {
+         goto error;
+      }
    }
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
 
    if (archive_write_close(a) != ARCHIVE_OK)
    {
@@ -118,6 +90,8 @@ pgmoneta_tar(char* src, char* dst)
    return 0;
 
 error:
+   pgmoneta_deque_iterator_destroy(iter);
+
    if (a != NULL)
    {
       archive_write_close(a);
@@ -222,6 +196,58 @@ error:
       archive_read_close(a);
       archive_read_free(a);
    }
+   return 1;
+}
+
+static int
+write_tar_directory(struct archive* a, char* src)
+{
+   char archive_root[MAX_PATH];
+   size_t src_len = 0;
+   size_t end = 0;
+   char* start = NULL;
+   size_t root_len = 0;
+
+   if (src == NULL)
+   {
+      goto error;
+   }
+
+   src_len = strlen(src);
+   end = src_len;
+   while (end > 0 && src[end - 1] == '/')
+   {
+      end--;
+   }
+
+   if (end == 0)
+   {
+      goto error;
+   }
+
+   start = src;
+   for (size_t i = end; i > 0; i--)
+   {
+      if (src[i - 1] == '/')
+      {
+         start = &src[i];
+         break;
+      }
+   }
+
+   root_len = end - (size_t)(start - src);
+   if (root_len == 0 || root_len >= sizeof(archive_root))
+   {
+      goto error;
+   }
+
+   memset(archive_root, 0, sizeof(archive_root));
+   memcpy(archive_root, start, root_len);
+   archive_root[root_len] = '\0';
+
+   return write_tar_file(a, src, archive_root);
+
+error:
    return 1;
 }
 

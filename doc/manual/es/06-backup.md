@@ -484,6 +484,9 @@ que tomará el backup más reciente y todos los segmentos Write-Ahead Log (WAL) 
 un archivo denominado `/tmp/primary-<timestamp>.tar.zstd`. Este archivo contendrá
 una copia actualizada.
 
+Si el cluster tiene tablespaces, sus directorios se incluyen junto al directorio de
+datos, para que los enlaces de `pg_tblspc` funcionen después de extraerlo.
+
 ## Crontab
 
 Vamos a crear un `crontab` de manera que se haga un backup cada día,

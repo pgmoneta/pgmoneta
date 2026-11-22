@@ -514,6 +514,9 @@ which will take the latest backup and all Write-Ahead Log (WAL) segments and cre
 an archive named `/tmp/primary-<timestamp>.tar.zstd`. This archive will contain
 an up-to-date copy.
 
+If the cluster has tablespaces, their directories are included next to the data
+directory, so the `pg_tblspc` links resolve after extraction.
+
 ## Crontab
 
 Lets create a `crontab` such that a backup is made every day,

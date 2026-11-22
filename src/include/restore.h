@@ -87,6 +87,16 @@ int
 pgmoneta_restore_backup(struct art* nodes);
 
 /**
+ * Delete the restored tablespace directories of a backup
+ * @param server The server
+ * @param directory The target root directory
+ * @param backup The backup
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_restore_tablespaces(int server, char* directory, struct backup* backup);
+
+/**
  * Combine the provided backups
  * @param server The server
  * @param label The label of the current backup to combine

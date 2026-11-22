@@ -1008,6 +1008,35 @@ pgmoneta_restore_backup(struct art* nodes)
 }
 
 int
+pgmoneta_delete_restore_tablespaces(int server, char* directory, struct backup* backup)
+{
+   char tblspc[MAX_PATH];
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (directory == NULL || backup == NULL)
+   {
+      return 1;
+   }
+
+   for (uint64_t i = 0; i < backup->number_of_tablespaces; i++)
+   {
+      memset(tblspc, 0, MAX_PATH);
+      pgmoneta_snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", directory,
+                        config->common.servers[server].name, backup->label,
+                        backup->tablespaces[i]);
+
+      if (pgmoneta_exists(tblspc))
+      {
+         pgmoneta_delete_directory(tblspc);
+      }
+   }
+
+   return 0;
+}
+
+int
 pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, char* output_dir, struct deque* prior_labels, struct backup* bck, struct json* manifest, bool incremental, bool combine_as_is, struct art* nodes)
 {
    uint32_t tsoid = 0;
@@ -2835,20 +2864,7 @@ error:
 
    if (workflow_started)
    {
-      for (uint64_t i = 0; i < backup->number_of_tablespaces; i++)
-      {
-         char tblspc[MAX_PATH];
-
-         memset(tblspc, 0, MAX_PATH);
-         pgmoneta_snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", directory,
-                           config->common.servers[server].name, backup->label,
-                           backup->tablespaces[i]);
-
-         if (pgmoneta_exists(tblspc))
-         {
-            pgmoneta_delete_directory(tblspc);
-         }
-      }
+      pgmoneta_delete_restore_tablespaces(server, directory, backup);
    }
 
    free(target_root);

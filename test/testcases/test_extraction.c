@@ -237,6 +237,7 @@ MCTF_TEST(test_extraction_layered_archive)
 {
    struct main_configuration* config = NULL;
    struct test_encryption_env enc_env;
+   struct deque* directories = NULL;
    FILE* f = NULL;
    const char* wal_name = "000000010000000000000001";
    uint32_t file_type = 0;
@@ -289,7 +290,9 @@ MCTF_TEST(test_extraction_layered_archive)
    config->compression_level = 1;
    config->workers = 1;
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_tar(src_dir, tar_path), 0, cleanup, "tar failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_deque_create(false, &directories), 0, cleanup, "deque create failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_deque_add(directories, NULL, (uintptr_t)src_dir, ValueString), 0, cleanup, "deque add failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_tar(directories, tar_path), 0, cleanup, "tar failed");
    MCTF_ASSERT(pgmoneta_exists(tar_path), cleanup, "tar file missing");
 
    MCTF_ASSERT_INT_EQ(pgmoneta_zstandardc_file(tar_path, zstd_path), 0, cleanup, "zstd compression failed");
@@ -316,6 +319,7 @@ cleanup:
       pgmoneta_test_teardown_encryption_env(&enc_env);
    }
 
+   pgmoneta_deque_destroy(directories);
    pgmoneta_delete_directory(root);
    MCTF_FINISH();
 }
