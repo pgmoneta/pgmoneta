@@ -12,6 +12,8 @@ Para ejecutar los tests, simplemente ejecuta `<PATH_TO_PGMONETA>/test/check.sh`.
 e iniciará un contenedor docker/podman usando la imagen (así que asegúrate de tener al menos uno de ellos instalado y el motor de contenedor correspondiente iniciado). 
 El servidor postgres en contenedor tendrá un usuario `repl` con el atributo de replicación, un usuario normal `myuser` y una base de datos `mydb`.
 
+**Versión de PostgreSQL:** Define `TEST_PG_VERSION` para probar otra versión de PostgreSQL, por ejemplo `TEST_PG_VERSION=18 <PATH_TO_PGMONETA>/test/check.sh`. Hay imágenes de prueba para PostgreSQL 14, 15, 16, 17, 18 y 19 en `test/postgresql/src/postgresql<version>/`, y CI ejecuta el conjunto de pruebas contra cada una de ellas. Para PostgreSQL 17 y posteriores el script también inicia una réplica en streaming, que usan el servidor `[replica]` y las pruebas de backup desde réplica.
+
 El script luego inicia pgmoneta y ejecuta pruebas en tu entorno local. Las pruebas se ejecutan localmente para que puedas aprovechar stdout para depuración y
 el entorno de prueba no tendrá problemas de entorno de contenedor extraño, y para que podamos reutilizar las dependencias instaladas y el caché de cmake para acelerar el desarrollo
 y depuración.

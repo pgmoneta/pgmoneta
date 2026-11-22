@@ -12,6 +12,8 @@ To run the tests, simply run `<PATH_TO_PGMONETA>/test/check.sh`. The script will
 and start a docker/podman container using the image (so make sure you at least have one of them installed and have the corresponding container engine started). 
 The containerized postgres server will have a `repl` user with the replication attribute, a normal user `myuser` and a database `mydb`.
 
+**PostgreSQL version:** Set `TEST_PG_VERSION` to test another PostgreSQL version, for example `TEST_PG_VERSION=18 <PATH_TO_PGMONETA>/test/check.sh`. There are test images for PostgreSQL 14, 15, 16, 17, 18 and 19 in `test/postgresql/src/postgresql<version>/`, and CI runs the test suite against each of them. For PostgreSQL 17 and later the script also starts a streaming replica, which is used by the `[replica]` server and the replica backup tests.
+
 The script then starts pgmoneta and runs tests in your local environment. The tests are run locally so that you may leverage stdout to debug and
 the testing environment won't run into weird container environment issues, and so that we can reuse the installed dependencies and cmake cache to speed up development
 and debugging.

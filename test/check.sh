@@ -42,6 +42,19 @@ EXECUTABLE_DIRECTORY=$PROJECT_DIRECTORY/build/src
 TEST_DIRECTORY=$PROJECT_DIRECTORY/build/test
 TEST_PG_DIRECTORY="$PROJECT_DIRECTORY/test/postgresql/src/postgresql$PG_VERSION"
 
+if [[ ! "$PG_VERSION" =~ ^[0-9]+$ ]] || [[ ! -d "$TEST_PG_DIRECTORY" ]]; then
+  echo "TEST_PG_VERSION=$PG_VERSION has no test image in test/postgresql/src/"
+  echo "Available versions: $(ls -d "$PROJECT_DIRECTORY"/test/postgresql/src/postgresql* | sed 's/.*postgresql//' | sort -n | tr '\n' ' ')"
+  exit 1
+fi
+
+# The [replica] server and its tests (test_pgmoneta_replica_backup_*) were added for
+# PostgreSQL 17+ in #1214. Before 17 an incremental backup takes pgmoneta's own path
+# (WAL summary of its archive + pgmoneta_ext_get_blocks()); on 16 a full backup from
+# the replica works, but the incremental one fails because the replica's WAL archive
+# lacks the segments the summary needs.
+PG_REPLICA_MIN_VERSION=17
+
 PGMONETA_ROOT_DIR="/tmp/pgmoneta-test"
 BASE_DIR="$PGMONETA_ROOT_DIR/base"
 COVERAGE_DIR="$PGMONETA_ROOT_DIR/coverage"
@@ -183,7 +196,7 @@ cleanup() {
      remove_postgresql_replica_container
    fi
 
-   if [[ $MODE == "ci" ]] && [[ "$PG_VERSION" -ge 17 ]] ; then
+   if [[ $MODE == "ci" ]] && [[ "$PG_VERSION" -ge $PG_REPLICA_MIN_VERSION ]] ; then
      echo "Stopping local PostgreSQL $PG_VERSION replica"
      /usr/pgsql-$PG_VERSION/bin/pg_ctl -D /pgdata_replica/ stop 2>/dev/null || true
      $SUDO rm -Rf /pgdata_replica
@@ -490,7 +503,7 @@ workers = 4
 hot_standby = $HOT_STANDBY_DIRECTORY
 hot_standby_overrides = $HOT_STANDBY_DIRECTORY/overrides
 EOF
-   if [[ "$PG_VERSION" -ge 17 ]]; then
+   if [[ "$PG_VERSION" -ge $PG_REPLICA_MIN_VERSION ]]; then
    cat <<EOF >>$CONFIGURATION_DIRECTORY/pgmoneta.conf
 # replica configuration
 [replica]
@@ -622,7 +635,7 @@ do_setup() {
   if [[ $MODE == "ci" ]]; then
     echo "Start PostgreSQL $PG_VERSION locally"
     start_postgresql
-    if [[ "$PG_VERSION" -ge 17 ]]; then
+    if [[ "$PG_VERSION" -ge $PG_REPLICA_MIN_VERSION ]]; then
       echo "Start PostgreSQL $PG_VERSION replica locally"
       start_postgresql_replica_local
     fi
@@ -634,7 +647,7 @@ do_setup() {
     rm -Rf "$TABLESPACE_DIR"
     mkdir -p "$TABLESPACE_DIR"
     chmod 777 "$TABLESPACE_DIR"
-    if [[ "$PG_VERSION" -ge 17 ]]; then
+    if [[ "$PG_VERSION" -ge $PG_REPLICA_MIN_VERSION ]]; then
       echo "Start PostgreSQL $PG_VERSION replica container"
       start_postgresql_replica
     fi
@@ -742,6 +755,7 @@ usage() {
    echo " -t, --test NAME     Run only tests matching NAME"
    echo " -m, --module NAME   Run all tests in module NAME"
    echo " -i, --integration   Run only the storage-engine integration tests (all backends)"
+   echo "Note: TEST_PG_VERSION selects the PostgreSQL version (14, 15, 16, 17, 18 or 19; default 17)"
    echo "Note: PGMONETA_TEST_PORT overrides the default container port (6432)"
    echo "Note: PGMONETA_TEST_REPLICA_PORT overrides the default replica container port (primary port + 1)"
    echo "Examples:"
