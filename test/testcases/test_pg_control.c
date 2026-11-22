@@ -31,6 +31,7 @@
 #include <utils.h>
 #include <walfile/pg_control.h>
 #include <walfile/rmgr.h>
+#include <walfile/rm_standby.h>
 #include <walfile/rm_xlog.h>
 #include <walfile/wal_reader.h>
 
@@ -333,5 +334,79 @@ cleanup:
    free(description);
    free(payload);
    server_config = saved;
+   MCTF_FINISH();
+}
+
+/*
+ * XLOG_END_OF_RECOVERY is laid out as { end_time, ThisTimeLineID,
+ * PrevTimeLineID, wal_level }. xlog_desc() must decode the fields in that
+ * order and return the description it built.
+ */
+MCTF_TEST(test_end_of_recovery_description)
+{
+   struct server srv;
+   struct server* saved = server_config;
+   struct decoded_xlog_record record;
+   struct xl_end_of_recovery_v17 eor;
+   char* description = NULL;
+
+   memset(&srv, 0, sizeof(srv));
+   srv.version = 17;
+   server_config = &srv;
+
+   memset(&eor, 0, sizeof(eor));
+   eor.end_time = 0;
+   eor.this_timeline_id = 2;
+   eor.prev_timeline_id = 1;
+   eor.wal_level = WAL_LEVEL_REPLICA;
+
+   memset(&record, 0, sizeof(record));
+   record.header.xl_rmid = RM_XLOG_ID;
+   record.header.xl_info = XLOG_END_OF_RECOVERY;
+   record.main_data = (char*)&eor;
+   record.main_data_len = offsetof(struct xl_end_of_recovery_v17, wal_level) + sizeof(int);
+
+   description = pgmoneta_wal_xlog_desc(NULL, &record);
+   MCTF_ASSERT_PTR_NONNULL(description, cleanup, "end of recovery was not described");
+   MCTF_ASSERT(strncmp(description, "tli 2; prev tli 1; time ", strlen("tli 2; prev tli 1; time ")) == 0, cleanup,
+               "end of recovery has the wrong timelines");
+   MCTF_ASSERT(strstr(description, "; wal_level replica") != NULL, cleanup,
+               "end of recovery has the wrong wal_level");
+   free(description);
+   description = NULL;
+
+   /* A short record is not decoded */
+   record.main_data_len = offsetof(struct xl_end_of_recovery_v17, wal_level);
+   description = pgmoneta_wal_xlog_desc(pgmoneta_append(NULL, "desc:"), &record);
+   MCTF_ASSERT_PTR_NONNULL(description, cleanup, "short record must return the buffer");
+   MCTF_ASSERT_STR_EQ(description, "desc:", cleanup, "short record must not be decoded");
+
+cleanup:
+   free(description);
+   server_config = saved;
+   MCTF_FINISH();
+}
+
+/*
+ * A catalog invalidation message must be appended to the returned buffer.
+ */
+MCTF_TEST(test_standby_desc_catalog_invalidation)
+{
+   union shared_invalidation_message msgs[2];
+   char* description = NULL;
+
+   memset(msgs, 0, sizeof(msgs));
+   msgs[0].cat.id = SHAREDINVALCATALOG_ID;
+   msgs[0].cat.cat_id = 1259;
+   msgs[1].rc.id = SHAREDINVALRELCACHE_ID;
+   msgs[1].rc.rel_id = 16384;
+
+   description = pgmoneta_wal_standby_desc_invalidations(pgmoneta_append(NULL, "desc"), 2, msgs, 0, 0, false);
+   MCTF_ASSERT_PTR_NONNULL(description, cleanup, "invalidations were not described");
+   MCTF_ASSERT_STR_EQ(description, "desc; inval msgs: catalog 1259 relcache 16384", cleanup,
+                      "catalog invalidation is missing from the description");
+
+cleanup:
+   free(description);
    MCTF_FINISH();
 }

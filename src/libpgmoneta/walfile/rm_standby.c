@@ -94,7 +94,7 @@ pgmoneta_wal_standby_desc_invalidations(char* buf, int nmsgs, union shared_inval
       }
       else if (msg->id == SHAREDINVALCATALOG_ID)
       {
-         pgmoneta_format_and_append(buf, " catalog %u", msg->cat.cat_id);
+         buf = pgmoneta_format_and_append(buf, " catalog %u", msg->cat.cat_id);
       }
       else if (msg->id == SHAREDINVALRELCACHE_ID)
       {

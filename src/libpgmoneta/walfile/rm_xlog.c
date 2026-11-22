@@ -36,6 +36,9 @@
 #include <walfile/wal_reader.h>
 #include <walfile/transaction.h>
 
+/* system */
+#include <stddef.h>
+
 struct config_enum_entry wal_level_options[] = {
    {"minimal", WAL_LEVEL_MINIMAL, false},
    {"replica", WAL_LEVEL_REPLICA, false},
@@ -304,28 +307,22 @@ check_point_parse_v19(struct check_point* wrapper, void* rec)
    wrapper->data.v19 = *((struct check_point_v19*)rec);
 }
 
+/* Size of the fields, without trailing struct padding */
+#define XL_END_OF_RECOVERY_V17_SIZE (offsetof(struct xl_end_of_recovery_v17, wal_level) + sizeof(int))
+#define XL_END_OF_RECOVERY_V16_SIZE (offsetof(struct xl_end_of_recovery_v16, prev_timeline_id) + sizeof(timeline_id))
+
 void
 xl_end_of_recovery_parse_v17(struct xl_end_of_recovery* wrapper, void* rec)
 {
-   char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v17.this_timeline_id, ptr, sizeof(uint32_t));
-   ptr += sizeof(uint32_t);
-   memcpy(&wrapper->data.v17.prev_timeline_id, ptr, sizeof(uint32_t));
-   ptr += sizeof(uint32_t);
-   memcpy(&wrapper->data.v17.end_time, ptr, sizeof(timestamp_tz));
-   ptr += sizeof(timestamp_tz);
-   memcpy(&wrapper->data.v17.wal_level, ptr, sizeof(int));
+   /* Same field order as PostgreSQL: end_time comes first */
+   memcpy(&wrapper->data.v17, rec, XL_END_OF_RECOVERY_V17_SIZE);
 }
 
 void
 xl_end_of_recovery_parse_v16(struct xl_end_of_recovery* wrapper, void* rec)
 {
-   char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v16.this_timeline_id, ptr, sizeof(uint32_t));
-   ptr += sizeof(uint32_t);
-   memcpy(&wrapper->data.v16.prev_timeline_id, ptr, sizeof(uint32_t));
-   ptr += sizeof(uint32_t);
-   memcpy(&wrapper->data.v16.end_time, ptr, sizeof(timestamp_tz));
+   /* Same field order as PostgreSQL: end_time comes first */
+   memcpy(&wrapper->data.v16, rec, XL_END_OF_RECOVERY_V16_SIZE);
 }
 
 char*
@@ -450,9 +447,17 @@ pgmoneta_wal_xlog_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_END_OF_RECOVERY)
    {
-      struct xl_end_of_recovery* xlrec = create_xl_end_of_recovery();
+      size_t len = server_config->version >= 17 ? XL_END_OF_RECOVERY_V17_SIZE : XL_END_OF_RECOVERY_V16_SIZE;
+      struct xl_end_of_recovery* xlrec = NULL;
+
+      if (rec == NULL || XLOG_REC_GET_DATA_LEN(record) < len)
+      {
+         return buf;
+      }
+
+      xlrec = create_xl_end_of_recovery();
       xlrec->parse(xlrec, rec);
-      xlrec->format(xlrec, buf);
+      buf = xlrec->format(xlrec, buf);
       free(xlrec);
    }
    else if (info == XLOG_OVERWRITE_CONTRECORD)
