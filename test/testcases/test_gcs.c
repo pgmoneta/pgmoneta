@@ -571,3 +571,44 @@ MCTF_INTEGRATION_TEST(test_gcs_scheduled_verification_keeps_backup_valid)
 cleanup:
    MCTF_FINISH();
 }
+
+/*
+ * Deleting a backup must remove its objects from GCS too, or retention leaves
+ * them behind for good. A fresh backup is used so the shared one stays intact,
+ * and the shared prefix is checked to pin that only the deleted label goes.
+ */
+MCTF_INTEGRATION_TEST(test_gcs_delete_removes_remote_objects)
+{
+   char label[256];
+   char prefix[MAX_PATH];
+   char shared_prefix[MAX_PATH];
+   int before;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   MCTF_ASSERT(mctf_se_backup("primary") == 0, cleanup, "backup to GCS failed");
+   MCTF_ASSERT(mctf_se_newest_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "no label for the new backup");
+   MCTF_ASSERT(strcmp(label, shared_label) != 0, cleanup, "the new backup reused label %s", label);
+
+   snprintf(prefix, sizeof(prefix), "pgmoneta/primary/backup/%s/", label);
+   snprintf(shared_prefix, sizeof(shared_prefix), "pgmoneta/primary/backup/%s/", shared_label);
+
+   before = mctf_se_gcs_object_count_prefix(prefix);
+   MCTF_ASSERT(before > 0, cleanup, "no objects under %s after the backup", prefix);
+
+   MCTF_ASSERT(mctf_se_delete("primary", label) == 0, cleanup, "delete of %s failed", label);
+
+   MCTF_ASSERT_INT_EQ(mctf_se_gcs_object_count_prefix(prefix), 0, cleanup,
+                      "%s still holds objects after deleting %s (%d before)", prefix, label, before);
+   MCTF_ASSERT(mctf_se_gcs_object_count_prefix(shared_prefix) > 0, cleanup,
+               "deleting %s also removed the objects of %s", label, shared_label);
+
+cleanup:
+   MCTF_FINISH();
+}

@@ -96,7 +96,9 @@ static int gcs_upload_files(char* local_root, char* gcs_root, int server, int co
 static int gcs_send_upload_request(char* local_root, char* gcs_root, char* relative_path, char* file_sha512, int server);
 
 static int gcs_send_get_request(char* gcs_root, char* relative_path, struct http_response** response, int server);
-static int gcs_send_object_request(char* gcs_root, char* relative_path, char* query, struct http_response** response, int server);
+static int gcs_send_request(int method, char* request_path, struct http_response** response, int server);
+static int gcs_send_object_request(int method, char* gcs_root, char* relative_path, char* query, struct http_response** response, int server);
+static int gcs_list_objects(int server, char* prefix, struct deque** names);
 static int gcs_object_exists(char* gcs_root, char* relative_path, int server);
 static char* gcs_build_object_path(char* gcs_root, char* relative_path);
 static int gcs_get_object(int server, char* root, char* relative_path, struct http_response** response);
@@ -1372,31 +1374,22 @@ gcs_build_object_path(char* gcs_root, char* relative_path)
 static int
 gcs_send_get_request(char* gcs_root, char* relative_path, struct http_response** response, int server)
 {
-   return gcs_send_object_request(gcs_root, relative_path, "?alt=media", response, server);
+   return gcs_send_object_request(PGMONETA_HTTP_GET, gcs_root, relative_path, "?alt=media", response, server);
 }
 
+/* Send a body-less request for request_path (bucket path plus query) */
 static int
-gcs_send_object_request(char* gcs_root, char* relative_path, char* query, struct http_response** response, int server)
+gcs_send_request(int method, char* request_path, struct http_response** response, int server)
 {
    char* auth_token = NULL;
    char* gcs_host = NULL;
-   char* object_name = NULL;
-   char* encoded_object_name = NULL;
-   char* request_path = NULL;
    int gcs_port;
    bool use_tls;
    struct http* connection = NULL;
    struct http_request* request = NULL;
 
-   char* effective_bucket = gcs_get_effective_bucket(server);
    int effective_port = gcs_get_effective_port(server);
    bool effective_use_tls = gcs_get_effective_use_tls(server);
-
-   object_name = gcs_build_object_path(gcs_root, relative_path);
-   if (object_name == NULL)
-   {
-      goto error;
-   }
 
    gcs_host = gcs_get_host(server);
 
@@ -1425,17 +1418,9 @@ gcs_send_object_request(char* gcs_root, char* relative_path, char* query, struct
       goto error;
    }
 
-   encoded_object_name = gcs_url_encode(object_name);
+   pgmoneta_log_debug("GCS request prepared: host=%s, path=%s", gcs_host, request_path);
 
-   request_path = pgmoneta_append(request_path, "/storage/v1/b/");
-   request_path = pgmoneta_append(request_path, effective_bucket);
-   request_path = pgmoneta_append(request_path, "/o/");
-   request_path = pgmoneta_append(request_path, encoded_object_name);
-   request_path = pgmoneta_append(request_path, query);
-
-   pgmoneta_log_debug("GCS restore request prepared: host=%s, path=%s", gcs_host, request_path);
-
-   if (pgmoneta_http_request_create(PGMONETA_HTTP_GET, request_path, &request))
+   if (pgmoneta_http_request_create(method, request_path, &request))
    {
       goto error;
    }
@@ -1447,16 +1432,13 @@ gcs_send_object_request(char* gcs_root, char* relative_path, char* query, struct
 
    if (pgmoneta_http_invoke(connection, request, response))
    {
-      pgmoneta_log_error("Failed to execute HTTP GET request for %s", object_name);
+      pgmoneta_log_error("Failed to execute HTTP request for %s", request_path);
       goto error;
    }
 
-   pgmoneta_log_debug("GCS GET response: object=%s, status=%d", object_name, (*response)->status_code);
+   pgmoneta_log_debug("GCS response: path=%s, status=%d", request_path, (*response)->status_code);
 
    free(gcs_host);
-   free(object_name);
-   free(encoded_object_name);
-   free(request_path);
    free(auth_token);
 
    pgmoneta_http_request_destroy(request);
@@ -1467,9 +1449,6 @@ gcs_send_object_request(char* gcs_root, char* relative_path, char* query, struct
 error:
 
    free(gcs_host);
-   free(object_name);
-   free(encoded_object_name);
-   free(request_path);
    free(auth_token);
 
    if (connection != NULL)
@@ -1483,6 +1462,38 @@ error:
    }
 
    return 1;
+}
+
+static int
+gcs_send_object_request(int method, char* gcs_root, char* relative_path, char* query, struct http_response** response, int server)
+{
+   char* object_name = NULL;
+   char* encoded_object_name = NULL;
+   char* request_path = NULL;
+   int rc = 1;
+
+   object_name = gcs_build_object_path(gcs_root, relative_path);
+   encoded_object_name = gcs_url_encode(object_name);
+   if (encoded_object_name == NULL)
+   {
+      goto done;
+   }
+
+   request_path = pgmoneta_append(request_path, "/storage/v1/b/");
+   request_path = pgmoneta_append(request_path, gcs_get_effective_bucket(server));
+   request_path = pgmoneta_append(request_path, "/o/");
+   request_path = pgmoneta_append(request_path, encoded_object_name);
+   request_path = pgmoneta_append(request_path, query);
+
+   rc = gcs_send_request(method, request_path, response, server);
+
+done:
+
+   free(object_name);
+   free(encoded_object_name);
+   free(request_path);
+
+   return rc;
 }
 
 static int
@@ -1621,7 +1632,7 @@ gcs_object_exists(char* gcs_root, char* relative_path, int server)
    struct http_response* response = NULL;
    int result = -1;
 
-   if (gcs_send_object_request(gcs_root, relative_path, "", &response, server))
+   if (gcs_send_object_request(PGMONETA_HTTP_GET, gcs_root, relative_path, "", &response, server))
    {
       pgmoneta_log_error("GCS verify: request failed for %s", relative_path);
       goto done;
@@ -1728,6 +1739,210 @@ cleanup:
    free(manifest_path);
    free(remote_path);
    free(suffix);
+
+   return rc;
+}
+
+/*
+ * List the names of all objects starting with prefix, following
+ * nextPageToken until the listing is complete.
+ */
+static int
+gcs_list_objects(int server, char* prefix, struct deque** names)
+{
+   char* encoded_prefix = NULL;
+   char* page_token = NULL;
+   char* encoded_token = NULL;
+   char* request_path = NULL;
+   struct json* listing = NULL;
+   struct json* items = NULL;
+   struct json_iterator* iter = NULL;
+   struct http_response* response = NULL;
+
+   *names = NULL;
+
+   if (pgmoneta_deque_create(false, names))
+   {
+      goto error;
+   }
+
+   encoded_prefix = gcs_url_encode(prefix);
+   if (encoded_prefix == NULL)
+   {
+      goto error;
+   }
+
+   do
+   {
+      request_path = pgmoneta_format_and_append(NULL, "/storage/v1/b/%s/o?prefix=%s&fields=items(name),nextPageToken",
+                                                gcs_get_effective_bucket(server), encoded_prefix);
+      if (page_token != NULL)
+      {
+         encoded_token = gcs_url_encode(page_token);
+         request_path = pgmoneta_format_and_append(request_path, "&pageToken=%s", encoded_token);
+      }
+
+      if (request_path == NULL || gcs_send_request(PGMONETA_HTTP_GET, request_path, &response, server))
+      {
+         goto error;
+      }
+
+      if (response->status_code != 200 || response->payload.data == NULL)
+      {
+         pgmoneta_log_error("GCS list: unexpected status %d for prefix %s", response->status_code, prefix);
+         goto error;
+      }
+
+      if (pgmoneta_json_parse_string(response->payload.data, &listing) || listing == NULL)
+      {
+         pgmoneta_log_error("GCS list: malformed response for prefix %s", prefix);
+         goto error;
+      }
+
+      /* An empty listing has no items key */
+      items = (struct json*)pgmoneta_json_get(listing, "items");
+      if (items != NULL)
+      {
+         if (pgmoneta_json_iterator_create(items, &iter))
+         {
+            goto error;
+         }
+
+         while (pgmoneta_json_iterator_next(iter))
+         {
+            struct json* item = (struct json*)pgmoneta_value_data(iter->value);
+            char* name = (char*)pgmoneta_json_get(item, "name");
+
+            if (name == NULL || pgmoneta_deque_add(*names, NULL, (uintptr_t)name, ValueString))
+            {
+               pgmoneta_log_error("GCS list: malformed item for prefix %s", prefix);
+               goto error;
+            }
+         }
+
+         pgmoneta_json_iterator_destroy(iter);
+         iter = NULL;
+      }
+
+      free(page_token);
+      page_token = NULL;
+
+      if (pgmoneta_json_contains_key(listing, "nextPageToken"))
+      {
+         char* next = (char*)pgmoneta_json_get(listing, "nextPageToken");
+
+         if (next != NULL && strlen(next) > 0)
+         {
+            page_token = pgmoneta_append(NULL, next);
+         }
+      }
+
+      pgmoneta_json_destroy(listing);
+      listing = NULL;
+      pgmoneta_http_response_destroy(response);
+      response = NULL;
+      free(request_path);
+      request_path = NULL;
+      free(encoded_token);
+      encoded_token = NULL;
+   }
+   while (page_token != NULL);
+
+   free(encoded_prefix);
+
+   return 0;
+
+error:
+
+   pgmoneta_json_iterator_destroy(iter);
+   pgmoneta_json_destroy(listing);
+   pgmoneta_http_response_destroy(response);
+   free(encoded_prefix);
+   free(page_token);
+   free(encoded_token);
+   free(request_path);
+   pgmoneta_deque_destroy(*names);
+   *names = NULL;
+
+   return 1;
+}
+
+/*
+ * Delete every object of a backup. The objects are found by listing the
+ * backup prefix, so this also works once the local backup directory is gone.
+ */
+int
+gcs_cleanup(int server, char* label)
+{
+   char* gcs_root = NULL;
+   char* prefix = NULL;
+   struct deque* names = NULL;
+   struct deque_iterator* iter = NULL;
+   struct main_configuration* config;
+   int failed = 0;
+   int deleted = 0;
+   int rc = 1;
+
+   config = (struct main_configuration*)shmem;
+
+   gcs_root = gcs_get_basepath(server, label);
+   prefix = pgmoneta_append(pgmoneta_append(NULL, gcs_root), "/");
+   if (gcs_root == NULL || prefix == NULL)
+   {
+      goto done;
+   }
+
+   pgmoneta_log_debug("GCS storage engine (cleanup): %s/%s", config->common.servers[server].name, label);
+
+   if (gcs_list_objects(server, prefix, &names))
+   {
+      pgmoneta_log_error("GCS cleanup: could not list %s", prefix);
+      goto done;
+   }
+
+   if (pgmoneta_deque_iterator_create(names, &iter))
+   {
+      goto done;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* name = (char*)pgmoneta_value_data(iter->value);
+      struct http_response* response = NULL;
+
+      /* The object name is complete, so it goes in as the root */
+      if (gcs_send_object_request(PGMONETA_HTTP_DELETE, name, NULL, "", &response, server) ||
+          !((response->status_code >= 200 && response->status_code < 300) || response->status_code == 404))
+      {
+         pgmoneta_log_error("GCS cleanup: could not delete %s (status %d)", name,
+                            response != NULL ? response->status_code : -1);
+         failed++;
+      }
+      else
+      {
+         deleted++;
+      }
+
+      pgmoneta_http_response_destroy(response);
+   }
+
+   if (failed > 0)
+   {
+      pgmoneta_log_error("GCS cleanup: %d of %d objects not deleted for %s/%s",
+                         failed, failed + deleted, config->common.servers[server].name, label);
+      goto done;
+   }
+
+   pgmoneta_log_debug("GCS cleanup: deleted %d objects for %s/%s",
+                      deleted, config->common.servers[server].name, label);
+   rc = 0;
+
+done:
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(names);
+   free(gcs_root);
+   free(prefix);
 
    return rc;
 }

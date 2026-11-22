@@ -1410,6 +1410,8 @@ http_method_to_string(int method)
          return "PUT";
       case PGMONETA_HTTP_HEAD:
          return "HEAD";
+      case PGMONETA_HTTP_DELETE:
+         return "DELETE";
       default:
          return NULL;
    }

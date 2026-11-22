@@ -146,6 +146,13 @@ struct workflow*
 pgmoneta_storage_create_remote(void);
 
 /**
+ * Create a workflow that deletes a backup from every configured remote storage engine
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_storage_create_remote_delete(void);
+
+/**
  * Stage a backup from the given remote storage engine into a temporary directory in the workspace
  * @param server The server index
  * @param engine_flag The storage engine to download from (STORAGE_ENGINE_S3, STORAGE_ENGINE_AZURE, STORAGE_ENGINE_GCS)

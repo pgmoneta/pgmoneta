@@ -788,3 +788,44 @@ MCTF_INTEGRATION_TEST(test_azure_restored_cluster_starts)
 cleanup:
    MCTF_FINISH();
 }
+
+/*
+ * Deleting a backup must remove its blobs from Azure too, or retention leaves
+ * them behind for good. A fresh backup is used so the shared one stays intact,
+ * and the shared prefix is checked to pin that only the deleted label goes.
+ */
+MCTF_INTEGRATION_TEST(test_azure_delete_removes_remote_blobs)
+{
+   char label[256];
+   char prefix[MAX_PATH];
+   char shared_prefix[MAX_PATH];
+   int before;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+   MCTF_ASSERT(shared_label[0] != '\0', cleanup, "no backup label available");
+
+   MCTF_ASSERT(mctf_se_backup("primary") == 0, cleanup, "backup to Azure failed");
+   MCTF_ASSERT(mctf_se_newest_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "no label for the new backup");
+   MCTF_ASSERT(strcmp(label, shared_label) != 0, cleanup, "the new backup reused label %s", label);
+
+   snprintf(prefix, sizeof(prefix), "pgmoneta/primary/backup/%s/", label);
+   snprintf(shared_prefix, sizeof(shared_prefix), "pgmoneta/primary/backup/%s/", shared_label);
+
+   before = mctf_se_azure_blob_count_prefix(prefix);
+   MCTF_ASSERT(before > 0, cleanup, "no blobs under %s after the backup", prefix);
+
+   MCTF_ASSERT(mctf_se_delete("primary", label) == 0, cleanup, "delete of %s failed", label);
+
+   MCTF_ASSERT_INT_EQ(mctf_se_azure_blob_count_prefix(prefix), 0, cleanup,
+                      "%s still holds blobs after deleting %s (%d before)", prefix, label, before);
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(shared_prefix) > 0, cleanup,
+               "deleting %s also removed the blobs of %s", label, shared_label);
+
+cleanup:
+   MCTF_FINISH();
+}

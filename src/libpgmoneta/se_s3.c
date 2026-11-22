@@ -57,14 +57,12 @@
 #include <string.h>
 
 static char* s3_backup_name(void);
-static char* s3_cleanup_name(void);
 static char* s3_info_name(void);
 static int s3_storage_setup(char*, struct art*);
 static int s3_storage_execute(char*, struct art*);
 static int s3_storage_list(char*, struct art*);
 static int s3_storage_teardown(char*, struct art*);
 static int s3_storage_noop_teardown(char*, struct art*);
-static int s3_storage_cleanup(char*, struct art*);
 static int s3_upload_files(char* local_root, char* s3_root, int server, int compression, int encryption);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, char* file_sha512, int server);
 static int s3_list_objects(char* relative_path, char* s3_list, int server, bool common_prefixes, struct deque** objects);
@@ -154,11 +152,6 @@ pgmoneta_storage_create_s3(int workflow_type)
          wf->execute = &s3_storage_list;
          wf->teardown = &s3_storage_noop_teardown;
          break;
-      case WORKFLOW_TYPE_DELETE_BACKUP:
-         wf->name = &s3_cleanup_name;
-         wf->execute = &s3_storage_cleanup;
-         wf->teardown = &s3_storage_noop_teardown;
-         break;
       default:
          break;
    }
@@ -214,12 +207,6 @@ static char*
 s3_backup_name(void)
 {
    return PHASE_NAME_BASEBACKUP;
-}
-
-static char*
-s3_cleanup_name(void)
-{
-   return PHASE_NAME_DELETE;
 }
 
 static char*
@@ -579,49 +566,6 @@ static int
 s3_storage_noop_teardown(char* name __attribute__((unused)), struct art* nodes __attribute__((unused)))
 {
    return 0;
-}
-
-static int
-s3_storage_cleanup(char* name __attribute__((unused)), struct art* nodes)
-{
-   int server = -1;
-   char* label = NULL;
-   char* s3_root = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_dump_art(nodes);
-
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("S3 storage engine (cleanup): %s/%s",
-                      config->common.servers[server].name, label);
-   pgmoneta_log_debug("S3 effective config: bucket=%s, region=%s, endpoint=%s",
-                      s3_get_effective_bucket(server),
-                      s3_get_effective_region(server),
-                      s3_get_effective_endpoint(server));
-
-   s3_root = s3_get_basepath(server, label);
-
-   if (s3_delete_all_objects("", s3_root, server, nodes))
-   {
-      goto error;
-   }
-
-   free(s3_root);
-
-   return 0;
-
-error:
-   free(s3_root);
-   return 1;
 }
 
 static int
