@@ -1877,8 +1877,8 @@ MCTF_TEST(test_walbridge_reader_cross_segment)
    /* fillers exactly fill pages 0-2 and land on page 3. NOTE: a record that
     * overflows a page continues AFTER that page's short header, so the next
     * record starts 24 bytes past the overflow point. */
-   write_filler_craft(buf, 40, 8128, 0x41);    /* fills page 0, ends at LSN 8192       */
-   write_filler_craft(buf, 8216, 8168, 0x42);  /* overflows p1, ends at LSN 16432      */
+   write_filler_craft(buf, 40, 8128, 0x41);   /* fills page 0, ends at LSN 8192       */
+   write_filler_craft(buf, 8216, 8168, 0x42); /* overflows p1, ends at LSN 16432      */
    /* the record above spills 24 bytes onto page 2, which it overwrote */
    write_page_header_craft(buf, 16384, WAL_MAGIC_V18, XLP_FIRST_IS_CONTRECORD, 49152, 24);
    write_filler_craft(buf, 16432, 8120, 0x43); /* fills page 2, ends at LSN 24576      */
@@ -1926,8 +1926,8 @@ MCTF_TEST(test_walbridge_reader_cross_segment)
       buf[40 + i] = (uint8_t)(38 + i);
    }
 
-   write_filler_craft(buf, 96, 8072, 0x51);    /* fills page 0, ends at LSN 8192       */
-   write_filler_craft(buf, 8216, 8168, 0x52);  /* overflows p1, ends at LSN 16432      */
+   write_filler_craft(buf, 96, 8072, 0x51);   /* fills page 0, ends at LSN 8192       */
+   write_filler_craft(buf, 8216, 8168, 0x52); /* overflows p1, ends at LSN 16432      */
    /* the record above spills 24 bytes onto page 2, which it overwrote */
    write_page_header_craft(buf, 16384, WAL_MAGIC_V18, XLP_FIRST_IS_CONTRECORD, 81920, 24);
    write_filler_craft(buf, 16432, 8120, 0x53); /* fills page 2, ends at LSN 24576      */
