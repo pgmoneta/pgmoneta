@@ -47,6 +47,7 @@ static char* xact_desc_prepare_v15(char* buf, uint8_t info, struct xl_xact_prepa
 
 static char* xact_desc_assignment(char* buf, struct xl_xact_assignment* xlrec);
 static char* xact_desc_subxacts(char* buf, int nsubxacts, transaction_id* subxacts);
+static size_t xact_stats_item_size(void);
 
 void parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v14* parsed);
 void parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v15* parsed);
@@ -610,6 +611,21 @@ xact_desc_subxacts(char* buf, int nsubxacts, transaction_id* subxacts)
    return buf;
 }
 
+/*
+ * PostgreSQL 18 stores the object id of a dropped stats item as two uint32
+ * (objid_lo, objid_hi), so each item is 4 bytes larger than in 15 to 17.
+ */
+static size_t
+xact_stats_item_size(void)
+{
+   if (server_config != NULL && server_config->version >= 18)
+   {
+      return sizeof(struct xl_xact_stats_item) + sizeof(uint32_t);
+   }
+
+   return sizeof(struct xl_xact_stats_item);
+}
+
 char*
 pgmoneta_wal_xact_desc(char* buf, struct decoded_xlog_record* record)
 {
@@ -954,7 +970,7 @@ parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
       parsed->stats = xl_drops->items;
 
       data += MIN_SIZE_OF_XACT_STATS_ITEMS;
-      data += xl_drops->nitems * sizeof(struct xl_xact_stats_item);
+      data += xl_drops->nitems * xact_stats_item_size();
    }
 
    if (parsed->xinfo & XACT_XINFO_HAS_TWOPHASE)
@@ -1023,10 +1039,10 @@ parse_prepare_record_v15(uint8_t info __attribute__((unused)), struct xl_xact_pr
    bufptr += MAXALIGN(xlrec->nabortrels * sizeof(struct rel_file_node));
 
    parsed->stats = (struct xl_xact_stats_item*)bufptr;
-   bufptr += MAXALIGN(xlrec->ncommitstats * sizeof(struct xl_xact_stats_item));
+   bufptr += MAXALIGN(xlrec->ncommitstats * xact_stats_item_size());
 
    parsed->abortstats = (struct xl_xact_stats_item*)bufptr;
-   bufptr += MAXALIGN(xlrec->nabortstats * sizeof(struct xl_xact_stats_item));
+   bufptr += MAXALIGN(xlrec->nabortstats * xact_stats_item_size());
 
    parsed->msgs = (union shared_invalidation_message*)bufptr;
    bufptr += MAXALIGN(xlrec->ninvalmsgs * sizeof(union shared_invalidation_message));
@@ -1093,7 +1109,7 @@ parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
       parsed->stats = xl_drops->items;
 
       data += MIN_SIZE_OF_XACT_STATS_ITEMS;
-      data += xl_drops->nitems * sizeof(struct xl_xact_stats_item);
+      data += xl_drops->nitems * xact_stats_item_size();
    }
 
    if (parsed->xinfo & XACT_XINFO_HAS_INVALS)
