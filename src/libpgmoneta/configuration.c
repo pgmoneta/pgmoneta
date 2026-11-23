@@ -6532,7 +6532,7 @@ copy_server(struct server* dst, struct server* src)
    /* memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0], MISC_LENGTH); */
    /* memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH); */
    dst->workers = src->workers;
-   dst->progress = src->progress;
+   dst->progress_enabled = src->progress_enabled;
    dst->max_rate = src->max_rate;
 
    if (restart_string("tls_cert_file", dst->tls_cert_file, src->tls_cert_file))
