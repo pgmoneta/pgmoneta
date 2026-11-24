@@ -5592,6 +5592,7 @@ main(int argc, char** argv)
                      free(temp_list[i]);
                   }
                   free(temp_list);
+                  temp_list = NULL;
                }
             }
          }
@@ -5656,6 +5657,8 @@ main(int argc, char** argv)
                free(databases_list[i]);
             }
             free(databases_list);
+            databases_list = NULL;
+            databases_count = 0;
          }
 
          if (tablespaces_list)
@@ -5665,6 +5668,8 @@ main(int argc, char** argv)
                free(tablespaces_list[i]);
             }
             free(tablespaces_list);
+            tablespaces_list = NULL;
+            tablespaces_count = 0;
          }
 
          if (relations_list)
@@ -5674,6 +5679,8 @@ main(int argc, char** argv)
                free(relations_list[i]);
             }
             free(relations_list);
+            relations_list = NULL;
+            relations_count = 0;
          }
       }
       else
