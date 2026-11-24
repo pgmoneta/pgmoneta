@@ -49,9 +49,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define NAME            "verify"
-
-#define MAX_CHAIN_DEPTH 1000000
+#define NAME "verify"
 
 /*
  * Check whether the incremental backup chain is restorable from its metadata.
@@ -1336,6 +1334,7 @@ pgmoneta_verify_sha512_chain(int server, char* label, bool self, bool missing_ok
    char* backup_dir = NULL;
    struct backup* bck = NULL;
    int ret = 0;
+   int depth = 0;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -1368,6 +1367,13 @@ pgmoneta_verify_sha512_chain(int server, char* label, bool self, bool missing_ok
 
       if (bck->type != TYPE_INCREMENTAL)
       {
+         break;
+      }
+
+      if (++depth > MAX_CHAIN_DEPTH)
+      {
+         pgmoneta_log_error("Verify: %s: chain of %s exceeds the maximum depth or is cyclic", config->common.servers[server].name, label);
+         ret = 1;
          break;
       }
 

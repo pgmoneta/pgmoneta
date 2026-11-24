@@ -3224,6 +3224,7 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
    char* server_dir = NULL;
    char label[MISC_LENGTH];
    struct deque* l = NULL;
+   int depth = 0;
 
    if (pgmoneta_compare_string(newest_label, oldest_label))
    {
@@ -3256,6 +3257,12 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
    {
       while (bck->type != TYPE_FULL)
       {
+         if (++depth > MAX_CHAIN_DEPTH)
+         {
+            pgmoneta_log_error("Chain of backup %s exceeds the maximum depth or is cyclic", newest_label);
+            goto error;
+         }
+
          memset(label, 0, MISC_LENGTH);
          memcpy(label, bck->parent_label, sizeof(bck->parent_label));
          free(bck);
@@ -3276,6 +3283,12 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
    {
       while (!pgmoneta_compare_string(bck->label, oldest_label))
       {
+         if (++depth > MAX_CHAIN_DEPTH)
+         {
+            pgmoneta_log_error("Chain of backup %s exceeds the maximum depth or is cyclic", newest_label);
+            goto error;
+         }
+
          memset(label, 0, MISC_LENGTH);
          memcpy(label, bck->parent_label, sizeof(bck->parent_label));
          free(bck);

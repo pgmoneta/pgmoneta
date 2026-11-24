@@ -40,6 +40,9 @@ extern "C" {
 
 #include <stdlib.h>
 
+/* Longest incremental chain walked before it is taken to be cyclic */
+#define MAX_CHAIN_DEPTH 10000
+
 /**
  * Create a verify
  * @param ssl The SSL connection

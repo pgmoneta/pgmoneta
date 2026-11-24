@@ -30,6 +30,7 @@
 #include <art.h>
 #include <backup.h>
 #include <info.h>
+#include <verify.h>
 #include <utils.h>
 #include <mctf.h>
 #include <tsclient.h>
@@ -218,5 +219,42 @@ cleanup:
    {
       pgmoneta_art_destroy(nodes);
    }
+   MCTF_FINISH();
+}
+
+/* A parent chain that loops back on itself must end the walk, not spin forever. */
+MCTF_TEST_NEGATIVE(test_verify_sha512_chain_cycle)
+{
+   char* d = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   char* p = NULL;
+   int ret = 0;
+
+   cleanup_mock_backups();
+   for (int i = 0; i < 2; i++)
+   {
+      char* label = i == 0 ? "20250101000000" : "20250101010000";
+      char* parent = i == 0 ? "20250101010000" : "20250101000000";
+      FILE* f = NULL;
+
+      p = pgmoneta_format_and_append(NULL, "%s/%s", d, label);
+      pgmoneta_mkdir(p);
+      p = pgmoneta_append(p, "/backup.info");
+      f = fopen(p, "w");
+      MCTF_ASSERT_PTR_NONNULL(f, cleanup, "fopen");
+      fprintf(f, "LABEL=%s\nSTATUS=1\nTYPE=1\nPARENT=%s\n", label, parent);
+      fclose(f);
+      free(p);
+      p = NULL;
+   }
+
+   alarm(20);
+   ret = pgmoneta_verify_sha512_chain(PRIMARY_SERVER, "20250101000000", false, true, NULL);
+   alarm(0);
+   MCTF_ASSERT_INT_EQ(ret, 1, cleanup, "cyclic chain must fail");
+
+cleanup:
+   free(p);
+   free(d);
+   cleanup_mock_backups();
    MCTF_FINISH();
 }
