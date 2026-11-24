@@ -1524,9 +1524,26 @@ parse_relation_file(char* backup_data, char* rel_file_path, struct rel_file_loca
    }
    else if (pgmoneta_compare_string(results[0], "pg_tblspc"))
    {
+      if (count < 5)
+      {
+         pgmoneta_log_error("Invalid tablespace relation path: %s", rel_file_path);
+         goto error;
+      }
+
       rlocator.spcOid = pgmoneta_atoi(results[1]);
       rlocator.dbOid = pgmoneta_atoi(results[3]);
       relation_file = pgmoneta_append(relation_file, results[4]);
+
+      /* create directory */
+      base_directory_path = pgmoneta_format_and_append(base_directory_path, "%s%spg_tblspc/%s/%s/%s",
+                                                       backup_data,
+                                                       pgmoneta_ends_with(backup_data, "/") ? "" : "/",
+                                                       results[1], results[2], results[3]);
+      if (pgmoneta_mkdir(base_directory_path))
+      {
+         pgmoneta_log_error("Incremental backup: Failed to create tablespace directory: %s", base_directory_path);
+         goto error;
+      }
    }
    else
    {
