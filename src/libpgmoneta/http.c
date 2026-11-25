@@ -57,6 +57,9 @@ static int http_read_response_body(SSL* ssl, int socket, struct http_response* h
 static int http_read_response_header(SSL* ssl, int socket, char** header_text, struct http_response* http_response);
 static int http_build_request(struct http* connection, struct http_request* request, char** full_request, size_t* full_request_size);
 static bool http_request_has_header(struct http_request* request, char* name);
+static char* http_get_header_value(struct deque* headers, const char* name);
+static int http_remove_header(struct deque* headers, const char* name);
+static bool http_contains_token_case(const char* header_value, const char* token);
 static char* http_method_to_string(int method);
 static int http_set_peer_verification(SSL* ssl, char* hostname);
 
@@ -286,6 +289,66 @@ error:
    return PGMONETA_HTTP_STATUS_ERROR;
 }
 
+static char*
+http_get_header_value(struct deque* headers, const char* name)
+{
+   struct deque_iterator* iter = NULL;
+   char* value = NULL;
+
+   if (headers == NULL || name == NULL || pgmoneta_deque_empty(headers))
+   {
+      return NULL;
+   }
+
+   if (pgmoneta_deque_iterator_create(headers, &iter))
+   {
+      return NULL;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      if (iter->tag != NULL && strcasecmp(iter->tag, name) == 0)
+      {
+         value = (char*)pgmoneta_value_data(iter->value);
+         break;
+      }
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+
+   return value;
+}
+
+static int
+http_remove_header(struct deque* headers, const char* name)
+{
+   int cnt = 0;
+   struct deque_iterator* iter = NULL;
+
+   if (headers == NULL || name == NULL || pgmoneta_deque_empty(headers))
+   {
+      return 0;
+   }
+
+   if (pgmoneta_deque_iterator_create(headers, &iter))
+   {
+      return 0;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      if (iter->tag != NULL && strcasecmp(iter->tag, name) == 0)
+      {
+         pgmoneta_deque_iterator_remove(iter);
+         cnt++;
+      }
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+
+   return cnt;
+}
+
 char*
 pgmoneta_http_request_get_header(struct http_request* request, char* name)
 {
@@ -294,12 +357,7 @@ pgmoneta_http_request_get_header(struct http_request* request, char* name)
       return NULL;
    }
 
-   if (request->payload.headers == NULL)
-   {
-      return NULL;
-   }
-
-   return (char*)pgmoneta_deque_get(request->payload.headers, name);
+   return http_get_header_value(request->payload.headers, name);
 }
 
 int
@@ -317,7 +375,7 @@ pgmoneta_http_request_update_header(struct http_request* request, char* name, ch
       goto error;
    }
 
-   if (pgmoneta_deque_remove(request->payload.headers, name) > 0)
+   if (http_remove_header(request->payload.headers, name) > 0)
    {
       pgmoneta_log_trace("Removed existing header: %s", name);
    }
@@ -349,7 +407,7 @@ pgmoneta_http_request_remove_header(struct http_request* request, char* name)
       goto error;
    }
 
-   int removed = pgmoneta_deque_remove(request->payload.headers, name);
+   int removed = http_remove_header(request->payload.headers, name);
    if (removed == 0)
    {
       pgmoneta_log_debug("Header not found for removal: %s", name);
@@ -404,19 +462,7 @@ pgmoneta_http_get_response_header(struct http_response* response, char* name)
       return NULL;
    }
 
-   if (response->payload.headers == NULL)
-   {
-      return NULL;
-   }
-
-   char* key = NULL;
-   if (pgmoneta_copy_string(name, &key))
-   {
-      return NULL;
-   }
-   char* value = (char*)pgmoneta_deque_get(response->payload.headers, key);
-   free(key);
-   return value;
+   return http_get_header_value(response->payload.headers, name);
 }
 
 int
@@ -1091,17 +1137,46 @@ error:
    return MESSAGE_STATUS_ERROR;
 }
 
+static bool
+http_contains_token_case(const char* header_value, const char* token)
+{
+   if (header_value == NULL || token == NULL)
+   {
+      return false;
+   }
+
+   size_t token_len = strlen(token);
+   size_t header_len = strlen(header_value);
+
+   if (header_len < token_len)
+   {
+      return false;
+   }
+
+   for (size_t i = 0; i <= header_len - token_len; i++)
+   {
+      if (strncasecmp(&header_value[i], token, token_len) == 0)
+      {
+         return true;
+      }
+   }
+
+   return false;
+}
+
 static int
 http_read_response_body(SSL* ssl, int socket, struct http_response* http_response)
 {
    if (!http_response)
+   {
       return MESSAGE_STATUS_ERROR;
+   }
 
-   char* transfer_encoding = (char*)pgmoneta_deque_get(http_response->payload.headers, "Transfer-Encoding");
-   char* cl_str = (char*)pgmoneta_deque_get(http_response->payload.headers, "Content-Length");
+   char* transfer_encoding = pgmoneta_http_get_response_header(http_response, "Transfer-Encoding");
+   char* cl_str = pgmoneta_http_get_response_header(http_response, "Content-Length");
 
    // handle chunked transfer_encoding
-   if (transfer_encoding && strstr(transfer_encoding, "chunked"))
+   if (transfer_encoding && http_contains_token_case(transfer_encoding, "chunked"))
    {
       return http_read_chunked_body(ssl, socket, http_response);
    }
@@ -1206,25 +1281,12 @@ error:
 static bool
 http_request_has_header(struct http_request* request, char* name)
 {
-   struct deque_iterator* iter = NULL;
-   bool found = false;
-
-   if (request->payload.headers == NULL || pgmoneta_deque_empty(request->payload.headers))
+   if (request == NULL || name == NULL)
    {
       return false;
    }
 
-   if (pgmoneta_deque_iterator_create(request->payload.headers, &iter))
-   {
-      return false;
-   }
-   while (!found && pgmoneta_deque_iterator_next(iter))
-   {
-      found = iter->tag != NULL && strcasecmp(iter->tag, name) == 0;
-   }
-   pgmoneta_deque_iterator_destroy(iter);
-
-   return found;
+   return http_get_header_value(request->payload.headers, name) != NULL;
 }
 
 static int
