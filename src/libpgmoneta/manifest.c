@@ -216,11 +216,11 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
                }
             }
          }
+         pgmoneta_deque_iterator_destroy(iter);
+         iter = NULL;
          pgmoneta_art_destroy(tree);
          tree = NULL;
       }
-      pgmoneta_deque_iterator_destroy(iter);
-      iter = NULL;
 
       // traverse
       while (!pgmoneta_deque_empty(que))
@@ -273,11 +273,11 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
                pgmoneta_deque_iterator_remove(iter);
             }
          }
+         pgmoneta_deque_iterator_destroy(iter);
+         iter = NULL;
          pgmoneta_art_destroy(tree);
          tree = NULL;
       }
-      pgmoneta_deque_iterator_destroy(iter);
-      iter = NULL;
 
       while (!pgmoneta_deque_empty(que))
       {
@@ -316,6 +316,9 @@ error:
    pgmoneta_csv_reader_destroy(r2);
    pgmoneta_art_destroy(tree);
    pgmoneta_deque_destroy(que);
+   pgmoneta_art_destroy(deleted);
+   pgmoneta_art_destroy(changed);
+   pgmoneta_art_destroy(added);
    return 1;
 }
 
@@ -757,6 +760,7 @@ build_deque(struct deque* deque, struct csv_reader* reader, char** f)
    int cols = 0;
    if (deque == NULL)
    {
+      free(f);
       return;
    }
    path = f[MANIFEST_PATH_INDEX];
@@ -787,6 +791,7 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
    int cols = 0;
    if (tree == NULL)
    {
+      free(f);
       return;
    }
    path = f[MANIFEST_PATH_INDEX];
