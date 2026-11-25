@@ -52,9 +52,9 @@ static int json_stream_parse_item(struct json_reader* reader, struct json** item
 static bool type_allowed(enum value_type type);
 static char* item_to_string(struct json* item, int32_t format, char* tag, int indent);
 static char* array_to_string(struct json* array, int32_t format, char* tag, int indent);
-static int parse_string(char* str, uint64_t* index, struct json** obj);
+static int parse_string(char* str, uint64_t len, uint64_t* index, struct json** obj);
 static int json_add(struct json* obj, char* key, uintptr_t val, enum value_type type);
-static int fill_value(char* str, char* key, uint64_t* index, struct json* o);
+static int fill_value(char* str, uint64_t len, char* key, uint64_t* index, struct json* o);
 static bool value_start(char ch);
 static int handle_escape_char(char* str, uint64_t* index, uint64_t len, char* ch);
 
@@ -622,12 +622,20 @@ int
 pgmoneta_json_parse_string(char* str, struct json** obj)
 {
    uint64_t idx = 0;
-   if (str == NULL || strlen(str) < 2)
+   uint64_t len = 0;
+
+   if (str == NULL)
    {
       return 1;
    }
 
-   return parse_string(str, &idx, obj);
+   len = strlen(str);
+   if (len < 2)
+   {
+      return 1;
+   }
+
+   return parse_string(str, len, &idx, obj);
 }
 
 int
@@ -720,14 +728,13 @@ pgmoneta_json_put_size_value(struct json* res, char* key, unsigned int bytes)
 }
 
 static int
-parse_string(char* str, uint64_t* index, struct json** obj)
+parse_string(char* str, uint64_t len, uint64_t* index, struct json** obj)
 {
    enum json_type type;
    struct json* o = NULL;
    uint64_t idx = *index;
    char ch = str[idx];
    char* key = NULL;
-   uint64_t len = strlen(str);
 
    if (ch == '{')
    {
@@ -818,7 +825,7 @@ parse_string(char* str, uint64_t* index, struct json** obj)
             goto error;
          }
          // The value
-         if (fill_value(str, key, &idx, o))
+         if (fill_value(str, len, key, &idx, o))
          {
             goto error;
          }
@@ -861,7 +868,7 @@ parse_string(char* str, uint64_t* index, struct json** obj)
             goto error;
          }
 
-         if (fill_value(str, key, &idx, o))
+         if (fill_value(str, len, key, &idx, o))
          {
             goto error;
          }
@@ -902,10 +909,9 @@ value_start(char ch)
 }
 
 static int
-fill_value(char* str, char* key, uint64_t* index, struct json* o)
+fill_value(char* str, uint64_t len, char* key, uint64_t* index, struct json* o)
 {
    uint64_t idx = *index;
-   uint64_t len = strlen(str);
    if (str[idx] == '"')
    {
       char* val = NULL;
@@ -978,7 +984,7 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
    else if (str[idx] == '{')
    {
       struct json* val = NULL;
-      if (parse_string(str, &idx, &val))
+      if (parse_string(str, len, &idx, &val))
       {
          goto error;
       }
@@ -987,7 +993,7 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
    else if (str[idx] == '[')
    {
       struct json* val = NULL;
-      if (parse_string(str, &idx, &val))
+      if (parse_string(str, len, &idx, &val))
       {
          goto error;
       }
