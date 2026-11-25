@@ -62,6 +62,7 @@ main(int argc, char** argv)
    char* logfile = NULL;
    char* server_name = NULL;
    char* workspace = NULL;
+   bool dry_run = false;
 
    struct muse_configuration* config = NULL;
 
@@ -94,6 +95,10 @@ main(int argc, char** argv)
       if (optname == NULL)
       {
          break;
+      }
+      else if (match_opt(optname, "d", "dry-run"))
+      {
+         dry_run = true;
       }
       else if (match_opt(optname, "c", "config"))
       {
@@ -203,9 +208,10 @@ main(int argc, char** argv)
       errx(1, "pgmoneta-muse: Unable to start logging");
    }
 
-   if (pgmoneta_migrate(backup_id, server_name, workspace))
+   if (pgmoneta_migrate(backup_id, server_name, workspace, dry_run))
    {
       pgmoneta_log_error("Failed to migrate source directory");
+      ret = 1;
    }
    else
    {
@@ -218,7 +224,7 @@ main(int argc, char** argv)
    pgmoneta_delete_directory(workspace);
 
    free(workspace);
-   return 0;
+   return ret;
 }
 
 static bool
@@ -242,11 +248,12 @@ usage(void)
    printf("\n");
 
    printf("Usage:\n");
-   printf("  pgmoneta-muse {-s SERVER} {-b BACKUP_ID} [ -c CONFIG_FILE ]\n");
+   printf("  pgmoneta-muse {-s SERVER} {-b BACKUP_ID} [ -c CONFIG_FILE ] [ -d ]\n");
    printf("\n");
    printf("Options:\n");
    printf("  -c, --config CONFIG_FILE  Set the path to the pgmoneta_muse.conf file\n");
    printf("  -b, --backup-id BACKUP_ID The final backup in the backup chain, all backups in the chain will be migrated\n");
+   printf("  -d, --dry-run             Check that the backup can be migrated, without writing anything\n");
    printf("  -L, --logfile FILE        Set the log file\n");
    printf("  -s, --server SERVER       Set the target server name the backups correspond to post migration\n");
    printf("  -V, --version             Display version information\n");

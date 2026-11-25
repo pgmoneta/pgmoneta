@@ -35,8 +35,18 @@ extern "C" {
 
 #include <pgmoneta.h>
 
+/**
+ * Migrate a backup and its parents from another tool into the base directory.
+ * Backups and WAL that are already there are never changed, and a failed
+ * migration removes only what it wrote
+ * @param backup_id The backup identifier in the source tool
+ * @param server The target server name
+ * @param workspace The workspace directory
+ * @param dry_run Only check that the backup can be migrated, write nothing
+ * @return 0 upon success, otherwise 1
+ */
 int
-pgmoneta_migrate(char* backup_id, char* server, char* workspace);
+pgmoneta_migrate(char* backup_id, char* server, char* workspace, bool dry_run);
 
 #ifdef __cplusplus
 }

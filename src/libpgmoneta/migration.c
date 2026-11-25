@@ -28,6 +28,7 @@
 #include <pgmoneta.h>
 #include <aes.h>
 #include <art.h>
+#include <backup.h>
 #include <compression.h>
 #include <info.h>
 #include <json.h>
@@ -96,7 +97,12 @@ struct timeline_history
 static int load_backup_info(char* source_dir, char* workspace, char** password, struct art** backups);
 static int load_archive_password(char* source_wal_dir, char* workspace_dir, char** password);
 static void build_target_dir(char* source_dir, char* server, char** target_data_dir, char** target_wal_dir);
-static int migrate_pgbackrest(char* source_data_dir, char* source_wal_dir, char* target_base_dir, char* backup_id, char* server, char* workspace);
+static int migrate_pgbackrest(char* source_data_dir, char* source_wal_dir, char* target_base_dir, char* backup_id, char* server, char* workspace, bool dry_run);
+static int check_target_labels(struct art* backups, struct pgbackrest_backup_info* bck, char* target_data_dir);
+static int get_existing_wal(char* target_wal_dir, struct art** existing);
+static int publish_wal(char* staging_wal_dir, char* target_wal_dir, struct art* created_wal);
+static int compress_encrypt_wal(struct art** created_wal);
+static void delete_created(struct art* created, bool directories);
 
 static int parse_pgbackrest_backup_info(char* path, char** password, struct art** backups);
 static int insert_pgbackrest_backup_info(char* backup_id, struct pgbackrest_backup_info* backup, struct art* backups);
@@ -105,7 +111,7 @@ static int pgbackrest_backup_info_create(char* backup_id, struct json* info, str
 static void pgbackrest_backup_info_destroy(struct pgbackrest_backup_info* backup);
 static void pgbackrest_backup_info_destroy_cb(uintptr_t data);
 static void get_target_backup_id(time_t start_time, char** target_id);
-static int migrate_pgbackrest_backup(struct art* manifests, struct pgbackrest_backup_info* prev_backup_info, struct pgbackrest_backup_info* backup_info, char* password, char* root_workspace, char* source_dir, char* target_data_dir, char* target_wal_dir);
+static int migrate_pgbackrest_backup(struct art* manifests, struct pgbackrest_backup_info* prev_backup_info, struct pgbackrest_backup_info* backup_info, char* password, char* root_workspace, char* source_dir, char* target_data_dir, char* target_wal_dir, struct art* created_backups, struct art* markers);
 static void pgbackrest_manifest_create(struct pgbackrest_manifest** manifest);
 static void pgbackrest_manifest_destroy(struct pgbackrest_manifest* manifest);
 static int pgbackrest_manifest_validate(struct pgbackrest_manifest* manifest);
@@ -115,7 +121,7 @@ static int migrate_pgbackrest_file(struct art* manifests, struct pgbackrest_back
 static int create_file_directory(char* target_root_dir, char* workspace_root_dir, char* relative_path);
 static int create_file_placeholder(char* target_path);
 static int migrate_wal_segments(char* workspace, char* source_dir, char* target_dir);
-static int extract_wal_segments(char* password, char* source_dir, char* target_dir);
+static int extract_wal_segments(char* password, char* source_dir, char* target_dir, char* workspace);
 static int extract_wal_history(char* password, char* source_history, char* history_name, char* target_dir);
 static bool is_wal_dir(char* dir);
 static int extract_wal_file_info(char* file_name, char** seg_name, int* compression);
@@ -132,7 +138,7 @@ static int get_and_set_file_manifest(struct art* manifests, struct pgbackrest_ba
 static int link_backups(char* data_dir, struct pgbackrest_backup_info* from_bck, struct pgbackrest_backup_info* to_bck);
 
 int
-pgmoneta_migrate(char* backup_id, char* server, char* workspace)
+pgmoneta_migrate(char* backup_id, char* server, char* workspace, bool dry_run)
 {
    struct muse_configuration* config = NULL;
    char* source_data_dir = NULL;
@@ -161,7 +167,7 @@ pgmoneta_migrate(char* backup_id, char* server, char* workspace)
 
    if (config->source_tool == TOOL_PGBACKREST)
    {
-      if (migrate_pgbackrest(source_data_dir, source_wal_dir, target_base_dir, backup_id, server, workspace))
+      if (migrate_pgbackrest(source_data_dir, source_wal_dir, target_base_dir, backup_id, server, workspace, dry_run))
       {
          pgmoneta_log_error("Failed to migrate pgbackrest backup and archive,"
                             "source data: %s, source wal: %s, target base: %s, backup id: %s, server %s, workspace %s",
@@ -181,30 +187,57 @@ error:
 }
 
 static int
-migrate_pgbackrest(char* source_data_dir, char* source_wal_dir, char* target_base_dir, char* backup_id, char* server, char* workspace)
+migrate_pgbackrest(char* source_data_dir, char* source_wal_dir, char* target_base_dir, char* backup_id, char* server, char* workspace, bool dry_run)
 {
    char* target_data_dir = NULL;
    char* target_wal_dir = NULL;
+   char* staging_wal_dir = NULL;
    char* password = NULL;
    struct art* backups = NULL;
    struct art* manifests = NULL;
+   struct art* created_backups = NULL;
+   struct art* created_wal = NULL;
+   struct art* markers = NULL;
+   struct art_iterator* iter = NULL;
    struct pgbackrest_backup_info* bck = NULL;
-   struct muse_configuration* conf = NULL;
    struct pgbackrest_backup_info* prev_backup = NULL;
 
-   conf = (struct muse_configuration*)shmem;
-
-   pgmoneta_art_create(&manifests);
-
-   pgmoneta_log_info("Start migration from pgB_file_sha256_checksumackRest, workspace %s", workspace);
-   build_target_dir(target_base_dir, server, &target_data_dir, &target_wal_dir);
-   if (pgmoneta_exists(target_data_dir))
+   if (pgmoneta_art_create(&manifests) || pgmoneta_art_create(&created_backups) ||
+       pgmoneta_art_create(&created_wal) || pgmoneta_art_create(&markers))
    {
-      if (pgmoneta_delete_directory(target_data_dir))
-      {
-         pgmoneta_log_error("Failed to clean up target data directory %s", target_data_dir);
-         goto error;
-      }
+      pgmoneta_log_error("Failed to allocate the migration state");
+      goto error;
+   }
+
+   pgmoneta_log_info("Start migration from pgBackRest, workspace %s", workspace);
+   build_target_dir(target_base_dir, server, &target_data_dir, &target_wal_dir);
+
+   if (load_backup_info(source_data_dir, workspace, &password, &backups))
+   {
+      pgmoneta_log_error("Failed to load backup info from %s", source_data_dir);
+      goto error;
+   }
+
+   bck = (struct pgbackrest_backup_info*)pgmoneta_art_search(backups, backup_id);
+   if (bck == NULL)
+   {
+      pgmoneta_log_error("Unable to find backup info of %s", backup_id);
+      goto error;
+   }
+   else
+   {
+      pgmoneta_log_info("Found backup info of %s, backup start time %ld", backup_id, bck->start_time);
+   }
+
+   if (check_target_labels(backups, bck, target_data_dir))
+   {
+      goto error;
+   }
+
+   if (dry_run)
+   {
+      pgmoneta_log_info("Dry run: %s and %d parent backup(s) can be migrated to %s", backup_id, bck->backup_chain_size, target_data_dir);
+      goto done;
    }
 
    pgmoneta_log_info("Creating backup directory %s and %s", target_data_dir, target_wal_dir);
@@ -220,27 +253,18 @@ migrate_pgbackrest(char* source_data_dir, char* source_wal_dir, char* target_bas
       goto error;
    }
 
-   if (load_backup_info(source_data_dir, workspace, &password, &backups))
+   /* The backups take their WAL from here, and only what pgmoneta doesn't have yet goes to the archive */
+   staging_wal_dir = pgmoneta_format_and_append(NULL, "%swal/", workspace);
+   if (staging_wal_dir == NULL || pgmoneta_mkdir(staging_wal_dir))
    {
-      pgmoneta_log_error("Failed to load backup info");
-   }
-
-   bck = (struct pgbackrest_backup_info*)pgmoneta_art_search(backups, backup_id);
-   if (bck == NULL)
-   {
-      pgmoneta_log_error("Unable to find backup info of %s", backup_id);
+      pgmoneta_log_error("Failed to create the WAL staging directory in %s", workspace);
       goto error;
    }
-   else
-   {
-      pgmoneta_log_info("Found backup info of %s, backup start time %ld", backup_id, bck->start_time);
-   }
 
-   //Move WAL segments
-   pgmoneta_log_info("Migrating WAL segments from %s to %s", source_wal_dir, target_wal_dir);
-   if (migrate_wal_segments(workspace, source_wal_dir, target_wal_dir))
+   pgmoneta_log_info("Extracting WAL segments from %s to %s", source_wal_dir, staging_wal_dir);
+   if (migrate_wal_segments(workspace, source_wal_dir, staging_wal_dir))
    {
-      pgmoneta_log_error("Failed to migrate WAL segments from %s to %s", source_wal_dir, target_wal_dir);
+      pgmoneta_log_error("Failed to extract WAL segments from %s to %s", source_wal_dir, staging_wal_dir);
       goto error;
    }
 
@@ -254,7 +278,7 @@ migrate_pgbackrest(char* source_data_dir, char* source_wal_dir, char* target_bas
          pgmoneta_log_error("Failed to find parent backup %s", parent_backup_id);
          goto error;
       }
-      if (migrate_pgbackrest_backup(manifests, prev_backup, b, password, workspace, source_data_dir, target_data_dir, target_wal_dir))
+      if (migrate_pgbackrest_backup(manifests, prev_backup, b, password, workspace, source_data_dir, target_data_dir, staging_wal_dir, created_backups, markers))
       {
          pgmoneta_log_error("Failed to migrate backup %s", b->backup_id);
          goto error;
@@ -264,48 +288,418 @@ migrate_pgbackrest(char* source_data_dir, char* source_wal_dir, char* target_bas
    }
 
    pgmoneta_log_info("Start migrating backup %s", bck->backup_id);
-   if (migrate_pgbackrest_backup(manifests, prev_backup, bck, password, workspace, source_data_dir, target_data_dir, target_wal_dir))
+   if (migrate_pgbackrest_backup(manifests, prev_backup, bck, password, workspace, source_data_dir, target_data_dir, staging_wal_dir, created_backups, markers))
    {
       pgmoneta_log_error("Failed to migrate backup %s", bck->backup_id);
       goto error;
    }
    pgmoneta_log_info("Successfully migrated backup %s", bck->backup_id);
 
-   //compress and encrypt wal segments
-   if (conf->compression != COMPRESSION_NONE)
+   pgmoneta_log_info("Migrating WAL segments to %s", target_wal_dir);
+   if (publish_wal(staging_wal_dir, target_wal_dir, created_wal))
    {
-      if (pgmoneta_compress_directory(-1, target_wal_dir, conf->compression, NULL, NULL))
+      pgmoneta_log_error("Failed to migrate WAL segments to %s", target_wal_dir);
+      goto error;
+   }
+
+   if (compress_encrypt_wal(&created_wal))
+   {
+      pgmoneta_log_error("Failed to compress or encrypt the WAL migrated to %s", target_wal_dir);
+      goto error;
+   }
+
+   /* Only now is every migrated backup complete, with its WAL */
+   if (pgmoneta_art_iterator_create(markers, &iter))
+   {
+      goto error;
+   }
+   while (pgmoneta_art_iterator_next(iter))
+   {
+      pgmoneta_delete_file(iter->key, NULL);
+      if (pgmoneta_exists(iter->key))
       {
-         pgmoneta_log_error("Failed to compress WAL archive directory %s", target_wal_dir);
+         pgmoneta_log_error("Failed to remove %s", iter->key);
          goto error;
       }
    }
+   pgmoneta_art_iterator_destroy(iter);
+   iter = NULL;
 
-   if (conf->encryption != ENCRYPTION_NONE)
-   {
-      if (pgmoneta_encrypt_directory(-1, target_wal_dir, NULL, NULL))
-      {
-         pgmoneta_log_error("Failed to encrypt WAL archive directory %s", target_wal_dir);
-         goto error;
-      }
-   }
-
+done:
    free(password);
    free(target_data_dir);
    free(target_wal_dir);
+   free(staging_wal_dir);
    pgmoneta_art_destroy(backups);
    pgmoneta_art_destroy(manifests);
+   pgmoneta_art_destroy(created_backups);
+   pgmoneta_art_destroy(created_wal);
+   pgmoneta_art_destroy(markers);
    return 0;
 
 error:
-   pgmoneta_delete_directory(target_data_dir);
-   pgmoneta_delete_directory(target_wal_dir);
+   pgmoneta_art_iterator_destroy(iter);
+   /* Only what this run wrote, the markers last so a backup is never left without one */
+   delete_created(created_wal, false);
+   delete_created(created_backups, true);
+   delete_created(markers, false);
    free(target_data_dir);
    free(target_wal_dir);
+   free(staging_wal_dir);
    free(password);
    pgmoneta_art_destroy(backups);
    pgmoneta_art_destroy(manifests);
+   pgmoneta_art_destroy(created_backups);
+   pgmoneta_art_destroy(created_wal);
+   pgmoneta_art_destroy(markers);
    return 1;
+}
+
+static int
+check_target_labels(struct art* backups, struct pgbackrest_backup_info* bck, char* target_data_dir)
+{
+   char* label = NULL;
+   char* path = NULL;
+   char* marker = NULL;
+   struct pgbackrest_backup_info* b = NULL;
+
+   for (int i = 0; i <= bck->backup_chain_size; i++)
+   {
+      b = i < bck->backup_chain_size ? (struct pgbackrest_backup_info*)pgmoneta_art_search(backups, bck->backup_chain[i]) : bck;
+      if (b == NULL)
+      {
+         pgmoneta_log_error("Failed to find parent backup %s", bck->backup_chain[i]);
+         goto error;
+      }
+
+      label = b->target_backup_id;
+      path = pgmoneta_format_and_append(NULL, "%s%s", target_data_dir, label);
+      marker = pgmoneta_format_and_append(NULL, "%s%s%s", target_data_dir, label, BACKUP_INCOMPLETE_SUFFIX);
+      if (path == NULL || marker == NULL)
+      {
+         goto error;
+      }
+
+      if (pgmoneta_exists(path) || pgmoneta_exists(marker))
+      {
+         pgmoneta_log_error("Backup %s already exists in %s, so %s can't be migrated", label, target_data_dir, b->backup_id);
+         goto error;
+      }
+
+      free(path);
+      free(marker);
+      path = NULL;
+      marker = NULL;
+   }
+
+   return 0;
+
+error:
+   free(path);
+   free(marker);
+   return 1;
+}
+
+static int
+get_existing_wal(char* target_wal_dir, struct art** existing)
+{
+   char* key = NULL;
+   char* dot = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* iter = NULL;
+   struct art* names = NULL;
+
+   *existing = NULL;
+
+   if (pgmoneta_art_create(&names))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_exists(target_wal_dir))
+   {
+      if (pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, target_wal_dir, false, &files) ||
+          pgmoneta_deque_iterator_create(files, &iter))
+      {
+         goto error;
+      }
+
+      while (pgmoneta_deque_iterator_next(iter))
+      {
+         key = pgmoneta_append(NULL, (char*)pgmoneta_value_data(iter->value));
+         if (key == NULL)
+         {
+            goto error;
+         }
+
+         /* A segment that is still being streamed, or a file a compression left behind,
+          * doesn't have the whole segment, so the one from the source is still copied */
+         if (pgmoneta_ends_with(key, ".partial") || pgmoneta_ends_with(key, ".tmp"))
+         {
+            free(key);
+            key = NULL;
+            continue;
+         }
+
+         /* A segment is there in any form, compressed or encrypted */
+         if (!pgmoneta_ends_with(key, HISTORY_SUFFIX) && (dot = strchr(key, '.')) != NULL)
+         {
+            *dot = '\0';
+         }
+
+         if (pgmoneta_art_insert(names, key, (uintptr_t)true, ValueBool))
+         {
+            goto error;
+         }
+
+         free(key);
+         key = NULL;
+      }
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(files);
+
+   *existing = names;
+
+   return 0;
+
+error:
+   free(key);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(files);
+   pgmoneta_art_destroy(names);
+   return 1;
+}
+
+static int
+publish_wal(char* staging_wal_dir, char* target_wal_dir, struct art* created_wal)
+{
+   char* key = NULL;
+   char* dot = NULL;
+   char* from = NULL;
+   char* to = NULL;
+   struct art* existing = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* iter = NULL;
+
+   if (get_existing_wal(target_wal_dir, &existing) ||
+       pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, staging_wal_dir, false, &files) ||
+       pgmoneta_deque_iterator_create(files, &iter))
+   {
+      pgmoneta_log_error("Failed to list the WAL in %s and %s", staging_wal_dir, target_wal_dir);
+      goto error;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      char* name = (char*)pgmoneta_value_data(iter->value);
+
+      key = pgmoneta_append(NULL, name);
+      if (key == NULL)
+      {
+         goto error;
+      }
+      if (!pgmoneta_ends_with(key, HISTORY_SUFFIX) && (dot = strchr(key, '.')) != NULL)
+      {
+         *dot = '\0';
+      }
+
+      if (pgmoneta_art_contains_key(existing, key))
+      {
+         pgmoneta_log_debug("Keeping %s that is already in %s", name, target_wal_dir);
+      }
+      else
+      {
+         from = pgmoneta_format_and_append(NULL, "%s%s", staging_wal_dir, name);
+         to = pgmoneta_format_and_append(NULL, "%s%s", target_wal_dir, name);
+         if (from == NULL || to == NULL ||
+             pgmoneta_art_insert(created_wal, to, (uintptr_t)true, ValueBool) ||
+             pgmoneta_copy_file(from, to, NULL))
+         {
+            pgmoneta_log_error("Failed to copy %s to %s", name, target_wal_dir);
+            goto error;
+         }
+         free(from);
+         free(to);
+         from = NULL;
+         to = NULL;
+      }
+
+      free(key);
+      key = NULL;
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(files);
+   pgmoneta_art_destroy(existing);
+
+   return 0;
+
+error:
+   free(key);
+   free(from);
+   free(to);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(files);
+   pgmoneta_art_destroy(existing);
+   return 1;
+}
+
+static int
+compress_encrypt_wal(struct art** created_wal)
+{
+   const char* suffix = NULL;
+   char* path = NULL;
+   struct art* done = NULL;
+   struct art_iterator* iter = NULL;
+   struct muse_configuration* conf = NULL;
+
+   conf = (struct muse_configuration*)shmem;
+
+   if (conf->compression == COMPRESSION_NONE && conf->encryption == ENCRYPTION_NONE)
+   {
+      return 0;
+   }
+
+   if (pgmoneta_art_create(&done) || pgmoneta_art_iterator_create(*created_wal, &iter))
+   {
+      goto error;
+   }
+
+   while (pgmoneta_art_iterator_next(iter))
+   {
+      path = pgmoneta_append(NULL, iter->key);
+      if (path == NULL)
+      {
+         goto error;
+      }
+
+      if (conf->compression != COMPRESSION_NONE)
+      {
+         char* to = NULL;
+
+         if (pgmoneta_compression_get_suffix(conf->compression, &suffix) || suffix == NULL)
+         {
+            pgmoneta_log_error("No suffix for compression %d", conf->compression);
+            goto error;
+         }
+
+         to = pgmoneta_format_and_append(NULL, "%s%s", path, suffix);
+         if (to == NULL)
+         {
+            goto error;
+         }
+
+         /* Record the new name first, so a failure leaves nothing unrecorded */
+         if (pgmoneta_art_insert(done, to, (uintptr_t)true, ValueBool))
+         {
+            free(to);
+            goto error;
+         }
+         if (pgmoneta_compress_file(path, to, conf->compression, NULL))
+         {
+            pgmoneta_log_error("Failed to compress %s", path);
+            free(to);
+            goto error;
+         }
+
+         free(path);
+         path = to;
+      }
+
+      if (conf->encryption != ENCRYPTION_NONE)
+      {
+         char* to = pgmoneta_format_and_append(NULL, "%s.aes", path);
+
+         if (to == NULL)
+         {
+            goto error;
+         }
+
+         if (pgmoneta_art_insert(done, to, (uintptr_t)true, ValueBool))
+         {
+            free(to);
+            goto error;
+         }
+         if (pgmoneta_encrypt_file(path, to, NULL))
+         {
+            pgmoneta_log_error("Failed to encrypt %s", path);
+            free(to);
+            goto error;
+         }
+
+         free(path);
+         path = to;
+      }
+
+      if (pgmoneta_art_insert(done, path, (uintptr_t)true, ValueBool))
+      {
+         goto error;
+      }
+      free(path);
+      path = NULL;
+   }
+
+   pgmoneta_art_iterator_destroy(iter);
+   pgmoneta_art_destroy(*created_wal);
+   *created_wal = done;
+
+   return 0;
+
+error:
+   free(path);
+   pgmoneta_art_iterator_destroy(iter);
+   /* Both lists hold what may be on disk now, so the caller removes all of it */
+   if (done != NULL)
+   {
+      struct art_iterator* d = NULL;
+
+      if (!pgmoneta_art_iterator_create(done, &d))
+      {
+         while (pgmoneta_art_iterator_next(d))
+         {
+            if (pgmoneta_art_insert(*created_wal, d->key, (uintptr_t)true, ValueBool))
+            {
+               pgmoneta_log_warn("%s may be left behind by the failed migration", d->key);
+            }
+         }
+         pgmoneta_art_iterator_destroy(d);
+      }
+      pgmoneta_art_destroy(done);
+   }
+   return 1;
+}
+
+static void
+delete_created(struct art* created, bool directories)
+{
+   struct art_iterator* iter = NULL;
+
+   if (created == NULL || pgmoneta_art_iterator_create(created, &iter))
+   {
+      return;
+   }
+
+   while (pgmoneta_art_iterator_next(iter))
+   {
+      if (!pgmoneta_exists(iter->key))
+      {
+         continue;
+      }
+
+      pgmoneta_log_warn("Removing %s, written by the failed migration", iter->key);
+      if (directories)
+      {
+         pgmoneta_delete_directory(iter->key);
+      }
+      else
+      {
+         pgmoneta_delete_file(iter->key, NULL);
+      }
+   }
+
+   pgmoneta_art_iterator_destroy(iter);
 }
 
 static int
@@ -762,8 +1156,10 @@ get_target_backup_id(time_t start_time, char** target_id)
 }
 
 static int
-migrate_pgbackrest_backup(struct art* manifests, struct pgbackrest_backup_info* prev_backup_info, struct pgbackrest_backup_info* backup_info, char* password, char* root_workspace, char* source_dir, char* target_data_dir, char* target_wal_dir)
+migrate_pgbackrest_backup(struct art* manifests, struct pgbackrest_backup_info* prev_backup_info, struct pgbackrest_backup_info* backup_info, char* password, char* root_workspace, char* source_dir, char* target_data_dir, char* target_wal_dir, struct art* created_backups, struct art* markers)
 {
+   char marker[MAX_PATH];
+   FILE* marker_file = NULL;
    char source_backup_path[MAX_PATH];
    char source_backup_data_path[MAX_PATH];
    char target_backup_path[MAX_PATH];
@@ -832,12 +1228,20 @@ migrate_pgbackrest_backup(struct art* manifests, struct pgbackrest_backup_info* 
       goto error;
    }
 
-   if (pgmoneta_exists(target_backup_path))
+   /* Like a backup taken by pgmoneta, it stays marked as incomplete until the
+    * whole migration succeeds, so pgmoneta removes it if muse is killed */
+   pgmoneta_snprintf(marker, sizeof(marker), "%s%s%s", target_data_dir, backup_info->target_backup_id, BACKUP_INCOMPLETE_SUFFIX);
+   if (pgmoneta_art_insert(markers, marker, (uintptr_t)true, ValueBool) ||
+       pgmoneta_fopen_secure(marker, "w", &marker_file))
    {
-      pgmoneta_delete_directory(target_backup_path);
+      pgmoneta_log_error("Failed to mark %s as incomplete", target_backup_path);
+      goto error;
    }
+   fclose(marker_file);
+   marker_file = NULL;
 
-   if (pgmoneta_mkdir(target_backup_path))
+   if (pgmoneta_art_insert(created_backups, target_backup_path, (uintptr_t)true, ValueBool) ||
+       pgmoneta_mkdir(target_backup_path))
    {
       pgmoneta_log_error("Failed to create backup directory %s", target_backup_path);
       goto error;
@@ -1389,7 +1793,7 @@ migrate_wal_segments(char* workspace, char* source_dir, char* target_dir)
          {
             from = pgmoneta_append(from, "/");
             pgmoneta_log_info("Extracting WAL directory %s", from);
-            if (extract_wal_segments(password, from, target_dir))
+            if (extract_wal_segments(password, from, target_dir, workspace))
             {
                pgmoneta_log_error("Failed to extract WAL segments from %s", from);
                goto error;
@@ -1432,16 +1836,23 @@ error:
 }
 
 static int
-extract_wal_segments(char* password, char* source_dir, char* target_dir)
+extract_wal_segments(char* password, char* source_dir, char* target_dir, char* workspace)
 {
    struct dirent* entry;
    struct stat statbuf;
-   DIR* d = opendir(source_dir);
+   DIR* d = NULL;
    char* path = NULL;
-   char* target_path = NULL;
+   char* decrypted_path = NULL;
    char* final_path = NULL;
    char* seg_name = NULL;
    int compression = COMPRESSION_NONE;
+
+   d = opendir(source_dir);
+   if (d == NULL)
+   {
+      pgmoneta_log_error("Failed to open directory %s", source_dir);
+      goto error;
+   }
 
    while ((entry = readdir(d)))
    {
@@ -1453,20 +1864,22 @@ extract_wal_segments(char* password, char* source_dir, char* target_dir)
       }
 
       path = pgmoneta_format_and_append(path, "%s%s", source_dir, entry->d_name);
-      target_path = pgmoneta_format_and_append(target_path, "%s%s", target_dir, entry->d_name);
 
-      if (!stat(path, &statbuf))
+      if (stat(path, &statbuf) || !S_ISREG(statbuf.st_mode))
       {
-         if (S_ISREG(statbuf.st_mode))
-         {
-            if (extract_wal_file_info(entry->d_name, &seg_name, &compression))
-            {
-               pgmoneta_log_error("Failed to extract WAL file info from %s", entry->d_name);
-               goto error;
-            }
-         }
+         pgmoneta_log_debug("Skipping %s", path);
+         free(path);
+         path = NULL;
+         continue;
       }
 
+      if (extract_wal_file_info(entry->d_name, &seg_name, &compression))
+      {
+         pgmoneta_log_error("Failed to extract WAL file info from %s", entry->d_name);
+         goto error;
+      }
+
+      decrypted_path = pgmoneta_format_and_append(decrypted_path, "%s%s", workspace, entry->d_name);
       final_path = pgmoneta_format_and_append(final_path, "%s%s", target_dir, seg_name);
 
       if (pgmoneta_cbc_decrypt_salted_file(CBC_DIGEST_DEFAULT,
@@ -1474,34 +1887,36 @@ extract_wal_segments(char* password, char* source_dir, char* target_dir)
                                            (unsigned char*)password,
                                            strlen(password),
                                            path,
-                                           target_path))
+                                           decrypted_path))
       {
          pgmoneta_log_error("Failed to decrypt WAL segments");
          goto error;
       }
 
-      if (pgmoneta_decompress_file(target_path, final_path, compression, NULL))
+      if (pgmoneta_decompress_file(decrypted_path, final_path, compression, NULL))
       {
-         pgmoneta_log_error("Failed to decompress %s to %s, compression mode %d", target_path, final_path, compression);
+         pgmoneta_log_error("Failed to decompress %s to %s, compression mode %d", decrypted_path, final_path, compression);
          goto error;
       }
 
+      if (pgmoneta_exists(decrypted_path))
+      {
+         pgmoneta_delete_file(decrypted_path, NULL);
+      }
+
       free(path);
-      free(target_path);
+      free(decrypted_path);
       free(final_path);
       free(seg_name);
-      target_path = NULL;
+      decrypted_path = NULL;
       final_path = NULL;
       path = NULL;
       seg_name = NULL;
    }
 
-   if (d != NULL)
-   {
-      closedir(d);
-   }
+   closedir(d);
    free(path);
-   free(target_path);
+   free(decrypted_path);
    free(final_path);
    free(seg_name);
    return 0;
@@ -1511,9 +1926,13 @@ error:
    {
       closedir(d);
    }
+   if (decrypted_path != NULL && pgmoneta_exists(decrypted_path))
+   {
+      pgmoneta_delete_file(decrypted_path, NULL);
+   }
    free(path);
    free(seg_name);
-   free(target_path);
+   free(decrypted_path);
    free(final_path);
    return 1;
 }
