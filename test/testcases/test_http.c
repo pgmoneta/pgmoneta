@@ -390,19 +390,27 @@ MCTF_TEST(test_pgmoneta_http_header_operations)
    MCTF_ASSERT_PTR_NONNULL(header_value, cleanup, "header Authorization should not be null");
    MCTF_ASSERT_STR_EQ(header_value, "Bearer token123", cleanup, "header Authorization mismatch");
 
+   header_value = pgmoneta_http_request_get_header(request, "authorization");
+   MCTF_ASSERT_PTR_NONNULL(header_value, cleanup, "lowercase header authorization should not be null");
+   MCTF_ASSERT_STR_EQ(header_value, "Bearer token123", cleanup, "lowercase header authorization mismatch");
+
    header_value = pgmoneta_http_request_get_header(request, "Content-Type");
    MCTF_ASSERT_PTR_NONNULL(header_value, cleanup, "header Content-Type should not be null");
    MCTF_ASSERT_STR_EQ(header_value, "application/json", cleanup, "header Content-Type mismatch");
 
+   header_value = pgmoneta_http_request_get_header(request, "CONTENT-TYPE");
+   MCTF_ASSERT_PTR_NONNULL(header_value, cleanup, "uppercase header Content-Type should not be null");
+   MCTF_ASSERT_STR_EQ(header_value, "application/json", cleanup, "uppercase header Content-Type mismatch");
+
    MCTF_ASSERT_PTR_NULL(pgmoneta_http_request_get_header(request, "NonExistent"), cleanup, "header NonExistent should be null");
 
-   MCTF_ASSERT(!pgmoneta_http_request_update_header(request, "Authorization", "Bearer newtoken456"), cleanup, "failed to update Authorization header");
+   MCTF_ASSERT(!pgmoneta_http_request_update_header(request, "authorization", "Bearer newtoken456"), cleanup, "failed to update Authorization header with lowercase name");
 
    header_value = pgmoneta_http_request_get_header(request, "Authorization");
    MCTF_ASSERT_PTR_NONNULL(header_value, cleanup, "updated header value is null");
    MCTF_ASSERT_STR_EQ(header_value, "Bearer newtoken456", cleanup, "updated header value mismatch");
 
-   MCTF_ASSERT(!pgmoneta_http_request_remove_header(request, "Content-Type"), cleanup, "failed to remove Content-Type header");
+   MCTF_ASSERT(!pgmoneta_http_request_remove_header(request, "content-type"), cleanup, "failed to remove Content-Type header with lowercase name");
 
    header_value = pgmoneta_http_request_get_header(request, "Content-Type");
    MCTF_ASSERT_PTR_NULL(header_value, cleanup, "removed header should be null");
@@ -544,6 +552,180 @@ MCTF_TEST(test_pgmoneta_http_write_cb_chunked)
    MCTF_ASSERT_INT_EQ(write_context.data_size, 13, cleanup, "write_cb should receive chunked body");
    MCTF_ASSERT_STR_EQ(write_context.data, "Hello, World!", cleanup, "write_cb chunked body mismatch");
    MCTF_ASSERT(response->payload.data_size == 0, cleanup, "write_cb should prevent buffering for chunked response");
+
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_http_response_header_case_insensitive)
+{
+   int status;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   char* header_val = NULL;
+
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+
+   char* response_text =
+      "HTTP/1.1 200 OK\r\n"
+      "content-type: application/json\r\n"
+      "X-Custom-Header: CustomVal123\r\n"
+      "etag: \"abcdef123456\"\r\n"
+      "content-length: 16\r\n"
+      "connection: close\r\n"
+      "\r\n"
+      "{\"status\":\"ok\"}\n";
+
+   setup_echo_server(response_text);
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/test", &request), cleanup, "failed to create request");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP GET request failed");
+
+   /* Exact casing check */
+   header_val = pgmoneta_http_get_response_header(response, "content-type");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "content-type header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "application/json", cleanup, "content-type mismatch");
+
+   /* Title-case query on lowercase response header */
+   header_val = pgmoneta_http_get_response_header(response, "Content-Type");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "Content-Type header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "application/json", cleanup, "Content-Type mismatch");
+
+   /* Uppercase query on lowercase response header */
+   header_val = pgmoneta_http_get_response_header(response, "CONTENT-TYPE");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "CONTENT-TYPE header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "application/json", cleanup, "CONTENT-TYPE mismatch");
+
+   /* Lowercase query on mixed-case response header */
+   header_val = pgmoneta_http_get_response_header(response, "x-custom-header");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "x-custom-header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "CustomVal123", cleanup, "x-custom-header mismatch");
+
+   /* Uppercase query on mixed-case response header */
+   header_val = pgmoneta_http_get_response_header(response, "X-CUSTOM-HEADER");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "X-CUSTOM-HEADER is null");
+   MCTF_ASSERT_STR_EQ(header_val, "CustomVal123", cleanup, "X-CUSTOM-HEADER mismatch");
+
+   /* Title-case query on lowercase etag */
+   header_val = pgmoneta_http_get_response_header(response, "ETag");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "ETag header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "\"abcdef123456\"", cleanup, "ETag mismatch");
+
+   /* Non-existent header returns NULL */
+   header_val = pgmoneta_http_get_response_header(response, "X-Non-Existent");
+   MCTF_ASSERT_PTR_NULL(header_val, cleanup, "non-existent header should be null");
+
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_http_get_chunked_case_insensitive)
+{
+   int status;
+   char* header_val = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+
+   /* Lowercase header name and mixed-case coding value "Chunked" */
+   char* response_text =
+      "HTTP/1.1 200 OK\r\n"
+      "content-type: text/plain\r\n"
+      "transfer-encoding: Chunked\r\n"
+      "connection: close\r\n"
+      "\r\n"
+      "5\r\n"
+      "Hello\r\n"
+      "8\r\n"
+      ", World!\r\n"
+      "0\r\n"
+      "\r\n";
+
+   setup_echo_server(response_text);
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/chunked", &request), cleanup, "failed to create request");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP GET chunked request failed");
+
+   /* Chunk framing must be decoded: body size must be 13 ("Hello, World!"), not 28 raw chunk bytes */
+   MCTF_ASSERT_INT_EQ((int)response->payload.data_size, 13, cleanup, "chunked body size mismatch");
+   MCTF_ASSERT(!memcmp(response->payload.data, "Hello, World!", 13), cleanup, "chunked body content mismatch");
+
+   header_val = pgmoneta_http_get_response_header(response, "Transfer-Encoding");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "Transfer-Encoding header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "Chunked", cleanup, "Transfer-Encoding header mismatch");
+
+   header_val = pgmoneta_http_get_response_header(response, "transfer-encoding");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "transfer-encoding header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "Chunked", cleanup, "transfer-encoding header mismatch");
+
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_http_get_content_length_case_insensitive)
+{
+   int status;
+   char* header_val = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+
+   /* Lowercase content-length header */
+   char* response_text =
+      "HTTP/1.1 200 OK\r\n"
+      "content-type: application/json\r\n"
+      "content-length: 16\r\n"
+      "connection: close\r\n"
+      "\r\n"
+      "{\"status\":\"ok\"}\n";
+
+   setup_echo_server(response_text);
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/cl", &request), cleanup, "failed to create request");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP GET content-length request failed");
+
+   MCTF_ASSERT_INT_EQ((int)response->payload.data_size, 16, cleanup, "content-length body size mismatch");
+   MCTF_ASSERT(!memcmp(response->payload.data, "{\"status\":\"ok\"}\n", 16), cleanup, "content-length body mismatch");
+
+   header_val = pgmoneta_http_get_response_header(response, "Content-Length");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "Content-Length header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "16", cleanup, "Content-Length mismatch");
+
+   header_val = pgmoneta_http_get_response_header(response, "content-length");
+   MCTF_ASSERT_PTR_NONNULL(header_val, cleanup, "content-length header is null");
+   MCTF_ASSERT_STR_EQ(header_val, "16", cleanup, "content-length mismatch");
 
 cleanup:
    pgmoneta_http_request_destroy(request);
