@@ -735,7 +735,7 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
 
       while ((read_bytes = fread(buffer, 1, sizeof(buffer), sfile)) > 0)
       {
-         if (sftp_write(dfile, buffer, read_bytes) != (ssize_t)read_bytes)
+         if (pgmoneta_sftp_write(dfile, buffer, read_bytes))
          {
             pgmoneta_log_error("Failed to write %s to the remote server: %s", d, ssh_get_error(session));
             goto error;
@@ -878,7 +878,7 @@ error:
 static int
 sftp_link_file(char* target, char* path)
 {
-#if LIBSSH_VERSION_INT >= SSH_VERSION_INT(0, 11, 0)
+#if LIBSSH_VERSION_MAJOR > 0 || LIBSSH_VERSION_MINOR >= 11
    if (sftp_extension_supported(sftp, "hardlink@openssh.com", "1"))
    {
       if (sftp_hardlink(sftp, target, path) == SSH_OK)
@@ -1120,6 +1120,31 @@ error:
    }
    free(path);
    return 1;
+}
+
+int
+pgmoneta_sftp_write(sftp_file file, char* data, size_t length)
+{
+   size_t written = 0;
+
+   if (file == NULL || data == NULL)
+   {
+      return 1;
+   }
+
+   while (written < length)
+   {
+      ssize_t w = sftp_write(file, data + written, length - written);
+
+      if (w <= 0)
+      {
+         return 1;
+      }
+
+      written += w;
+   }
+
+   return 0;
 }
 
 int

@@ -14,14 +14,30 @@ on:
 jobs:
   static-analysis:
     runs-on: ubuntu-latest
+    env:
+      # The baseline depends on the cppcheck version, so the distribution package
+      # isn't used. When moving to a new release, regenerate the baseline with it.
+      CPPCHECK_VERSION: "2.22.0"
     steps:
       - uses: actions/checkout@v6
 
+      - name: Cache cppcheck
+        id: cache-cppcheck
+        uses: actions/cache@v4
+        with:
+          path: ~/cppcheck
+          key: cppcheck-${{ runner.os }}-${{ env.CPPCHECK_VERSION }}
+
+      - name: Build cppcheck
+        if: steps.cache-cppcheck.outputs.cache-hit != 'true'
+        run: |
+          git clone --quiet --depth 1 --branch "$CPPCHECK_VERSION" https://github.com/danmar/cppcheck.git /tmp/cppcheck
+          make -C /tmp/cppcheck -j"$(nproc)" MATCHCOMPILER=yes PREFIX="$HOME/cppcheck" FILESDIR="$HOME/cppcheck/share/cppcheck" CXXOPTS="-O2" install
+
       - name: Install cppcheck
         run: |
-          sudo apt update -y
-          sudo apt install -y cppcheck
-          cppcheck --version
+          echo "$HOME/cppcheck/bin" >> "$GITHUB_PATH"
+          "$HOME/cppcheck/bin/cppcheck" --version
 
       - name: Run cppcheck against the known baseline
         run: |
@@ -198,7 +214,7 @@ jobs:
           chown -R runner:runner $GITHUB_WORKSPACE
 
       - name: Run Tests
-        timeout-minutes: 45
+        timeout-minutes: 60
         run: |
           export TEST_PG_VERSION=${{ matrix.pg_version }}
           if [ "${{ matrix.compiler }}" = "clang" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then

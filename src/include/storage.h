@@ -177,6 +177,18 @@ int
 pgmoneta_sftp_wal_open(int server, char* filename, int segsize, sftp_file* file);
 
 /**
+ * Write a buffer to a file in the remote ssh server. A single sftp_write()
+ * can write less than requested, as it is limited by the maximum packet
+ * size of the server, so write until everything is sent
+ * @param file The file
+ * @param data The data
+ * @param length The length of the data
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_sftp_write(sftp_file file, char* data, size_t length);
+
+/**
  * Close WAL shipping file in remote ssh server
  * @param srv The server index
  * @param filename WAL file name
