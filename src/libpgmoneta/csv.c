@@ -33,10 +33,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+static bool csv_line_put(struct csv_reader* reader, size_t pos, char c);
+static char* csv_append_field(char* row, char* field);
+
 int
 pgmoneta_csv_reader_init(char* path, struct csv_reader** reader)
 {
-   struct csv_reader* r = malloc(sizeof(struct csv_reader));
+   struct csv_reader* r = calloc(1, sizeof(struct csv_reader));
 
    if (r == NULL)
    {
@@ -47,8 +50,6 @@ pgmoneta_csv_reader_init(char* path, struct csv_reader** reader)
    {
       goto error;
    }
-   memset(r->line, 0, sizeof(r->line));
-   r->saveptr = NULL;
    *reader = r;
    return 0;
 error:
@@ -64,53 +65,113 @@ bool
 pgmoneta_csv_next_row(struct csv_reader* reader, int* num_col, char*** cols)
 {
    char** cs = NULL;
-   char** tmp = NULL;
-   char* col = NULL;
-   char* last_tok = NULL;
+   size_t* starts = NULL;
+   size_t* tmp = NULL;
+   size_t len = 0;
    int num = 0;
+   int c;
+   bool in_quotes = false;
+   bool any = false;
+
    if (reader == NULL || reader->file == NULL)
    {
       goto error;
    }
-   memset(reader->line, 0, sizeof(reader->line));
-   reader->saveptr = NULL;
-   if (fgets(reader->line, sizeof(reader->line), reader->file) == NULL)
+
+   /* The first field starts at offset 0 */
+   starts = malloc(sizeof(size_t));
+   if (starts == NULL)
    {
       goto error;
    }
-   col = strtok_r(reader->line, ",", &reader->saveptr);
-   while (col != NULL)
+   starts[num++] = 0;
+
+   while ((c = fgetc(reader->file)) != EOF)
    {
-      tmp = realloc(cs, (num + 1) * sizeof(char*));
-      if (tmp == NULL)
+      any = true;
+
+      if (in_quotes)
+      {
+         if (c == '"')
+         {
+            int next = fgetc(reader->file);
+
+            if (next == '"')
+            {
+               /* An escaped quote */
+            }
+            else
+            {
+               in_quotes = false;
+               if (next != EOF)
+               {
+                  ungetc(next, reader->file);
+               }
+               continue;
+            }
+         }
+      }
+      else if (c == '"' && len == starts[num - 1])
+      {
+         in_quotes = true;
+         continue;
+      }
+      else if (c == '\r')
+      {
+         continue;
+      }
+      else if (c == '\n')
+      {
+         break;
+      }
+      else if (c == ',')
+      {
+         c = '\0';
+      }
+
+      if (!csv_line_put(reader, len++, (char)c))
       {
          goto error;
       }
-      cs = tmp;
-      cs[num] = col;
-      num++;
-      col = strtok_r(NULL, ",", &reader->saveptr);
-   }
-   if (num > 0)
-   {
-      size_t len;
 
-      last_tok = cs[num - 1];
-      len = strlen(last_tok);
-      if (len > 0 && last_tok[len - 1] == '\n')
+      if (c == '\0')
       {
-         last_tok[len - 1] = '\0';
-         len--;
-      }
-      if (len > 0 && last_tok[len - 1] == '\r')
-      {
-         last_tok[len - 1] = '\0';
+         tmp = realloc(starts, (num + 1) * sizeof(size_t));
+         if (tmp == NULL)
+         {
+            goto error;
+         }
+         starts = tmp;
+         starts[num++] = len;
       }
    }
+
+   if (!any)
+   {
+      goto error;
+   }
+
+   if (!csv_line_put(reader, len, '\0'))
+   {
+      goto error;
+   }
+
+   cs = malloc(num * sizeof(char*));
+   if (cs == NULL)
+   {
+      goto error;
+   }
+   for (int i = 0; i < num; i++)
+   {
+      cs[i] = reader->line + starts[i];
+   }
+
+   free(starts);
    *cols = cs;
    *num_col = num;
    return true;
 error:
+   free(starts);
    free(cs);
    return false;
 }
@@ -126,6 +187,7 @@ pgmoneta_csv_reader_destroy(struct csv_reader* reader)
    {
       fclose(reader->file);
    }
+   free(reader->line);
    free(reader);
    return 0;
 }
@@ -138,7 +200,6 @@ pgmoneta_csv_reader_reset(struct csv_reader* reader)
       goto error;
    }
    rewind(reader->file);
-   reader->saveptr = NULL;
    return 0;
 error:
    return 1;
@@ -179,7 +240,7 @@ pgmoneta_csv_write(struct csv_writer* writer, int num_col, char** cols)
    }
    for (int i = 0; i < num_col; i++)
    {
-      row = pgmoneta_append(row, cols[i]);
+      row = csv_append_field(row, cols[i]);
       if (i != num_col - 1)
       {
          row = pgmoneta_append(row, ",");
@@ -215,4 +276,49 @@ pgmoneta_csv_writer_destroy(struct csv_writer* writer)
    }
    free(writer);
    return ret;
+}
+
+static bool
+csv_line_put(struct csv_reader* reader, size_t pos, char c)
+{
+   if (pos >= reader->capacity)
+   {
+      size_t capacity = reader->capacity == 0 ? 512 : reader->capacity * 2;
+      char* line = realloc(reader->line, capacity);
+
+      if (line == NULL)
+      {
+         return false;
+      }
+      reader->line = line;
+      reader->capacity = capacity;
+   }
+   reader->line[pos] = c;
+   return true;
+}
+
+static char*
+csv_append_field(char* row, char* field)
+{
+   if (field == NULL)
+   {
+      return pgmoneta_append(row, "");
+   }
+
+   /* Quote the field when it holds a character that has a meaning in CSV */
+   if (strpbrk(field, ",\"\r\n") == NULL)
+   {
+      return pgmoneta_append(row, field);
+   }
+
+   row = pgmoneta_append_char(row, '"');
+   for (char* p = field; *p != '\0'; p++)
+   {
+      if (*p == '"')
+      {
+         row = pgmoneta_append_char(row, '"');
+      }
+      row = pgmoneta_append_char(row, *p);
+   }
+   return pgmoneta_append_char(row, '"');
 }

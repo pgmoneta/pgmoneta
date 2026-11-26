@@ -44,9 +44,9 @@ extern "C" {
  */
 struct csv_reader
 {
-   FILE* file;     /**< The file */
-   char line[512]; /**< The line */
-   char* saveptr;  /**< Per-reader strtok_r state (thread-safe) */
+   FILE* file;      /**< The file */
+   char* line;      /**< The current row, fields separated by '\0' */
+   size_t capacity; /**< The capacity of line */
 };
 
 /** @struct csv_writer
@@ -68,7 +68,9 @@ pgmoneta_csv_reader_init(char* path, struct csv_reader** reader);
 
 /**
  * Get the next row in csv file.
- * You need to do free(cols) as the structure is allocated by the function
+ * Fields may be quoted with '"' (RFC 4180), so they can hold ',', '"' and newlines.
+ * You need to do free(cols) as the structure is allocated by the function.
+ * The column strings stay valid until the next call on the reader
  * @param reader The reader
  * @param num_col [out] The number of columns in the row
  * @param cols [out] The columns in the row
