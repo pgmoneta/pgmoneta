@@ -168,7 +168,11 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
          from = pgmoneta_append(from, "data/");
          to = pgmoneta_append(to, "data/");
 
-         pgmoneta_compare_manifests(to_manifest, from_manifest, &deleted_files, &changed_files, &added_files);
+         if (pgmoneta_compare_manifests(to_manifest, from_manifest, &deleted_files, &changed_files, &added_files))
+         {
+            pgmoneta_log_error("Link: Failed to compare manifests");
+            goto error;
+         }
          pgmoneta_link_manifest(from, to, from, changed_files, added_files, workers);
 
          pgmoneta_workers_wait(workers);

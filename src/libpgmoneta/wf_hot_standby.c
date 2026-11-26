@@ -202,7 +202,12 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             pgmoneta_log_trace("old_manifest: %s", old_manifest);
             pgmoneta_log_trace("new_manifest: %s", new_manifest);
 
-            pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &added_files);
+            if (pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &added_files))
+            {
+               pgmoneta_log_error("Hot standby: Failed to compare manifests");
+               error = true;
+               goto cleanup;
+            }
 
             pgmoneta_art_iterator_create(deleted_files, &deleted_iter);
             pgmoneta_art_iterator_create(changed_files, &changed_iter);

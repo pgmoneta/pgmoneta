@@ -44,9 +44,9 @@ extern "C" {
  */
 struct csv_reader
 {
-   FILE* file;     /**< The file */
-   char line[512]; /**< The line */
-   char* saveptr;  /**< Per-reader strtok_r state (thread-safe) */
+   FILE* file;                 /**< The file */
+   char line[MAX_PATH + 256]; /**< The line */
+   char* saveptr;              /**< Per-reader strtok_r state (thread-safe) */
 };
 
 /** @struct csv_writer
