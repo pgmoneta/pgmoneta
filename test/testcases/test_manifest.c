@@ -167,15 +167,92 @@ cleanup:
    MCTF_FINISH();
 }
 
-MCTF_TEST_NEGATIVE(test_manifest_compare_invalid_paths)
+MCTF_TEST(test_manifest_compare_multiple_chunks)
 {
+   char old_path[MAX_PATH] = {0};
+   char new_path[MAX_PATH] = {0};
+   char last_path[MAX_PATH] = {0};
+   FILE* f_old = NULL;
+   FILE* f_new = NULL;
    struct art* deleted = NULL;
    struct art* changed = NULL;
    struct art* added = NULL;
 
    pgmoneta_test_setup();
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_compare_manifests("/nonexistent/manifest1.csv",
+   pgmoneta_snprintf(old_path, sizeof(old_path), "%s/manifest_multi_old_%d.csv", pgmoneta_get_tmpdir(), getpid());
+   pgmoneta_snprintf(new_path, sizeof(new_path), "%s/manifest_multi_new_%d.csv", pgmoneta_get_tmpdir(), getpid());
+   pgmoneta_snprintf(last_path, sizeof(last_path), "base/1/%d", MANIFEST_CHUNK_SIZE + 1);
+
+   f_old = fopen(old_path, "w");
+   MCTF_ASSERT_PTR_NONNULL(f_old, cleanup, "Failed to create old multi-chunk manifest");
+   fprintf(f_old, "base/1/1,hash_shared\n");
+   fclose(f_old);
+   f_old = NULL;
+
+   f_new = fopen(new_path, "w");
+   MCTF_ASSERT_PTR_NONNULL(f_new, cleanup, "Failed to create new multi-chunk manifest");
+   for (int i = 1; i <= MANIFEST_CHUNK_SIZE + 1; i++)
+   {
+      fprintf(f_new, "base/1/%d,%s\n", i, i == 1 ? "hash_shared" : "hash_added");
+   }
+   fclose(f_new);
+   f_new = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_compare_manifests(old_path, new_path, &deleted, &changed, &added), 0, cleanup,
+                      "pgmoneta_compare_manifests failed across chunk boundary");
+
+   MCTF_ASSERT_PTR_NONNULL(deleted, cleanup, "deleted tree is NULL");
+   MCTF_ASSERT_PTR_NONNULL(changed, cleanup, "changed tree is NULL");
+   MCTF_ASSERT_PTR_NONNULL(added, cleanup, "added tree is NULL");
+   MCTF_ASSERT_INT_EQ(deleted->size, 0, cleanup, "deleted size should be 0");
+   MCTF_ASSERT_INT_EQ(changed->size, 1, cleanup, "changed tree should contain only backup_manifest");
+   MCTF_ASSERT_INT_EQ(added->size, MANIFEST_CHUNK_SIZE, cleanup, "added tree size should match the extra manifest rows");
+   MCTF_ASSERT(pgmoneta_art_contains_key(added, last_path), cleanup,
+               "added tree missing the last row after the chunk boundary");
+
+cleanup:
+   if (f_old != NULL)
+   {
+      fclose(f_old);
+   }
+   if (f_new != NULL)
+   {
+      fclose(f_new);
+   }
+   if (old_path[0] != '\0')
+   {
+      unlink(old_path);
+   }
+   if (new_path[0] != '\0')
+   {
+      unlink(new_path);
+   }
+   pgmoneta_art_destroy(deleted);
+   pgmoneta_art_destroy(changed);
+   pgmoneta_art_destroy(added);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_manifest_compare_invalid_paths)
+{
+   char old_path[MAX_PATH] = {0};
+   FILE* f_old = NULL;
+   struct art* deleted = NULL;
+   struct art* changed = NULL;
+   struct art* added = NULL;
+
+   pgmoneta_test_setup();
+
+   pgmoneta_snprintf(old_path, sizeof(old_path), "%s/manifest_error_%d.csv", pgmoneta_get_tmpdir(), getpid());
+   f_old = fopen(old_path, "w");
+   MCTF_ASSERT_PTR_NONNULL(f_old, cleanup, "Failed to create old manifest for error-path test");
+   fprintf(f_old, "base/1/1234,hash_old\n");
+   fclose(f_old);
+   f_old = NULL;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_compare_manifests(old_path,
                                                  "/nonexistent/manifest2.csv",
                                                  &deleted, &changed, &added), 1, cleanup,
                       "pgmoneta_compare_manifests should fail for nonexistent paths");
@@ -185,6 +262,14 @@ MCTF_TEST_NEGATIVE(test_manifest_compare_invalid_paths)
    MCTF_ASSERT_PTR_NULL(added, cleanup, "added should be NULL on error");
 
 cleanup:
+   if (f_old != NULL)
+   {
+      fclose(f_old);
+   }
+   if (old_path[0] != '\0')
+   {
+      unlink(old_path);
+   }
    pgmoneta_art_destroy(deleted);
    pgmoneta_art_destroy(changed);
    pgmoneta_art_destroy(added);
