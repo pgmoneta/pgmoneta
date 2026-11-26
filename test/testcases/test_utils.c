@@ -2883,10 +2883,10 @@ cleanup:
 
 MCTF_TEST(test_utils_copy_directory_exclusions)
 {
-   char* base = "test_copy_dir_excl";
-   char* src = "test_copy_dir_excl/src";
-   char* sub = "test_copy_dir_excl/src/sub";
-   char* dst = "test_copy_dir_excl/dst";
+   char base[] = "test_copy_dir_excl";
+   char src[] = "test_copy_dir_excl/src";
+   char sub[] = "test_copy_dir_excl/src/sub";
+   char dst[] = "test_copy_dir_excl/dst";
    char* files[] = {"test_copy_dir_excl/src/sub/first.txt", "test_copy_dir_excl/src/mid.txt",
                     "test_copy_dir_excl/src/last.txt", "test_copy_dir_excl/src/keep.txt", NULL};
    char* excluded[] = {"test_copy_dir_excl/src/sub/first.txt", "test_copy_dir_excl/src/mid.txt",
