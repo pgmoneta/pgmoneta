@@ -1511,6 +1511,10 @@ pgmoneta_art_iterator_create(struct art* t, struct art_iterator** iter)
       return 1;
    }
    i = malloc(sizeof(struct art_iterator));
+   if (i == NULL)
+   {
+      return 1;
+   }
    i->count = 0;
    i->tree = t;
    i->key = NULL;
