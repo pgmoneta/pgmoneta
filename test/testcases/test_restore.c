@@ -29,6 +29,7 @@
 #include <pgmoneta.h>
 #include <info.h>
 #include <management.h>
+#include <restore.h>
 #include <tsclient.h>
 #include <tscommon.h>
 #include <utils.h>
@@ -197,5 +198,46 @@ MCTF_TEST_NEGATIVE(test_pgmoneta_restore_position_too_long)
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_pgmoneta_copy_postgresql_restore_excludes_last_files)
+{
+   char* base = "test_restore_excl";
+   char* src = "test_restore_excl/src";
+   char* global = "test_restore_excl/src/global";
+   char* dst = "test_restore_excl/dst";
+   char* files[] = {"test_restore_excl/src/PG_VERSION", "test_restore_excl/src/postgresql.conf",
+                    "test_restore_excl/src/pg_hba.conf", "test_restore_excl/src/global/pg_control", NULL};
+   struct backup bck;
+   FILE* f = NULL;
+
+   memset(&bck, 0, sizeof(bck));
+   pgmoneta_delete_directory(base);
+   pgmoneta_mkdir(base);
+   pgmoneta_mkdir(src);
+   pgmoneta_mkdir(global);
+
+   for (int i = 0; files[i] != NULL; i++)
+   {
+      f = fopen(files[i], "w");
+      MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not create %s", files[i]);
+      fprintf(f, "data");
+      fclose(f);
+      f = NULL;
+   }
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_copy_postgresql_restore(-1, "test_restore_excl/src/", dst, base, "lbl", &bck, NULL), 0, cleanup, "copy_postgresql_restore failed");
+   MCTF_ASSERT(pgmoneta_exists("test_restore_excl/dst/PG_VERSION"), cleanup, "PG_VERSION should be copied");
+   MCTF_ASSERT(!pgmoneta_exists("test_restore_excl/dst/postgresql.conf"), cleanup, "postgresql.conf should be excluded");
+   MCTF_ASSERT(!pgmoneta_exists("test_restore_excl/dst/pg_hba.conf"), cleanup, "pg_hba.conf should be excluded");
+   MCTF_ASSERT(!pgmoneta_exists("test_restore_excl/dst/global/pg_control"), cleanup, "global/pg_control should be excluded");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   pgmoneta_delete_directory(base);
    MCTF_FINISH();
 }

@@ -2545,11 +2545,17 @@ pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_fi
          to_buffer = NULL;
 
          from_buffer = pgmoneta_append(from_buffer, from);
-         from_buffer = pgmoneta_append(from_buffer, "/");
+         if (!pgmoneta_ends_with(from_buffer, "/"))
+         {
+            from_buffer = pgmoneta_append(from_buffer, "/");
+         }
          from_buffer = pgmoneta_append(from_buffer, entry->d_name);
 
          to_buffer = pgmoneta_append(to_buffer, to);
-         to_buffer = pgmoneta_append(to_buffer, "/");
+         if (!pgmoneta_ends_with(to_buffer, "/"))
+         {
+            to_buffer = pgmoneta_append(to_buffer, "/");
+         }
          to_buffer = pgmoneta_append(to_buffer, entry->d_name);
 
          if (!stat(from_buffer, &statbuf))
@@ -2568,7 +2574,11 @@ pgmoneta_copy_directory(int server, char* from, char* to, char** restore_last_fi
                {
                   for (int i = 0; restore_last_files_names[i] != NULL; i++)
                   {
-                     file_is_excluded = pgmoneta_compare_string(from_buffer, restore_last_files_names[i]);
+                     if (pgmoneta_compare_string(from_buffer, restore_last_files_names[i]))
+                     {
+                        file_is_excluded = true;
+                        break;
+                     }
                   }
                   if (!file_is_excluded)
                   {

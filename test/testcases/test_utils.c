@@ -2880,3 +2880,44 @@ cleanup:
    }
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_utils_copy_directory_exclusions)
+{
+   char* base = "test_copy_dir_excl";
+   char* src = "test_copy_dir_excl/src";
+   char* sub = "test_copy_dir_excl/src/sub";
+   char* dst = "test_copy_dir_excl/dst";
+   char* files[] = {"test_copy_dir_excl/src/sub/first.txt", "test_copy_dir_excl/src/mid.txt",
+                    "test_copy_dir_excl/src/last.txt", "test_copy_dir_excl/src/keep.txt", NULL};
+   char* excluded[] = {"test_copy_dir_excl/src/sub/first.txt", "test_copy_dir_excl/src/mid.txt",
+                       "test_copy_dir_excl/src/last.txt", NULL};
+   FILE* f = NULL;
+
+   pgmoneta_delete_directory(base);
+   pgmoneta_mkdir(base);
+   pgmoneta_mkdir(src);
+   pgmoneta_mkdir(sub);
+
+   for (int i = 0; files[i] != NULL; i++)
+   {
+      f = fopen(files[i], "w");
+      MCTF_ASSERT_PTR_NONNULL(f, cleanup, "could not create %s", files[i]);
+      fprintf(f, "data");
+      fclose(f);
+      f = NULL;
+   }
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_copy_directory(-1, "test_copy_dir_excl/src/", dst, excluded, NULL), 0, cleanup, "copy_directory failed");
+   MCTF_ASSERT(pgmoneta_exists("test_copy_dir_excl/dst/keep.txt"), cleanup, "keep.txt should be copied");
+   MCTF_ASSERT(!pgmoneta_exists("test_copy_dir_excl/dst/sub/first.txt"), cleanup, "first.txt should be excluded");
+   MCTF_ASSERT(!pgmoneta_exists("test_copy_dir_excl/dst/mid.txt"), cleanup, "mid.txt should be excluded");
+   MCTF_ASSERT(!pgmoneta_exists("test_copy_dir_excl/dst/last.txt"), cleanup, "last.txt should be excluded");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+   }
+   pgmoneta_delete_directory(base);
+   MCTF_FINISH();
+}

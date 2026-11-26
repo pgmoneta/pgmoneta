@@ -1474,16 +1474,30 @@ pgmoneta_copy_postgresql_restore(int server, char* from, char* to, char* base, c
 
    if (restore_last_files_names != NULL)
    {
+      bool from_has_slash = pgmoneta_ends_with(from, "/");
       for (int i = 0; restore_last_files_names[i] != NULL; i++)
       {
-         char* temp = NULL;
-         temp = (char*)malloc((strlen(restore_last_files_names[i]) + strlen(from)) * sizeof(char) + 1);
+         char* suffix = restore_last_files_names[i];
+         if (from_has_slash && suffix[0] == '/')
+         {
+            suffix++;
+         }
+
+         size_t len = strlen(from) + strlen(suffix) + (!from_has_slash && suffix[0] != '/' ? 2 : 1);
+         char* temp = (char*)malloc(len);
 
          if (temp == NULL)
          {
             goto error;
          }
-         pgmoneta_snprintf(temp, strlen(from) + strlen(restore_last_files_names[i]) + 1, "%s%s", from, restore_last_files_names[i]);
+         if (!from_has_slash && suffix[0] != '/')
+         {
+            pgmoneta_snprintf(temp, len, "%s/%s", from, suffix);
+         }
+         else
+         {
+            pgmoneta_snprintf(temp, len, "%s%s", from, suffix);
+         }
          free(restore_last_files_names[i]);
 
          restore_last_files_names[i] = temp;
@@ -1547,7 +1561,11 @@ pgmoneta_copy_postgresql_restore(int server, char* from, char* to, char* base, c
                {
                   for (int i = 0; restore_last_files_names[i] != NULL; i++)
                   {
-                     file_is_excluded = pgmoneta_compare_string(from_buffer, restore_last_files_names[i]);
+                     if (pgmoneta_compare_string(from_buffer, restore_last_files_names[i]))
+                     {
+                        file_is_excluded = true;
+                        break;
+                     }
                   }
                   if (!file_is_excluded)
                   {
