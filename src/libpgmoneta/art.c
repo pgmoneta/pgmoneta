@@ -1515,6 +1515,7 @@ pgmoneta_art_iterator_create(struct art* t, struct art_iterator** iter)
    i->tree = t;
    i->key = NULL;
    i->value = NULL;
+   i->started = false;
    pgmoneta_deque_create(false, &i->que);
    *iter = i;
    return 0;
@@ -1534,9 +1535,10 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
    }
    que = iter->que;
    tree = iter->tree;
-   if (iter->count == 0)
+   if (!iter->started)
    {
       pgmoneta_deque_add(que, NULL, (uintptr_t)tree->root, ValueRef);
+      iter->started = true;
    }
    while (!pgmoneta_deque_empty(que))
    {
