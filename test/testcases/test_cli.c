@@ -696,8 +696,30 @@ MCTF_TEST_NEGATIVE(test_cli_negative)
    MCTF_ASSERT(pgmoneta_tsclient_decompress("/nonexistent/path/file.txt.zstd", MANAGEMENT_ERROR_ZSTD_NOFILE) == 0, cleanup,
                "Decompress nonexistent file should fail with NOFILE");
 
+   /* List backup invalid sort order */
+   MCTF_ASSERT(pgmoneta_tsclient_list_backup("primary", "invalid_sort", NULL, MANAGEMENT_ERROR_LIST_BACKUP_INVALID_SORT) == 0, cleanup,
+               "List backup invalid sort should fail with INVALID_SORT");
+
+   /* Mode unknown action */
+   MCTF_ASSERT(pgmoneta_tsclient_mode("primary", "invalid_mode_action", MANAGEMENT_ERROR_MODE_UNKNOWN_ACTION) == 0, cleanup,
+               "Mode invalid action should fail with UNKNOWN_ACTION");
+
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
+
+   /* Annotate unknown action */
+   MCTF_ASSERT(pgmoneta_tsclient_annotate("primary", "newest", "invalid_action", "key", "comment", MANAGEMENT_ERROR_ANNOTATE_UNKNOWN_ACTION) == 0, cleanup,
+               "Annotate invalid action should fail with UNKNOWN_ACTION");
+
+   /* Job invalid job id */
+   MCTF_ASSERT(pgmoneta_tsclient_job("s0-backup-00000000000000", NULL, MANAGEMENT_ERROR_JOB_NOT_FOUND) == 0, cleanup,
+               "Job invalid job id should fail with NOT_FOUND");
+
+   /* Job status invalid server */
+   MCTF_ASSERT(pgmoneta_tsclient_job_status("invalid_server", "backup", NULL, MANAGEMENT_ERROR_JOB_NOSERVER) == 0, cleanup,
+               "Job status invalid server should fail with NOSERVER");
+
 cleanup:
-   pgmoneta_test_teardown();
+   pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
 }
 
