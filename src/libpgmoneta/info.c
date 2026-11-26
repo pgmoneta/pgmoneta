@@ -455,6 +455,23 @@ error:
    return 1;
 }
 
+/* Copy a value read from backup.info into a fixed size field, clamped to the
+ * field so an oversized value cannot write past it. dst is already zeroed. */
+static void
+copy_info_value(char* dst, size_t size, char* value)
+{
+   size_t n = strlen(value);
+
+   if (n >= size)
+   {
+      n = size - 1;
+   }
+
+   memcpy(dst, value, n);
+}
+
+#define COPY_INFO_VALUE(field) copy_info_value((field), sizeof(field), &value[0])
+
 int
 pgmoneta_load_info_file(char* path, struct backup** backup)
 {
@@ -516,7 +533,7 @@ pgmoneta_load_info_file(char* path, struct backup** backup)
 
       if (pgmoneta_compare_string(INFO_PGMONETA_VERSION, &key[0]))
       {
-         memcpy(&bck->version[0], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->version);
       }
       else if (pgmoneta_compare_string(INFO_STATUS, &key[0]))
       {
@@ -531,11 +548,11 @@ pgmoneta_load_info_file(char* path, struct backup** backup)
       }
       else if (pgmoneta_compare_string(INFO_LABEL, &key[0]))
       {
-         memcpy(&bck->label[0], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->label);
       }
       else if (pgmoneta_compare_string(INFO_WAL, &key[0]))
       {
-         memcpy(&bck->wal[0], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->wal);
       }
       else if (pgmoneta_compare_string(INFO_BACKUP, &key[0]))
       {
@@ -620,20 +637,28 @@ pgmoneta_load_info_file(char* path, struct backup** backup)
       else if (pgmoneta_compare_string(INFO_TABLESPACES, &key[0]))
       {
          bck->number_of_tablespaces = strtoul(&value[0], &ptr, 10);
+         if (bck->number_of_tablespaces > MAX_NUMBER_OF_TABLESPACES)
+         {
+            bck->number_of_tablespaces = MAX_NUMBER_OF_TABLESPACES;
+         }
+      }
+      else if (pgmoneta_starts_with(&key[0], "TABLESPACE") && tbl_idx >= MAX_NUMBER_OF_TABLESPACES)
+      {
+         /* More tablespace entries than there is room for: ignore the rest */
       }
       else if (pgmoneta_starts_with(&key[0], "TABLESPACE_OID"))
       {
-         memcpy(&bck->tablespaces_oids[tbl_idx], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->tablespaces_oids[tbl_idx]);
       }
       else if (pgmoneta_starts_with(&key[0], "TABLESPACE_PATH"))
       {
-         memcpy(&bck->tablespaces_paths[tbl_idx], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->tablespaces_paths[tbl_idx]);
          /* This one is last */
          tbl_idx++;
       }
       else if (pgmoneta_starts_with(&key[0], "TABLESPACE"))
       {
-         memcpy(&bck->tablespaces[tbl_idx], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->tablespaces[tbl_idx]);
       }
       else if (pgmoneta_starts_with(&key[0], INFO_START_WALPOS))
       {
@@ -657,11 +682,11 @@ pgmoneta_load_info_file(char* path, struct backup** backup)
       }
       else if (pgmoneta_starts_with(&key[0], INFO_COMMENTS))
       {
-         memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->comments);
       }
       else if (pgmoneta_starts_with(&key[0], INFO_EXTRA))
       {
-         memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->comments);
       }
       else if (pgmoneta_starts_with(&key[0], INFO_COMPRESSION))
       {
@@ -677,7 +702,7 @@ pgmoneta_load_info_file(char* path, struct backup** backup)
       }
       else if (pgmoneta_starts_with(&key[0], INFO_PARENT))
       {
-         memcpy(&bck->parent_label[0], &value[0], strlen(&value[0]));
+         COPY_INFO_VALUE(bck->parent_label);
       }
    }
 
