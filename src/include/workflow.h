@@ -48,6 +48,7 @@ extern "C" {
 #define WORKFLOW_TYPE_COMBINE            8
 #define WORKFLOW_TYPE_COMBINE_AS_IS      9
 #define WORKFLOW_TYPE_POST_ROLLUP        10
+#define WORKFLOW_TYPE_MIGRATION          11
 
 #define WORKFLOW_TYPE_S3_LIST            100
 

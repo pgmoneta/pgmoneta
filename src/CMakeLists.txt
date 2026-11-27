@@ -535,3 +535,16 @@ endif()
 target_link_libraries(pgmoneta-config-bin pgmoneta)
 
 install(TARGETS pgmoneta-config-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+#
+# Build muse
+#
+add_executable(pgmoneta-muse-bin muse.c)
+if (CMAKE_C_LINK_PIE_SUPPORTED)
+  set_target_properties(pgmoneta-muse-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-muse POSITION_INDEPENDENT_CODE TRUE)
+else()
+  set_target_properties(pgmoneta-muse-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-muse POSITION_INDEPENDENT_CODE FALSE)
+endif()
+target_link_libraries(pgmoneta-muse-bin pgmoneta)
+
+install(TARGETS pgmoneta-muse-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
