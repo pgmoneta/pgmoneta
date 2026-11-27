@@ -590,6 +590,125 @@ cleanup:
    MCTF_FINISH();
 }
 
+static int
+archive_progress_limits(int compression, int encryption, int* archive, int* comp, int* enc, int* perm, int* phase, int* state)
+{
+   struct art* nodes = NULL;
+   struct workflow* workflow = NULL;
+   struct backup* backup = NULL;
+   struct progress* p;
+   struct main_configuration* config;
+   int ret = 1;
+
+   config = (struct main_configuration*)shmem;
+   p = &config->common.servers[0].progress;
+
+   backup = calloc(1, sizeof(struct backup));
+   if (backup == NULL || pgmoneta_art_create(&nodes))
+   {
+      goto done;
+   }
+
+   backup->compression = compression;
+   backup->encryption = encryption;
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, backup);
+   if (workflow == NULL)
+   {
+      goto done;
+   }
+
+   pgmoneta_progress_setup(0, workflow, nodes, WORKFLOW_TYPE_ARCHIVE);
+
+   *archive = pgmoneta_art_contains_key(nodes, NODE_PROGRESS_LIMIT_ARCHIVE) ? (int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_ARCHIVE) : -1;
+   *comp = pgmoneta_art_contains_key(nodes, NODE_PROGRESS_LIMIT_COMPRESSION) ? (int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_COMPRESSION) : -1;
+   *enc = pgmoneta_art_contains_key(nodes, NODE_PROGRESS_LIMIT_ENCRYPTION) ? (int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_ENCRYPTION) : -1;
+   *perm = pgmoneta_art_contains_key(nodes, NODE_PROGRESS_LIMIT_PERMISSIONS) ? (int)(uintptr_t)pgmoneta_art_search(nodes, NODE_PROGRESS_LIMIT_PERMISSIONS) : -1;
+   *phase = (int)atomic_load(&p->current_phase);
+   *state = (int)atomic_load(&p->state);
+
+   pgmoneta_progress_teardown(0);
+   ret = 0;
+
+done:
+   if (workflow != NULL)
+   {
+      pgmoneta_workflow_destroy(workflow);
+   }
+   if (nodes != NULL)
+   {
+      pgmoneta_art_destroy(nodes);
+   }
+   free(backup);
+   return ret;
+}
+
+MCTF_TEST(test_progress_setup_archive_workflows)
+{
+   struct main_configuration* config;
+   int archive = 0;
+   int comp = 0;
+   int enc = 0;
+   int perm = 0;
+   int phase = 0;
+   int state = 0;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_test_load_conf(TEST_CONF_DIR "/progress/02.conf"), 0,
+                      cleanup, "failed to read 02.conf");
+
+   config = (struct main_configuration*)shmem;
+   config->common.servers[0].progress_enabled = true;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_phase_from_workflow_name(WORKFLOW_NAME_ARCHIVE), PHASE_ARCHIVE,
+                      cleanup, "archive step should map to the archive phase");
+   MCTF_ASSERT_STR_EQ((char*)pgmoneta_phase_name(PHASE_ARCHIVE), PHASE_NAME_ARCHIVE,
+                      cleanup, "archive phase should have a name");
+   MCTF_ASSERT_STR_EQ(pgmoneta_progress_limit_node_key(PHASE_ARCHIVE), NODE_PROGRESS_LIMIT_ARCHIVE,
+                      cleanup, "archive phase should have a limit key");
+
+   /* Tar only */
+   MCTF_ASSERT_INT_EQ(archive_progress_limits(COMPRESSION_NONE, ENCRYPTION_NONE,
+                                              &archive, &comp, &enc, &perm, &phase, &state),
+                      0, cleanup, "failed to set up plain archive progress");
+   MCTF_ASSERT_INT_EQ(state, WORKFLOW_PROGRESS_RUNNING, cleanup, "plain archive should start progress tracking");
+   MCTF_ASSERT_INT_EQ(phase, PHASE_ARCHIVE, cleanup, "plain archive should start in the archive phase");
+   MCTF_ASSERT_INT_EQ(archive, 99, cleanup, "plain archive should reserve 99 percent for tar");
+   MCTF_ASSERT_INT_EQ(comp, -1, cleanup, "plain archive should not store a compression limit");
+   MCTF_ASSERT_INT_EQ(enc, -1, cleanup, "plain archive should not store an encryption limit");
+   MCTF_ASSERT_INT_EQ(perm, 100, cleanup, "plain archive should finish with permissions at 100 percent");
+
+   /* Tar + compression */
+   MCTF_ASSERT_INT_EQ(archive_progress_limits(COMPRESSION_CLIENT_ZSTD, ENCRYPTION_NONE,
+                                              &archive, &comp, &enc, &perm, &phase, &state),
+                      0, cleanup, "failed to set up compressed archive progress");
+   MCTF_ASSERT_INT_EQ(phase, PHASE_ARCHIVE, cleanup, "compressed archive should start in the archive phase");
+   MCTF_ASSERT_INT_EQ(archive, 30, cleanup, "compressed archive should reserve 30 percent for tar");
+   MCTF_ASSERT_INT_EQ(comp, 99, cleanup, "compressed archive should reach 99 percent after compression");
+   MCTF_ASSERT_INT_EQ(enc, -1, cleanup, "compressed archive should not store an encryption limit");
+   MCTF_ASSERT_INT_EQ(perm, 100, cleanup, "compressed archive should finish with permissions at 100 percent");
+
+   /* Tar + encryption */
+   MCTF_ASSERT_INT_EQ(archive_progress_limits(COMPRESSION_NONE, ENCRYPTION_AES_256_GCM,
+                                              &archive, &comp, &enc, &perm, &phase, &state),
+                      0, cleanup, "failed to set up encrypted archive progress");
+   MCTF_ASSERT_INT_EQ(archive, 50, cleanup, "encrypted archive should reserve 50 percent for tar");
+   MCTF_ASSERT_INT_EQ(comp, -1, cleanup, "encrypted archive should not store a compression limit");
+   MCTF_ASSERT_INT_EQ(enc, 99, cleanup, "encrypted archive should reach 99 percent after encryption");
+   MCTF_ASSERT_INT_EQ(perm, 100, cleanup, "encrypted archive should finish with permissions at 100 percent");
+
+   /* Tar + compression + encryption */
+   MCTF_ASSERT_INT_EQ(archive_progress_limits(COMPRESSION_CLIENT_ZSTD, ENCRYPTION_AES_256_GCM,
+                                              &archive, &comp, &enc, &perm, &phase, &state),
+                      0, cleanup, "failed to set up compressed and encrypted archive progress");
+   MCTF_ASSERT_INT_EQ(archive, 20, cleanup, "full archive should reserve 20 percent for tar");
+   MCTF_ASSERT_INT_EQ(comp, 75, cleanup, "full archive should reach 75 percent after compression");
+   MCTF_ASSERT_INT_EQ(enc, 99, cleanup, "full archive should reach 99 percent after encryption");
+   MCTF_ASSERT_INT_EQ(perm, 100, cleanup, "full archive should finish with permissions at 100 percent");
+
+cleanup:
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_progress_setup_post_rollup_untracked)
 {
    struct art* nodes = NULL;

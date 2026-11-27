@@ -87,6 +87,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    struct main_configuration* config;
    enum value_type async_type = ValueBool;
    bool async = false;
+   bool progress_started = false;
 
    pgmoneta_start_logging();
 
@@ -241,9 +242,23 @@ job_error:
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, backup);
 
+   /* The restore above tracked its own progress and tore it down, so the
+    * tar, compression and encryption steps are tracked as a second run */
+   if (pgmoneta_is_progress_enabled(server))
+   {
+      pgmoneta_progress_setup(server, workflow, nodes, WORKFLOW_TYPE_ARCHIVE);
+      progress_started = true;
+   }
+
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;
+   }
+
+   if (progress_started)
+   {
+      pgmoneta_progress_teardown(server);
+      progress_started = false;
    }
 
    if (pgmoneta_management_create_response(payload, server, &response))
@@ -332,6 +347,11 @@ job_error:
    exit(0);
 
 error:
+
+   if (progress_started)
+   {
+      pgmoneta_progress_teardown(server);
+   }
 
    if (pgmoneta_exists(real_directory))
    {

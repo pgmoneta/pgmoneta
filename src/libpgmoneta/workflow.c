@@ -190,6 +190,10 @@ pgmoneta_phase_from_workflow_name(char* name)
    {
       return PHASE_COMBINE_INCREMENTAL;
    }
+   if (pgmoneta_compare_string(name, PHASE_NAME_ARCHIVE))
+   {
+      return PHASE_ARCHIVE;
+   }
    return -1;
 }
 
@@ -589,6 +593,8 @@ pgmoneta_phase_name(int phase)
          return PHASE_NAME_COMBINE_INCREMENTAL;
       case PHASE_CLEANUP:
          return PHASE_NAME_CLEANUP;
+      case PHASE_ARCHIVE:
+         return PHASE_NAME_ARCHIVE;
       default:
          return PHASE_NAME_UNKNOWN;
    }
