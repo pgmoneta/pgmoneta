@@ -735,6 +735,147 @@ cleanup:
    MCTF_FINISH();
 }
 
+struct split_chunk_server
+{
+   int listen_fd;
+   const char* part1;
+   const char* part2;
+};
+
+static void*
+split_chunk_server_thread(void* arg)
+{
+   struct split_chunk_server* srv = (struct split_chunk_server*)arg;
+   struct sockaddr_in client_addr;
+   socklen_t client_len = sizeof(client_addr);
+   int client_fd = accept(srv->listen_fd, (struct sockaddr*)&client_addr, &client_len);
+
+   if (client_fd >= 0)
+   {
+      char buffer[4096];
+      ssize_t n = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+      if (n > 0)
+      {
+         send(client_fd, srv->part1, strlen(srv->part1), 0);
+         usleep(50000);
+         send(client_fd, srv->part2, strlen(srv->part2), 0);
+      }
+      close(client_fd);
+   }
+
+   return NULL;
+}
+
+static int
+run_split_chunk_case(const char* part1, const char* part2, struct http_response** out_response)
+{
+   int listen_fd = -1;
+   struct sockaddr_in addr;
+   socklen_t addr_len = sizeof(addr);
+   struct split_chunk_server srv;
+   pthread_t thread;
+   bool started = false;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   int status = PGMONETA_HTTP_STATUS_ERROR;
+
+   listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+   if (listen_fd < 0)
+   {
+      goto done;
+   }
+
+   memset(&addr, 0, sizeof(addr));
+   addr.sin_family = AF_INET;
+   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+   addr.sin_port = 0;
+
+   if (bind(listen_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0 ||
+       listen(listen_fd, 1) < 0 ||
+       getsockname(listen_fd, (struct sockaddr*)&addr, &addr_len) < 0)
+   {
+      goto done;
+   }
+
+   srv.listen_fd = listen_fd;
+   srv.part1 = part1;
+   srv.part2 = part2;
+
+   if (pthread_create(&thread, NULL, split_chunk_server_thread, &srv) != 0)
+   {
+      goto done;
+   }
+   started = true;
+
+   if (pgmoneta_http_create("127.0.0.1", ntohs(addr.sin_port), false, &connection) ||
+       pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/chunked", &request))
+   {
+      goto done;
+   }
+
+   status = pgmoneta_http_invoke(connection, request, out_response);
+
+done:
+   if (started)
+   {
+      pthread_join(thread, NULL);
+   }
+   if (listen_fd >= 0)
+   {
+      close(listen_fd);
+   }
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_destroy(connection);
+   return status;
+}
+
+MCTF_TEST(test_pgmoneta_http_get_chunked_split_crlf)
+{
+   struct http_response* response = NULL;
+   int status;
+
+   pgmoneta_test_setup();
+
+   /* Data chunk trailing CRLF split: '\r' prefetched, '\n' arrives in next read */
+   status = run_split_chunk_case(
+      "HTTP/1.1 200 OK\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "Connection: close\r\n"
+      "\r\n"
+      "5\r\n"
+      "Hello\r",
+      "\n0\r\n\r\n",
+      &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "split data trailing CRLF failed");
+   MCTF_ASSERT_PTR_NONNULL(response, cleanup, "response is null for data trailing split");
+   MCTF_ASSERT_INT_EQ((int)response->payload.data_size, 5, cleanup, "payload size mismatch for data trailing split");
+   MCTF_ASSERT(!memcmp(response->payload.data, "Hello", 5), cleanup, "payload body mismatch for data trailing split");
+   pgmoneta_http_response_destroy(response);
+   response = NULL;
+
+   /* Terminating chunk trailing CRLF split: '\r' prefetched, '\n' arrives in next read */
+   status = run_split_chunk_case(
+      "HTTP/1.1 200 OK\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "Connection: close\r\n"
+      "\r\n"
+      "5\r\n"
+      "Hello\r\n"
+      "0\r\n"
+      "\r",
+      "\n",
+      &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "split terminating trailing CRLF failed");
+   MCTF_ASSERT_PTR_NONNULL(response, cleanup, "response is null for terminating split");
+   MCTF_ASSERT_INT_EQ((int)response->payload.data_size, 5, cleanup, "payload size mismatch for terminating split");
+   MCTF_ASSERT(!memcmp(response->payload.data, "Hello", 5), cleanup, "payload body mismatch for terminating split");
+
+cleanup:
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
 static void*
 echo_server_thread(void* arg)
 {
