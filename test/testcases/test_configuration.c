@@ -1299,3 +1299,58 @@ cleanup:
    unlink(path);
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_configuration_as_int_rejects_out_of_range)
+{
+   char path[] = "/tmp/pgmoneta_as_int_XXXXXX";
+   void* shmem = NULL;
+   struct main_configuration* config = NULL;
+   FILE* file = NULL;
+   int fd = -1;
+
+   fd = mkstemp(path);
+   MCTF_ASSERT(fd != -1, cleanup, "could not create a temporary configuration");
+   file = fdopen(fd, "w");
+   MCTF_ASSERT(file != NULL, cleanup, "could not open the temporary configuration");
+
+   fprintf(file, "[pgmoneta]\n");
+   fprintf(file, "host = localhost\n");
+   fprintf(file, "unix_socket_dir = /tmp/\n");
+   fprintf(file, "base_dir = /tmp/pgmoneta\n");
+   fprintf(file, "compression_level = -2147483649\n");
+   fprintf(file, "workers = 2147483648\n");
+   fprintf(file, "retention = -2147483649\n");
+   fclose(file);
+   file = NULL;
+
+   MCTF_ASSERT(pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem) == 0,
+               cleanup, "failed to create shared memory for the test configuration");
+   MCTF_ASSERT_PTR_NONNULL(shmem, cleanup, "shared memory pointer is NULL");
+
+   pgmoneta_init_main_configuration(shmem);
+   config = (struct main_configuration*)shmem;
+   int default_compression_level = config->compression_level;
+   int default_workers = config->workers;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_main_configuration(shmem, path), 0,
+                      cleanup, "out-of-range int values must not fail the whole parse");
+
+   MCTF_ASSERT_INT_EQ(config->compression_level, default_compression_level, cleanup,
+                      "below-INT_MIN compression_level must not wrap to INT_MAX");
+   MCTF_ASSERT_INT_EQ(config->workers, default_workers, cleanup,
+                      "above-INT_MAX workers must not wrap to INT_MIN");
+   MCTF_ASSERT_INT_EQ(config->retention_days, -1, cleanup,
+                      "below-INT_MIN retention must not wrap to positive days");
+
+cleanup:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   if (shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+   }
+   unlink(path);
+   MCTF_FINISH();
+}
