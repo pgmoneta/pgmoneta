@@ -79,6 +79,7 @@ extern "C" {
 
 #define TYPE_FULL                      0
 #define TYPE_INCREMENTAL               1
+#define TYPE_DIFFERENTIAL              2 // Not supported by pgmoneta
 
 #define VALID_UNKNOWN                  -1
 #define VALID_FALSE                    0

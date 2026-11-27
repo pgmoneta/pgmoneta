@@ -286,7 +286,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   max = MISC_LENGTH - 1;
                }
                memcpy(&section, trimmed_line + 1, max);
-               if (strcmp(section, "pgmoneta") && strcmp(section, "pgmoneta-walbridge"))
+               if (strcmp(section, "pgmoneta") && strcmp(section, "pgmoneta-walbridge") && strcmp(section, "muse"))
                {
                   if (idx_server > 0 && idx_server <= NUMBER_OF_SERVERS)
                   {
@@ -322,7 +322,6 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   srv.workers = -1;
                   srv.max_rate = -1;
                   srv.progress_enabled = -1;
-
                   idx_server++;
                }
             }
@@ -2001,6 +2000,85 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   }
                }
 #endif
+               else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_SOURCE_PASSWORD))
+               {
+                  if (pgmoneta_compare_string(section, "muse"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PASSWORD_LENGTH - 1)
+                     {
+                        warnx("Cipher length of %d exceeds %d", (int)max, MAX_PASSWORD_LENGTH);
+                        unknown = true;
+                     }
+                     else
+                     {
+                        memcpy(config->muse.source_password, value, max);
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_SOURCE_DATA_DIR))
+               {
+                  if (pgmoneta_compare_string(section, "muse"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        warnx("Base directory length of %d exceeds %d", (int)max, MAX_PATH);
+                        unknown = true;
+                     }
+                     else
+                     {
+                        memcpy(config->muse.source_data_dir, value, max);
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_SOURCE_WAL_DIR))
+               {
+                  if (pgmoneta_compare_string(section, "muse"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        warnx("Base directory length of %d exceeds %d", (int)max, MAX_PATH);
+                        unknown = true;
+                     }
+                     else
+                     {
+                        memcpy(config->muse.source_wal_dir, value, max);
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_SOURCE_TOOL))
+               {
+                  if (pgmoneta_compare_string(section, "muse"))
+                  {
+                     if (pgmoneta_compare_string(value, "pgbackrest"))
+                     {
+                        config->muse.source_tool = TOOL_PGBACKREST;
+                     }
+                     else
+                     {
+                        warnx("Unknown source tool: %s, support \"pgbackrest\"", value);
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else
                {
                   unknown = true;
@@ -2495,7 +2573,7 @@ pgmoneta_read_cli_configuration(void* shmem, char* filename)
             {
                if (as_management_compression(value, &config->compression))
                {
-                  warnx("Unknown management compression: %s", value);
+                  warnx("Unknown management compression mode: %s", value);
                }
             }
             else if (pgmoneta_compare_string(key, CONFIGURATION_ARGUMENT_ENCRYPTION))
@@ -2572,6 +2650,38 @@ pgmoneta_validate_cli_configuration(void* shmem)
    }
 
    return 0;
+}
+
+void
+pgmoneta_validate_muse_configuration()
+{
+   struct main_configuration* config = NULL;
+
+   config = (struct main_configuration*)shmem;
+   if (strlen(config->muse.source_data_dir) == 0 || !pgmoneta_exists(config->muse.source_data_dir) || !pgmoneta_is_directory(config->muse.source_data_dir))
+   {
+      errx(1, "Unable to find source data directory %s", config->muse.source_data_dir);
+   }
+   if (strlen(config->muse.source_wal_dir) == 0 || !pgmoneta_exists(config->muse.source_wal_dir) || !pgmoneta_is_directory(config->muse.source_wal_dir))
+   {
+      errx(1, "Unable to find source WAL directory %s", config->muse.source_wal_dir);
+   }
+   if (COMPRESSION_IS_SERVER(config->compression_type))
+   {
+      errx(1, "Server side compression is not supported during migration");
+   }
+   if (config->muse.source_tool == 0)
+   {
+      errx(1, "Source backup tool must be specified");
+   }
+   if (pgmoneta_starts_with(config->base_dir, config->muse.source_data_dir))
+   {
+      errx(1, "Target base directory cannot be sub-directory of source data repository");
+   }
+   if (pgmoneta_starts_with(config->base_dir, config->muse.source_wal_dir))
+   {
+      errx(1, "Target base directory cannot be sub-directory of source WAL repository");
+   }
 }
 
 int

@@ -103,6 +103,7 @@ extern "C" {
 #define ENCRYPTION_AES_256_GCM       1
 #define ENCRYPTION_AES_192_GCM       2
 #define ENCRYPTION_AES_128_GCM       3
+#define ENCRYPTION_AES_256_CBC       4
 
 #define HUGEPAGE_OFF                 0
 #define HUGEPAGE_TRY                 1
@@ -172,6 +173,9 @@ extern "C" {
 #define INCREMENTAL_PREFIX           "INCREMENTAL."
 
 #define JOBS_DIR                     ".jobs"
+#define TOOL_PGBACKREST              1
+
+#define WORKSPACE_DEFAULT            "/tmp/pgmoneta-workspace/"
 
 #define likely(x)                    __builtin_expect(!!(x), 1)
 #define unlikely(x)                  __builtin_expect(!!(x), 0)
@@ -493,6 +497,17 @@ struct common_configuration
    struct prometheus prometheus; /**< The Prometheus metrics */
 } __attribute__((aligned(64)));
 
+/** @struct muse configuration
+ * Defines the muse configuration to migrate the backup(s)
+ */
+struct muse_configuration
+{
+   char source_password[MAX_PASSWORD_LENGTH]; /**< The source cipher password for encryption */
+   int source_tool;                           /**< The source tool */
+   char source_data_dir[MAX_PATH];            /**< The direct source data directory */
+   char source_wal_dir[MAX_PATH];             /**< The direct source WAL directory */
+} __attribute__((aligned(64)));
+
 /** @struct main_configuration
  * Defines the main configuration list
  */
@@ -573,7 +588,8 @@ struct main_configuration
 
    pgmoneta_time_t verification; /**< The sha512 verification interval */
 
-   bool progress; /**< Enable backup progress tracking */
+   bool progress;                  /**< Enable backup progress tracking */
+   struct muse_configuration muse; /**< The muse configurations */
 
 #ifdef DEBUG
    bool link; /**< Do linking */
