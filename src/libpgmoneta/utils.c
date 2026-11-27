@@ -2762,6 +2762,7 @@ copy_file(struct worker_input* fi)
    char* to = NULL;
    bool use_direct_io = false;
    bool aligned_buffer = false;
+   bool to_opened = false;
    int flags_from = O_RDONLY;
    int flags_to = O_WRONLY | O_CREAT | O_TRUNC;
    size_t alignment = 4096;
@@ -2866,7 +2867,7 @@ copy_file(struct worker_input* fi)
 
    if (fd_from < 0)
    {
-      pgmoneta_log_error("File doesn't exists: %s", from);
+      pgmoneta_log_error("Unable to open file: %s (%s)", from, strerror(errno));
       goto error;
    }
 
@@ -2907,9 +2908,11 @@ copy_file(struct worker_input* fi)
 
    if (fd_to < 0)
    {
-      pgmoneta_log_error("Unable to create file: %s", to);
+      pgmoneta_log_error("Unable to create file: %s (%s)", to, strerror(errno));
       goto error;
    }
+
+   to_opened = true;
 
    while ((nread = read(fd_from, buffer, buffer_size)) > 0)
    {
@@ -2927,7 +2930,7 @@ copy_file(struct worker_input* fi)
          fd_to = open(to, flags_to | O_APPEND, permissions);
          if (fd_to < 0)
          {
-            pgmoneta_log_error("Unable to reopen file for partial block write: %s", to);
+            pgmoneta_log_error("Unable to reopen file for partial block write: %s (%s)", to, strerror(errno));
             goto error;
          }
          use_direct_io = false;
@@ -2956,6 +2959,7 @@ copy_file(struct worker_input* fi)
                fd_to = open(to, flags_to | O_APPEND, permissions);
                if (fd_to < 0)
                {
+                  pgmoneta_log_error("Unable to reopen file for buffered write: %s (%s)", to, strerror(errno));
                   goto error;
                }
                use_direct_io = false;
@@ -2963,6 +2967,7 @@ copy_file(struct worker_input* fi)
                continue;
             }
 #endif
+            pgmoneta_log_error("Unable to write file: %s (%s)", to, strerror(errno));
             goto error;
          }
       }
@@ -2971,16 +2976,22 @@ copy_file(struct worker_input* fi)
 
    if (nread < 0)
    {
-      pgmoneta_log_error("Unable to read file: %s", from);
+      pgmoneta_log_error("Unable to read file: %s (%s)", from, strerror(errno));
       goto error;
    }
 
    if (nread == 0)
    {
-      fsync(fd_to);
+      /* Some file systems only report a full disk or an I/O error at fsync time */
+      if (fsync(fd_to) < 0)
+      {
+         pgmoneta_log_error("Unable to sync file: %s (%s)", to, strerror(errno));
+         goto error;
+      }
 
       if (close(fd_to) < 0)
       {
+         pgmoneta_log_error("Unable to close file: %s (%s)", to, strerror(errno));
          fd_to = -1;
          goto error;
       }
@@ -3018,6 +3029,15 @@ error:
    if (fd_to >= 0)
    {
       close(fd_to);
+   }
+
+   /*
+    * The destination was truncated when it was opened, so whatever is on disk is
+    * incomplete. Remove it instead of leaving a file that looks like a valid copy
+    */
+   if (to_opened && to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
    }
 
    errno = 0;

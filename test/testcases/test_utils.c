@@ -31,6 +31,7 @@
 #include <aes.h>
 #include <configuration.h>
 #include <extraction.h>
+#include <fault_inject.h>
 #include <mctf.h>
 #include <shmem.h>
 #include <tscommon.h>
@@ -1204,6 +1205,134 @@ cleanup:
    }
    // Clean up
 
+   pgmoneta_delete_directory(base);
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_utils_copy_file_missing_source)
+{
+   char base[MAX_PATH];
+   char from[MAX_PATH];
+   char to[MAX_PATH];
+
+   /* pgmoneta_mkdir writes into its argument, so these cannot be literals */
+   strcpy(base, "test_copy_fail_src");
+   strcpy(from, "test_copy_fail_src/does_not_exist.txt");
+   strcpy(to, "test_copy_fail_src/destination.txt");
+
+   pgmoneta_delete_directory(base);
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(base), 0, cleanup, "unable to create the test directory");
+
+   MCTF_ASSERT(pgmoneta_copy_file(from, to, NULL) != 0, cleanup, "copy_file should fail for a missing source");
+   MCTF_ASSERT(!pgmoneta_exists(to), cleanup, "no destination should be created for a missing source");
+
+cleanup:
+   pgmoneta_delete_directory(base);
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_utils_copy_file_destination_is_directory)
+{
+   char base[MAX_PATH];
+   char from[MAX_PATH];
+   char to[MAX_PATH];
+   FILE* f = NULL;
+
+   strcpy(base, "test_copy_fail_dst");
+   strcpy(from, "test_copy_fail_dst/source.txt");
+   strcpy(to, "test_copy_fail_dst/destination");
+
+   pgmoneta_delete_directory(base);
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(base), 0, cleanup, "unable to create the test directory");
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(to), 0, cleanup, "unable to create the destination directory");
+
+   f = fopen(from, "w");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "unable to create the source file");
+   fprintf(f, "test content");
+   fflush(f);
+   fclose(f);
+   f = NULL;
+
+   /* The destination is an existing directory, so it cannot be opened for writing */
+   MCTF_ASSERT(pgmoneta_copy_file(from, to, NULL) != 0, cleanup, "copy_file should fail when the destination is a directory");
+   MCTF_ASSERT(pgmoneta_is_directory(to), cleanup, "the destination directory should be left alone");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   pgmoneta_delete_directory(base);
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_utils_copy_file_unreadable_source_removes_destination)
+{
+   char base[MAX_PATH];
+   char from[MAX_PATH];
+   char to[MAX_PATH];
+
+   strcpy(base, "test_copy_fail_read");
+   strcpy(from, "test_copy_fail_read/source");
+   strcpy(to, "test_copy_fail_read/destination.txt");
+
+   pgmoneta_delete_directory(base);
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(base), 0, cleanup, "unable to create the test directory");
+
+   /* A directory opens for reading but fails on read(), which is the error path
+    * taken once the copy has already truncated the destination */
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(from), 0, cleanup, "unable to create the source directory");
+
+   MCTF_ASSERT(pgmoneta_copy_file(from, to, NULL) != 0, cleanup, "copy_file should fail when the source cannot be read");
+   MCTF_ASSERT(!pgmoneta_exists(to), cleanup, "the incomplete destination should be removed");
+
+cleanup:
+   pgmoneta_delete_directory(base);
+   MCTF_FINISH();
+}
+
+MCTF_TEST_NEGATIVE(test_utils_copy_file_failed_write_removes_destination)
+{
+   char base[MAX_PATH];
+   char from[MAX_PATH];
+   char to[MAX_PATH];
+   static char data[30000];
+   struct rlimit orig;
+   void (*old_handler)(int) = SIG_ERR;
+   FILE* f = NULL;
+   size_t written = 0;
+   int closed = -1;
+
+   PGMONETA_FAULT_BEGIN(orig, old_handler);
+
+   strcpy(base, "test_copy_fail_write");
+   strcpy(from, "test_copy_fail_write/source");
+   strcpy(to, "test_copy_fail_write/destination");
+
+   pgmoneta_delete_directory(base);
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(base), 0, cleanup, "unable to create the test directory");
+
+   memset(data, 'x', sizeof(data));
+   f = fopen(from, "w");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "unable to create the source file");
+   written = fwrite(data, 1, sizeof(data), f);
+   closed = fclose(f);
+   f = NULL;
+   MCTF_ASSERT(written == sizeof(data) && closed == 0, cleanup, "unable to write the source file");
+
+   /* Stands in for a disk that fills up partway through the copy */
+   PGMONETA_ASSERT_TRUNCATED_WRITE_FAILS(orig, sizeof(data), pgmoneta_copy_file(from, to, NULL),
+                                         from, to, "copy_file");
+   PGMONETA_FAULT_END(orig, old_handler);
+
+cleanup:
+   PGMONETA_FAULT_END(orig, old_handler);
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
    pgmoneta_delete_directory(base);
    MCTF_FINISH();
 }
