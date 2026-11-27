@@ -343,6 +343,7 @@ MCTF_TEST(test_art_iterator_read)
    MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config), cleanup, "Insert key_obj failed");
 
    MCTF_ASSERT(pgmoneta_art_iterator_create(NULL, &iter), cleanup, "Iterator creation should fail with NULL ART");
+   MCTF_ASSERT(pgmoneta_art_iterator_create(t, NULL), cleanup, "Iterator creation should fail with NULL iter");
    MCTF_ASSERT_PTR_NULL(iter, cleanup, "Iterator should be NULL");
    MCTF_ASSERT(!pgmoneta_art_iterator_create(t, &iter), cleanup, "Iterator creation failed");
    MCTF_ASSERT_PTR_NONNULL(iter, cleanup, "Iterator should not be NULL");
