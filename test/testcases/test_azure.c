@@ -54,6 +54,7 @@
 #include <utils.h>
 #include <verify.h>
 
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -484,6 +485,543 @@ MCTF_INTEGRATION_TEST(test_azure_uploads_metadata_commit_markers)
    }
 
 cleanup:
+   MCTF_FINISH();
+}
+
+static int
+take_backup_and_get_label(const char* server, char* out, size_t size)
+{
+   char previous_label[256] = {0};
+
+   if (mctf_se_newest_label(server, previous_label, sizeof(previous_label)) != MCTF_OK)
+   {
+      return MCTF_FAIL;
+   }
+
+   if (mctf_se_backup(server) != 0)
+   {
+      return MCTF_FAIL;
+   }
+
+   if (mctf_se_newest_label(server, out, size) != MCTF_OK)
+   {
+      return MCTF_FAIL;
+   }
+
+   if (strcmp(previous_label, out) == 0)
+   {
+      return MCTF_FAIL;
+   }
+
+   return MCTF_OK;
+}
+
+/*
+ * Verify that a backup label has no blobs left in Azure. This is the Azure
+ * equivalent of S3's assert_no_s3_objects, scoped by prefix since
+ * mctf_se_azure_blob_count_prefix queries Azurite directly rather than
+ * going through a "azure ls" CLI command (which does not exist).
+ */
+static int
+assert_no_azure_blobs(const char* server, const char* label)
+{
+   char prefix[MAX_PATH];
+
+   snprintf(prefix, sizeof(prefix), "pgmoneta/%s/backup/%s/", server, label);
+
+   if (mctf_se_azure_blob_count_prefix(prefix) != 0)
+   {
+      return MCTF_FAIL;
+   }
+
+   return MCTF_OK;
+}
+
+extern int xml_parse_azure_next_marker(char* xml, char** next_marker);
+
+MCTF_TEST(test_azure_next_marker_self_closing_means_no_more_pages)
+{
+   char* next_marker = NULL;
+   const char* no_more_pages =
+      "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+      "<EnumerationResults><Prefix>pgmoneta/</Prefix><Blobs>"
+      "<Blob><Name>pgmoneta/a</Name></Blob></Blobs>"
+      "<NextMarker/></EnumerationResults>";
+
+   MCTF_ASSERT(xml_parse_azure_next_marker((char*)no_more_pages, &next_marker) == 0, cleanup,
+               "parse failed on a self-closing <NextMarker/>");
+   MCTF_ASSERT(next_marker == NULL, cleanup,
+               "self-closing <NextMarker/> must mean there is no next page");
+
+cleanup:
+   free(next_marker);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_azure_next_marker_open_tag_means_more_pages)
+{
+   char* next_marker = NULL;
+   const char* more_pages =
+      "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+      "<EnumerationResults><Prefix>pgmoneta/</Prefix><Blobs>"
+      "<Blob><Name>pgmoneta/a</Name></Blob></Blobs>"
+      "<NextMarker>2!100!token==</NextMarker></EnumerationResults>";
+
+   MCTF_ASSERT(xml_parse_azure_next_marker((char*)more_pages, &next_marker) == 0, cleanup,
+               "parse failed on an open <NextMarker>...</NextMarker>");
+   MCTF_ASSERT_PTR_NONNULL(next_marker, cleanup,
+                           "an open <NextMarker> must produce a non-NULL token");
+   MCTF_ASSERT(strcmp(next_marker, "2!100!token==") == 0, cleanup,
+               "next marker token did not match the XML content");
+
+cleanup:
+   free(next_marker);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_azure_next_marker_absent_means_no_more_pages)
+{
+   char* next_marker = NULL;
+   const char* no_tag_at_all =
+      "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+      "<EnumerationResults><Prefix>pgmoneta/</Prefix><Blobs>"
+      "<Blob><Name>pgmoneta/a</Name></Blob></Blobs></EnumerationResults>";
+
+   MCTF_ASSERT(xml_parse_azure_next_marker((char*)no_tag_at_all, &next_marker) == 0, cleanup,
+               "parse failed when there is no <NextMarker> element at all");
+   MCTF_ASSERT(next_marker == NULL, cleanup,
+               "a response with no <NextMarker> element must mean there is no next page");
+
+cleanup:
+   free(next_marker);
+   MCTF_FINISH();
+}
+
+MCTF_INTEGRATION_TEST(test_azure_delete_removes_blobs)
+{
+   char label[256] = {0};
+   char prefix[MAX_PATH];
+   char* backup_list = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+
+   snprintf(prefix, sizeof(prefix), "pgmoneta/primary/backup/%s/", label);
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(prefix) > 0, cleanup,
+               "no blobs found for the backup before delete");
+
+   MCTF_ASSERT(mctf_se_delete("primary", label) == 0, cleanup, "delete command failed");
+
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(prefix) == 0, cleanup,
+               "Azure blobs remain after delete");
+
+   MCTF_ASSERT(mctf_se_list_backup("primary", &backup_list) == 0, cleanup,
+               "list-backup failed after delete");
+   MCTF_ASSERT_PTR_NONNULL(backup_list, cleanup,
+                           "empty list-backup response after delete");
+
+   MCTF_ASSERT(strstr(backup_list, label) == NULL, cleanup,
+               "deleted backup is still present in list-backup output");
+
+   MCTF_ASSERT(strstr(backup_list, "\"Status\": true") != NULL, cleanup,
+               "list-backup did not report success after delete");
+
+cleanup:
+   free(backup_list);
+   MCTF_FINISH();
+}
+
+MCTF_INTEGRATION_TEST(test_azure_delete_one_backup_keeps_the_other)
+{
+   char first_label[256] = {0};
+   char second_label[256] = {0};
+   char first_prefix[MAX_PATH];
+   char second_prefix[MAX_PATH];
+   int second_blob_count = 0;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", first_label, sizeof(first_label)) == MCTF_OK,
+               cleanup, "could not create first backup and resolve its label");
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", second_label, sizeof(second_label)) == MCTF_OK,
+               cleanup, "could not create second backup and resolve its label");
+
+   MCTF_ASSERT(strcmp(first_label, second_label) != 0, cleanup,
+               "two backups have the same label");
+
+   snprintf(first_prefix, sizeof(first_prefix), "pgmoneta/primary/backup/%s/", first_label);
+   snprintf(second_prefix, sizeof(second_prefix), "pgmoneta/primary/backup/%s/", second_label);
+
+   second_blob_count = mctf_se_azure_blob_count_prefix(second_prefix);
+   MCTF_ASSERT(second_blob_count > 0, cleanup,
+               "second backup has no Azure blobs before delete");
+
+   MCTF_ASSERT(mctf_se_delete("primary", first_label) == 0, cleanup,
+               "delete of first backup failed");
+
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(first_prefix) == 0, cleanup,
+               "first backup blobs remain after delete");
+
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(second_prefix) == second_blob_count, cleanup,
+               "deleting the first backup changed the number of blobs in the second backup");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+/*
+ * Verify that a backup label which never existed has no blobs in Azure.
+ */
+MCTF_INTEGRATION_TEST(test_azure_list_nonexistent_backup_is_empty)
+{
+   char invalid_label[256];
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   pgmoneta_snprintf(invalid_label, sizeof(invalid_label), "%s-invalid", shared_label);
+
+   MCTF_ASSERT(assert_no_azure_blobs("primary", invalid_label) == MCTF_OK, cleanup,
+               "a non-existent backup has blobs in Azure");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+/*
+ * azure restore, delete and retain must all refuse a label that does not
+ * exist, and report the failure explicitly rather than silently doing
+ * nothing. restore needs an extra target directory argument that the other
+ * two commands do not take. retain and delete must also fail with their
+ * specific "no backup" error codes.
+ */
+MCTF_INTEGRATION_TEST(test_azure_commands_report_failure_for_invalid_label)
+{
+   const char* commands[] = {"restore", "delete", "retain"};
+   const int command_count = sizeof(commands) / sizeof(commands[0]);
+   char invalid_label[256];
+   char cmd[2 * MAX_PATH];
+   char* output = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   pgmoneta_snprintf(invalid_label, sizeof(invalid_label), "%s-invalid", shared_label);
+
+   for (int i = 0; i < command_count; i++)
+   {
+      if (strcmp(commands[i], "restore") == 0)
+      {
+         pgmoneta_snprintf(cmd, sizeof(cmd), "azure restore primary %s %s", invalid_label, TEST_RESTORE_DIR);
+      }
+      else
+      {
+         pgmoneta_snprintf(cmd, sizeof(cmd), "%s primary %s", commands[i], invalid_label);
+      }
+
+      mctf_se_cli(cmd, &output);
+
+      MCTF_ASSERT_PTR_NONNULL(output, cleanup, "no output from %s command", commands[i]);
+      MCTF_ASSERT(strstr(output, "Status: false") != NULL, cleanup,
+                  "%s did not report failure for a non-existent label", commands[i]);
+
+      if (strcmp(commands[i], "retain") == 0)
+      {
+         MCTF_ASSERT(strstr(output, "Error: 1200") != NULL, cleanup,
+                     "%s returned an unexpected error code", commands[i]);
+      }
+      else if (strcmp(commands[i], "delete") == 0)
+      {
+         MCTF_ASSERT(strstr(output, "Error: 505") != NULL, cleanup,
+                     "%s returned an unexpected error code", commands[i]);
+      }
+
+      free(output);
+      output = NULL;
+   }
+
+   MCTF_ASSERT(mctf_sh(NULL, "! ls -A %s/workspace | grep -q '^\\.tmp_primary_'", mctf_se_run_dir()) == 0,
+               cleanup, "failed azure restore left its staging directory in the workspace");
+
+cleanup:
+   free(output);
+   MCTF_FINISH();
+}
+
+/*
+ * retain and expunge must actually flip the Keep flag on the backup, not
+ * just return success while leaving the metadata unchanged.
+ */
+MCTF_INTEGRATION_TEST(test_azure_retain_then_expunge_toggles_keep)
+{
+   char label[256] = {0};
+   char cmd[512];
+   char* output = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "retain primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "retain failed");
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "-F json info primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, &output) == 0, cleanup, "info after retain failed");
+   MCTF_ASSERT_PTR_NONNULL(output, cleanup, "no info output after retain");
+   MCTF_ASSERT(strstr(output, "\"Keep\": true") != NULL,
+               cleanup, "Keep flag not set after retain");
+   free(output);
+   output = NULL;
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "expunge primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "expunge failed");
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "-F json info primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, &output) == 0, cleanup, "info after expunge failed");
+   MCTF_ASSERT_PTR_NONNULL(output, cleanup, "no info output after expunge");
+   MCTF_ASSERT(strstr(output, "\"Keep\": false") != NULL,
+               cleanup, "Keep flag not cleared after expunge");
+
+cleanup:
+   free(output);
+   MCTF_FINISH();
+}
+
+/*
+ * A retained backup must be protected from delete: the command must be
+ * refused and the Azure blobs must remain untouched. Once expunged, delete
+ * must work normally and the blobs must be removed.
+ */
+MCTF_INTEGRATION_TEST(test_azure_retain_blocks_delete_until_expunged)
+{
+   char label[256] = {0};
+   char prefix[MAX_PATH];
+   char cmd[512];
+   char* output = NULL;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+
+   snprintf(prefix, sizeof(prefix), "pgmoneta/primary/backup/%s/", label);
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "retain primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "retain failed");
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "-F json delete primary %s", label);
+   mctf_se_cli(cmd, &output);
+   MCTF_ASSERT_PTR_NONNULL(output, cleanup, "no output from delete command");
+   MCTF_ASSERT(strstr(output, "\"Status\": false") != NULL, cleanup,
+               "delete of a retained backup did not report failure status");
+   MCTF_ASSERT(strstr(output, "\"Error\": 506") != NULL, cleanup,
+               "delete did not fail with the retained-backup error code");
+   free(output);
+   output = NULL;
+
+   MCTF_ASSERT(mctf_se_azure_blob_count_prefix(prefix) > 0, cleanup,
+               "retained backup blobs vanished from Azure after refused delete");
+
+   pgmoneta_snprintf(cmd, sizeof(cmd), "expunge primary %s", label);
+   MCTF_ASSERT(mctf_se_cli(cmd, NULL) == 0, cleanup, "expunge failed");
+
+   MCTF_ASSERT(mctf_se_delete("primary", label) == 0, cleanup, "delete failed after expunge");
+
+   MCTF_ASSERT(assert_no_azure_blobs("primary", label) == MCTF_OK, cleanup,
+               "Azure blobs remain after delete of expunged backup");
+
+cleanup:
+   free(output);
+   MCTF_FINISH();
+}
+
+/*
+ * A backup that dies after backup.info is written can already be uploaded,
+ * so removing it has to remove it from Azure too.
+ */
+MCTF_INTEGRATION_TEST(test_azure_incomplete_backup_removed)
+{
+   char label[256] = {0};
+   char newest[256] = {0};
+   char backup_dir[MAX_PATH];
+   pid_t backup = 0;
+   bool throttled = false;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/primary/backup", mctf_se_run_dir());
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+   MCTF_ASSERT(mctf_sh(NULL, "touch %s/%s.incomplete", backup_dir, label) == 0, cleanup,
+               "could not mark the backup as incomplete");
+
+   /* incomplete backups are removed when a backup process dies */
+   MCTF_ASSERT(mctf_se_cli("conf set server.primary.max_rate 32768", NULL) == 0, cleanup, "could not slow down backups");
+   throttled = true;
+   MCTF_ASSERT(mctf_se_cli("backup primary >/dev/null 2>&1 &", NULL) == 0, cleanup, "could not start a backup");
+
+   for (int i = 0; i < 100 && backup <= 0; i++)
+   {
+      SLEEP(100000000L);
+      if (mctf_se_newest_label("primary", newest, sizeof(newest)) == MCTF_OK && strcmp(newest, label) > 0)
+      {
+         backup = pgmoneta_test_find_process("backup/primary");
+      }
+   }
+   MCTF_ASSERT(backup > 0, cleanup, "the backup did not start");
+
+   MCTF_ASSERT(!kill(backup, SIGKILL), cleanup, "could not kill the backup");
+   backup = 0;
+
+   for (int i = 0; i < 300 && (mctf_sh(NULL, "test -e %s/%s", backup_dir, label) == 0 || pgmoneta_test_find_process("cleanup/primary") > 0); i++)
+   {
+      SLEEP(100000000L);
+   }
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s", backup_dir, label) != 0, cleanup, "the incomplete backup is still on disk");
+   MCTF_ASSERT(assert_no_azure_blobs("primary", label) == MCTF_OK, cleanup,
+               "the incomplete backup is still in Azure");
+
+cleanup:
+   if (backup > 0)
+   {
+      kill(backup, SIGKILL);
+   }
+   if (throttled)
+   {
+      mctf_se_cli("conf set server.primary.max_rate 0", NULL);
+   }
+   MCTF_FINISH();
+}
+
+/*
+ * Startup removes what a crash of pgmoneta left behind: a backup that was
+ * still being taken, a backup whose cleanup had already deleted backup.info,
+ * both also from Azure, and a backup directory without backup.info.
+ */
+MCTF_INTEGRATION_TEST(test_azure_restart_removes_incomplete_backups)
+{
+   char label[256] = {0};
+   char cleaned[256] = {0};
+   char backup_dir[MAX_PATH];
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/primary/backup", mctf_se_run_dir());
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+   MCTF_ASSERT(take_backup_and_get_label("primary", cleaned, sizeof(cleaned)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+   MCTF_ASSERT(mctf_sh(NULL, "touch %s/%s.incomplete && mkdir -p %s/20000101000000/data", backup_dir, label, backup_dir) == 0,
+               cleanup, "could not create the leftovers of a crash");
+   MCTF_ASSERT(mctf_sh(NULL, "echo remote > %s/%s.incomplete && rm %s/%s/backup.info", backup_dir, cleaned, backup_dir, cleaned) == 0,
+               cleanup, "could not create the leftovers of an interrupted cleanup");
+
+   MCTF_ASSERT(mctf_se_restart() == MCTF_OK, cleanup, "could not restart pgmoneta");
+
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s", backup_dir, label) != 0, cleanup, "the incomplete backup is still on disk");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s.incomplete", backup_dir, label) != 0, cleanup, "the incomplete marker is still on disk");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/20000101000000", backup_dir) != 0, cleanup,
+               "the backup directory without backup.info is still on disk");
+   MCTF_ASSERT(assert_no_azure_blobs("primary", label) == MCTF_OK, cleanup,
+               "the incomplete backup is still in Azure");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s", backup_dir, cleaned) != 0, cleanup, "the cleaned up backup is still on disk");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s.incomplete", backup_dir, cleaned) != 0, cleanup, "the cleaned up marker is still on disk");
+   MCTF_ASSERT(assert_no_azure_blobs("primary", cleaned) == MCTF_OK, cleanup,
+               "the cleaned up backup is still in Azure");
+   MCTF_ASSERT(mctf_se_has_local_metadata("primary"), cleanup, "a complete backup was removed");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_INTEGRATION_TEST(test_azure_retention_removes_incomplete_backups)
+{
+   char label[256] = {0};
+   char complete[256] = {0};
+   char backup_dir[MAX_PATH];
+   char conf[MAX_PATH];
+   bool changed = false;
+
+   if (storage_status == MCTF_SKIPPED)
+   {
+      MCTF_SKIP("no container engine / test environment");
+   }
+   MCTF_ASSERT(storage_status == MCTF_OK, cleanup, "storage backend setup failed");
+
+   pgmoneta_snprintf(backup_dir, sizeof(backup_dir), "%s/backup/primary/backup", mctf_se_run_dir());
+   pgmoneta_snprintf(conf, sizeof(conf), "%s/pgmoneta.conf", mctf_se_run_dir());
+
+   MCTF_ASSERT(take_backup_and_get_label("primary", complete, sizeof(complete)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+   MCTF_ASSERT(take_backup_and_get_label("primary", label, sizeof(label)) == MCTF_OK, cleanup,
+               "could not create backup and resolve its label");
+
+   MCTF_ASSERT(mctf_sh(NULL, "sed -i 's/^\\[pgmoneta\\]$/[pgmoneta]\\nretention_interval = 1/' %s", conf) == 0, cleanup,
+               "could not set retention_interval");
+   changed = true;
+   MCTF_ASSERT(mctf_se_restart() == MCTF_OK, cleanup, "could not restart pgmoneta");
+
+   /* pgmoneta keeps running, so only retention can retry the cleanup */
+   MCTF_ASSERT(mctf_sh(NULL, "echo remote > %s/%s.incomplete && rm %s/%s/backup.info", backup_dir, label, backup_dir, label) == 0,
+               cleanup, "could not create the leftovers of an interrupted cleanup");
+   MCTF_ASSERT(mctf_sh(NULL, "mkdir -p %s/20000101000000/data", backup_dir) == 0, cleanup,
+               "could not create a backup directory without backup.info");
+
+   for (int i = 0; i < 30 && mctf_sh(NULL, "test -e %s/%s.incomplete", backup_dir, label) == 0; i++)
+   {
+      sleep(1);
+   }
+
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s.incomplete", backup_dir, label) != 0, cleanup, "retention did not remove the incomplete marker");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s", backup_dir, label) != 0, cleanup, "retention did not remove the incomplete backup");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/20000101000000", backup_dir) != 0, cleanup,
+               "retention did not remove the backup directory without backup.info");
+   MCTF_ASSERT(assert_no_azure_blobs("primary", label) == MCTF_OK, cleanup,
+               "the incomplete backup is still in Azure");
+   MCTF_ASSERT(mctf_sh(NULL, "test -e %s/%s/backup.info", backup_dir, complete) == 0, cleanup, "a complete backup was removed");
+
+cleanup:
+   if (changed)
+   {
+      mctf_sh(NULL, "sed -i '/^retention_interval = 1$/d' %s", conf);
+      mctf_se_restart();
+   }
    MCTF_FINISH();
 }
 

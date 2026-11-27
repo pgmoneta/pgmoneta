@@ -48,6 +48,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define AZURE_API_VERSION "2021-08-06"
+
 static char* azure_storage_name(void);
 static int azure_storage_setup(char* name, struct art*);
 static int azure_storage_execute(char* name, struct art*);
@@ -74,8 +76,6 @@ static int azure_create_transfer_task(int server, char* azure_root, char* remote
 static int azure_upload_one_file(struct azure_transfer_task* task);
 
 static int azure_send_request(int method, char* azure_root, char* relative_path, struct http_response** response);
-static int azure_list_blobs(char* prefix, struct deque** names);
-static int azure_delete_blob(char* name);
 static int azure_object_exists(char* azure_root, char* relative_path, int server);
 static char* azure_build_object_path(char* azure_root, char* relative_path);
 static int azure_build_authorization(char* signed_headers_prefix, char* azure_path,
@@ -85,6 +85,26 @@ static int azure_http_prepare(char* azure_path, char** azure_host, char* request
 
 static char* azure_get_host(void);
 static char* azure_get_basepath(int server, char* identifier);
+
+static int azure_delete_all_objects(char* relative_path, char* azure_root, int server);
+static int azure_send_list_request(char* prefix, char* marker, struct http_response** response);
+static int azure_send_delete_blob_request(char* azure_path);
+static int azure_build_list_authorization(char* utc_date, char* prefix, char* marker, char** auth_value);
+static int xml_parse_azure_blob_names(char* xml, struct deque** keys);
+int xml_parse_azure_next_marker(char* xml, char** next_marker);
+
+struct azure_delete_task
+{
+   struct worker_common common;
+   int server;
+   bool progress_enabled;
+   char object_name[MAX_PATH];
+};
+
+static void do_delete_blob(struct worker_common* wc);
+static int azure_create_delete_task(int server, char* object_name,
+                                    struct workers* workers, struct azure_delete_task** task);
+static int azure_delete_one_blob(struct azure_delete_task* task);
 
 struct azure_upload_file_context
 {
@@ -550,7 +570,7 @@ azure_build_authorization(char* signed_headers_prefix, char* azure_path,
 
    string_to_sign = pgmoneta_append(string_to_sign, signed_headers_prefix);
    string_to_sign = pgmoneta_append(string_to_sign, utc_date);
-   string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:2021-08-06\n/");
+   string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:" AZURE_API_VERSION "\n/");
    string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
    string_to_sign = pgmoneta_append(string_to_sign, "/");
    /* For path-style endpoints (Azurite), the URI already contains /<account>/<container>/<blob>.
@@ -989,6 +1009,580 @@ error:
 }
 
 static int
+xml_parse_azure_blob_names(char* xml, struct deque** keys)
+{
+   return pgmoneta_xml_extract_tag(xml, "Name", keys);
+}
+
+int
+xml_parse_azure_next_marker(char* xml, char** next_marker)
+{
+   struct deque* values = NULL;
+
+   if (xml == NULL || next_marker == NULL)
+   {
+      return 1;
+   }
+
+   *next_marker = NULL;
+
+   if (pgmoneta_xml_extract_tag(xml, "NextMarker", &values))
+   {
+      pgmoneta_deque_destroy(values);
+      return 1;
+   }
+
+   if (values != NULL && pgmoneta_deque_size(values) > 0)
+   {
+      char* val = (char*)pgmoneta_deque_peek(values, NULL);
+      if (val != NULL && strlen(val) > 0)
+      {
+         pgmoneta_copy_string(val, next_marker);
+      }
+   }
+
+   pgmoneta_deque_destroy(values);
+
+   return 0;
+}
+
+static int
+azure_build_list_authorization(char* utc_date, char* prefix, char* marker, char** auth_value)
+{
+   char* string_to_sign = NULL;
+   char* signing_key = NULL;
+   char* base64_signature = NULL;
+   size_t base64_signature_length = 0;
+   unsigned char* signature_hmac = NULL;
+   int hmac_length = 0;
+   size_t signing_key_length = 0;
+   struct main_configuration* config;
+
+   *auth_value = NULL;
+   config = (struct main_configuration*)shmem;
+
+   if (utc_date == NULL)
+   {
+      goto error;
+   }
+
+   if (strchr(config->azure_storage_account, ' ') != NULL)
+   {
+      pgmoneta_log_error("Azure storage account name contains spaces: '%s'. This is not allowed.",
+                         config->azure_storage_account);
+      goto error;
+   }
+
+   string_to_sign = pgmoneta_append(string_to_sign, "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:");
+   string_to_sign = pgmoneta_append(string_to_sign, utc_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:" AZURE_API_VERSION "\n/");
+   string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   if (strlen(config->azure_endpoint) > 0)
+   {
+      string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
+      string_to_sign = pgmoneta_append(string_to_sign, "/");
+   }
+   string_to_sign = pgmoneta_append(string_to_sign, config->azure_container);
+
+   string_to_sign = pgmoneta_append(string_to_sign, "\ncomp:list");
+   if (marker != NULL && strlen(marker) > 0)
+   {
+      string_to_sign = pgmoneta_append(string_to_sign, "\nmarker:");
+      string_to_sign = pgmoneta_append(string_to_sign, marker);
+   }
+   if (prefix != NULL && strlen(prefix) > 0)
+   {
+      string_to_sign = pgmoneta_append(string_to_sign, "\nprefix:");
+      string_to_sign = pgmoneta_append(string_to_sign, prefix);
+   }
+   string_to_sign = pgmoneta_append(string_to_sign, "\nrestype:container");
+
+   if (pgmoneta_base64_decode(config->azure_shared_key, strlen(config->azure_shared_key),
+                              (void**)&signing_key, &signing_key_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash(signing_key, signing_key_length, string_to_sign,
+                                                 strlen(string_to_sign), &signature_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_base64_encode((char*)signature_hmac, hmac_length, &base64_signature,
+                              &base64_signature_length))
+   {
+      goto error;
+   }
+
+   *auth_value = pgmoneta_append(*auth_value, "SharedKey ");
+   *auth_value = pgmoneta_append(*auth_value, config->azure_storage_account);
+   *auth_value = pgmoneta_append(*auth_value, ":");
+   *auth_value = pgmoneta_append(*auth_value, base64_signature);
+
+   free(string_to_sign);
+   free(signing_key);
+   free(base64_signature);
+   free(signature_hmac);
+
+   return 0;
+
+error:
+
+   free(string_to_sign);
+   free(signing_key);
+   free(base64_signature);
+   free(signature_hmac);
+   free(*auth_value);
+   *auth_value = NULL;
+
+   return 1;
+}
+
+static int
+azure_send_list_request(char* prefix, char* marker, struct http_response** response)
+{
+   char utc_date[UTC_TIME_LENGTH];
+   char* azure_host = NULL;
+   char* auth_value = NULL;
+   char* request_path = NULL;
+   char* encoded_prefix = NULL;
+   char* encoded_marker = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct main_configuration* config;
+   bool use_endpoint;
+   int conn_port;
+   bool conn_tls;
+
+   config = (struct main_configuration*)shmem;
+
+   memset(&utc_date[0], 0, sizeof(utc_date));
+
+   if (pgmoneta_get_timestamp_UTC_format(utc_date))
+   {
+      goto error;
+   }
+
+   if (azure_build_list_authorization(utc_date, prefix, marker, &auth_value))
+   {
+      goto error;
+   }
+
+   azure_host = azure_get_host();
+   if (azure_host == NULL)
+   {
+      goto error;
+   }
+
+   use_endpoint = (strlen(config->azure_endpoint) > 0);
+   conn_port = use_endpoint ? (config->azure_port > 0 ? config->azure_port : 443) : 443;
+   conn_tls = use_endpoint ? config->azure_use_tls : true;
+
+   if (pgmoneta_http_create(azure_host, conn_port, conn_tls, &connection))
+   {
+      pgmoneta_log_error("Failed to connect to Azure host: %s:%d", azure_host, conn_port);
+      goto error;
+   }
+
+   if (use_endpoint)
+   {
+      request_path = pgmoneta_append(request_path, "/");
+      request_path = pgmoneta_append(request_path, config->azure_storage_account);
+      request_path = pgmoneta_append(request_path, "/");
+      request_path = pgmoneta_append(request_path, config->azure_container);
+   }
+   else
+   {
+      request_path = pgmoneta_append(request_path, "/");
+      request_path = pgmoneta_append(request_path, config->azure_container);
+   }
+   request_path = pgmoneta_append(request_path, "?restype=container&comp=list");
+
+   if (prefix != NULL && strlen(prefix) > 0)
+   {
+      encoded_prefix = pgmoneta_url_encode(prefix);
+      request_path = pgmoneta_append(request_path, "&prefix=");
+      request_path = pgmoneta_append(request_path, encoded_prefix);
+   }
+
+   if (marker != NULL && strlen(marker) > 0)
+   {
+      encoded_marker = pgmoneta_url_encode(marker);
+      request_path = pgmoneta_append(request_path, "&marker=");
+      request_path = pgmoneta_append(request_path, encoded_marker);
+   }
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_GET, request_path, &request))
+   {
+      goto error;
+   }
+
+   if (azure_add_request_headers(request, auth_value, utc_date, false))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, response))
+   {
+      pgmoneta_log_error("Failed to execute HTTP GET (list) request for %s", request_path);
+      goto error;
+   }
+
+   if ((*response)->status_code < 200 || (*response)->status_code >= 300)
+   {
+      pgmoneta_log_error("Azure list failed with status code: %d for prefix %s",
+                         (*response)->status_code, prefix != NULL ? prefix : "");
+      goto error;
+   }
+
+   free(azure_host);
+   free(auth_value);
+   free(request_path);
+   free(encoded_prefix);
+   free(encoded_marker);
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_destroy(connection);
+
+   return 0;
+
+error:
+
+   free(azure_host);
+   free(auth_value);
+   free(request_path);
+   free(encoded_prefix);
+   free(encoded_marker);
+
+   if (connection != NULL)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+
+   if (request != NULL)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+
+   if (response != NULL && *response != NULL)
+   {
+      pgmoneta_http_response_destroy(*response);
+      *response = NULL;
+   }
+
+   return 1;
+}
+
+static int
+azure_send_delete_blob_request(char* azure_path)
+{
+   char utc_date[UTC_TIME_LENGTH];
+   char* azure_host = NULL;
+   char* auth_value = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+   char azure_delete_path[MAX_PATH];
+
+   memset(&utc_date[0], 0, sizeof(utc_date));
+
+   if (pgmoneta_get_timestamp_UTC_format(utc_date))
+   {
+      goto error;
+   }
+
+   if (azure_build_authorization("DELETE\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:",
+                                 azure_path, NULL, utc_date, &auth_value))
+   {
+      goto error;
+   }
+
+   if (azure_http_prepare(azure_path, &azure_host, azure_delete_path, sizeof(azure_delete_path), &connection))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_DELETE, azure_delete_path, &request))
+   {
+      goto error;
+   }
+
+   if (azure_add_request_headers(request, auth_value, utc_date, false))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, &response))
+   {
+      pgmoneta_log_error("Failed to execute HTTP DELETE request for %s", azure_path);
+      goto error;
+   }
+
+   if (!((response->status_code >= 200 && response->status_code < 300) || response->status_code == 404))
+   {
+      pgmoneta_log_error("Azure delete failed with status code: %d for blob %s",
+                         response->status_code, azure_path);
+      goto error;
+   }
+
+   free(azure_host);
+   free(auth_value);
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+
+   return 0;
+
+error:
+
+   free(azure_host);
+   free(auth_value);
+
+   if (connection != NULL)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+
+   if (request != NULL)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+
+   if (response != NULL)
+   {
+      pgmoneta_http_response_destroy(response);
+   }
+
+   return 1;
+}
+
+static int
+azure_create_delete_task(int server, char* object_name,
+                         struct workers* workers, struct azure_delete_task** task)
+{
+   struct azure_delete_task* t = NULL;
+
+   *task = NULL;
+
+   if (object_name == NULL)
+   {
+      goto error;
+   }
+
+   if (strlen(object_name) >= MAX_PATH)
+   {
+      pgmoneta_log_error("Azure delete path too long");
+      goto error;
+   }
+
+   t = (struct azure_delete_task*)malloc(sizeof(struct azure_delete_task));
+   if (t == NULL)
+   {
+      goto error;
+   }
+
+   memset(t, 0, sizeof(struct azure_delete_task));
+   pgmoneta_snprintf(t->object_name, sizeof(t->object_name), "%s", object_name);
+
+   t->common.workers = workers;
+   t->server = server;
+   t->progress_enabled = (server >= 0 && pgmoneta_is_progress_enabled(server));
+
+   *task = t;
+
+   return 0;
+
+error:
+   free(t);
+   return 1;
+}
+
+static int
+azure_delete_one_blob(struct azure_delete_task* task)
+{
+   if (azure_send_delete_blob_request(task->object_name))
+   {
+      pgmoneta_log_error("Azure delete: failed %s", task->object_name);
+      return 1;
+   }
+
+   if (task->progress_enabled)
+   {
+      pgmoneta_progress_increment(task->server, 1);
+   }
+
+   return 0;
+}
+
+static void
+do_delete_blob(struct worker_common* wc)
+{
+   struct azure_delete_task* task = (struct azure_delete_task*)wc;
+
+   if (azure_delete_one_blob(task))
+   {
+      pgmoneta_record_failure(task->common.workers != NULL ? task->common.workers->outcome : NULL,
+                              "Azure delete failed: %s", task->object_name);
+   }
+
+   free(task);
+}
+
+static int
+azure_delete_all_objects(char* relative_path, char* azure_root, int server)
+{
+   char* prefix = NULL;
+   char* marker = NULL;
+   char* next_marker = NULL;
+   struct http_response* list_response = NULL;
+   struct deque* blob_names = NULL;
+   struct deque_iterator* iter = NULL;
+   struct workers* workers = NULL;
+   struct azure_delete_task* task = NULL;
+   int number_of_workers = 0;
+   bool more = true;
+   int64_t deleted_objects = 0;
+
+   prefix = azure_build_object_path(azure_root, relative_path);
+   if (prefix == NULL)
+   {
+      goto error;
+   }
+
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+
+   while (more)
+   {
+      if (azure_send_list_request(prefix, marker, &list_response))
+      {
+         goto error;
+      }
+
+      free(marker);
+      marker = NULL;
+
+      if (xml_parse_azure_blob_names(list_response->payload.data, &blob_names))
+      {
+         goto error;
+      }
+
+      if (xml_parse_azure_next_marker(list_response->payload.data, &next_marker))
+      {
+         goto error;
+      }
+
+      pgmoneta_http_response_destroy(list_response);
+      list_response = NULL;
+
+      if (blob_names != NULL && pgmoneta_deque_size(blob_names) > 0)
+      {
+         size_t sample_size = pgmoneta_deque_size(blob_names);
+
+         if (pgmoneta_is_progress_enabled(server))
+         {
+            pgmoneta_progress_set_total(server, deleted_objects + (int64_t)sample_size + (next_marker != NULL ? 1 : 0));
+         }
+
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_initialize(number_of_workers, &workers);
+         }
+
+         if (pgmoneta_deque_iterator_create(blob_names, &iter))
+         {
+            goto error;
+         }
+
+         while (pgmoneta_deque_iterator_next(iter))
+         {
+            char* blob_name = (char*)pgmoneta_value_data(iter->value);
+
+            if (azure_create_delete_task(server, blob_name, workers, &task))
+            {
+               pgmoneta_log_error("Azure delete: failed to create delete task");
+               goto error;
+            }
+
+            if (workers != NULL && pgmoneta_workers_outcome_ok(workers))
+            {
+               if (pgmoneta_workers_add(workers, do_delete_blob, (struct worker_common*)task))
+               {
+                  free(task);
+                  task = NULL;
+                  pgmoneta_log_error("Azure delete: failed to queue delete task");
+                  goto error;
+               }
+               task = NULL;
+            }
+            else
+            {
+               if (azure_delete_one_blob(task))
+               {
+                  pgmoneta_log_error("Azure delete: failed to delete blob %s", blob_name);
+                  free(task);
+                  task = NULL;
+                  goto error;
+               }
+               free(task);
+               task = NULL;
+            }
+         }
+
+         pgmoneta_deque_iterator_destroy(iter);
+         iter = NULL;
+
+         pgmoneta_workers_wait(workers);
+         if (workers != NULL && !pgmoneta_workers_outcome_ok(workers))
+         {
+            pgmoneta_workers_log_failures(workers);
+            goto error;
+         }
+         pgmoneta_workers_destroy(workers);
+         workers = NULL;
+
+         deleted_objects += (int64_t)sample_size;
+      }
+
+      pgmoneta_deque_destroy(blob_names);
+      blob_names = NULL;
+
+      if (next_marker != NULL && strlen(next_marker) > 0)
+      {
+         marker = next_marker;
+         next_marker = NULL;
+      }
+      else
+      {
+         free(next_marker);
+         next_marker = NULL;
+         more = false;
+      }
+   }
+
+   free(prefix);
+   free(marker);
+
+   return 0;
+
+error:
+
+   free(prefix);
+   free(marker);
+   free(next_marker);
+   free(task);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(blob_names);
+   pgmoneta_http_response_destroy(list_response);
+   pgmoneta_workers_wait(workers);
+   pgmoneta_workers_destroy(workers);
+
+   return 1;
+}
+
+static int
 azure_send_request(int method, char* azure_root, char* relative_path, struct http_response** response)
 {
    char* azure_path = NULL;
@@ -1003,259 +1597,6 @@ azure_send_request(int method, char* azure_root, char* relative_path, struct htt
    rc = azure_send_container_request(method, azure_path, NULL, NULL, response);
 
    free(azure_path);
-
-   return rc;
-}
-
-static char*
-azure_url_encode(char* str)
-{
-   char* encoded = NULL;
-   char hex[4];
-
-   for (int i = 0; str != NULL && str[i] != '\0'; i++)
-   {
-      unsigned char c = (unsigned char)str[i];
-
-      if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
-      {
-         char ch[2] = {(char)c, '\0'};
-         encoded = pgmoneta_append(encoded, ch);
-      }
-      else
-      {
-         pgmoneta_snprintf(hex, sizeof(hex), "%%%02X", c);
-         encoded = pgmoneta_append(encoded, hex);
-      }
-   }
-
-   return encoded;
-}
-
-/* Undo the XML escaping of a List Blobs value */
-static char*
-azure_xml_unescape(char* start, char* end)
-{
-   static const char* entities[][2] = {
-      {"&amp;", "&"}, {"&lt;", "<"}, {"&gt;", ">"}, {"&quot;", "\""}, {"&apos;", "'"}};
-   char* out = NULL;
-   char* p = start;
-   size_t n = 0;
-
-   /* Unescaping only shrinks the text */
-   out = malloc((size_t)(end - start) + 1);
-   if (out == NULL)
-   {
-      return NULL;
-   }
-
-   while (p < end)
-   {
-      bool matched = false;
-
-      if (*p == '&')
-      {
-         for (size_t i = 0; !matched && i < sizeof(entities) / sizeof(entities[0]); i++)
-         {
-            size_t len = strlen(entities[i][0]);
-
-            if ((size_t)(end - p) >= len && !strncmp(p, entities[i][0], len))
-            {
-               out[n++] = entities[i][1][0];
-               p += len;
-               matched = true;
-            }
-         }
-      }
-
-      if (!matched)
-      {
-         out[n++] = *p++;
-      }
-   }
-
-   out[n] = '\0';
-
-   return out;
-}
-
-/*
- * Add the text of every <tag>...</tag> in xml, unescaped, to values.
- * Only for the flat elements of a List Blobs response.
- */
-static int
-azure_xml_collect(char* xml, char* tag, struct deque* values)
-{
-   char open_tag[128];
-   char close_tag[128];
-   char* p = xml;
-
-   pgmoneta_snprintf(open_tag, sizeof(open_tag), "<%s>", tag);
-   pgmoneta_snprintf(close_tag, sizeof(close_tag), "</%s>", tag);
-
-   while ((p = strstr(p, open_tag)) != NULL)
-   {
-      char* value_start = p + strlen(open_tag);
-      char* value_end = strstr(value_start, close_tag);
-      char* value = NULL;
-
-      if (value_end == NULL)
-      {
-         return 1;
-      }
-
-      value = azure_xml_unescape(value_start, value_end);
-      if (value == NULL || pgmoneta_deque_add(values, NULL, (uintptr_t)value, ValueString))
-      {
-         free(value);
-         return 1;
-      }
-      free(value);
-
-      p = value_end + strlen(close_tag);
-   }
-
-   return 0;
-}
-
-/*
- * List the names of all blobs starting with prefix, following NextMarker
- * until the listing is complete.
- */
-static int
-azure_list_blobs(char* prefix, struct deque** names)
-{
-   char* marker = NULL;
-   char* encoded_prefix = NULL;
-   char* encoded_marker = NULL;
-   char* query = NULL;
-   char* canonical_query = NULL;
-   struct deque* markers = NULL;
-   struct http_response* response = NULL;
-
-   *names = NULL;
-
-   if (pgmoneta_deque_create(false, names))
-   {
-      goto error;
-   }
-
-   encoded_prefix = azure_url_encode(prefix);
-   if (encoded_prefix == NULL)
-   {
-      goto error;
-   }
-
-   do
-   {
-      /* Canonicalized parameters are sorted by name and not URL-encoded */
-      query = pgmoneta_format_and_append(NULL, "?restype=container&comp=list&prefix=%s", encoded_prefix);
-      canonical_query = pgmoneta_append(NULL, "\ncomp:list");
-      if (marker != NULL)
-      {
-         encoded_marker = azure_url_encode(marker);
-         query = pgmoneta_format_and_append(query, "&marker=%s", encoded_marker);
-         canonical_query = pgmoneta_format_and_append(canonical_query, "\nmarker:%s", marker);
-      }
-      canonical_query = pgmoneta_format_and_append(canonical_query, "\nprefix:%s\nrestype:container", prefix);
-
-      if (query == NULL || canonical_query == NULL)
-      {
-         goto error;
-      }
-
-      if (azure_send_container_request(PGMONETA_HTTP_GET, NULL, query, canonical_query, &response))
-      {
-         goto error;
-      }
-
-      if (response->status_code != 200 || response->payload.data == NULL)
-      {
-         pgmoneta_log_error("Azure list: unexpected status %d for prefix %s", response->status_code, prefix);
-         goto error;
-      }
-
-      if (azure_xml_collect(response->payload.data, "Name", *names))
-      {
-         pgmoneta_log_error("Azure list: malformed response for prefix %s", prefix);
-         goto error;
-      }
-
-      free(marker);
-      marker = NULL;
-
-      if (pgmoneta_deque_create(false, &markers) ||
-          azure_xml_collect(response->payload.data, "NextMarker", markers))
-      {
-         goto error;
-      }
-
-      if (pgmoneta_deque_size(markers) > 0)
-      {
-         char* next = (char*)pgmoneta_deque_peek(markers, NULL);
-
-         if (next != NULL && strlen(next) > 0)
-         {
-            marker = pgmoneta_append(NULL, next);
-         }
-      }
-
-      pgmoneta_deque_destroy(markers);
-      markers = NULL;
-      pgmoneta_http_response_destroy(response);
-      response = NULL;
-      free(query);
-      query = NULL;
-      free(canonical_query);
-      canonical_query = NULL;
-      free(encoded_marker);
-      encoded_marker = NULL;
-   }
-   while (marker != NULL);
-
-   free(encoded_prefix);
-
-   return 0;
-
-error:
-
-   pgmoneta_deque_destroy(markers);
-   pgmoneta_http_response_destroy(response);
-   free(marker);
-   free(encoded_prefix);
-   free(encoded_marker);
-   free(query);
-   free(canonical_query);
-   pgmoneta_deque_destroy(*names);
-   *names = NULL;
-
-   return 1;
-}
-
-/* Delete one blob; a blob that is already gone counts as deleted */
-static int
-azure_delete_blob(char* name)
-{
-   struct http_response* response = NULL;
-   int rc = 1;
-
-   if (azure_send_request(PGMONETA_HTTP_DELETE, name, NULL, &response))
-   {
-      goto done;
-   }
-
-   if ((response->status_code >= 200 && response->status_code < 300) || response->status_code == 404)
-   {
-      rc = 0;
-   }
-   else
-   {
-      pgmoneta_log_error("Azure delete: unexpected status %d for %s", response->status_code, name);
-   }
-
-done:
-
-   pgmoneta_http_response_destroy(response);
 
    return rc;
 }
@@ -1372,7 +1713,7 @@ azure_add_request_headers(struct http_request* request, char* auth_value, char* 
       return 1;
    }
 
-   if (pgmoneta_http_request_add_header(request, "x-ms-version", "2021-08-06"))
+   if (pgmoneta_http_request_add_header(request, "x-ms-version", AZURE_API_VERSION))
    {
       return 1;
    }
@@ -1393,6 +1734,18 @@ azure_upload(int server, char* label, int compression __attribute__((unused)), i
    rc = azure_upload_files(local_root, azure_root, server, compression, encryption);
 
    free(local_root);
+   free(azure_root);
+   return rc;
+}
+
+int
+azure_cleanup(int server, char* label)
+{
+   char* azure_root = NULL;
+   int rc;
+
+   azure_root = azure_get_basepath(server, label);
+   rc = azure_delete_all_objects("", azure_root, server);
    free(azure_root);
    return rc;
 }
@@ -1509,79 +1862,6 @@ cleanup:
    free(manifest_path);
    free(remote_path);
    free(suffix);
-
-   return rc;
-}
-
-/*
- * Delete every blob of a backup. The blobs are found by listing the backup
- * prefix, so this also works once the local backup directory is gone.
- */
-int
-azure_cleanup(int server, char* label)
-{
-   char* azure_root = NULL;
-   char* prefix = NULL;
-   struct deque* names = NULL;
-   struct deque_iterator* iter = NULL;
-   struct main_configuration* config;
-   int failed = 0;
-   int deleted = 0;
-   int rc = 1;
-
-   config = (struct main_configuration*)shmem;
-
-   azure_root = azure_get_basepath(server, label);
-   prefix = pgmoneta_append(pgmoneta_append(NULL, azure_root), "/");
-   if (azure_root == NULL || prefix == NULL)
-   {
-      goto done;
-   }
-
-   pgmoneta_log_debug("Azure storage engine (cleanup): %s/%s", config->common.servers[server].name, label);
-
-   if (azure_list_blobs(prefix, &names))
-   {
-      pgmoneta_log_error("Azure cleanup: could not list %s", prefix);
-      goto done;
-   }
-
-   if (pgmoneta_deque_iterator_create(names, &iter))
-   {
-      goto done;
-   }
-
-   while (pgmoneta_deque_iterator_next(iter))
-   {
-      char* name = (char*)pgmoneta_value_data(iter->value);
-
-      if (azure_delete_blob(name))
-      {
-         failed++;
-      }
-      else
-      {
-         deleted++;
-      }
-   }
-
-   if (failed > 0)
-   {
-      pgmoneta_log_error("Azure cleanup: %d of %d blobs not deleted for %s/%s",
-                         failed, failed + deleted, config->common.servers[server].name, label);
-      goto done;
-   }
-
-   pgmoneta_log_debug("Azure cleanup: deleted %d blobs for %s/%s",
-                      deleted, config->common.servers[server].name, label);
-   rc = 0;
-
-done:
-
-   pgmoneta_deque_iterator_destroy(iter);
-   pgmoneta_deque_destroy(names);
-   free(azure_root);
-   free(prefix);
 
    return rc;
 }
