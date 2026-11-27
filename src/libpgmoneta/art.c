@@ -1506,17 +1506,25 @@ int
 pgmoneta_art_iterator_create(struct art* t, struct art_iterator** iter)
 {
    struct art_iterator* i = NULL;
-   if (t == NULL)
+   if (t == NULL || iter == NULL)
    {
       return 1;
    }
    i = malloc(sizeof(struct art_iterator));
+   if (i == NULL)
+   {
+      return 1;
+   }
    i->count = 0;
    i->tree = t;
    i->key = NULL;
    i->value = NULL;
    i->started = false;
-   pgmoneta_deque_create(false, &i->que);
+   if (pgmoneta_deque_create(false, &i->que))
+   {
+      free(i);
+      return 1;
+   }
    *iter = i;
    return 0;
 }
