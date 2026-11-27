@@ -5364,6 +5364,11 @@ as_int(char* str, int* i)
    char* endptr;
    long val;
 
+   if (str == NULL)
+   {
+      goto error;
+   }
+
    errno = 0;
    val = strtol(str, &endptr, 10);
 
@@ -5378,6 +5383,11 @@ as_int(char* str, int* i)
    }
 
    if (*endptr != '\0')
+   {
+      goto error;
+   }
+
+   if (val < INT_MIN || val > INT_MAX)
    {
       goto error;
    }
