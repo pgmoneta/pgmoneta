@@ -79,6 +79,7 @@ Sakir Ahmed <sakirahmed690078@gmail.com>
 Hardik Kaurani <hardikkaurani1@gmail.com>
 Karman Singh Talwar <flyingoffkarmansinghtalwar@gmail.com>
 Manish Kumar <manishpatel953249@gmail.com>
+Omar Ahmed <omar.ahmed75566@gmail.com>
 ```
 
 ## Committers
