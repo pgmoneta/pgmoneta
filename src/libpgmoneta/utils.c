@@ -1706,6 +1706,175 @@ pgmoneta_append_double_precision(char* orig, double d, int precision)
 }
 
 char*
+pgmoneta_url_encode(char* str)
+{
+   char* encoded = NULL;
+   char hex[4];
+
+   if (str == NULL)
+   {
+      return NULL;
+   }
+
+   for (int i = 0; str[i] != '\0'; i++)
+   {
+      unsigned char c = (unsigned char)str[i];
+
+      if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
+      {
+         char ch[2] = {(char)c, '\0'};
+         encoded = pgmoneta_append(encoded, ch);
+      }
+      else
+      {
+         pgmoneta_snprintf(hex, sizeof(hex), "%%%02X", c);
+         encoded = pgmoneta_append(encoded, hex);
+      }
+   }
+
+   return encoded;
+}
+
+static void
+pgmoneta_xml_decode_entities(char* str)
+{
+   char* src = str;
+   char* dst = str;
+
+   if (str == NULL)
+   {
+      return;
+   }
+
+   while (*src != '\0')
+   {
+      if (*src == '&')
+      {
+         if (strncmp(src, "&amp;", 5) == 0)
+         {
+            *dst++ = '&';
+            src += 5;
+            continue;
+         }
+         if (strncmp(src, "&lt;", 4) == 0)
+         {
+            *dst++ = '<';
+            src += 4;
+            continue;
+         }
+         if (strncmp(src, "&gt;", 4) == 0)
+         {
+            *dst++ = '>';
+            src += 4;
+            continue;
+         }
+         if (strncmp(src, "&quot;", 6) == 0)
+         {
+            *dst++ = '"';
+            src += 6;
+            continue;
+         }
+         if (strncmp(src, "&apos;", 6) == 0)
+         {
+            *dst++ = '\'';
+            src += 6;
+            continue;
+         }
+         if (src[1] == '#')
+         {
+            char* end = NULL;
+            long code;
+
+            if (src[2] == 'x' || src[2] == 'X')
+            {
+               code = strtol(src + 3, &end, 16);
+            }
+            else
+            {
+               code = strtol(src + 2, &end, 10);
+            }
+
+            if (end != NULL && *end == ';' && code > 0 && code < 0x80)
+            {
+               *dst++ = (char)code;
+               src = end + 1;
+               continue;
+            }
+         }
+      }
+
+      *dst++ = *src++;
+   }
+
+   *dst = '\0';
+}
+
+int
+pgmoneta_xml_extract_tag(char* xml, char* tag, struct deque** values)
+{
+   char open_tag[1024];
+   char close_tag[1024];
+   char* ptr = xml;
+   char* val = NULL;
+
+   if (xml == NULL || tag == NULL || values == NULL)
+   {
+      goto error;
+   }
+
+   if (*values == NULL)
+   {
+      if (pgmoneta_deque_create(false, values))
+      {
+         goto error;
+      }
+   }
+
+   pgmoneta_snprintf(open_tag, sizeof(open_tag), "<%s>", tag);
+   pgmoneta_snprintf(close_tag, sizeof(close_tag), "</%s>", tag);
+
+   while ((ptr = strstr(ptr, open_tag)) != NULL)
+   {
+      char* end = NULL;
+      int len = 0;
+
+      ptr += strlen(open_tag);
+      end = strstr(ptr, close_tag);
+      if (end == NULL)
+      {
+         break;
+      }
+
+      len = end - ptr;
+      val = malloc(len + 1);
+      if (val == NULL)
+      {
+         goto error;
+      }
+
+      memcpy(val, ptr, len);
+      val[len] = '\0';
+      pgmoneta_xml_decode_entities(val);
+
+      if (pgmoneta_deque_add(*values, NULL, (uintptr_t)val, ValueString))
+      {
+         goto error;
+      }
+
+      free(val);
+      val = NULL;
+
+      ptr = end + strlen(close_tag);
+   }
+
+   return 0;
+
+error:
+   free(val);
+   return 1;
+}
+
+char*
 pgmoneta_append_bool(char* orig, bool b)
 {
    if (b)

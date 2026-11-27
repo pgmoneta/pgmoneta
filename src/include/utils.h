@@ -1645,6 +1645,24 @@ pgmoneta_time_format(pgmoneta_time_t t, enum pgmoneta_time_format_t fmt, char** 
 int
 pgmoneta_fsync_directory(const char* file_path);
 
+/**
+ * URL-encode a string
+ * @param str The string
+ * @return The URL-encoded string, or NULL on error
+ */
+char*
+pgmoneta_url_encode(char* str);
+
+/**
+ * Extract all values for an XML tag
+ * @param xml The XML document
+ * @param tag The tag name
+ * @param values The deque to append extracted values to
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_xml_extract_tag(char* xml, char* tag, struct deque** values);
+
 #ifdef __cplusplus
 }
 #endif

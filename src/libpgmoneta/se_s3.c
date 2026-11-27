@@ -97,7 +97,6 @@ static const struct object_storage_ops s3_ops = {
    .get_object = &s3_get_object,
 };
 static char* s3_get_basepath(int server, char* identifier);
-static char* s3_url_encode(char* str);
 static char* s3_label_from_common_prefix(char* prefix);
 static int xml_parse_s3_delete_result(char* xml, bool* has_fatal_error);
 static int xml_s3_build_delete_key(char** xml, char* key);
@@ -1478,7 +1477,7 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
 
    if (continuationToken != NULL)
    {
-      char* encoded_token = s3_url_encode(continuationToken);
+      char* encoded_token = pgmoneta_url_encode(continuationToken);
       query_string = pgmoneta_append(query_string, "continuation-token=");
       query_string = pgmoneta_append(query_string, encoded_token);
       free(encoded_token);
@@ -1496,7 +1495,7 @@ s3_send_list_request(char* relative_path, char* s3_root, int server, char* conti
    if (query_string != NULL)
       query_string = pgmoneta_append(query_string, "&");
 
-   char* encoded_prefix = s3_url_encode(prefix);
+   char* encoded_prefix = pgmoneta_url_encode(prefix);
    query_string = pgmoneta_append(query_string, "list-type=2&prefix=");
    query_string = pgmoneta_append(query_string, encoded_prefix);
    free(encoded_prefix);
@@ -2276,84 +2275,10 @@ s3_get_basepath(int server, char* identifier)
    return d;
 }
 
-static char*
-s3_url_encode(char* str)
-{
-   char* encoded = NULL;
-   char hex[4];
-   if (str == NULL)
-      return NULL;
-   for (int i = 0; str[i] != '\0'; i++)
-   {
-      unsigned char c = (unsigned char)str[i];
-      if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
-      {
-         char ch[2] = {c, '\0'};
-         encoded = pgmoneta_append(encoded, ch);
-      }
-      else
-      {
-         pgmoneta_snprintf(hex, sizeof(hex), "%%%02X", c);
-         encoded = pgmoneta_append(encoded, hex);
-      }
-   }
-   return encoded;
-}
-
-static int
-xml_extract_tag(char* xml, char* tag, struct deque** values)
-{
-   char open_tag[1024];
-   char close_tag[1024];
-   char* ptr = xml;
-
-   if (xml == NULL || tag == NULL || values == NULL)
-   {
-      return 1;
-   }
-
-   if (*values == NULL)
-   {
-      if (pgmoneta_deque_create(false, values))
-      {
-         return 1;
-      }
-   }
-
-   pgmoneta_snprintf(open_tag, sizeof(open_tag), "<%s>", tag);
-   pgmoneta_snprintf(close_tag, sizeof(close_tag), "</%s>", tag);
-
-   while ((ptr = strstr(ptr, open_tag)) != NULL)
-   {
-      ptr += strlen(open_tag);
-      char* end = strstr(ptr, close_tag);
-      if (end != NULL)
-      {
-         int len = end - ptr;
-         char* val = malloc(len + 1);
-         if (val == NULL)
-         {
-            return 1;
-         }
-         memcpy(val, ptr, len);
-         val[len] = '\0';
-         pgmoneta_deque_add(*values, NULL, (uintptr_t)val, ValueString);
-         ptr = end + strlen(close_tag);
-         free(val);
-      }
-      else
-      {
-         break;
-      }
-   }
-
-   return 0;
-}
-
 static int
 xml_parse_s3_list(char* xml, struct deque** keys)
 {
-   return xml_extract_tag(xml, "Key", keys);
+   return pgmoneta_xml_extract_tag(xml, "Key", keys);
 }
 
 static int
@@ -2361,7 +2286,7 @@ xml_parse_s3_common_prefixes(char* xml, struct deque** prefixes)
 {
    struct deque* common_prefix_blocks = NULL;
    struct deque_iterator* iter = NULL;
-   if (xml_extract_tag(xml, "CommonPrefixes", &common_prefix_blocks))
+   if (pgmoneta_xml_extract_tag(xml, "CommonPrefixes", &common_prefix_blocks))
    {
       goto error;
    }
@@ -2376,7 +2301,7 @@ xml_parse_s3_common_prefixes(char* xml, struct deque** prefixes)
    {
       char* block = (char*)pgmoneta_value_data(iter->value);
       struct deque* prefix_values = NULL;
-      if (xml_extract_tag(block, "Prefix", &prefix_values))
+      if (pgmoneta_xml_extract_tag(block, "Prefix", &prefix_values))
       {
          pgmoneta_deque_destroy(prefix_values);
          goto error;
@@ -2416,7 +2341,7 @@ xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuation_t
    *is_truncated = false;
    *continuation_token = NULL;
 
-   if (xml_extract_tag(xml, "IsTruncated", &trunc_values) == 0 && trunc_values != NULL && pgmoneta_deque_size(trunc_values) > 0)
+   if (pgmoneta_xml_extract_tag(xml, "IsTruncated", &trunc_values) == 0 && trunc_values != NULL && pgmoneta_deque_size(trunc_values) > 0)
    {
       char* val = (char*)pgmoneta_deque_peek(trunc_values, NULL);
       if (val != NULL && pgmoneta_compare_string(val, "true"))
@@ -2425,7 +2350,7 @@ xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuation_t
       }
    }
 
-   if (xml_extract_tag(xml, "NextContinuationToken", &token_values) == 0 && token_values != NULL && pgmoneta_deque_size(token_values) > 0)
+   if (pgmoneta_xml_extract_tag(xml, "NextContinuationToken", &token_values) == 0 && token_values != NULL && pgmoneta_deque_size(token_values) > 0)
    {
       char* val = (char*)pgmoneta_deque_peek(token_values, NULL);
       if (val != NULL)
@@ -2487,18 +2412,18 @@ xml_parse_s3_delete_result(char* xml, bool* has_fatal_error)
       memcpy(error_block, cursor, block_len);
       error_block[block_len] = '\0';
 
-      if (xml_extract_tag(error_block, "Key", &key_values))
+      if (pgmoneta_xml_extract_tag(error_block, "Key", &key_values))
       {
          free(error_block);
          return 1;
       }
-      if (xml_extract_tag(error_block, "Code", &code_values))
+      if (pgmoneta_xml_extract_tag(error_block, "Code", &code_values))
       {
          pgmoneta_deque_destroy(key_values);
          free(error_block);
          return 1;
       }
-      if (xml_extract_tag(error_block, "Message", &message_values))
+      if (pgmoneta_xml_extract_tag(error_block, "Message", &message_values))
       {
          pgmoneta_deque_destroy(key_values);
          pgmoneta_deque_destroy(code_values);

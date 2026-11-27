@@ -105,7 +105,6 @@ static int gcs_get_object(int server, char* root, char* relative_path, struct ht
 
 static char* gcs_get_host(int server);
 static char* gcs_get_basepath(int server, char* identifier);
-static char* gcs_url_encode(char* str);
 static int gcs_apply_auth_header(struct http_request* request, char* auth_token);
 
 static int gcs_get_effective_port(int server);
@@ -1258,7 +1257,7 @@ gcs_send_upload_request(char* local_root, char* gcs_root, char* relative_path, c
       goto error;
    }
 
-   encoded_object_name = gcs_url_encode(object_name);
+   encoded_object_name = pgmoneta_url_encode(object_name);
 
    request_path = pgmoneta_append(request_path, "/upload/storage/v1/b/");
    request_path = pgmoneta_append(request_path, effective_bucket);
@@ -1473,7 +1472,7 @@ gcs_send_object_request(int method, char* gcs_root, char* relative_path, char* q
    int rc = 1;
 
    object_name = gcs_build_object_path(gcs_root, relative_path);
-   encoded_object_name = gcs_url_encode(object_name);
+   encoded_object_name = pgmoneta_url_encode(object_name);
    if (encoded_object_name == NULL)
    {
       goto done;
@@ -1563,35 +1562,6 @@ gcs_get_basepath(int server, char* identifier)
       d = pgmoneta_append(d, identifier);
    }
    return d;
-}
-
-static char*
-gcs_url_encode(char* str)
-{
-   char* encoded = NULL;
-   char hex[4];
-
-   if (str == NULL)
-   {
-      return NULL;
-   }
-
-   for (int i = 0; str[i] != '\0'; i++)
-   {
-      unsigned char c = (unsigned char)str[i];
-
-      if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
-      {
-         char ch[2] = {(char)c, '\0'};
-         encoded = pgmoneta_append(encoded, ch);
-      }
-      else
-      {
-         pgmoneta_snprintf(hex, sizeof(hex), "%%%02X", c);
-         encoded = pgmoneta_append(encoded, hex);
-      }
-   }
-   return encoded;
 }
 
 int
@@ -1766,7 +1736,7 @@ gcs_list_objects(int server, char* prefix, struct deque** names)
       goto error;
    }
 
-   encoded_prefix = gcs_url_encode(prefix);
+   encoded_prefix = pgmoneta_url_encode(prefix);
    if (encoded_prefix == NULL)
    {
       goto error;
@@ -1778,7 +1748,7 @@ gcs_list_objects(int server, char* prefix, struct deque** names)
                                                 gcs_get_effective_bucket(server), encoded_prefix);
       if (page_token != NULL)
       {
-         encoded_token = gcs_url_encode(page_token);
+         encoded_token = pgmoneta_url_encode(page_token);
          request_path = pgmoneta_format_and_append(request_path, "&pageToken=%s", encoded_token);
       }
 
