@@ -1299,3 +1299,56 @@ cleanup:
    unlink(path);
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_configuration_as_int_rejects_unrepresentable)
+{
+   char path[] = "/tmp/pgmoneta_as_int_XXXXXX";
+   void* shmem = NULL;
+   struct main_configuration* config = NULL;
+   FILE* file = NULL;
+   int fd = -1;
+
+   fd = mkstemp(path);
+   MCTF_ASSERT(fd != -1, cleanup, "could not create a temporary configuration");
+   file = fdopen(fd, "w");
+   MCTF_ASSERT(file != NULL, cleanup, "could not open the temporary configuration");
+
+   fprintf(file, "[pgmoneta]\n");
+   fprintf(file, "host = localhost\n");
+   fprintf(file, "unix_socket_dir = /tmp/\n");
+   fprintf(file, "base_dir = /tmp/pgmoneta\n");
+   fprintf(file, "compression_level = -2147483649\n");
+   fprintf(file, "metrics = 2147483648\n");
+   fprintf(file, "workers = 4\n");
+   fclose(file);
+   file = NULL;
+
+   MCTF_ASSERT(pgmoneta_create_shared_memory(sizeof(struct main_configuration), HUGEPAGE_OFF, &shmem) == 0,
+               cleanup, "failed to create shared memory for the test configuration");
+   MCTF_ASSERT_PTR_NONNULL(shmem, cleanup, "shared memory pointer is NULL");
+
+   pgmoneta_init_main_configuration(shmem);
+   config = (struct main_configuration*)shmem;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_main_configuration(shmem, path), 0,
+                      cleanup, "an unrepresentable integer must not fail the whole parse");
+
+   MCTF_ASSERT_INT_EQ(config->compression_level, 3, cleanup,
+                      "a value below INT_MIN must not be truncated into a positive level");
+   MCTF_ASSERT(config->metrics >= 0, cleanup,
+               "a value above INT_MAX must not be truncated into a negative port");
+   MCTF_ASSERT_INT_EQ(config->workers, 4, cleanup,
+                      "a representable value must still parse");
+
+cleanup:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   if (shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, sizeof(struct main_configuration));
+   }
+   unlink(path);
+   MCTF_FINISH();
+}
