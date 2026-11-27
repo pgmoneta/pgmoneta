@@ -60,6 +60,7 @@ extern "C" {
 #define NODE_PROGRESS_LIMIT_RECOVERY_INFO       "progress_limit_recovery_info"       /* Recovery Info phase limit */
 #define NODE_PROGRESS_LIMIT_EXCLUDED_FILES      "progress_limit_excluded_files"      /* Excluded Files phase limit */
 #define NODE_PROGRESS_LIMIT_COMBINE_INCREMENTAL "progress_limit_combine_incremental" /* Combine incremental phase limit */
+#define NODE_PROGRESS_LIMIT_ARCHIVE             "progress_limit_archive"             /* Archive phase limit */
 
 #define MAX_PHASES                              10 /**< Maximum number of tracked phases */
 

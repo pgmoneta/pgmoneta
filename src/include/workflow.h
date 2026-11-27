@@ -81,6 +81,7 @@ extern "C" {
 #define PHASE_PERMISSIONS                14 /* Permissions phase */
 #define PHASE_CLEANUP                    15 /* Cleanup phase */
 #define PHASE_COMBINE_INCREMENTAL        16 /* Combine incremental phase */
+#define PHASE_ARCHIVE                    17 /* Archive (tar) phase */
 
 #define PHASE_NAME_BASEBACKUP            "Base backup"             /**< The name of base backup phase */
 #define PHASE_NAME_RESTORE               "Restore backup"          /**< The name of restore backup phase */
@@ -104,6 +105,7 @@ extern "C" {
 #define PHASE_NAME_EXCLUDED_FILES        "Recovery excluded files" /**< The name of recovery excluded files phase */
 #define PHASE_NAME_PERMISSIONS           "Permissions"             /**< The name of permissions phase */
 #define PHASE_NAME_CLEANUP               "Cleanup"                 /**< The name of cleanup phase */
+#define PHASE_NAME_ARCHIVE               "Archive"                 /**< The name of archive phase */
 #define PHASE_NAME_UNKNOWN               "Unknown"                 /**< The name of unknown phase */
 
 #define PERMISSION_TYPE_BACKUP           0

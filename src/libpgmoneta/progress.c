@@ -338,6 +338,74 @@ calculate_combine_fallback_weights(int* phases, int n_phases, int* weights)
 }
 
 static void
+calculate_archive_fallback_weights(int* phases, int n_phases, int* weights)
+{
+   /* The archive workflow runs after the restore, on a single tar file:
+    * tar the restored directory, then optionally compress and/or encrypt
+    * the tar file as one stream, then set the file permissions.
+    * Compression of a single stream is the slowest step, the tar and
+    * encryption steps are mostly I/O bound, and permissions is trivial */
+   bool has_compression = false;
+   bool has_encryption = false;
+   int archive_weight = 0;
+   int compression_weight = 0;
+   int encryption_weight = 0;
+
+   for (int i = 0; i < n_phases; i++)
+   {
+      if (phases[i] == PHASE_COMPRESSION)
+      {
+         has_compression = true;
+      }
+      else if (phases[i] == PHASE_ENCRYPTION)
+      {
+         has_encryption = true;
+      }
+   }
+
+   if (has_compression && has_encryption)
+   {
+      archive_weight = 20;
+      compression_weight = 55;
+      encryption_weight = 24;
+   }
+   else if (has_compression)
+   {
+      archive_weight = 30;
+      compression_weight = 69;
+   }
+   else if (has_encryption)
+   {
+      archive_weight = 50;
+      encryption_weight = 49;
+   }
+   else
+   {
+      archive_weight = 99;
+   }
+
+   for (int i = 0; i < n_phases; i++)
+   {
+      switch (phases[i])
+      {
+         case PHASE_ARCHIVE:
+            weights[i] = archive_weight;
+            break;
+         case PHASE_COMPRESSION:
+            weights[i] = compression_weight;
+            break;
+         case PHASE_ENCRYPTION:
+            weights[i] = encryption_weight;
+            break;
+         case PHASE_PERMISSIONS:
+         default:
+            weights[i] = 1;
+            break;
+      }
+   }
+}
+
+static void
 calculate_fallback_weights(int workflow_type, int* phases, int n_phases, int* weights)
 {
    switch (workflow_type)
@@ -403,7 +471,7 @@ calculate_fallback_weights(int workflow_type, int* phases, int n_phases, int* we
          calculate_restore_fallback_weights(phases, n_phases, weights);
          break;
       case WORKFLOW_TYPE_ARCHIVE:
-         /* TODO: Implement fallback weights for archive */
+         calculate_archive_fallback_weights(phases, n_phases, weights);
          break;
       case WORKFLOW_TYPE_COMBINE:
       case WORKFLOW_TYPE_COMBINE_AS_IS:
@@ -564,8 +632,11 @@ pgmoneta_progress_setup(int server, struct workflow* workflow, struct art* nodes
          calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
       case WORKFLOW_TYPE_ARCHIVE:
-         /* TODO: Implement adaptive/fallback weights for archive */
-         return;
+         /* No adaptive model: the timings in backup.info are for compressing and
+          * encrypting the backup file by file, not one tar stream, so they don't
+          * predict the archive phases */
+         calculate_fallback_weights(workflow_type, phases, n_phases, weights);
+         break;
       case WORKFLOW_TYPE_VERIFY:
          calculate_fallback_weights(workflow_type, phases, n_phases, weights);
          break;
@@ -811,6 +882,8 @@ pgmoneta_progress_limit_node_key(int phase)
          return NODE_PROGRESS_LIMIT_PERMISSIONS;
       case PHASE_CLEANUP:
          return NODE_PROGRESS_LIMIT_CLEANUP;
+      case PHASE_ARCHIVE:
+         return NODE_PROGRESS_LIMIT_ARCHIVE;
       default:
          return NULL;
    }
