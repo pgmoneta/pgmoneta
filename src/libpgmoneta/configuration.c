@@ -5382,6 +5382,11 @@ as_int(char* str, int* i)
       goto error;
    }
 
+   if (val > INT_MAX || val < INT_MIN)
+   {
+      goto error;
+   }
+
    *i = (int)val;
 
    return 0;
