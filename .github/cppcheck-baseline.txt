@@ -21,7 +21,7 @@ ctunullpointer:src/libpgmoneta/message.c 2
 ctunullpointer:src/libpgmoneta/wf_backup_incremental.c 1
 ctunullpointer:src/libpgmoneta/workflow.c 1
 ctunullpointerOutOfMemory:src/libpgmoneta/json.c 1
-nullPointerOutOfMemory:src/libpgmoneta/art.c 17
+nullPointerOutOfMemory:src/libpgmoneta/art.c 18
 nullPointerOutOfMemory:src/libpgmoneta/bzip2_compression.c 4
 nullPointerOutOfMemory:src/libpgmoneta/compression.c 4
 nullPointerOutOfMemory:src/libpgmoneta/deque.c 11

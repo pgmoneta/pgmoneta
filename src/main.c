@@ -76,27 +76,32 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 
 #include <openssl/crypto.h>
 #ifdef HAVE_SYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
 
-#define NAME           "main"
-#define MAX_FDS        64
-#define SIGNALS_NUMBER 7
+#define NAME                   "main"
+#define MAX_FDS                64
+#define SIGNALS_NUMBER         7
+#define CHILD_SHUTDOWN_TIMEOUT 5
+#define CHILD_KILL_WAIT        1
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_nagios_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
+struct child_process;
 struct accept_io;
 static void http_child_serve(struct ev_loop* loop, int client_fd, struct accept_io* ai,
                              const char* title,
@@ -114,6 +119,12 @@ static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void coredump_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void sigchld_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void child_cb(struct ev_loop* loop, struct ev_child* w, int revents);
+static void child_atfork(void);
+static pid_t fork_child_process(void);
+static void remove_child_process(pid_t pid);
+static int reap_child_processes(void);
+static int signal_child_processes(int signum);
+static int wait_for_children(void);
 static void retention_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void verification_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
@@ -138,6 +149,14 @@ struct accept_io
    int socket;
    char** argv;
 };
+
+struct child_process
+{
+   pid_t pid;
+   struct child_process* next;
+};
+
+static struct child_process* child_processes = NULL;
 
 static volatile int keep_running = 1;
 static volatile int stop = 0;
@@ -341,6 +360,7 @@ main(int argc, char** argv)
    size_t prometheus_cache_shmem_size = 0;
    struct main_configuration* config = NULL;
    int ret;
+   int shutdown_error = 0;
    char* os = NULL;
    int kernel_major, kernel_minor, kernel_patch;
    argv_ptr = argv;
@@ -838,6 +858,13 @@ main(int argc, char** argv)
       ev_signal_start(main_loop, (struct ev_signal*)&signal_watcher[i]);
    }
 
+   ret = pthread_atfork(NULL, NULL, child_atfork);
+   if (ret != 0)
+   {
+      pgmoneta_log_fatal("Could not register child signal handlers: %s", strerror(ret));
+      goto error;
+   }
+
    if (pgmoneta_tls_valid())
    {
       pgmoneta_log_fatal("Invalid TLS configuration");
@@ -1019,15 +1046,6 @@ main(int argc, char** argv)
       ev_loop(main_loop, 0);
    }
 
-   /* sigchld_cb is an event watcher, so it stops running the moment the loop
-    * is broken. Any child exiting during the shutdown sequence below would
-    * therefore stay a zombie for the rest of the process's life. Reap what has
-    * already exited before starting it. */
-   while (waitpid(-1, NULL, WNOHANG) > 0)
-   {
-      ;
-   }
-
    pgmoneta_log_info("Shutdown");
 #ifdef HAVE_SYSTEMD
    sd_notify(0, "STOPPING=1");
@@ -1038,6 +1056,24 @@ main(int argc, char** argv)
    shutdown_nagios();
    shutdown_console(true);
    shutdown_mgt(true);
+
+   config->running = false;
+   if (signal_child_processes(SIGTERM) != 0)
+   {
+      shutdown_error = 1;
+   }
+   if (daemon || stop)
+   {
+      if (kill(0, SIGTERM) != 0)
+      {
+         pgmoneta_log_error("Shutdown: Could not signal child processes: %s", strerror(errno));
+         shutdown_error = 1;
+      }
+   }
+   if (wait_for_children() != 0)
+   {
+      shutdown_error = 1;
+   }
 
    for (int i = 0; i < SIGNALS_NUMBER; i++)
    {
@@ -1057,19 +1093,13 @@ main(int argc, char** argv)
    pgmoneta_destroy_shared_memory(shmem, shmem_size);
    pgmoneta_destroy_shared_memory(prometheus_cache_shmem, prometheus_cache_shmem_size);
 
-   if (daemon || stop)
-   {
-      kill(0, SIGTERM);
-   }
-
-   return 0;
+   return shutdown_error;
 
 error:
 
-   if (pid_file_created)
+   if (config != NULL)
    {
-      remove_pidfile();
-      pid_file_created = false;
+      config->running = false;
    }
 
    if (mgt_started)
@@ -1098,16 +1128,25 @@ error:
    free(console_fds);
    free(management_fds);
 
-   config->running = false;
+   if (pid_file_created)
+   {
+      remove_pidfile();
+      pid_file_created = false;
+   }
+
+   signal_child_processes(SIGTERM);
+   if (daemon || stop)
+   {
+      if (kill(0, SIGTERM) != 0)
+      {
+         pgmoneta_log_error("Shutdown: Could not signal child processes: %s", strerror(errno));
+      }
+   }
+   wait_for_children();
 
    pgmoneta_stop_logging();
    pgmoneta_destroy_shared_memory(shmem, shmem_size);
    pgmoneta_destroy_shared_memory(prometheus_cache_shmem, prometheus_cache_shmem_size);
-
-   if (daemon || stop)
-   {
-      kill(0, SIGTERM);
-   }
 
    exit(1);
 
@@ -1214,7 +1253,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          if (pgmoneta_server_is_online(srv))
          {
-            pid = fork();
+            pid = fork_child_process();
             if (pid == -1)
             {
                pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOFORK, NAME,
@@ -1264,7 +1303,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK, NAME, compression, encryption, payload);
@@ -1305,7 +1344,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_S3_NOFORK, NAME, compression, encryption, payload);
@@ -1349,7 +1388,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_S3_NOFORK, NAME, compression, encryption, payload);
@@ -1393,7 +1432,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_AZURE_NOFORK, NAME, compression, encryption, payload);
@@ -1437,7 +1476,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_GCS_NOFORK, NAME, compression, encryption, payload);
@@ -1479,7 +1518,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOFORK, NAME, compression, encryption, payload);
@@ -1521,7 +1560,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOFORK, NAME, compression, encryption, payload);
@@ -1562,7 +1601,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOFORK, NAME, compression, encryption, payload);
@@ -1603,7 +1642,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOFORK, NAME, compression, encryption, payload);
@@ -1739,7 +1778,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_CONF_GET)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_GET_NOFORK, NAME, compression, encryption, payload);
@@ -1762,7 +1801,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_CONF_SET)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_SET_NOFORK, NAME, compression, encryption, payload);
@@ -1785,7 +1824,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_STATUS)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_NOFORK, NAME, compression, encryption, payload);
@@ -1806,7 +1845,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_STATUS_DETAILS)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK, NAME, compression, encryption, payload);
@@ -1840,7 +1879,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOFORK, NAME, compression, encryption, payload);
@@ -1881,7 +1920,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOFORK, NAME, compression, encryption, payload);
@@ -1909,7 +1948,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_DECRYPT)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECRYPT_NOFORK, NAME, compression, encryption, payload);
@@ -1930,7 +1969,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_ENCRYPT)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ENCRYPT_NOFORK, NAME, compression, encryption, payload);
@@ -1951,7 +1990,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_DECOMPRESS)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK, NAME, compression, encryption, payload);
@@ -1993,7 +2032,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_COMPRESS)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_COMPRESS_NOFORK, NAME, compression, encryption, payload);
@@ -2048,7 +2087,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOFORK, NAME, compression, encryption, payload);
@@ -2089,7 +2128,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOFORK, NAME, compression, encryption, payload);
@@ -2241,7 +2280,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_PROGRESS)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_PROGRESS_NOFORK, NAME, compression, encryption, payload);
@@ -2262,7 +2301,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_JOB)
    {
-      pid = fork();
+      pid = fork_child_process();
       if (pid == -1)
       {
          pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_JOB_NOFORK, NAME, compression, encryption, payload);
@@ -2376,7 +2415,7 @@ accept_http_cb(struct ev_loop* loop, struct ev_io* watcher, int revents,
       return;
    }
 
-   if (!fork())
+   if (!fork_child_process())
    {
       http_child_serve(loop, client_fd, ai, title, cert_file, key_file, ca_file, serve_fn);
    }
@@ -2506,7 +2545,7 @@ accept_nagios_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       return;
    }
 
-   if (!fork())
+   if (!fork_child_process())
    {
       ev_loop_fork(loop);
       shutdown_ports(false);
@@ -2587,7 +2626,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
    pgmoneta_get_address((struct sockaddr*)&client_addr, (char*)&address, sizeof(address));
 
-   if (!fork())
+   if (!fork_child_process())
    {
       char* addr = NULL;
 
@@ -2606,10 +2645,268 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 static void
 sigchld_cb(struct ev_loop* loop __attribute__((unused)), ev_signal* w __attribute__((unused)), int revents __attribute__((unused)))
 {
-   while (waitpid(-1, NULL, WNOHANG) > 0)
+   pid_t pid;
+
+   for (;;)
    {
-      ;
+      pid = waitpid(-1, NULL, WNOHANG);
+      if (pid > 0)
+      {
+         remove_child_process(pid);
+         continue;
+      }
+      if (pid < 0 && errno == EINTR)
+      {
+         continue;
+      }
+      if (pid < 0 && errno != ECHILD)
+      {
+         pgmoneta_log_error("SIGCHLD: waitpid failed: %s", strerror(errno));
+      }
+      break;
    }
+}
+
+/* Forked workers do not run the parent's libev signal loop. */
+static void
+child_atfork(void)
+{
+   const int signals[] = {SIGTERM, SIGINT, SIGCHLD};
+   struct sigaction action;
+
+   memset(&action, 0, sizeof(action));
+   action.sa_handler = SIG_DFL;
+   sigemptyset(&action.sa_mask);
+
+   for (size_t i = 0; i < sizeof(signals) / sizeof(signals[0]); i++)
+   {
+      if (sigaction(signals[i], &action, NULL) != 0)
+      {
+         _exit(1);
+      }
+   }
+}
+
+static pid_t
+fork_child_process(void)
+{
+   struct child_process* child;
+   pid_t pid;
+
+   child = malloc(sizeof(struct child_process));
+   if (child == NULL)
+   {
+      pgmoneta_log_error("Could not allocate child process tracking data: %s", strerror(ENOMEM));
+      errno = ENOMEM;
+      return -1;
+   }
+
+   pid = fork();
+   if (pid < 0)
+   {
+      int saved_errno = errno;
+
+      free(child);
+      pgmoneta_log_error("fork failed: %s", strerror(saved_errno));
+      errno = saved_errno;
+      return -1;
+   }
+   if (pid == 0)
+   {
+      free(child);
+      return 0;
+   }
+
+   child->pid = pid;
+   child->next = child_processes;
+   child_processes = child;
+
+   return pid;
+}
+
+static void
+remove_child_process(pid_t pid)
+{
+   struct child_process** current;
+
+   current = &child_processes;
+   while (*current != NULL)
+   {
+      struct child_process* child = *current;
+
+      if (child->pid == pid)
+      {
+         *current = child->next;
+         free(child);
+         return;
+      }
+      current = &child->next;
+   }
+}
+
+static int
+reap_child_processes(void)
+{
+   struct child_process** current;
+   int error = 0;
+
+   current = &child_processes;
+   while (*current != NULL)
+   {
+      struct child_process* child = *current;
+      pid_t pid = waitpid(child->pid, NULL, WNOHANG);
+
+      if (pid == child->pid || (pid < 0 && errno == ECHILD))
+      {
+         *current = child->next;
+         free(child);
+         continue;
+      }
+      if (pid < 0 && errno != EINTR)
+      {
+         pgmoneta_log_error("Shutdown: waitpid(%d) failed: %s", child->pid, strerror(errno));
+         error = 1;
+         *current = child->next;
+         free(child);
+         continue;
+      }
+
+      current = &child->next;
+   }
+
+   return error;
+}
+
+static int
+signal_child_processes(int signum)
+{
+   struct child_process* child;
+   int error = reap_child_processes();
+
+   for (child = child_processes; child != NULL; child = child->next)
+   {
+      if (kill(child->pid, signum) != 0 && errno != ESRCH)
+      {
+         pgmoneta_log_error("Could not signal child process %d: %s", child->pid, strerror(errno));
+         error = 1;
+      }
+   }
+
+   return error;
+}
+
+static int
+wait_for_children(void)
+{
+   struct timespec deadline;
+   struct timespec now;
+   struct timespec interval = {0, 100000000};
+   struct child_process* child;
+   int error = 0;
+   bool timed_out = false;
+
+   if (clock_gettime(CLOCK_MONOTONIC, &deadline) != 0)
+   {
+      pgmoneta_log_error("Shutdown: clock_gettime failed: %s", strerror(errno));
+      error = 1;
+   }
+   else
+   {
+      deadline.tv_sec += CHILD_SHUTDOWN_TIMEOUT;
+   }
+
+   while (child_processes != NULL)
+   {
+      error |= reap_child_processes();
+      if (child_processes == NULL)
+      {
+         break;
+      }
+      if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+      {
+         pgmoneta_log_error("Shutdown: clock_gettime failed: %s", strerror(errno));
+         error = 1;
+         break;
+      }
+      if (now.tv_sec > deadline.tv_sec ||
+          (now.tv_sec == deadline.tv_sec && now.tv_nsec >= deadline.tv_nsec))
+      {
+         timed_out = true;
+         break;
+      }
+      interval.tv_sec = 0;
+      interval.tv_nsec = 100000000;
+      while (nanosleep(&interval, &interval) != 0 && errno == EINTR)
+      {
+         ;
+      }
+   }
+
+   if (child_processes != NULL)
+   {
+      error = 1;
+   }
+   for (child = child_processes; child != NULL; child = child->next)
+   {
+      if (timed_out)
+      {
+         pgmoneta_log_warn("Shutdown: Child process %d did not exit within %d seconds; sending SIGKILL",
+                           child->pid, CHILD_SHUTDOWN_TIMEOUT);
+      }
+      else
+      {
+         pgmoneta_log_warn("Shutdown: Forcibly terminating child process %d", child->pid);
+      }
+      if (kill(child->pid, SIGKILL) != 0 && errno != ESRCH)
+      {
+         pgmoneta_log_error("Shutdown: Could not kill child process %d: %s", child->pid, strerror(errno));
+         error = 1;
+      }
+   }
+
+   if (child_processes != NULL && clock_gettime(CLOCK_MONOTONIC, &deadline) == 0)
+   {
+      deadline.tv_sec += CHILD_KILL_WAIT;
+      while (child_processes != NULL)
+      {
+         error |= reap_child_processes();
+         if (child_processes == NULL)
+         {
+            break;
+         }
+         if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+         {
+            pgmoneta_log_error("Shutdown: clock_gettime failed: %s", strerror(errno));
+            error = 1;
+            break;
+         }
+         if (now.tv_sec > deadline.tv_sec ||
+             (now.tv_sec == deadline.tv_sec && now.tv_nsec >= deadline.tv_nsec))
+         {
+            break;
+         }
+         interval.tv_sec = 0;
+         interval.tv_nsec = 100000000;
+         while (nanosleep(&interval, &interval) != 0 && errno == EINTR)
+         {
+            ;
+         }
+      }
+   }
+   else if (child_processes != NULL)
+   {
+      pgmoneta_log_error("Shutdown: Could not start bounded wait after SIGKILL: %s", strerror(errno));
+      error = 1;
+   }
+
+   while (child_processes != NULL)
+   {
+      pgmoneta_log_error("Shutdown: Child process %d remains after SIGKILL; giving up", child_processes->pid);
+      remove_child_process(child_processes->pid);
+      error = 1;
+   }
+
+   return error;
 }
 
 /* A process that exits holding a repository lock or an async job, e.g. killed by a signal, can't release them */
@@ -2624,6 +2921,7 @@ child_cb(struct ev_loop* loop __attribute__((unused)), struct ev_child* w, int r
 
    config = (struct main_configuration*)shmem;
 
+   remove_child_process(pid);
    pgmoneta_job_owner_exited(pid);
 
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2649,7 +2947,7 @@ child_cb(struct ev_loop* loop __attribute__((unused)), struct ev_child* w, int r
          config->common.servers[i].active_backup = false;
          config->common.servers[i].active_delete = true;
 
-         cleanup = fork();
+         cleanup = fork_child_process();
 
          if (cleanup == 0)
          {
@@ -2855,7 +3153,7 @@ retention_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attr
       return;
    }
 
-   if (!fork())
+   if (!fork_child_process())
    {
       shutdown_ports(false);
       pgmoneta_retention(argv_ptr);
@@ -2872,7 +3170,7 @@ verification_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __a
       return;
    }
 
-   if (!fork())
+   if (!fork_child_process())
    {
       shutdown_ports(false);
       pgmoneta_sha512_verification(argv_ptr);
@@ -2893,7 +3191,7 @@ valid_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribut
       return;
    }
 
-   if (!fork())
+   if (!fork_child_process())
    {
       shutdown_ports(false);
       pgmoneta_start_logging();
@@ -3029,7 +3327,7 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
          {
             pid_t pid;
 
-            pid = fork();
+            pid = fork_child_process();
             if (pid == -1)
             {
                /* No process */
@@ -3215,7 +3513,7 @@ init_receivewal(int server)
       {
          pid_t pid;
 
-         pid = fork();
+         pid = fork_child_process();
          if (pid == -1)
          {
             /* No process */
