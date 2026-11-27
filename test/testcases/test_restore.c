@@ -203,10 +203,10 @@ cleanup:
 
 MCTF_TEST(test_pgmoneta_copy_postgresql_restore_excludes_last_files)
 {
-   char* base = "test_restore_excl";
-   char* src = "test_restore_excl/src";
-   char* global = "test_restore_excl/src/global";
-   char* dst = "test_restore_excl/dst";
+   char base[] = "test_restore_excl";
+   char src[] = "test_restore_excl/src";
+   char global[] = "test_restore_excl/src/global";
+   char dst[] = "test_restore_excl/dst";
    char* files[] = {"test_restore_excl/src/PG_VERSION", "test_restore_excl/src/postgresql.conf",
                     "test_restore_excl/src/pg_hba.conf", "test_restore_excl/src/global/pg_control", NULL};
    struct backup bck;

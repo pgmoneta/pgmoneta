@@ -1198,6 +1198,7 @@ int
 pgmoneta_mkdir(char* dir)
 {
    char* p;
+   char d[MAX_PATH];
 
    /* dir + 1 would run past the terminator for an empty string, and callers
     * pass allocations that can be NULL. */
@@ -1206,13 +1207,21 @@ pgmoneta_mkdir(char* dir)
       return 1;
    }
 
-   for (p = dir + 1; *p; p++)
+   if (strlen(dir) >= MAX_PATH)
+   {
+      return 1;
+   }
+
+   memset(d, 0, sizeof(d));
+   memcpy(d, dir, strlen(dir));
+
+   for (p = d + 1; *p; p++)
    {
       if (*p == '/')
       {
          *p = '\0';
 
-         if (mkdir(dir, S_IRWXU) != 0)
+         if (mkdir(d, S_IRWXU) != 0)
          {
             if (errno != EEXIST)
             {
@@ -1226,7 +1235,7 @@ pgmoneta_mkdir(char* dir)
       }
    }
 
-   if (mkdir(dir, S_IRWXU) != 0)
+   if (mkdir(d, S_IRWXU) != 0)
    {
       if (errno != EEXIST)
       {

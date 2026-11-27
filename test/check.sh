@@ -204,8 +204,8 @@ cleanup() {
    fi
 
    if [[ -d "$TABLESPACE_DIR" ]]; then
-     chmod -R u+rwx "$TABLESPACE_DIR" 2>/dev/null || true
-     rm -Rf "$TABLESPACE_DIR"
+     $SUDO chmod -R u+rwx "$TABLESPACE_DIR" 2>/dev/null || true
+     $SUDO rm -Rf "$TABLESPACE_DIR"
    fi
 
    echo "Unsetting environment variables"
