@@ -888,6 +888,24 @@ error:
 }
 
 static int
+http_read_chunked_trailing(SSL* ssl, int socket, const char* prefetched, size_t prefetched_size, size_t* prefetched_pos, char trailing[2])
+{
+   for (int i = 0; i < 2; i++)
+   {
+      if (*prefetched_pos < prefetched_size)
+      {
+         trailing[i] = prefetched[(*prefetched_pos)++];
+      }
+      else if (http_read_bytes(ssl, socket, &trailing[i], 1) != 1)
+      {
+         return 1;
+      }
+   }
+
+   return 0;
+}
+
+static int
 http_read_chunked_body(SSL* ssl, int socket, struct http_response* http_response)
 {
    char buffer[8192];
@@ -936,27 +954,10 @@ http_read_chunked_body(SSL* ssl, int socket, struct http_response* http_response
       if (chunk_size == 0)
       {
          char trailing[2];
-         // check if prefetched bytes are available
-         if (prefetched_pos < prefetched_size)
+         if (http_read_chunked_trailing(ssl, socket, prefetched, prefetched_size, &prefetched_pos, trailing))
          {
-            size_t remaining_prefetched = prefetched_size - prefetched_pos;
-            if (remaining_prefetched >= 2)
-            {
-               memcpy(trailing, prefetched + prefetched_pos, 2);
-               prefetched_pos += 2;
-               bytes_read = 2;
-            }
-            else
-            {
-               bytes_read = http_read_bytes(ssl, socket, trailing, 2);
-            }
-         }
-         else
-         {
-            bytes_read = http_read_bytes(ssl, socket, trailing, 2);
-         }
-         if (bytes_read != 2)
             goto error;
+         }
          break;
       }
 
@@ -1003,26 +1004,10 @@ http_read_chunked_body(SSL* ssl, int socket, struct http_response* http_response
 
       // read the traling CLF or \r\n
       char trailing[2];
-      if (prefetched_pos < prefetched_size)
+      if (http_read_chunked_trailing(ssl, socket, prefetched, prefetched_size, &prefetched_pos, trailing))
       {
-         size_t remaining_prefetched = prefetched_size - prefetched_pos;
-         if (remaining_prefetched >= 2)
-         {
-            memcpy(trailing, prefetched + prefetched_pos, 2);
-            prefetched_pos += 2;
-            bytes_read = 2;
-         }
-         else
-         {
-            bytes_read = http_read_bytes(ssl, socket, trailing, 2);
-         }
-      }
-      else
-      {
-         bytes_read = http_read_bytes(ssl, socket, trailing, 2);
-      }
-      if (bytes_read != 2)
          goto error;
+      }
 
       if (trailing[0] != '\r' || trailing[1] != '\n')
          goto error;
