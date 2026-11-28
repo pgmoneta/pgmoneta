@@ -219,7 +219,7 @@ pgmoneta_brt_entry_get_blocks(block_ref_table_entry* entry, block_number start_b
       {
          start_offset = start_blkno % BLOCKS_PER_CHUNK;
       }
-      if (chunkno == stop_chunkno - 1)
+      if (chunkno == stop_chunkno - 1 && stop_blkno / BLOCKS_PER_CHUNK == chunkno)
       {
          stop_offset = stop_blkno - (chunkno * BLOCKS_PER_CHUNK);
       }
