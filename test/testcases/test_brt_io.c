@@ -111,6 +111,48 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_pgmoneta_brt_get_blocks_stop_beyond_nchunks)
+{
+   int nblocks = 0;
+   int expected = MAX_ENTRIES_PER_CHUNK + 10;
+   block_ref_table* brt = NULL;
+   block_number* blocks = NULL;
+   struct rel_file_locator rlocator;
+   enum fork_number frk;
+   block_ref_table_entry* entry = NULL;
+
+   pgmoneta_test_setup();
+
+   pgmoneta_brt_create_empty(&brt);
+   MCTF_ASSERT_PTR_NONNULL(brt, cleanup, "BRT creation failed");
+
+   relation_fork_init(1663, 234, 345, MAIN_FORKNUM, &rlocator, &frk);
+
+   /* Promote chunk 0 to bitmap representation while keeping nchunks == 1 */
+   MCTF_ASSERT(!consecutive_mark_block_modified(brt, &rlocator, frk, 0, expected), cleanup, "Mark modified failed");
+
+   entry = pgmoneta_brt_get_entry(brt, &rlocator, frk, NULL);
+   MCTF_ASSERT_PTR_NONNULL(entry, cleanup, "Entry not found in block reference table");
+
+   blocks = calloc(BLOCKS_PER_CHUNK, sizeof(block_number));
+   MCTF_ASSERT_PTR_NONNULL(blocks, cleanup, "Allocation failed");
+
+   MCTF_ASSERT(!pgmoneta_brt_entry_get_blocks(entry, 0, 2 * BLOCKS_PER_CHUNK, blocks, BLOCKS_PER_CHUNK, &nblocks), cleanup, "Get blocks failed");
+   MCTF_ASSERT_INT_EQ(nblocks, expected, cleanup, "Unexpected block count for stop_blkno beyond nchunks");
+   MCTF_ASSERT_INT_EQ(blocks[0], 0, cleanup, "Unexpected first block");
+   MCTF_ASSERT_INT_EQ(blocks[nblocks - 1], expected - 1, cleanup, "Unexpected last block");
+
+   nblocks = 0;
+   MCTF_ASSERT(!pgmoneta_brt_entry_get_blocks(entry, 0, InvalidBlockNumber, blocks, BLOCKS_PER_CHUNK, &nblocks), cleanup, "Get blocks with InvalidBlockNumber failed");
+   MCTF_ASSERT_INT_EQ(nblocks, expected, cleanup, "Unexpected block count for InvalidBlockNumber");
+
+cleanup:
+   free(blocks);
+   pgmoneta_brt_destroy(brt);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
 static void
 relation_fork_init(int spcoid, int dboid, int relnum, enum fork_number forknum, struct rel_file_locator* r, enum fork_number* frk)
 {
